@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Components.ServerListControl;
 using IRSpeedyVPN.Events;
 using IRSpeedyVPN.Interfaces;
@@ -6,6 +6,7 @@ using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Models.Services;
 using IRSpeedyVPN.Services;
+using IRSpeedyVPN.Services.Fastest;
 using IRSpeedyVPN.Windows;
 using System;
 using System.Collections.Generic;
@@ -182,7 +183,6 @@ namespace IRSpeedyVPN.UserControls
 
         #region Background URL tests
 
-        /// <summary>True when any of the service's Urls has a valid (non-stale, &gt;0) latency.</summary>
         private static bool HasValidLatency(IVPNService service)
         {
             var urls = service.GetServerUrls();
@@ -196,11 +196,6 @@ namespace IRSpeedyVPN.UserControls
             _urlTestCts?.Cancel();
         }
 
-        /// <summary>
-        /// Tests services lacking valid latency in the background and refreshes the
-        /// picker as each result lands. <paramref name="priorityFirst"/> (the country
-        /// the user just opened) is tested first, then the rest.
-        /// </summary>
         private void RunBackgroundUrlTests(IVPNService[] services, IVPNService priorityFirst)
         {
             _urlTestCts?.Cancel();
@@ -248,45 +243,41 @@ namespace IRSpeedyVPN.UserControls
 
         private void ConnectToFastestServer()
         {
-            if (cmbService.SelectedItem == null) return;
+            if (cmbService.SelectedItem == null || OnConnectRequest == null)
+                return;
 
-            // stop any background tests, but allow this fastest-search to run its own
-            _urlTestCts?.Cancel();
-            UrlTestCoordinator.BeginBatch();
+            StopUrlTests();
 
-            var services = serviceFactory.Services
-                .Where(x => x.IsUrlTestSupported && x.Name == cmbService.SelectedItem.ToString())
-                .Randomize().ToList();
+            var serviceName = cmbService.SelectedItem.ToString();
+            var services = (_currentServices ?? serviceFactory.Services?.ToArray() ?? new IVPNService[0])
+                .Where(x => x != null
+                    && x.IsUrlTestSupported
+                    && x.Name == serviceName
+                    && (selectedProtocol == null
+                        || (x.Protocols != null && x.Protocols.Contains(selectedProtocol))))
+                .OrderBy(x => x.Order)
+                .ThenBy(x => x.Country)
+                .ToArray();
 
-            if (!services.Any()) return;
-
-            Action action = () =>
+            if (services.Length == 0)
             {
-                OnLoadingRequest?.Invoke(true, "در حال یافتن سریعترین سرور");
-                try
-                {
-                    services.First().DisconnectAll();
-                    var deadline = DateTime.UtcNow.AddSeconds(30);
-                    foreach (var service in services)
-                    {
-                        if (DateTime.UtcNow >= deadline || UrlTestCoordinator.AbortRequested) break;
-                        try { service.UrlTest(); service.Disconnect(); } catch { }
-                    }
+                GetMainWindow()?.ShowUserMessage("سرور سازگار یافت نشد");
+                return;
+            }
 
-                    var fastest = services.Where(x => x.UrlTestSpeed > 0)
-                        .OrderBy(x => x.UrlTestSpeed).FirstOrDefault();
-
-                    OnLoadingRequest?.Invoke(false, null);
-
-                    if (fastest != null)
-                        OnConnectRequest.Invoke(this, fastest, "");
-                    else
-                        Dispatcher.Invoke((Action)(() => GetMainWindow()?.ShowUserMessage("سرور یافت نشد")));
-                }
-                catch { OnLoadingRequest?.Invoke(false, null); }
-            };
-
-            action.BeginInvoke(null, null);
+            try
+            {
+                var fastestService = new FastestConnectionService(
+                    services,
+                    globalInfo,
+                    selectedProtocol);
+                OnConnectRequest.Invoke(this, fastestService, selectedProtocol);
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteLog(ex);
+                GetMainWindow()?.ShowUserMessage("خطا در ایجاد اتصال هوشمند");
+            }
         }
 
         #endregion
