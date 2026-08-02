@@ -1,0 +1,1069 @@
+﻿using IRSpeedyVPN.WebServices;
+using IRSpeedyVPN.UserControls;
+using IRSpeedyVPN.Windows;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+using IRSpeedyVPN.Services;
+using System.ComponentModel.Composition;
+using IRSpeedyVPN.Interfaces;
+using IRSpeedyVPN.Models;
+using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Models.Services;
+using IRSpeedyVPN.Resource;
+using System.Reflection;
+using System.Diagnostics;
+using IRSpeedyVPN.Security;
+using Shadowsocks.Controller;
+using System.IO;
+using IRSpeedyVPN.Models.NewService;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+
+
+namespace IRSpeedyVPN
+{
+    /// <summary>
+    /// Interaction logic for MainWindow.xaml
+    /// </summary>
+    public partial class MainWindow : Window
+
+    {
+        [Import]
+        UCLogin uCLogin { get; set; }
+        [Import]
+        UCServerList uCServerList { get; set; }
+        [Import]
+        UCUserInfo uCUserInfo { get; set; }
+        [Import]
+        UCUpdate uCUpdate { get; set; }
+        [Import]
+        UCChangePassword uCChangePassword { get; set; }
+
+        [Import]
+        NewServiceController serviceController { get; set; }
+
+        [Import]
+        private  ServiceFactory serviceFactory { get; set; }
+        [Import]
+        private  IProxifier proxifier { get; set; }
+
+        [Import]
+        GlobalInfo gInfo { get; set; }
+        [Import]
+        ResourceManager localResource { get; set; }
+        System.Windows.Forms.NotifyIcon notify;
+        int Initialized = 0;        
+        StringSocketListener ManagementListener;
+        Timer mainTimer;
+        uint timercounter = 0;
+        uint timerRenewInfo = 0;
+        bool isUpdateAvailable;
+        bool LoadLocal =false &&  Debugger.IsAttached;
+        object lastControl;
+        bool IsRememberChecked;
+        bool IsUserLogin = false;
+        string lastLoginUsername;
+        string lastLoginPassword;
+        DeviceLimitWindow deviceLimitWindow;
+        GeoIp IpInfo = null;
+        readonly Dictionary<object, List<HeaderIconRegistration>> headerIconMap = new Dictionary<object, List<HeaderIconRegistration>>();
+        object currentHeaderOwner;
+        public MainWindow()
+        {
+
+            InitializeComponent();
+            mainTimer = new Timer(mainTimerCallback, null, int.MaxValue, int.MaxValue);
+            SetupNotify();
+            txtVersion.Text = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+
+            /* double netVersion = 0;                       
+            try
+            {
+
+
+                netVersion = double.Parse($"{NetVersions.NETInstalled.Major}.{NetVersions.NETInstalled.Minor}");
+                File.WriteAllText(".\\netVersion.txt", NetVersions.NETInstalled.ToString());
+               
+                if (netVersion < 4.8)
+                    txtGlobalMessage.Visibility = Visibility.Visible;
+            }
+            catch (Exception ex) { 
+                //File.WriteAllText(".\\netVersion.txt", ex.Message);
+                }
+         */ 
+          //  var isobf=ObfuscateManager.IsObfucated();
+        }
+        void SetupNotify()
+        {
+            notify = new System.Windows.Forms.NotifyIcon();
+            notify.Icon = System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
+            notify.Visible = false;
+            notify.DoubleClick += Notify_DoubleClick;
+            notify.BalloonTipClosed += Notify_BalloonTipClosed;
+            notify.ContextMenuStrip = new System.Windows.Forms.ContextMenuStrip();
+            notify.ContextMenuStrip.Items.Add("Show", null, this.Notify_DoubleClick);
+            notify.ContextMenuStrip.Items.Add("Exit", null, this.Notify_Exit);
+            notify.Visible = true;
+        }
+
+        private void Notify_BalloonTipClosed(object sender, EventArgs e)
+        {
+
+            //notify.Visible = (this.Visibility != Visibility.Visible);
+        }
+
+        private void Notify_DoubleClick(object sender, EventArgs e)
+        {
+            this.Visibility = Visibility.Visible;
+            this.Show();
+            this.WindowState = WindowState.Normal;
+            this.Activate();
+            this.Topmost = true;
+            this.Topmost = false;
+            this.Focus();
+            //  notify.Visible = false;
+        }
+
+        private void Notify_Exit(object sender, EventArgs e)
+        {
+            proxifier.Detach();
+            DisconnectAll();
+            System.Windows.Application.Current.Shutdown();
+        }
+        public void mainTimerCallback(object state)
+        {
+            timercounter++;
+
+            timerRenewInfo++;
+            if (timercounter % 30 == 0)
+            {
+
+                if (gInfo.ServerResponse.GetJsonString("user_data.ExpiryDate").IsValidTimeFormat() && gInfo.ExpiryDate != null && gInfo.ExpiryDate < DateTime.Now)
+                {
+                    RechareLogout();
+                }
+            }
+            /*
+            if (timercounter>=5*60 &&DateTime.Now>new DateTime(2020,08,16))
+            {
+                Dispatcher.Invoke((Action)(() =>
+                {
+                    if (gInfo.CurrentService != null)
+                        gInfo.CurrentService.Disconnect();
+                    proxifier.Detach();
+                }));
+            }*/
+            if (timerRenewInfo >= 10 * 60 && !isUpdateAvailable && !LoadLocal)
+            {
+                timerRenewInfo = 0;
+                RunAsync(() =>
+             {
+                 Login(gInfo.Username, gInfo.Password, IsRememberChecked, true);
+
+             }, false);
+            }
+        }
+        private void Window_Activated(object sender, EventArgs e)
+        {
+            if (Interlocked.CompareExchange(ref Initialized, 1, 0) == 0)
+            {
+                //                Initialized = 1;
+                uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
+                uCServerList.OnLoadingRequest += OnLoadingRequest;
+                uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
+                uCUserInfo.OnChangeServerRequest += UCUserInfo_OnChangeServerRequest;
+                uCUserInfo.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;
+                uCUserInfo.OnLoadingRequest += OnLoadingRequest;
+                uCLoading.OnCancelRequest += UCLoading_OnCancelRequest;
+                uCChangePassword.OnResult += UCChangePassword_OnResult;                
+                ShowControl(uCLogin);
+                proxifier.onResult += Proxifier_onResult;
+                TransitionBox.Transition = new Transitionals.Transitions.RotateTransition() { Direction=Transitionals.Transitions.RotateDirection.Right};
+                TransitionBox.TransitionEnded += TransitionBox_TransitionEnded;
+
+#if _PREMIUM
+                lblPremium.Visibility = Visibility.Visible;
+#endif
+
+                //ManagementListener = new StringSocketListener(gInfo.ManagementPort, 100);
+                //  try
+                //  {
+                //      ManagementListener.Listen();
+                //  }
+                //  catch { }
+                //  ManagementListener.onDataReceived += ManagementListener_onDataReceived;
+
+                SystemProxy.Disable();
+                AppDomain currentDomain = AppDomain.CurrentDomain;
+                currentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
+                localResource.onResourceExtracted += LocalResource_onResourceExtracted;
+                localResource.ExtractResource();
+               // ShareVPNSetting speedyShieldSetting = new ShareVPNSetting();
+                //speedyShieldSetting.ShowDialog(); //hint: test
+                if (File.Exists("./debug.txt"))
+                {
+                    ShellExecute.HideWindow = false;
+                }
+                if (File.Exists("./oneclick.txt"))
+                {
+                    LoadLocal = true;
+                }
+                if (!LoadLocal)
+                {
+                    var acc = localResource.GetConfig();
+                    if (acc != null)
+                    {
+                        uCLogin.SetUserPassword(acc.UserAccount.Username, localResource.Password);
+                        RunAsync(() =>
+                        {
+
+                            if (!Login(acc.UserAccount.Username, localResource.Password, true))
+                            {
+                                acc = localResource.GetConfig();
+                                if (acc != null)
+                                    ProcessInfo(acc, localResource.Password);
+
+                            }
+                        });
+
+                    }
+                }
+                else
+                {
+                    var acc = localResource.GetLocalConfig();
+                    if (acc != null)
+                    {
+                        IsRememberChecked = true;
+                        ProcessInfo(acc, localResource.Password);
+                    }
+                }
+
+
+            }
+        }
+
+        private void OnLoadingRequest(bool Show, string Message)
+        {
+            if (Show)
+                ShowLoading(Message);
+            else
+                HideLoading();
+
+        }
+
+        private void TransitionBox_TransitionEnded(object sender, Transitionals.Controls.TransitionEventArgs e)
+        {
+            if (TransitionBox.Content is IHasTitle)
+            {
+                lblCtrlTitle.Text = ((IHasTitle)TransitionBox.Content).Title;
+            }
+        }
+
+        private void UCChangePassword_OnResult(UCChangePassword sender, string oldPassword, string newpassword, bool cancel)
+        {
+
+            if (!cancel)
+            {
+                if (string.IsNullOrEmpty(oldPassword))
+                {
+                    ShowMessage("رمز عبور فعلی را وارد کنید");
+                }
+                else if (newpassword.Length < 3)
+                {
+                    ShowMessage("طول رمز عبور جدید کوتاه است ");
+                }
+                else if (oldPassword!=gInfo.Password)
+                {
+                    ShowMessage("رمز فعلی صحیح نیست");
+                }
+                else if(oldPassword==newpassword)
+                {
+                    ShowMessage("رمز فعلی و رمز جدید یکسان است");
+                }
+                else
+                {
+                    ShowMessage("");
+                    RunAsync(() =>
+                    {
+                        try
+                        {
+                            var ret = serviceController.ChangePassword(gInfo.Username, oldPassword, newpassword);
+                            if (ret.StatusCode == System.Net.HttpStatusCode.OK)
+                            {
+                                if (ret.ResponseData.IsSuccess)
+                                {
+                                    ShowMessage("تغییر رمز با موفقیت انجام شد", true);
+                                    gInfo.Password = newpassword;
+                                    uCChangePassword.ResetInput();
+                                    if (IsRememberChecked)
+                                        localResource.SaveConfig(localResource.GetConfig(), newpassword);
+                                }
+                                else
+                                {
+                                    ShowMessage(string.IsNullOrEmpty(ret.ResponseData.ErrorMessage)?"عملیات تغییر رمز با خطا مواجه شد": ret.ResponseData.ErrorMessage);
+                                }
+
+                            }
+                            else
+                                ShowMessage("خطا در فراخوانی سرویس");
+                        }
+                        catch(Exception ex)
+                        {
+                            ShowMessage(ex.Message);
+                        }
+                });
+                }
+            }
+            else
+            {
+                ShowPreviousControl();
+            }
+        }
+        void ShowPreviousControl()
+        {
+            ShowControl(lastControl);
+        }
+        GeoIp GetIPInfo()
+        {
+            if (IpInfo == null)
+            {
+                var res = serviceController.GetIpInfo();
+                if (res.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+                    IpInfo = res.ResponseData;
+                }
+            }
+            return IpInfo;
+        }
+        private void LocalResource_onResourceExtracted(object sender, EventArgs e)
+        {
+            /*
+            var res = GetIPInfo();
+            if (res!=null)
+            {
+                AppCenter.SetCountryCode(res.countryCode);
+                //var c = new CustomProperties();
+                //c.Set("Isp", res.ResponseData.isp)
+                //    .Set("As", res.ResponseData.@as);
+                //AppCenter.SetCustomProperties(c);
+            }
+            AppCenter.LogLevel = LogLevel.Verbose;
+
+            //AppCenter.Start("011bf984-b7c4-4fa5-8b76-f96e2184e850", //test
+            AppCenter.Start("95f1579c-3553-407d-b84f-e84e062a00ff",
+                typeof(Analytics), typeof(Crashes));
+
+            */
+        }
+
+        private Assembly CurrentDomain_AssemblyResolve(object sender, ResolveEventArgs args)
+        {
+            string resourcePath = null;
+           var miscPath = System.IO.Path.Combine(localResource.TempPath, "misc");
+            switch (args.Name.Split(',')[0])
+                {
+                case "DotRas":
+                    resourcePath = System.IO.Path.Combine(localResource.TempPath, "Ras", Tools.IsWinXpOrLower() ? "XP" : "7", args.Name.Split(',')[0]);
+                    break;
+                default:
+                    resourcePath = System.IO.Path.Combine(miscPath, args.Name.Split(',')[0]);
+                    break;
+
+            }
+           
+            if (!string.IsNullOrEmpty(resourcePath))
+                return Assembly.LoadFrom(resourcePath + ".dll");
+            return null;
+        }
+
+        private void Proxifier_onResult(bool connected, string message)
+        {
+            HideLoading();
+            Dispatcher.Invoke((Action)(() =>
+           {
+               ProcessConnectionResult(connected, message);
+           }));
+        }
+
+        //private void ManagementListener_onDataReceived(System.Net.Sockets.TcpClient client, string data)
+        //{
+        //    if (CurrentService is IManagementSupport)
+        //    {
+        //        string ret = ((IManagementSupport)CurrentService).ManagementDataProccess(data);
+        //        if (!string.IsNullOrEmpty(ret))
+        //        {
+        //            ManagementListener.Write(ret, client);
+        //        }
+        //    }
+        //}
+        private void UCLoading_OnCancelRequest(object sender, EventArgs e)
+        {
+            UCUserInfo_OnDisconnectRequest(sender, e);
+            HideLoading();
+        }
+
+        private void UCUserInfo_OnDisconnectRequest(object sender, EventArgs e)
+        {
+            ShowLoading(null);
+            if (gInfo?.CurrentService != null)
+                gInfo.CurrentService.Disconnect();
+            else
+            {
+                HideLoading();
+            }
+        }
+
+        private void UCUserInfo_OnChangeServerRequest(object sender, EventArgs e)
+        {
+            throw new NotImplementedException();
+        }
+
+        private void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service, string protocol)
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                ShowMessage("");
+            }));
+
+            try
+            {
+                if (!isUpdateAvailable)
+                {
+                    gInfo.CurrentService = service;
+                    RegiserVpnService();
+                    gInfo.CurrentService.Connect(protocol);
+                    ShowLoading("در حال اتصال به سرویس");
+                }
+                else
+                {
+                    throw new Exception("Please Upddate Program now");
+                }
+
+            }
+            catch(Exception ex)
+            {
+                notify.Visible = true;
+                ShowMessage(ex.Message);
+            }
+            finally
+            {
+                
+            }
+           
+        }
+        void RegiserVpnService()
+        {
+            if(!gInfo.CurrentService.IsRequirementAvailable())
+                localResource.ExtractResource(true);
+            gInfo.CurrentService.onConnectDisconnect += CurrentService_onConnectDisconnect;
+        }
+
+
+        private void CurrentService_onConnectDisconnect(IVPNService Service, bool connected,int listenPort, string message)
+        {
+
+            if (!Service.IsUsingProxifire || !connected)
+                HideLoading();
+            Dispatcher.Invoke((Action)(() =>
+            {
+
+                if (connected && Service.IsUsingProxifire)
+                    proxifier.Attach("127.0.0.1",
+                        listenPort,
+                        Service.ProxifierWithPassword?gInfo.Username:null,
+                        Service.ProxifierWithPassword ? gInfo.Password : null,
+                        Service.ProxyType,
+                        Service.ProxifierRuleType);
+                else
+                    ProcessConnectionResult(connected, message);
+            }));
+        }
+        void ProcessConnectionResult(bool connected,string Message)
+        {
+            if (connected)
+            {
+                ShowMessage("");
+                gInfo.ConnectionTime = DateTime.Now;
+                ShowControl(uCUserInfo);                
+
+            }
+            else
+            {
+                        
+                proxifier.Detach();
+                UnRegiserVpnService();
+                if (IsUserLogin)
+                {
+                    ShowMessage(Message);
+                    ShowControl(uCServerList);
+                }
+            }
+        }
+        void ShowControl(object ctrl)
+        {
+
+            if (TransitionBox.Content == null || !TransitionBox.Content.Equals(ctrl))
+            {
+                lblCtrlTitle.Text = "";
+                ShowMessage("");
+                lastControl = TransitionBox.Content;
+                TransitionBox.Content = ctrl;
+                currentHeaderOwner = ctrl;
+                RefreshHeaderIcons();
+            }
+        }
+
+        public void SetHeaderIcons(object owner, IEnumerable<HeaderIconRegistration> icons)
+        {
+            if (owner == null) return;
+            var list = icons == null ? new List<HeaderIconRegistration>() : icons.Where(x => x != null).ToList();
+            headerIconMap[owner] = list;
+            if (ReferenceEquals(currentHeaderOwner, owner))
+            {
+                RenderHeaderIcons(list);
+            }
+        }
+
+        public void ClearHeaderIcons(object owner)
+        {
+            if (owner == null) return;
+            if (headerIconMap.Remove(owner) && ReferenceEquals(currentHeaderOwner, owner))
+            {
+                RenderHeaderIcons(null);
+            }
+        }
+
+        private void RefreshHeaderIcons()
+        {
+            if (currentHeaderOwner != null && headerIconMap.TryGetValue(currentHeaderOwner, out var icons))
+            {
+                RenderHeaderIcons(icons);
+            }
+            else
+            {
+                RenderHeaderIcons(null);
+            }
+        }
+
+        private void RenderHeaderIcons(List<HeaderIconRegistration> icons)
+        {
+            panelHeaderIcons.Children.Clear();
+            if (icons == null || icons.Count == 0) return;
+
+            foreach (var icon in icons)
+            {
+                var label = new Label
+                {
+                    Style = (Style)FindResource("LabelButton"),
+                    Content = icon.Icon,
+                    Background = null,
+                    Foreground = Brushes.White,
+                    FontFamily = (FontFamily)FindResource("fa_ProLight"),
+                    FontSize = 20,
+                    ToolTip = icon.ToolTip,
+                };
+                ToolTipService.SetInitialShowDelay(label, 400);
+                ToolTipService.SetShowDuration(label, 2000);
+                ToolTipService.SetBetweenShowDelay(label, 10000);
+
+                var handler = icon.OnClick;
+                if (handler != null)
+                {
+                    label.PreviewMouseDown += (s, e) => handler();
+                }
+
+                panelHeaderIcons.Children.Add(label);
+            }
+        }
+        void ShowNotifiy(string Title, string Message)
+        {
+            notify.Visible = true;
+            notify.ShowBalloonTip(5000, Title, Message, System.Windows.Forms.ToolTipIcon.Info);
+        }
+        void ShowMessage(string Message, bool success = false)
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                
+                if (!string.IsNullOrEmpty(Message))
+                {
+                    lblErrorMessage.Foreground = success ? Brushes.DarkGreen : Brushes.Red;
+                    //ShowNotifiy("Conection Status", Message);
+                    if (Message.Contains("The remote name could not be resolved: 'apichcek-p.isdm.ir'"))
+                        lblErrorMessage.Text = "وب سرویس اعتبارسنجی در دسترس نیست";
+                    else
+                    if (Message.Length < 60)
+                        lblErrorMessage.Text = Message;
+                    else
+                    {
+                        lblErrorMessage.Text = "برقراری ارتباط با خطا مواجه شد";
+                        LogHelper.WriteLog(Message);
+                    }
+                    lblErrorMessage.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    lblErrorMessage.Visibility = Visibility.Hidden;
+
+                }
+            }));
+            
+            
+        }
+
+        public void ShowUserMessage(string message, bool success = false)
+        {
+            ShowMessage(message, success);
+        }
+
+        public void ShowHintPopup(string message, UIElement target = null)
+        {
+            Dispatcher.Invoke(() =>
+            {
+                if (string.IsNullOrWhiteSpace(message))
+                    return;
+
+                txtHintMessage.Text = message;
+                popHint.PlacementTarget = target ?? panelHeaderIcons;
+                popHint.IsOpen = true;
+
+                Task.Delay(2000).ContinueWith(_ =>
+                {
+                    Dispatcher.Invoke(() => popHint.IsOpen = false);
+                });
+            });
+        }
+
+        void UnRegiserVpnService()
+        {
+            gInfo.CurrentService.onConnectDisconnect -= CurrentService_onConnectDisconnect;
+        }
+
+
+        private void UCLogin_OnCredentialEntered(UCLogin sender, string username, string password,bool Remember)
+        {
+            gInfo.CurrentService = null;
+            if (string.IsNullOrEmpty(username))
+            {
+                ShowMessage("نام کاربری را وارد کنید");
+            }
+            else if (password.Length < 3)
+            {
+                ShowMessage("طول رمز عبور کوتاه است ");
+            }
+            else
+            {
+                uCLogin.HideRenewMessage();
+                ShowMessage("");
+                RunAsync(() =>
+                {
+                    Login(username, password, Remember);                        
+                });
+            }
+        }
+        bool Login(string username,string password,bool Remember,bool onlyRenew=false)
+        {
+            try
+            {
+                IsRememberChecked = Remember;
+                lastLoginUsername = username;
+                lastLoginPassword = password;
+                var res = serviceController.Login2(username, password);
+                if (res.StatusCode == System.Net.HttpStatusCode.NotAcceptable)
+                {
+                    var devices = TryParseDeviceList(res.ResponseData?.data);
+                    ShowDeviceLimitPopup(devices, res.ResponseData?.message);
+                    localResource.RemoveConfig();
+                }
+                else if (res.StatusCode == System.Net.HttpStatusCode.OK)
+                {
+
+                    //var acc = res.ResponseData;
+                    var acc = res.ResponseData.Decrypted;
+                    if (acc.UserAccount != null)
+                        acc.UserAccount.Username = username;
+                    if (ProcessInfo(acc, password, onlyRenew))
+                    {
+                        gInfo.ServerResponse = res.ResponseData.DecryptedString;
+
+                        if (Remember)
+                            localResource.SaveConfig(acc, password);
+                        else
+                            localResource.Password = password;
+                        return true;
+                    }
+                }
+                else if (!onlyRenew)
+                {
+
+                        ShowMessage(res.ResponseData.message);
+                    
+                }
+
+            }
+            catch (Exception ex)
+            {
+                if (!onlyRenew)
+                {
+                    ShowMessage("ارتباط با سرور برقرار نیست");
+                    LogHelper.WriteLog(ex);
+                }
+            }
+            return false;
+        }
+        private List<DeviceInfo> TryParseDeviceList(string data)
+        {
+            if (string.IsNullOrWhiteSpace(data))
+                return new List<DeviceInfo>();
+            try
+            {
+                return data.JsonDeserilize<List<DeviceInfo>>();
+            }
+            catch
+            {
+                return new List<DeviceInfo>();
+            }
+        }
+
+        private void ShowDeviceLimitPopup(List<DeviceInfo> devices, string message)
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                if (deviceLimitWindow == null || !deviceLimitWindow.IsVisible)
+                {
+                    deviceLimitWindow = new DeviceLimitWindow();
+                    deviceLimitWindow.Owner = this;
+                    deviceLimitWindow.OnRemoveRequested += DeviceLimitWindow_OnRemoveRequested;
+                    deviceLimitWindow.Closed += DeviceLimitWindow_Closed;
+                }
+                deviceLimitWindow.SetDevices(devices, message);
+                deviceLimitWindow.Show();
+                deviceLimitWindow.Activate();
+            }));
+        }
+
+        private void DeviceLimitWindow_OnRemoveRequested(DeviceLimitWindow sender, DeviceInfo device)
+        {
+            if (device == null)
+                return;
+
+            ShowMessage("");
+            RunAsync(() =>
+            {
+                try
+                {
+                    var res = serviceController.RemoveToken(
+                        lastLoginUsername,
+                        lastLoginPassword,
+                        device.device_name,
+                        device.device_token);
+
+                    if (res != null && res.StatusCode == System.Net.HttpStatusCode.OK)
+                    {
+                        Dispatcher.Invoke((Action)(() =>
+                        {
+                            if (deviceLimitWindow != null)
+                                deviceLimitWindow.Close();
+                        }));
+                        Login(lastLoginUsername, lastLoginPassword, IsRememberChecked);
+                    }
+                    else
+                    {
+                        Dispatcher.Invoke((Action)(() =>
+                        {
+                            deviceLimitWindow?.ShowError(res?.ResponseData?.message ?? "خطا در حذف دستگاه");
+                        }));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Dispatcher.Invoke((Action)(() =>
+                    {
+                        deviceLimitWindow?.ShowError("خطا در حذف دستگاه");
+                    }));
+                    LogHelper.WriteLog(ex);
+                }
+            });
+        }
+
+        private void DeviceLimitWindow_Closed(object sender, EventArgs e)
+        {
+            if (deviceLimitWindow != null)
+            {
+                deviceLimitWindow.OnRemoveRequested -= DeviceLimitWindow_OnRemoveRequested;
+                deviceLimitWindow.Closed -= DeviceLimitWindow_Closed;
+                deviceLimitWindow = null;
+            }
+        }
+        SettingInfo GetSetting()
+        {
+            try
+            {
+                var res = serviceController.GetSettings();
+                if (res.StatusCode == System.Net.HttpStatusCode.OK &&
+                    res.ResponseData?.data != null)
+                    return res.ResponseData.data;
+            }
+            catch
+            { 
+            }
+            return null;
+        }
+        private bool ProcessInfo(AccountInfoEx acc, string password, bool onlyRenew = false)
+        {
+            var setting = GetSetting();
+            if (setting != null)
+                acc.Settings = setting;
+
+            if (password != null)
+                gInfo.Import(acc, password, localResource.TempPath);
+            else
+                gInfo.TempPath = localResource.TempPath;
+
+            if (!CheckUpdateExist())
+            {
+
+
+                gInfo.settings = acc.Settings;
+                 
+                if (/*res.StatusCode == System.Net.HttpStatusCode.OK &&*/ acc.UserAccount.Status == "OK"|| acc.UserAccount.Status == "FirstUse" || acc.UserAccount.Status==null)
+                {
+                    //TODO: Remove This this line And remove pwergo test config from resource
+                    //var server = acc.Servers[0];
+                    //server.Service = "sslProxy";
+                    //acc.Servers.Add(server);
+                    /////////
+                    IsUserLogin = true;
+                    //serviceFactory.RenewServiceList(acc.Servers);
+                    serviceFactory.RenewServiceList(acc.groups);
+                    if (!onlyRenew &&!isUpdateAvailable)
+                    {
+                        DisconnectAll();
+                        proxifier.Detach();
+                        mainTimer.Change(1000,1000);
+                        Dispatcher.Invoke((Action)(() =>
+                        {
+                            btnSettings.Visibility = Visibility.Visible;
+                            txtUsername.Text = gInfo.Username;
+                            ShowMessage("");                            
+                            ShowControl(uCServerList);
+                            
+                        }));
+                        /*
+                        var ip = GetIPInfo();
+                        if (ip != null)
+                        {
+                            var properties = new Dictionary<string, string>
+                            {
+                               // { "Username", acc.UserAccount.Username },
+                                { "Isp", ip.isp },
+                                { "As", ip.@as },
+                              //  { "city",ip.city }
+                            };
+
+                            Analytics.TrackEvent("UserInfo", properties);
+                        }*/
+                    }
+                    return true;
+                }
+                else if(acc.UserAccount.Status == "Expired")
+                {
+                    RechareLogout(false);
+                }
+                else if(acc.UserAccount.Status == "AuthServerError" && !onlyRenew)
+                {
+                    ShowMessage("ارتباط با سرور اعتبار سنجی مقدور نیست");
+                }
+                else
+                {
+                    Logout("نام کاربری یا رمز عبور صحیح نیست",false);
+                    /*localResource.RemoveConfig();
+                    ShowMessage("نام کاربری یا رمز عبور صحیح نیست");*/
+                }
+                return false;
+            }
+            else
+            {
+                if (!uCLoading.IsVisible)
+                {
+
+                    Dispatcher.Invoke((Action)(() => { uCLoading.Visibility = Visibility.Visible; }));
+                    Thread.Sleep(3000);
+                    Dispatcher.Invoke((Action)(() => { uCLoading.Visibility = Visibility.Hidden; }));
+                }
+                DisconnectAll();
+                proxifier.Detach();
+                Dispatcher.Invoke((Action)(() =>
+                {
+                    uCUpdate.SetInfos(Version.Parse(gInfo.settings.last_version.version_number), gInfo.settings.last_version.version_url, gInfo.settings.last_version.update_change_log.ToString());
+                    ShowControl(uCUpdate);                    
+                }));
+                return true;
+
+            }
+        }
+
+        private void RechareLogout(bool resetInput=true)
+        {
+
+            DisconnectAll();
+            proxifier.Detach();
+            var rechargeUrl = gInfo.settings.setting.shop_url;
+#if !_RESELLER
+            if (!string.IsNullOrEmpty(rechargeUrl))
+            {
+                Dispatcher.Invoke((Action)(() => uCLogin.ShowRenewMessage(rechargeUrl)));
+            }
+#endif
+         
+            Dispatcher.Invoke((Action)(() =>
+            {
+                
+                 
+                Logout("اعتبار اکانت شما پایان یافته است لطفا تمدید نمایید",resetInput);
+                uCLogin.SetUserName(gInfo.Username);
+
+            }));
+            localResource.RemoveConfig();
+        }
+
+        private bool CheckUpdateExist()
+        {
+            bool ret = gInfo?.settings?.last_version!=null;
+            isUpdateAvailable = ret;
+            return ret;           
+        }
+        private void DisconnectAll()
+        {
+            if (serviceFactory.Services != null)
+                serviceFactory.Services.GroupBy(x => x.GetType())
+                   .Select(grp => grp.First())
+                   .ToList().ForEach(s => s.DisconnectAll());
+        }
+
+        void RunAsync(Action action, bool showloading = true)
+        {
+            if (showloading)
+                Dispatcher.Invoke((Action)(() => ShowLoading("")));
+            action.BeginInvoke((AsyncCallback)((ar) =>
+            {
+                if (showloading)
+                    HideLoading();
+            }), null);
+
+        }
+       
+        private void ShowLoading(string Messgae)
+        {
+            Dispatcher.Invoke((Action)(() =>
+            {
+                ShowMessage("");
+                uCLoading.SetMessage(Messgae);
+                uCLoading.Visibility = Visibility.Visible;
+
+            }));
+        }
+        private void HideLoading()
+        {
+
+           this.Dispatcher.Invoke((Action)(() => uCLoading.Visibility = Visibility.Hidden));
+        }
+        private void Header_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+            this.DragMove();
+        }
+
+        private void Exit_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (isUpdateAvailable)
+                Notify_Exit(sender, e);
+            else
+            {
+                this.Visibility = Visibility.Hidden;
+                notify.Visible = true;
+            }
+        }
+
+        private void btnSettings_MouseDown(object sender, MouseButtonEventArgs e)
+        {
+
+            uCChangePassword.ResetInput();
+            //                  TransitionBox.Transition = new Transitionals.Transitions.TranslateTransition();
+            ShowControl(uCChangePassword);
+            
+        }
+
+        private void Logout_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            Logout("");
+        }
+        void Logout(string Message,bool resetInput=true)
+        {
+
+            IsUserLogin = false;
+            mainTimer.Change(int.MaxValue,int.MaxValue);
+            if (gInfo?.CurrentService != null)
+                gInfo.CurrentService.Disconnect();
+            localResource.RemoveConfig();
+            Dispatcher.Invoke((Action)(() =>
+            {
+                btnSettings.Visibility = Visibility.Collapsed;
+                txtUsername.Text = "";
+                ShowMessage(Message);
+                if (resetInput)
+                    uCLogin.ResetInput();
+                ShowControl(uCLogin);              
+            }));
+        }
+        private void btnWeb_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+#if !_RESELLER
+            try
+            {
+                /*
+                TransitionBox.Transition = new Transitionals.Transitions.RotateTransition();
+                TransitionBox.Content = uCServerList;*/
+                var val = gInfo.settings.setting.shop_url;
+            if (!string.IsNullOrEmpty(val))
+                System.Diagnostics.Process.Start(val);
+            }
+            catch { }
+#endif
+        }
+        private void btnSupport_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+#if !_RESELLER
+            try
+            {
+                var val = gInfo.settings.setting.support_url;
+                if (!string.IsNullOrEmpty(val))
+                    System.Diagnostics.Process.Start(val);
+            }
+            catch { }
+
+            /*
+            TransitionBox.Transition = new Transitionals.Transitions.TranslateTransition();
+            TransitionBox.Content = uCUserInfo;*/
+#endif
+        }
+
+        private void btnRenew_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+          //  TransitionBox.Transition = new Transitionals.Transitions.TranslateTransition();
+          
+
+        }
+    }
+}

@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29728.190
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "IRSpeedyVPN", "IRSpeedyVPN\IRSpeedyVPN.csproj", "{52423534-CAF4-431C-9FAD-CC3342D45827}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UpdateHelper", "UpdateHelper\UpdateHelper.csproj", "{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{52423534-CAF4-431C-9FAD-CC3342D45827}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{52423534-CAF4-431C-9FAD-CC3342D45827}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{52423534-CAF4-431C-9FAD-CC3342D45827}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{52423534-CAF4-431C-9FAD-CC3342D45827}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A9221B0A-5709-4771-A59A-0DFA6407676B}
+	EndGlobalSection
+EndGlobal

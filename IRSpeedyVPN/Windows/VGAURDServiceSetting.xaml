@@ -1,0 +1,262 @@
+﻿<Window x:Class="IRSpeedyVPN.Windows.VGAURDServiceSetting"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ToggleSwitch="clr-namespace:ToggleSwitch"
+        mc:Ignorable="d"
+        Title="تنظیمات سرویس"
+        Width="330"
+        Height="399"
+        Background="Transparent"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        FontFamily="{StaticResource BKoodak}">
+
+    <Window.Resources>
+
+        <!-- Outer rounded card -->
+        <Style x:Key="OuterCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="26"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush" Value="#FF393F78"/>
+            <Setter Property="Background" Value="#CFFFFFFF"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <!-- Row container -->
+        <Style x:Key="SettingRowBorder" TargetType="Border">
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush" Value="#FF393F78"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Padding" Value="10,7"/>
+            <Setter Property="Margin" Value="10,6,10,0"/>
+        </Style>
+
+        <!-- OK button -->
+        <Style x:Key="OkButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="120"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Foreground" Value="#222"/>
+            <Setter Property="Background" Value="#D7D7D7"/>
+            <Setter Property="BorderBrush" Value="#888"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <Border Style="{StaticResource OuterCard}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="48"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- HEADER -->
+            <Border Grid.Row="0"
+                    CornerRadius="24,24,0,0"
+                    Background="#E9ECF7"
+                    BorderBrush="#FF393F78"
+                    BorderThickness="0,0,0,1.5">
+                <Grid Margin="10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="44"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="34"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="1"
+                               Text="تنظیمات سرویس"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF393F78"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"/>
+
+                    <!-- Close -->
+                    <Border Grid.Column="2"
+                            Width="26"
+                            Height="26"
+                            CornerRadius="13"
+                            Background="#F6DADA"
+                            BorderBrush="#C94B4B"
+                            BorderThickness="1"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right"
+                            Cursor="Hand"
+                            MouseDown="btnClose_MouseDown">
+                        <TextBlock Text="&#xF00D;"
+                                   FontFamily="{StaticResource fa_ProLight}"
+                                   Foreground="#C01616"
+                                   FontSize="14"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- CONTENT -->
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="18"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="0,10,0,0">
+
+                    <!-- VPN -->
+                    <Border Style="{StaticResource SettingRowBorder}" x:Name="rowVpn">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch
+                                x:Name="VPNMode"
+                                Checked="VPNMode_Checked"
+                                Unchecked="VPNMode_Unchecked"
+                                Margin="0,0,10,0"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="وی پی ان سراسری"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                 
+                    <!-- System Proxy -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch
+                                x:Name="SystemProxy"
+                                Checked="SystemProxy_Checked"
+                                Unchecked="SystemProxy_Unchecked"
+                                Margin="0,0,10,0"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="پروکسی سیستمی"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+                    <!-- Global Proxy -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch
+               x:Name="GlobalProxy"
+               Checked="GlobalProxy_Checked"
+               Unchecked="GlobalProxy_Unchecked"
+               Margin="0,0,10,0"/>
+
+                            <TextBlock Grid.Column="1"
+                      Text="پروکسیفایر"
+                      FontSize="18"
+                      FontWeight="Bold"
+                      HorizontalAlignment="Right"
+                      VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- Telegram / WhatsApp -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch
+                                x:Name="TelegramRouteProxy"
+                                Checked="TelegramRouteProxy_Checked"
+                                Unchecked="TelegramRouteProxy_Unchecked"
+                                Margin="0,0,10,0"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="پروکسی تلگرام، واتساپ"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                    <!-- VOD (independent) -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch
+                                x:Name="VodService"
+                                Checked="VodService_Checked"
+                                Unchecked="VodService_Unchecked"
+                                Margin="0,0,10,0"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="سرویس VOD"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
+                </StackPanel>
+
+                <!-- OK -->
+                <Button Grid.Row="1"
+                        x:Name="btnOK"
+                        Style="{StaticResource OkButtonStyle}"
+                        Content="تایید"
+                        Margin="0,14,0,0"
+                        Click="btnOK_Click"
+                        HorizontalAlignment="Center"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

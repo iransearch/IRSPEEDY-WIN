@@ -1,0 +1,14 @@
+.vs
+.git
+.git-old
+packages
+IRSpeedyVPN/bin
+IRSpeedyVPN/packages
+IRSpeedyVPN/obj
+IRSpeedyVPN/Resources/Files
+IRSpeedyVPN/Resources/Files.zip
+Throne/bin
+Throne/obj
+UpdateHelper/bin
+UpdateHelper/publish/
+UpdateHelper/obj

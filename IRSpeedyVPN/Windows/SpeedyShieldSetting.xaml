@@ -1,0 +1,399 @@
+﻿<Window x:Class="IRSpeedyVPN.Windows.SpeedyShieldSetting"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ToggleSwitch="clr-namespace:ToggleSwitch"
+        mc:Ignorable="d"
+        Title="تنظیمات شیلد اسپیدی"
+        Width="330" Height="660"
+        Background="Transparent"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        FontFamily="{StaticResource BKoodak}">
+
+    <Window.Resources>
+
+        <Style x:Key="OuterCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="26"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush" Value="#FF393F78"/>
+            <Setter Property="Background" Value="#CFFFFFFF"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+        </Style>
+
+        <Style x:Key="HeaderBar" TargetType="Border">
+            <Setter Property="CornerRadius" Value="24,24,0,0"/>
+            <Setter Property="Background" Value="#E9ECF7"/>
+            <Setter Property="BorderBrush" Value="#FF393F78"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1.5"/>
+        </Style>
+
+        <!-- SHORTER row -->
+        <Style x:Key="SettingRowBorder" TargetType="Border">
+            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush" Value="#FF393F78"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Padding" Value="10,5"/>
+            <!-- was 10,7 -->
+            <Setter Property="Margin" Value="10,4,10,0"/>
+            <!-- was 10,6,10,0 -->
+        </Style>
+
+        <!-- Title stays DARK always -->
+        <Style x:Key="RowTitleBase" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="16"/>
+            <!-- was 18 -->
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#111"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+        </Style>
+
+        <!-- Status line changes color+text -->
+        <Style x:Key="RowStatusBase" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="12"/>
+            <!-- was 13 -->
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="#D20000"/>
+            <Setter Property="Text" Value="این محتوا آزاد است"/>
+            <Setter Property="HorizontalAlignment" Value="Right"/>
+            <Setter Property="Margin" Value="0,1,0,0"/>
+            <!-- tighter -->
+        </Style>
+
+        <Style x:Key="OkButtonStyle" TargetType="Button">
+            <Setter Property="Width" Value="120"/>
+            <Setter Property="Height" Value="34"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="Foreground" Value="#222"/>
+            <Setter Property="Background" Value="#D7D7D7"/>
+            <Setter Property="BorderBrush" Value="#888"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="6"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.9"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.6"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <Border Style="{StaticResource OuterCard}">
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="48"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- HEADER -->
+            <Border Grid.Row="0" Style="{StaticResource HeaderBar}">
+                <Grid Margin="10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="44"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="34"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="1"
+                               Text="تنظیمات شیلد اسپیدی"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF393F78"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"/>
+
+                    <Border Grid.Column="2"
+                            Width="26" Height="26" CornerRadius="13"
+                            Background="#F6DADA"
+                            BorderBrush="#C94B4B"
+                            BorderThickness="1"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right"
+                            Cursor="Hand"
+                            MouseDown="btnClose_MouseDown">
+                        <TextBlock Text="&#xF00D;"
+                                   FontFamily="{StaticResource fa_ProLight}"
+                                   Foreground="#C01616"
+                                   FontSize="14"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <!-- CONTENT -->
+            <Grid Grid.Row="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="18"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Margin="0,10,0,0">
+
+                    <!-- Google Ads -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch x:Name="GoogleAdsToggle" Margin="0,0,10,0"/>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="تبلیغات گوگل" Style="{StaticResource RowTitleBase}"/>
+
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource RowStatusBase}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=GoogleAdsToggle, Path=IsChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#118A11"/>
+                                                    <Setter Property="Text" Value="این محتوا مسدود می‌شود"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Trackers -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch x:Name="TrackersToggle" Margin="0,0,10,0"/>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="تبلیغات و ردیاب" Style="{StaticResource RowTitleBase}"/>
+
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource RowStatusBase}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=TrackersToggle, Path=IsChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#118A11"/>
+                                                    <Setter Property="Text" Value="این محتوا مسدود می‌شود"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Adult -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch x:Name="AdultToggle" Margin="0,0,10,0"/>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="محتوای +۱۸" Style="{StaticResource RowTitleBase}"/>
+
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource RowStatusBase}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=AdultToggle, Path=IsChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#118A11"/>
+                                                    <Setter Property="Text" Value="این محتوا مسدود می‌شود"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Socials -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch x:Name="SocialsToggle" Margin="0,0,10,0"/>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="شبکه‌های اجتماعی" Style="{StaticResource RowTitleBase}"/>
+
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource RowStatusBase}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=SocialsToggle, Path=IsChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#118A11"/>
+                                                    <Setter Property="Text" Value="این محتوا مسدود می‌شود"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Crypto -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch x:Name="CryptoToggle" Margin="0,0,10,0"/>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="رمزارز" Style="{StaticResource RowTitleBase}"/>
+
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource RowStatusBase}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=CryptoToggle, Path=IsChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#118A11"/>
+                                                    <Setter Property="Text" Value="این محتوا مسدود می‌شود"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Gambling -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch x:Name="GamblingToggle" Margin="0,0,10,0"/>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="قمار" Style="{StaticResource RowTitleBase}"/>
+
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource RowStatusBase}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=GamblingToggle, Path=IsChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#118A11"/>
+                                                    <Setter Property="Text" Value="این محتوا مسدود می‌شود"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Phishing -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch x:Name="PhishingToggle" Margin="0,0,10,0"/>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="فیشینگ" Style="{StaticResource RowTitleBase}"/>
+
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource RowStatusBase}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=PhishingToggle, Path=IsChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#118A11"/>
+                                                    <Setter Property="Text" Value="این محتوا مسدود می‌شود"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <!-- Malware -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch x:Name="MalwareToggle" Margin="0,0,10,0"/>
+
+                            <StackPanel Grid.Column="1">
+                                <TextBlock Text="بدافزار" Style="{StaticResource RowTitleBase}"/>
+
+                                <TextBlock>
+                                    <TextBlock.Style>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource RowStatusBase}">
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding ElementName=MalwareToggle, Path=IsChecked}" Value="True">
+                                                    <Setter Property="Foreground" Value="#118A11"/>
+                                                    <Setter Property="Text" Value="این محتوا مسدود می‌شود"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </TextBlock.Style>
+                                </TextBlock>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+
+                </StackPanel>
+
+                <Button Grid.Row="1"
+                        x:Name="btnOK"
+                        Style="{StaticResource OkButtonStyle}"
+                        Content="تایید"
+                        Margin="0,14,0,0"
+                        Click="btnOK_Click"
+                        HorizontalAlignment="Center"/>
+            </Grid>
+        </Grid>
+    </Border>
+</Window>

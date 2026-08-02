@@ -1,0 +1,22 @@
+﻿<UserControl x:Class="IRSpeedyVPN.UserControls.UCLoading"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             xmlns:local="clr-namespace:IRSpeedyVPN.UserControls"
+             xmlns:svgc="http://sharpvectors.codeplex.com/svgc/"
+             xmlns:loader="clr-namespace:CustomLoader.Custom_Control"
+             mc:Ignorable="d" Loaded="UserControl_Loaded" IsVisibleChanged="UserControl_IsVisibleChanged" 
+             >
+    <Border BorderBrush="Transparent"
+             BorderThickness="1.5"
+             CornerRadius="20"
+             Background="#99FFFFFF">
+        <StackPanel Background="Transparent" Orientation="Vertical" VerticalAlignment="Stretch" Margin="0 150 0 0">
+            <loader:ProgressLoader x:Name="Loader"  HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <TextBlock  x:Name="lblMessage" Text="سلام بر تو ای زیبا رو" FontSize="16"  FontWeight="Bold" HorizontalAlignment="Center"  Foreground="black"  VerticalAlignment="Top"  />
+            <Button Style="{StaticResource RoundCornerLoading}" x:Name="btn_cancel" Width="100" Height="30" Foreground="#ff000000" Content="لغو"  Background="#FF172458" BorderBrush="{x:Null}" Click="btn_cancel_Click"  Margin="0 20" Visibility="Visible"/>
+
+        </StackPanel>
+    </Border>
+</UserControl>

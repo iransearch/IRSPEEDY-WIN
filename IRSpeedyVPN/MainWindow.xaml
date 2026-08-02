@@ -1,0 +1,93 @@
+﻿<Window x:Class="IRSpeedyVPN.MainWindow"
+        
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:IRSpeedyVPN"
+        xmlns:uc="clr-namespace:IRSpeedyVPN.UserControls"
+        xmlns:transc="clr-namespace:Transitionals.Controls;assembly=Transitionals"        
+xmlns:trans="clr-namespace:Transitionals;assembly=Transitionals"
+xmlns:transt="clr-namespace:Transitionals.Transitions;assembly=Transitionals"
+xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
+        FontFamily="{StaticResource BKoodak}" Activated="Window_Activated"
+     TextElement.FontWeight="Regular"
+     TextElement.FontSize="13"
+      TextOptions.TextFormattingMode="Display"
+      WindowStyle="None" WindowStartupLocation="CenterScreen" Width="391.408" Height="359.311" Background="Transparent" AllowsTransparency="True" Title="IRSpeedy VPN" ResizeMode="NoResize">
+    <Window.Resources>
+        <ResourceDictionary>
+
+        </ResourceDictionary>
+    </Window.Resources>
+    <Border BorderBrush="Black"
+             BorderThickness="1.5"
+             CornerRadius="20"
+             Background="WhiteSmoke">
+        <Grid>
+
+
+
+            <StackPanel >
+                <Grid Height="99">
+
+                    <Grid Panel.ZIndex="2">
+
+                        <Image  Source="{StaticResource headerCurve}" Stretch="Fill" Margin="20,-1,20,23" MouseDown="Header_MouseDown"/>
+                        <TextBlock VerticalAlignment="Top" x:Name="txtVersion" Text="1.0.0.1" FontFamily="arial"  Foreground="#ffffff"  Width="59" HorizontalAlignment="Right" TextAlignment="Right" Margin="0,0,30,0" Height="19" FontSize="13" MouseDown="Header_MouseDown"/>
+                        <TextBlock VerticalAlignment="Top" x:Name="txtUsername" Text="" FontFamily="arial"  Foreground="#ffffff"  HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,0" Height="19" FontSize="13" MouseDown="Header_MouseDown"/>
+                        <TextBlock  x:Name="lblCtrlTitle" Text="اعتبارسنجی" FontSize="15"  FontWeight="Bold"  Foreground="#FF172458"  HorizontalAlignment="Right" Margin="0,74,60,0" />
+                        <Image HorizontalAlignment="Left" Height="85" Margin="36,16,0,-2" VerticalAlignment="Top" Width="86" Source="{StaticResource Logo}" RenderTransformOrigin="0.349,0.377" MouseDown="Header_MouseDown" />
+                        <TextBlock VerticalAlignment="Bottom" Text="IRSPEEDY" FontWeight="Bold" Foreground="#ffffff"  Width="107" HorizontalAlignment="Left" Margin="107,0,0,22" Height="26" FontSize="18" MouseDown="Header_MouseDown"/>
+                        <Label Style="{StaticResource LabelButton}" Background="{x:Null}"  Foreground="#FFBB0000" FontSize="20" Content="" Width="30" Height="30" FontFamily="{StaticResource fa_ProLight}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,14,-2,0" MouseDown="Exit_PreviewMouseDown"
+                    ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="خروج"/>
+                        <Label Style="{StaticResource LabelButton}" Background="{x:Null}"  Foreground="#172458" FontSize="20" Content="&#xf2f5;" Width="30" Height="30" FontFamily="{StaticResource fa_ProLight}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,45,0,0" MouseDown="Logout_PreviewMouseDown" 
+                              ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="خروج از حساب کاربری"/>
+                        <TextBlock  x:Name="lblPremium" Text="PREMIUM" FontSize="15"  FontWeight="Bold"  Foreground="#FF172458"  HorizontalAlignment="Left" Margin="107,77,0,0" Visibility="Hidden" />
+
+
+
+                        <Grid VerticalAlignment="Bottom" HorizontalAlignment="Right" Margin="0,0,50,24">
+
+
+                            <StackPanel Orientation="Horizontal" Grid.ColumnSpan="2">
+                                <StackPanel x:Name="panelHeaderIcons" Orientation="Horizontal" />
+                                <Label x:Name="btnSettings" Style="{StaticResource LabelButton}" Content="" Background="{x:Null}"  Foreground="#ffffff" FontFamily="{StaticResource fa_ProLight}" FontSize="20"
+                                 ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="تغییر رمز" Visibility="Collapsed"  PreviewMouseDown="btnSettings_MouseDown"/>
+                            </StackPanel>
+                        </Grid>
+                        <TextBlock VerticalAlignment="Top"  x:Name="txtGlobalMessage" Text="برای عملکرد صحیح برنامه، نسخه دات نت را به 4.8 ارتقا دهید"  Foreground="Salmon" Width="318" HorizontalAlignment="Center" TextAlignment="Center" Visibility="Hidden"  Margin="0,11,0,0" Height="22" FontSize="14" MouseDown="Header_MouseDown"/>
+
+                    </Grid>
+
+
+                    <uc:UCLoading x:Name="uCLoading" Visibility="Hidden"  Panel.ZIndex="1" Margin="0,-1,0,-256"/>
+
+                    <transc:TransitionElement  Height="250" x:Name="TransitionBox" Panel.ZIndex="0" Margin="0,99,0,-250">
+
+                    </transc:TransitionElement>
+                </Grid>
+                <!--<uc:UCUserInfo/>-->
+                <!--<uc:UCServerList  />-->
+                <!--<uc:UCLogin  />-->
+
+            </StackPanel>
+            <TextBlock  x:Name="lblErrorMessage" Text="" FontSize="16"  FontWeight="Bold" HorizontalAlignment="Center" Visibility="Hidden" Foreground="Red" VerticalAlignment="Top" Margin="0,93,0,0" />
+            <Popup x:Name="popHint"
+                   Placement="Bottom"
+                   StaysOpen="True"
+                   AllowsTransparency="True">
+                <Border Background="#1F2B57"
+                        CornerRadius="12"
+                        Padding="10,6"
+                        Opacity="0.95">
+                    <TextBlock x:Name="txtHintMessage"
+                               Text=""
+                               Foreground="White"
+                               FontSize="13"
+                               FontWeight="Bold"/>
+                </Border>
+            </Popup>
+        </Grid>
+    </Border>
+</Window>

@@ -1,0 +1,184 @@
+<Window x:Class="IRSpeedyVPN.Windows.DeviceLimitWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        mc:Ignorable="d"
+        Title="مدیریت دستگاه‌ها"
+        Width="330"
+        Background="Transparent"
+        WindowStyle="None"
+        AllowsTransparency="True"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        SizeToContent="Height"
+        FlowDirection="RightToLeft"
+        FontFamily="{StaticResource BKoodak}">
+
+    <Window.Resources>
+
+        <Style x:Key="OuterCard" TargetType="Border">
+            <Setter Property="CornerRadius" Value="26"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush" Value="#FF393F78"/>
+            <Setter Property="Background" Value="#CFFFFFFF"/>
+            <Setter Property="SnapsToDevicePixels" Value="True"/>
+            <Setter Property="Effect">
+                <Setter.Value>
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.18"/>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="SettingRowBorder" TargetType="Border">
+            <Setter Property="CornerRadius" Value="12"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="BorderBrush" Value="#FF393F78"/>
+            <Setter Property="Background" Value="White"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="Margin" Value="14,10,14,0"/>
+        </Style>
+
+        <Style x:Key="DangerButton" TargetType="Button">
+            <Setter Property="MinWidth" Value="70"/>
+            <Setter Property="Height" Value="28"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Background" Value="#C62828"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="10"
+                                Background="{TemplateBinding Background}">
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.92"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+    </Window.Resources>
+
+    <Border Style="{StaticResource OuterCard}">
+        <Grid Width="330">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="52"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0"
+                    CornerRadius="24,24,0,0"
+                    Background="#E9ECF7"
+                    BorderBrush="#FF393F78"
+                    BorderThickness="0,0,0,1.5"
+                    FlowDirection="LeftToRight">
+                <Grid Margin="10,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="44"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="34"/>
+                    </Grid.ColumnDefinitions>
+
+                    <TextBlock Grid.Column="1"
+                               FlowDirection="RightToLeft"
+                               Text="مدیریت دستگاه‌ها"
+                               FontSize="18"
+                               FontWeight="Bold"
+                               Foreground="#FF393F78"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Center"/>
+
+                    <Border Grid.Column="2"
+                            Width="26"
+                            Height="26"
+                            CornerRadius="13"
+                            Background="#F6DADA"
+                            BorderBrush="#C94B4B"
+                            BorderThickness="1"
+                            VerticalAlignment="Center"
+                            HorizontalAlignment="Right"
+                            Cursor="Hand"
+                            MouseDown="btnClose_MouseDown">
+                        <TextBlock Text="&#xF00D;"
+                                   FontFamily="{StaticResource fa_ProLight}"
+                                   Foreground="#C01616"
+                                   FontSize="14"
+                                   HorizontalAlignment="Center"
+                                   VerticalAlignment="Center"/>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <StackPanel Grid.Row="1" Margin="10,12,10,14">
+                <TextBlock x:Name="txtMessage"
+                           FontSize="14"
+                           FontWeight="Bold"
+                           Foreground="#C01616"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"/>
+
+                <TextBlock x:Name="txtError"
+                           FontSize="12"
+                           Foreground="#C01616"
+                           TextWrapping="Wrap"
+                           TextAlignment="Center"
+                           Margin="0,6,0,0"
+                           Visibility="Collapsed"/>
+                <TextBlock x:Name="txthelp"
+             FontSize="14"
+             FontWeight="Bold"
+             Foreground="Black"
+             TextWrapping="Wrap"
+             Text="لطفا یکی از دستگاه های زیر را حذف نمایید"
+             TextAlignment="Center"/>
+               
+
+                <ItemsControl x:Name="listDevices" Margin="0,10,0,0">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border CornerRadius="12"
+                                    BorderThickness="1.5"
+                                    BorderBrush="#FF393F78"
+                                    Background="White"
+                                    Margin="14,6,14,0"
+                                    Padding="10,8">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto"/>
+                                        <ColumnDefinition Width="*"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Button Grid.Column="0"
+                                            Style="{StaticResource DangerButton}"
+                                            Content="حذف"
+                                            Margin="0,0,8,0"
+                                            Click="btnRemoveDevice_Click"/>
+
+                                    <TextBlock Grid.Column="1"
+                                               Text="{Binding device_name}"
+                                               VerticalAlignment="Center"
+                                               TextAlignment="Right"
+                                               TextWrapping="Wrap"/>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Grid>
+    </Border>
+</Window>

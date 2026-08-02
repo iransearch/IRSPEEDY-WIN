@@ -1,0 +1,35 @@
+﻿<Window x:Class="IRSpeedyVPN.Windows.MyMessageBox"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:IRSpeedyVPN.Windows"
+        mc:Ignorable="d"
+        Title="MyMessageBox" Height="158.631" Width="377.842" WindowStyle="None" WindowStartupLocation="CenterOwner" ResizeMode="NoResize"
+        FontFamily="{StaticResource BKoodak}">
+    <Border BorderBrush="Black"
+             BorderThickness="1"             
+             Background="WhiteSmoke">
+        <Grid>
+            <Grid VerticalAlignment="Top"  HorizontalAlignment="Stretch" Height="37">
+                <Rectangle Fill="#FF172458" Height="37" Stroke="Black" VerticalAlignment="Top" MouseDown="Header_MouseDown"  HorizontalAlignment="Stretch" />
+                <TextBlock VerticalAlignment="Center" HorizontalAlignment="Center" Foreground="#fff"  TextWrapping="Wrap" FontSize="16" Text="خطا" />
+            </Grid>
+
+            <TextBlock Text="" Foreground="#999999" TextAlignment="Center"  FontFamily="{StaticResource fa_ProLight}"  FontSize="50" Width="60" Height="60" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,46,5,0"/>
+
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Bottom" Width="400" Height="100" Margin="10">
+                <TextBlock Height="40" VerticalAlignment="Top" HorizontalAlignment="Center" Foreground="#000"  TextWrapping="Wrap" FontSize="15" Text="درخواست بیش از حد اعتبار است" Width="300" TextAlignment="Center" Margin="50,0"/>
+
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0 40 0 0" >
+
+                    <Button x:Name="cancel"  Style="{StaticResource RoundCornerGrey}" Width="120" Height="43"  Content="لغو"  Foreground="#000"  VerticalAlignment="Center" Margin="10 0"/>
+                    <Button x:Name="btn_pluse"  Style="{StaticResource RoundCornerGrey}" Width="120" Height="43" Foreground="#000" Content="افزایش اعتبار"  VerticalAlignment="Center" Margin="10 0" />
+                </StackPanel>
+
+            </Grid>
+            <Label Style="{StaticResource LabelButton}" Background="{x:Null}"  Foreground="#FFFFFFFF" FontSize="20" Content="&#xF00D;" Width="30" Height="30" FontFamily="{StaticResource fa_ProLight}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,2,5,0" MouseDown="BtnClose_Click"
+                ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="خروج"/>
+        </Grid>
+    </Border>
+</Window>

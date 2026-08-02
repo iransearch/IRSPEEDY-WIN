@@ -1,0 +1,19 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:local="clr-namespace:IRSpeedyVPN.Themes">
+    
+    <FontFamily x:Key="BKoodak">pack://application:,,,/resources/#B Koodak</FontFamily>
+    <FontFamily x:Key="fa_Brands">pack://application:,,,/resources/#Font Awesome 5 Brands</FontFamily>
+    <FontFamily x:Key="fa_ProLight">pack://application:,,,/resources/#Font Awesome 5 Pro Light</FontFamily>
+    
+    <BitmapImage x:Key="Logo" UriSource="pack://application:,,,/resources/Logo.png"/>
+    <BitmapImage x:Key="eye" UriSource="pack://application:,,,/resources/eye.png"/>
+    <BitmapImage x:Key="eyeSlash" UriSource="pack://application:,,,/resources/eyeSlash.png"/>
+    <BitmapImage x:Key="headerCurve" UriSource="pack://application:,,,/resources/IRCurve.png"/>
+   
+   
+    <!--<PathGeometry x:Key="svg" ="pack://application:,,,/resources/loading.svg"/>-->
+</ResourceDictionary>
+    
+    
+    
