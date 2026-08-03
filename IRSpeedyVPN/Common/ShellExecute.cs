@@ -1,12 +1,17 @@
 ﻿using System;
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 
 namespace IRSpeedyVPN.Common
 {
     internal class ShellExecute
     {
+        private static readonly ConcurrentDictionary<int, Process> OwnedProcesses =
+            new ConcurrentDictionary<int, Process>();
+
         public static bool HideWindow = true;
 
         private static string BaseDir =>
@@ -79,6 +84,7 @@ namespace IRSpeedyVPN.Common
             })
             {
                 process.Start();
+                RegisterOwned(process);
                 var output = process.StandardOutput.ReadToEnd();
                 var error = process.StandardError.ReadToEnd();
                 if (!process.WaitForExit(60000))
@@ -86,6 +92,7 @@ namespace IRSpeedyVPN.Common
                     KillProcessTree(process);
                     throw new TimeoutException("External process timed out.");
                 }
+                UnregisterOwned(process);
                 if (process.ExitCode != 0)
                     throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
                         ? "External process failed with exit code " + process.ExitCode
@@ -101,7 +108,10 @@ namespace IRSpeedyVPN.Common
                 StartInfo = BuildStartInfo(file, args, true, true, true)
             };
             if (start)
+            {
                 process.Start();
+                RegisterOwned(process);
+            }
             return process;
         }
 
@@ -112,7 +122,10 @@ namespace IRSpeedyVPN.Common
                 StartInfo = BuildStartInfo(file, args, true, false, false)
             };
             if (start)
+            {
                 process.Start();
+                RegisterOwned(process);
+            }
             return process;
         }
 
@@ -123,6 +136,7 @@ namespace IRSpeedyVPN.Common
                 StartInfo = BuildStartInfo(file, args, false, false, false)
             };
             process.Start();
+            RegisterOwned(process);
             return process;
         }
 
@@ -133,6 +147,7 @@ namespace IRSpeedyVPN.Common
                 StartInfo = BuildStartInfo(file, args, false, false, false, workingDirectory)
             };
             process.Start();
+            RegisterOwned(process);
             return process;
         }
 
@@ -143,11 +158,9 @@ namespace IRSpeedyVPN.Common
 
             try
             {
+                UnregisterOwned(process);
                 if (process.HasExited)
-                {
-                    process.Dispose();
                     return;
-                }
 
                 foreach (var child in GetChildProcesses(process.Id))
                     KillProcessTree(child);
@@ -161,6 +174,65 @@ namespace IRSpeedyVPN.Common
             finally
             {
                 try { process.Dispose(); } catch { }
+            }
+        }
+
+        public static void KillProccess(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return;
+
+            var owned = OwnedProcesses.Values
+                .Where(x => x != null)
+                .Where(x =>
+                {
+                    try
+                    {
+                        return string.Equals(x.ProcessName, name, StringComparison.OrdinalIgnoreCase);
+                    }
+                    catch
+                    {
+                        return false;
+                    }
+                })
+                .ToArray();
+
+            foreach (var process in owned)
+                KillProcessTree(process);
+        }
+
+        private static void RegisterOwned(Process process)
+        {
+            if (process == null)
+                return;
+            try
+            {
+                OwnedProcesses[process.Id] = process;
+                process.EnableRaisingEvents = true;
+                process.Exited += OwnedProcessExited;
+            }
+            catch
+            {
+            }
+        }
+
+        private static void OwnedProcessExited(object sender, EventArgs e)
+        {
+            var process = sender as Process;
+            UnregisterOwned(process);
+        }
+
+        private static void UnregisterOwned(Process process)
+        {
+            if (process == null)
+                return;
+            try
+            {
+                process.Exited -= OwnedProcessExited;
+                OwnedProcesses.TryRemove(process.Id, out _);
+            }
+            catch
+            {
             }
         }
 
@@ -225,16 +297,5 @@ namespace IRSpeedyVPN.Common
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr hObject);
-
-        [Obsolete("Global process-name termination is unsafe. Keep only for legacy call sites until they are migrated.")]
-        public static void KillProccess(string name)
-        {
-            foreach (var process in Process.GetProcessesByName(name))
-            {
-                try { process.Kill(); }
-                catch { }
-                finally { try { process.Dispose(); } catch { } }
-            }
-        }
     }
 }
