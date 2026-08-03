@@ -1,5 +1,4 @@
 ﻿using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -12,9 +11,6 @@ namespace IRSpeedyVPN.Common
     internal class ShellExecute
     {
         public static bool HideWindow = true;
-
-        private static readonly ConcurrentDictionary<int, byte> OwnedProcessIds =
-            new ConcurrentDictionary<int, byte>();
 
         private static string BaseDir =>
             AppDomain.CurrentDomain.BaseDirectory.TrimEnd(
@@ -103,8 +99,6 @@ namespace IRSpeedyVPN.Common
             })
             {
                 process.Start();
-                Track(process);
-
                 var outputTask = process.StandardOutput.ReadToEndAsync();
                 var errorTask = process.StandardError.ReadToEndAsync();
 
@@ -164,10 +158,7 @@ namespace IRSpeedyVPN.Common
                 StartInfo = BuildStartInfo(file, args, true, true, true)
             };
             if (start)
-            {
                 process.Start();
-                Track(process);
-            }
             return process;
         }
 
@@ -181,10 +172,7 @@ namespace IRSpeedyVPN.Common
                 StartInfo = BuildStartInfo(file, args, true, false, false)
             };
             if (start)
-            {
                 process.Start();
-                Track(process);
-            }
             return process;
         }
 
@@ -195,7 +183,6 @@ namespace IRSpeedyVPN.Common
                 StartInfo = BuildStartInfo(file, args, false, false, false)
             };
             process.Start();
-            Track(process);
             return process;
         }
 
@@ -215,42 +202,13 @@ namespace IRSpeedyVPN.Common
                     workingDirectory)
             };
             process.Start();
-            Track(process);
             return process;
-        }
-
-        private static void Track(Process process)
-        {
-            if (process == null)
-                return;
-
-            try
-            {
-                OwnedProcessIds[process.Id] = 0;
-                process.EnableRaisingEvents = true;
-                process.Exited += (sender, args) =>
-                {
-                    try
-                    {
-                        OwnedProcessIds.TryRemove(process.Id, out _);
-                    }
-                    catch
-                    {
-                    }
-                };
-            }
-            catch
-            {
-            }
         }
 
         public static void KillProcessTree(Process process)
         {
             if (process == null)
                 return;
-
-            var processId = 0;
-            try { processId = process.Id; } catch { }
 
             try
             {
@@ -268,9 +226,25 @@ namespace IRSpeedyVPN.Common
             }
             finally
             {
-                if (processId > 0)
-                    OwnedProcessIds.TryRemove(processId, out _);
                 try { process.Dispose(); } catch { }
+            }
+        }
+
+        public static void KillProccess(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return;
+
+            foreach (var process in Process.GetProcessesByName(name))
+            {
+                try
+                {
+                    KillProcessTree(process);
+                }
+                catch
+                {
+                    try { process.Dispose(); } catch { }
+                }
             }
         }
 
@@ -311,37 +285,6 @@ namespace IRSpeedyVPN.Common
                     CloseHandle(snapshot);
             }
             return children.ToArray();
-        }
-
-        [Obsolete("Use an owned Process reference and KillProcessTree whenever possible.")]
-        public static void KillProccess(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-                return;
-
-            foreach (var processId in OwnedProcessIds.Keys)
-            {
-                Process process = null;
-                try
-                {
-                    process = Process.GetProcessById(processId);
-                    if (!string.Equals(
-                        process.ProcessName,
-                        name,
-                        StringComparison.OrdinalIgnoreCase))
-                    {
-                        process.Dispose();
-                        continue;
-                    }
-
-                    KillProcessTree(process);
-                }
-                catch
-                {
-                    try { process?.Dispose(); } catch { }
-                    OwnedProcessIds.TryRemove(processId, out _);
-                }
-            }
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
