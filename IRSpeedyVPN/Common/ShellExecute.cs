@@ -1,21 +1,25 @@
 ﻿using System;
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
-using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace IRSpeedyVPN.Common
 {
     internal class ShellExecute
     {
-        private static readonly ConcurrentDictionary<int, Process> OwnedProcesses =
-            new ConcurrentDictionary<int, Process>();
-
         public static bool HideWindow = true;
 
+        private static readonly ConcurrentDictionary<int, byte> OwnedProcessIds =
+            new ConcurrentDictionary<int, byte>();
+
         private static string BaseDir =>
-            AppDomain.CurrentDomain.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            AppDomain.CurrentDomain.BaseDirectory.TrimEnd(
+                Path.DirectorySeparatorChar,
+                Path.AltDirectorySeparatorChar);
 
         private static bool DebugEnabled =>
             File.Exists(Path.Combine(BaseDir, "debug.txt"));
@@ -34,7 +38,10 @@ namespace IRSpeedyVPN.Common
             bool redirectStdErr,
             string workingDirectory = null)
         {
-            var workDir = string.IsNullOrWhiteSpace(workingDirectory) ? BaseDir : workingDirectory;
+            var workDir = string.IsNullOrWhiteSpace(workingDirectory)
+                ? BaseDir
+                : workingDirectory;
+
             if (ShouldKeepCmdOpen)
             {
                 var cmdArgs = $"/k \"\"{file}\" {args}\"";
@@ -48,7 +55,10 @@ namespace IRSpeedyVPN.Common
                     WorkingDirectory = workDir,
                     RedirectStandardInput = redirectStdIn,
                     RedirectStandardOutput = redirectStdOut,
-                    RedirectStandardError = redirectStdErr
+                    RedirectStandardError = redirectStdErr,
+                    StandardInputEncoding = Encoding.UTF8,
+                    StandardOutputEncoding = Encoding.UTF8,
+                    StandardErrorEncoding = Encoding.UTF8
                 };
             }
 
@@ -58,50 +68,96 @@ namespace IRSpeedyVPN.Common
                 Arguments = args,
                 UseShellExecute = false,
                 CreateNoWindow = ShouldHideWindow,
-                WindowStyle = ProcessWindowStyle.Normal,
+                WindowStyle = ShouldHideWindow
+                    ? ProcessWindowStyle.Hidden
+                    : ProcessWindowStyle.Normal,
                 WorkingDirectory = workDir,
                 RedirectStandardInput = redirectStdIn,
                 RedirectStandardOutput = redirectStdOut,
-                RedirectStandardError = redirectStdErr
+                RedirectStandardError = redirectStdErr,
+                StandardInputEncoding = Encoding.UTF8,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8
             };
         }
 
         public static string ShellexecAndReturnStringOutput(string file, string args)
         {
+            return ShellexecAndReturnStringOutputWithInput(file, args, null, 60000);
+        }
+
+        public static string ShellexecAndReturnStringOutputWithInput(
+            string file,
+            string args,
+            string standardInput,
+            int timeoutMs = 60000)
+        {
             using (var process = new Process
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = file,
-                    Arguments = args,
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true,
-                    WorkingDirectory = BaseDir,
-                    WindowStyle = ProcessWindowStyle.Hidden
-                }
+                StartInfo = BuildStartInfo(
+                    file,
+                    args,
+                    redirectStdIn: true,
+                    redirectStdOut: true,
+                    redirectStdErr: true)
             })
             {
                 process.Start();
-                RegisterOwned(process);
-                var output = process.StandardOutput.ReadToEnd();
-                var error = process.StandardError.ReadToEnd();
-                if (!process.WaitForExit(60000))
+                Track(process);
+
+                var outputTask = process.StandardOutput.ReadToEndAsync();
+                var errorTask = process.StandardError.ReadToEndAsync();
+
+                try
+                {
+                    if (standardInput != null)
+                    {
+                        var inputBytes = Encoding.UTF8.GetBytes(standardInput);
+                        process.StandardInput.BaseStream.Write(
+                            inputBytes,
+                            0,
+                            inputBytes.Length);
+                        process.StandardInput.BaseStream.Flush();
+                    }
+                }
+                finally
+                {
+                    try { process.StandardInput.Close(); } catch { }
+                }
+
+                if (!process.WaitForExit(Math.Max(1000, timeoutMs)))
                 {
                     KillProcessTree(process);
                     throw new TimeoutException("External process timed out.");
                 }
-                UnregisterOwned(process);
+
+                Task.WaitAll(
+                    new Task[] { outputTask, errorTask },
+                    Math.Min(5000, Math.Max(1000, timeoutMs)));
+
+                var output = outputTask.IsCompleted
+                    ? outputTask.Result
+                    : string.Empty;
+                var error = errorTask.IsCompleted
+                    ? errorTask.Result
+                    : string.Empty;
+
                 if (process.ExitCode != 0)
-                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
-                        ? "External process failed with exit code " + process.ExitCode
-                        : error.Trim());
+                {
+                    throw new InvalidOperationException(
+                        string.IsNullOrWhiteSpace(error)
+                            ? "External process failed with exit code " + process.ExitCode
+                            : error.Trim());
+                }
+
                 return output;
             }
         }
 
-        public static Process ShellexecAndReturnProcessRedirectOutput(string file, string args, bool start = true)
+        public static Process ShellexecAndReturnProcessRedirectOutput(
+            string file,
+            string args,
+            bool start = true)
         {
             var process = new Process
             {
@@ -110,12 +166,15 @@ namespace IRSpeedyVPN.Common
             if (start)
             {
                 process.Start();
-                RegisterOwned(process);
+                Track(process);
             }
             return process;
         }
 
-        public static Process ShellexecAndReturnProcessRedirectInput(string file, string args, bool start = true)
+        public static Process ShellexecAndReturnProcessRedirectInput(
+            string file,
+            string args,
+            bool start = true)
         {
             var process = new Process
             {
@@ -124,7 +183,7 @@ namespace IRSpeedyVPN.Common
             if (start)
             {
                 process.Start();
-                RegisterOwned(process);
+                Track(process);
             }
             return process;
         }
@@ -136,19 +195,53 @@ namespace IRSpeedyVPN.Common
                 StartInfo = BuildStartInfo(file, args, false, false, false)
             };
             process.Start();
-            RegisterOwned(process);
+            Track(process);
             return process;
         }
 
-        public static Process ShellexecAndReturnProcess(string file, string args, string workingDirectory)
+        public static Process ShellexecAndReturnProcess(
+            string file,
+            string args,
+            string workingDirectory)
         {
             var process = new Process
             {
-                StartInfo = BuildStartInfo(file, args, false, false, false, workingDirectory)
+                StartInfo = BuildStartInfo(
+                    file,
+                    args,
+                    false,
+                    false,
+                    false,
+                    workingDirectory)
             };
             process.Start();
-            RegisterOwned(process);
+            Track(process);
             return process;
+        }
+
+        private static void Track(Process process)
+        {
+            if (process == null)
+                return;
+
+            try
+            {
+                OwnedProcessIds[process.Id] = 0;
+                process.EnableRaisingEvents = true;
+                process.Exited += (sender, args) =>
+                {
+                    try
+                    {
+                        OwnedProcessIds.TryRemove(process.Id, out _);
+                    }
+                    catch
+                    {
+                    }
+                };
+            }
+            catch
+            {
+            }
         }
 
         public static void KillProcessTree(Process process)
@@ -156,89 +249,34 @@ namespace IRSpeedyVPN.Common
             if (process == null)
                 return;
 
+            var processId = 0;
+            try { processId = process.Id; } catch { }
+
             try
             {
-                UnregisterOwned(process);
-                if (process.HasExited)
-                    return;
+                if (!process.HasExited)
+                {
+                    foreach (var child in GetChildProcesses(process.Id))
+                        KillProcessTree(child);
 
-                foreach (var child in GetChildProcesses(process.Id))
-                    KillProcessTree(child);
-
-                process.Kill();
-                process.WaitForExit(3000);
+                    process.Kill();
+                    process.WaitForExit(3000);
+                }
             }
             catch
             {
             }
             finally
             {
+                if (processId > 0)
+                    OwnedProcessIds.TryRemove(processId, out _);
                 try { process.Dispose(); } catch { }
-            }
-        }
-
-        public static void KillProccess(string name)
-        {
-            if (string.IsNullOrWhiteSpace(name))
-                return;
-
-            var owned = OwnedProcesses.Values
-                .Where(x => x != null)
-                .Where(x =>
-                {
-                    try
-                    {
-                        return string.Equals(x.ProcessName, name, StringComparison.OrdinalIgnoreCase);
-                    }
-                    catch
-                    {
-                        return false;
-                    }
-                })
-                .ToArray();
-
-            foreach (var process in owned)
-                KillProcessTree(process);
-        }
-
-        private static void RegisterOwned(Process process)
-        {
-            if (process == null)
-                return;
-            try
-            {
-                OwnedProcesses[process.Id] = process;
-                process.EnableRaisingEvents = true;
-                process.Exited += OwnedProcessExited;
-            }
-            catch
-            {
-            }
-        }
-
-        private static void OwnedProcessExited(object sender, EventArgs e)
-        {
-            var process = sender as Process;
-            UnregisterOwned(process);
-        }
-
-        private static void UnregisterOwned(Process process)
-        {
-            if (process == null)
-                return;
-            try
-            {
-                process.Exited -= OwnedProcessExited;
-                OwnedProcesses.TryRemove(process.Id, out _);
-            }
-            catch
-            {
             }
         }
 
         private static Process[] GetChildProcesses(int parentId)
         {
-            var children = new System.Collections.Generic.List<Process>();
+            var children = new List<Process>();
             IntPtr snapshot = IntPtr.Zero;
             try
             {
@@ -257,8 +295,13 @@ namespace IRSpeedyVPN.Common
                 {
                     if (entry.th32ParentProcessID != (uint)parentId)
                         continue;
-                    try { children.Add(Process.GetProcessById((int)entry.th32ProcessID)); }
-                    catch { }
+                    try
+                    {
+                        children.Add(Process.GetProcessById((int)entry.th32ProcessID));
+                    }
+                    catch
+                    {
+                    }
                 }
                 while (Process32Next(snapshot, ref entry));
             }
@@ -268,6 +311,37 @@ namespace IRSpeedyVPN.Common
                     CloseHandle(snapshot);
             }
             return children.ToArray();
+        }
+
+        [Obsolete("Use an owned Process reference and KillProcessTree whenever possible.")]
+        public static void KillProccess(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name))
+                return;
+
+            foreach (var processId in OwnedProcessIds.Keys)
+            {
+                Process process = null;
+                try
+                {
+                    process = Process.GetProcessById(processId);
+                    if (!string.Equals(
+                        process.ProcessName,
+                        name,
+                        StringComparison.OrdinalIgnoreCase))
+                    {
+                        process.Dispose();
+                        continue;
+                    }
+
+                    KillProcessTree(process);
+                }
+                catch
+                {
+                    try { process?.Dispose(); } catch { }
+                    OwnedProcessIds.TryRemove(processId, out _);
+                }
+            }
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
@@ -287,13 +361,19 @@ namespace IRSpeedyVPN.Common
         }
 
         [DllImport("kernel32.dll", SetLastError = true)]
-        private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+        private static extern IntPtr CreateToolhelp32Snapshot(
+            uint dwFlags,
+            uint th32ProcessID);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+        private static extern bool Process32First(
+            IntPtr hSnapshot,
+            ref PROCESSENTRY32 lppe);
 
         [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
-        private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+        private static extern bool Process32Next(
+            IntPtr hSnapshot,
+            ref PROCESSENTRY32 lppe);
 
         [DllImport("kernel32.dll", SetLastError = true)]
         private static extern bool CloseHandle(IntPtr hObject);
