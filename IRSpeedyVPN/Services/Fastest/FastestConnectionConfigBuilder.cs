@@ -80,9 +80,6 @@ namespace IRSpeedyVPN.Services.Fastest
                 }
             }
 
-            if (normalLinks.Count == 0)
-                throw new InvalidOperationException("No compatible FASTEST CONNECTION routes were found.");
-
             Dictionary<string, string> generatedTagToUrl;
             var generated = IRSpeedyVPN.Services.SingBox.ConfigGenerator.GetUrlTestConfig(
                 normalLinks,
@@ -91,7 +88,6 @@ namespace IRSpeedyVPN.Services.Fastest
                 null,
                 socksOverrides);
             var core = JObject.Parse(generated);
-
             var routeByUrl = routes
                 .Where(x => x != null && !string.IsNullOrWhiteSpace(x.Link))
                 .GroupBy(x => x.Link, StringComparer.OrdinalIgnoreCase)
@@ -115,6 +111,15 @@ namespace IRSpeedyVPN.Services.Fastest
             if (proxyTags.Count == 0)
                 throw new InvalidOperationException("FASTEST CONNECTION could not create any native core outbounds.");
 
+            if (!outbounds.OfType<JObject>().Any(x => string.Equals((string)x["tag"], "block", StringComparison.OrdinalIgnoreCase)))
+            {
+                outbounds.Add(new JObject
+                {
+                    ["type"] = "block",
+                    ["tag"] = "block"
+                });
+            }
+
             outbounds.Add(new JObject
             {
                 ["type"] = "urltest",
@@ -126,8 +131,8 @@ namespace IRSpeedyVPN.Services.Fastest
                 ["idle_timeout"] = "30m",
                 ["interrupt_exist_connections"] = false
             });
-
             core["outbounds"] = outbounds;
+
             var routeObject = core["route"] as JObject ?? new JObject();
             routeObject["final"] = SelectorTag;
             core["route"] = routeObject;
@@ -147,8 +152,6 @@ namespace IRSpeedyVPN.Services.Fastest
                 excludedProcessPaths);
             var baseRoot = JObject.Parse(baseConfig);
             core["inbounds"] = baseRoot["inbounds"]?.DeepClone();
-            if (baseRoot["dns"] != null)
-                core["dns"] = baseRoot["dns"]?.DeepClone();
 
             var baseRoute = baseRoot["route"] as JObject;
             if (baseRoute != null)
