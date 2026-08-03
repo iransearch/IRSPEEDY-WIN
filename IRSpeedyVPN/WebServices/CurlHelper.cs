@@ -7,13 +7,11 @@ namespace IRSpeedyVPN.WebServices
 {
     internal sealed class CurlHelper
     {
-        public string CurlExePath { get; set; } = GetDefaultCurlPath();
+        private readonly string _preferredCurlPath;
 
-        private static string GetDefaultCurlPath()
+        public CurlHelper(string curlExePath = null)
         {
-            string tempRoot = Path.Combine(Path.GetTempPath(), "IRSpeedy");
-            string extractedCurl = Path.Combine(tempRoot, "curl", "curl.exe");
-            return File.Exists(extractedCurl) ? extractedCurl : "curl";
+            _preferredCurlPath = curlExePath;
         }
 
         public CurlResponse Send(
@@ -21,24 +19,29 @@ namespace IRSpeedyVPN.WebServices
             string method,
             string headers,
             string body,
-            string proxy=null)
+            string proxy = null,
+            int? timeoutSeconds = null)
         {
-            string output = ShellExecute.ShellexecAndReturnStringOutput(CurlExePath, BuildArgs(url, method, headers, body, proxy, null));
-            Parse(output, out string responseBody, out int httpCode);
+            var curlPath = ResolveCurlPath();
+            var config = BuildConfig(
+                url,
+                method,
+                headers,
+                body,
+                proxy,
+                timeoutSeconds);
 
-            return new CurlResponse(responseBody, httpCode);
-        }
+            var timeoutMs = timeoutSeconds.HasValue && timeoutSeconds.Value > 0
+                ? Math.Max(5000, timeoutSeconds.Value * 1000 + 5000)
+                : 35000;
 
-        public CurlResponse Send(
-            string url,
-            string method,
-            string headers,
-            string body,
-            string proxy,
-            int? timeoutSeconds)
-        {
-            string output = ShellExecute.ShellexecAndReturnStringOutput(CurlExePath, BuildArgs(url, method, headers, body, proxy, timeoutSeconds));
-            Parse(output, out string responseBody, out int httpCode);
+            var output = ShellExecute.ShellexecAndReturnStringOutputWithInput(
+                curlPath,
+                "--config -",
+                config,
+                timeoutMs);
+
+            Parse(output, out var responseBody, out var httpCode);
             return new CurlResponse(responseBody, httpCode);
         }
 
@@ -54,7 +57,41 @@ namespace IRSpeedyVPN.WebServices
             public int HttpCode { get; }
         }
 
-        private static string BuildArgs(
+        private string ResolveCurlPath()
+        {
+            if (!string.IsNullOrWhiteSpace(_preferredCurlPath)
+                && File.Exists(_preferredCurlPath))
+                return _preferredCurlPath;
+
+            var runtimeRoot = Path.Combine(Path.GetTempPath(), "IRSpeedy");
+            var activeVersionFile = Path.Combine(runtimeRoot, "active.version");
+            try
+            {
+                if (File.Exists(activeVersionFile))
+                {
+                    var version = File.ReadAllText(activeVersionFile).Trim();
+                    if (!string.IsNullOrWhiteSpace(version))
+                    {
+                        var versionedCurl = Path.Combine(
+                            runtimeRoot,
+                            "versions",
+                            version,
+                            "curl",
+                            "curl.exe");
+                        if (File.Exists(versionedCurl))
+                            return versionedCurl;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            var legacyCurl = Path.Combine(runtimeRoot, "curl", "curl.exe");
+            return File.Exists(legacyCurl) ? legacyCurl : "curl";
+        }
+
+        private static string BuildConfig(
             string url,
             string method,
             string headers,
@@ -62,80 +99,73 @@ namespace IRSpeedyVPN.WebServices
             string proxy,
             int? timeoutSeconds)
         {
-            var args = new StringBuilder();
-            args.Append(" -sS -L ");
-
-            bool isPost = string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase);
-            if (isPost)
-                args.Append(" -X POST ");
+            var config = new StringBuilder();
+            config.AppendLine("silent");
+            config.AppendLine("show-error");
+            config.AppendLine("location");
+            config.AppendLine("request = " + QuoteConfigValue(
+                string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)
+                    ? "POST"
+                    : "GET"));
 
             if (!string.IsNullOrWhiteSpace(proxy))
-            {
-                args.Append(" --proxy ");
-                args.Append(EscapeArg(proxy));
-            }
+                config.AppendLine("proxy = " + QuoteConfigValue(proxy));
 
             if (timeoutSeconds.HasValue && timeoutSeconds.Value > 0)
             {
-                args.Append(" --connect-timeout ");
-                args.Append(timeoutSeconds.Value);
-                args.Append(" --max-time ");
-                args.Append(timeoutSeconds.Value);
-                args.Append(" ");
+                config.AppendLine("connect-timeout = " + timeoutSeconds.Value);
+                config.AppendLine("max-time = " + timeoutSeconds.Value);
             }
-
-            // Headers
-            if (!string.IsNullOrEmpty(headers))
+            else
             {
-                string[] lines = headers.Split(new[] { "\r\n", "\n" }, StringSplitOptions.RemoveEmptyEntries);
-                foreach (string line in lines)
-                {
-                    args.Append(" -H ");
-                    args.Append(EscapeArg(line));
-                }
+                config.AppendLine("connect-timeout = 15");
+                config.AppendLine("max-time = 30");
             }
 
-            // Body
-            if (isPost && body != null)
+            if (!string.IsNullOrWhiteSpace(headers))
             {
-                args.Append(" --data ");
-                args.Append(EscapeArg(body));
+                var lines = headers.Split(
+                    new[] { "\r\n", "\n" },
+                    StringSplitOptions.RemoveEmptyEntries);
+                foreach (var line in lines)
+                    config.AppendLine("header = " + QuoteConfigValue(line));
             }
 
-            string writeOut = "\r\n__HTTP_CODE__:%{http_code}";
+            if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)
+                && body != null)
+                config.AppendLine("data-binary = " + QuoteConfigValue(body));
 
-            args.Append(" -w ");
-            args.Append(EscapeArg(writeOut));
+            config.AppendLine("write-out = " + QuoteConfigValue(
+                "\r\n__HTTP_CODE__:%{http_code}"));
+            config.AppendLine("url = " + QuoteConfigValue(url));
+            return config.ToString();
+        }
 
-            // URL
-            args.Append(" ");
-            args.Append(EscapeArg(url));
-
-            return args.ToString();
+        private static string QuoteConfigValue(string value)
+        {
+            var safe = (value ?? string.Empty)
+                .Replace("\\", "\\\\")
+                .Replace("\"", "\\\"")
+                .Replace("\r", "\\r")
+                .Replace("\n", "\\n");
+            return "\"" + safe + "\"";
         }
 
         private static void Parse(string output, out string body, out int code)
         {
             const string marker = "__HTTP_CODE__:";
-            int idx = output.LastIndexOf(marker, StringComparison.Ordinal);
+            output = output ?? string.Empty;
+            var index = output.LastIndexOf(marker, StringComparison.Ordinal);
 
             body = output;
             code = 0;
+            if (index < 0)
+                return;
 
-            if (idx >= 0)
-            {
-               
-                body = output.Substring(0, idx).TrimEnd('\r', '\n');
-                int.TryParse(output.Substring(idx + marker.Length).Trim(), out code);
-            }
-        }
-
-        private static string EscapeArg(string value)
-        {
-            // Quote for Windows command-line.
-            // Keep it simple: escape backslashes and quotes.
-            string escaped = value.Replace("\\", "\\\\").Replace("\"", "\\\"");
-            return "\"" + escaped + "\"";
+            body = output.Substring(0, index).TrimEnd('\r', '\n');
+            int.TryParse(
+                output.Substring(index + marker.Length).Trim(),
+                out code);
         }
     }
 }
