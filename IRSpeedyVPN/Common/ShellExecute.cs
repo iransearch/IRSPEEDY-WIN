@@ -1,12 +1,12 @@
 ﻿using System;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 
 namespace IRSpeedyVPN.Common
 {
     internal class ShellExecute
     {
-        // Default behavior (can still be overridden by debug.txt)
         public static bool HideWindow = true;
 
         private static string BaseDir =>
@@ -18,10 +18,7 @@ namespace IRSpeedyVPN.Common
         private static bool NoCloseEnabled =>
             File.Exists(Path.Combine(BaseDir, "noclose.txt"));
 
-        // Final decision: if debug.txt exists -> never hide
         private static bool ShouldHideWindow => HideWindow && !DebugEnabled;
-
-        // If noclose.txt exists and we're NOT hiding -> keep cmd open
         private static bool ShouldKeepCmdOpen => NoCloseEnabled && !ShouldHideWindow;
 
         private static ProcessStartInfo BuildStartInfo(
@@ -33,13 +30,9 @@ namespace IRSpeedyVPN.Common
             string workingDirectory = null)
         {
             var workDir = string.IsNullOrWhiteSpace(workingDirectory) ? BaseDir : workingDirectory;
-            // If we want "no close", we must run through cmd.exe /k
             if (ShouldKeepCmdOpen)
             {
-                // Quote executable path, keep args as-is
-                // cmd.exe /k "<file>" <args>
                 var cmdArgs = $"/k \"\"{file}\" {args}\"";
-
                 return new ProcessStartInfo
                 {
                     FileName = "cmd.exe",
@@ -47,14 +40,13 @@ namespace IRSpeedyVPN.Common
                     UseShellExecute = false,
                     CreateNoWindow = ShouldHideWindow,
                     WindowStyle = ProcessWindowStyle.Normal,
-                    WorkingDirectory = workDir, // current program path
+                    WorkingDirectory = workDir,
                     RedirectStandardInput = redirectStdIn,
                     RedirectStandardOutput = redirectStdOut,
                     RedirectStandardError = redirectStdErr
                 };
             }
 
-            // Normal direct execution
             return new ProcessStartInfo
             {
                 FileName = file,
@@ -62,7 +54,7 @@ namespace IRSpeedyVPN.Common
                 UseShellExecute = false,
                 CreateNoWindow = ShouldHideWindow,
                 WindowStyle = ProcessWindowStyle.Normal,
-                WorkingDirectory = workDir, // current program path
+                WorkingDirectory = workDir,
                 RedirectStandardInput = redirectStdIn,
                 RedirectStandardOutput = redirectStdOut,
                 RedirectStandardError = redirectStdErr
@@ -71,131 +63,177 @@ namespace IRSpeedyVPN.Common
 
         public static string ShellexecAndReturnStringOutput(string file, string args)
         {
-            // NOTE: noclose.txt + cmd /k would never exit, so this method MUST run normally.
-            // We'll still respect debug.txt for visibility.
-            try
+            using (var process = new Process
             {
-                using (var process = new Process
+                StartInfo = new ProcessStartInfo
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = file,
-                        Arguments = args,
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        CreateNoWindow = true,//ShouldHideWindow,
-                        WorkingDirectory = BaseDir,
-                        WindowStyle = ProcessWindowStyle.Normal
-                    }
-                })
-                {
-                    process.Start();
-                    string ret = process.StandardOutput.ReadToEnd();
-                    process.WaitForExit();
-                    return ret;
+                    FileName = file,
+                    Arguments = args,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    CreateNoWindow = true,
+                    WorkingDirectory = BaseDir,
+                    WindowStyle = ProcessWindowStyle.Hidden
                 }
-            }
-            catch
+            })
             {
-                throw;
+                process.Start();
+                var output = process.StandardOutput.ReadToEnd();
+                var error = process.StandardError.ReadToEnd();
+                if (!process.WaitForExit(60000))
+                {
+                    KillProcessTree(process);
+                    throw new TimeoutException("External process timed out.");
+                }
+                if (process.ExitCode != 0)
+                    throw new InvalidOperationException(string.IsNullOrWhiteSpace(error)
+                        ? "External process failed with exit code " + process.ExitCode
+                        : error.Trim());
+                return output;
             }
         }
 
         public static Process ShellexecAndReturnProcessRedirectOutput(string file, string args, bool start = true)
         {
-            try
+            var process = new Process
             {
-                var process = new Process
-                {
-                    StartInfo = BuildStartInfo(
-                        file, args,
-                        redirectStdIn: true,
-                        redirectStdOut: true,
-                        redirectStdErr: true)
-                };
-
-                if (start) process.Start();
-                return process;
-            }
-            catch
-            {
-                throw;
-            }
+                StartInfo = BuildStartInfo(file, args, true, true, true)
+            };
+            if (start)
+                process.Start();
+            return process;
         }
 
         public static Process ShellexecAndReturnProcessRedirectInput(string file, string args, bool start = true)
         {
-            try
+            var process = new Process
             {
-                var process = new Process
-                {
-                    StartInfo = BuildStartInfo(
-                        file, args,
-                        redirectStdIn: true,
-                        redirectStdOut: false,
-                        redirectStdErr: false)
-                };
-
-                if (start) process.Start();
-                return process;
-            }
-            catch
-            {
-                throw;
-            }
+                StartInfo = BuildStartInfo(file, args, true, false, false)
+            };
+            if (start)
+                process.Start();
+            return process;
         }
 
         public static Process ShellexecAndReturnProcess(string file, string args)
         {
-            try
+            var process = new Process
             {
-                var process = new Process
-                {
-                    StartInfo = BuildStartInfo(
-                        file, args,
-                        redirectStdIn: false,
-                        redirectStdOut: false,
-                        redirectStdErr: false)
-                };
-
-                process.Start();
-                return process;
-            }
-            catch
-            {
-                throw;
-            }
+                StartInfo = BuildStartInfo(file, args, false, false, false)
+            };
+            process.Start();
+            return process;
         }
 
         public static Process ShellexecAndReturnProcess(string file, string args, string workingDirectory)
         {
+            var process = new Process
+            {
+                StartInfo = BuildStartInfo(file, args, false, false, false, workingDirectory)
+            };
+            process.Start();
+            return process;
+        }
+
+        public static void KillProcessTree(Process process)
+        {
+            if (process == null)
+                return;
+
             try
             {
-                var process = new Process
+                if (process.HasExited)
                 {
-                    StartInfo = BuildStartInfo(
-                        file, args,
-                        redirectStdIn: false,
-                        redirectStdOut: false,
-                        redirectStdErr: false,
-                        workingDirectory: workingDirectory)
-                };
+                    process.Dispose();
+                    return;
+                }
 
-                process.Start();
-                return process;
+                foreach (var child in GetChildProcesses(process.Id))
+                    KillProcessTree(child);
+
+                process.Kill();
+                process.WaitForExit(3000);
             }
             catch
             {
-                throw;
+            }
+            finally
+            {
+                try { process.Dispose(); } catch { }
             }
         }
 
+        private static Process[] GetChildProcesses(int parentId)
+        {
+            var children = new System.Collections.Generic.List<Process>();
+            IntPtr snapshot = IntPtr.Zero;
+            try
+            {
+                snapshot = CreateToolhelp32Snapshot(0x00000002, 0);
+                if (snapshot == IntPtr.Zero || snapshot == new IntPtr(-1))
+                    return children.ToArray();
+
+                var entry = new PROCESSENTRY32
+                {
+                    dwSize = (uint)Marshal.SizeOf(typeof(PROCESSENTRY32))
+                };
+                if (!Process32First(snapshot, ref entry))
+                    return children.ToArray();
+
+                do
+                {
+                    if (entry.th32ParentProcessID != (uint)parentId)
+                        continue;
+                    try { children.Add(Process.GetProcessById((int)entry.th32ProcessID)); }
+                    catch { }
+                }
+                while (Process32Next(snapshot, ref entry));
+            }
+            finally
+            {
+                if (snapshot != IntPtr.Zero && snapshot != new IntPtr(-1))
+                    CloseHandle(snapshot);
+            }
+            return children.ToArray();
+        }
+
+        [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
+        private struct PROCESSENTRY32
+        {
+            public uint dwSize;
+            public uint cntUsage;
+            public uint th32ProcessID;
+            public IntPtr th32DefaultHeapID;
+            public uint th32ModuleID;
+            public uint cntThreads;
+            public uint th32ParentProcessID;
+            public int pcPriClassBase;
+            public uint dwFlags;
+            [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
+            public string szExeFile;
+        }
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern IntPtr CreateToolhelp32Snapshot(uint dwFlags, uint th32ProcessID);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern bool Process32First(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+        [DllImport("kernel32.dll", CharSet = CharSet.Auto, SetLastError = true)]
+        private static extern bool Process32Next(IntPtr hSnapshot, ref PROCESSENTRY32 lppe);
+
+        [DllImport("kernel32.dll", SetLastError = true)]
+        private static extern bool CloseHandle(IntPtr hObject);
+
+        [Obsolete("Global process-name termination is unsafe. Keep only for legacy call sites until they are migrated.")]
         public static void KillProccess(string name)
         {
             foreach (var process in Process.GetProcessesByName(name))
             {
                 try { process.Kill(); }
-                catch { /* ignore */ }
+                catch { }
+                finally { try { process.Dispose(); } catch { } }
             }
         }
     }
