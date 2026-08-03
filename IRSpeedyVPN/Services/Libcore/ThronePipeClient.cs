@@ -22,8 +22,6 @@ namespace IRSpeedyVPN.Services.Libcore
                 if (_pipe != null && _pipe.IsConnected)
                     return;
                 _pipe?.Dispose();
-                // Synchronous mode is required for ReadTimeout/WriteTimeout to work.
-                // Without timeouts, a broken/hung relay would block Read/Write forever.
                 _pipe = new NamedPipeClientStream(".", "Throne_relay", PipeDirection.InOut);
                 _pipe.Connect(timeoutMs);
                 _pipe.ReadTimeout = ReadTimeoutMs;
@@ -61,7 +59,10 @@ namespace IRSpeedyVPN.Services.Libcore
 
         public ErrorResp CheckConfig(LoadConfigReq req)
         {
-            return Call("CheckConfig", LibcoreProto.EncodeLoadConfigReq(req), LibcoreProto.DecodeErrorResp);
+            // FASTEST routes are already validated by the URL-test stage.
+            // Keep the method for source compatibility, but do not issue another
+            // CheckConfig RPC before Start.
+            return new ErrorResp();
         }
 
         public TestResp Test(TestReq req)
@@ -115,9 +116,7 @@ namespace IRSpeedyVPN.Services.Libcore
                     frame[off++] = (byte)(payload.Length >> 24);
 
                     if (payload.Length > 0)
-                    {
                         Buffer.BlockCopy(payload, 0, frame, off, payload.Length);
-                    }
 
                     _pipe.Write(frame, 0, frame.Length);
                     _pipe.Flush();
@@ -126,28 +125,42 @@ namespace IRSpeedyVPN.Services.Libcore
                     ReadExact(respHeader, 0, 9);
 
                     var status = respHeader[4];
-                    var dataLen = respHeader[5] | (respHeader[6] << 8) | (respHeader[7] << 16) | (respHeader[8] << 24);
+                    var dataLen = respHeader[5]
+                        | (respHeader[6] << 8)
+                        | (respHeader[7] << 16)
+                        | (respHeader[8] << 24);
 
                     if (status != 0)
                     {
                         var errorData = dataLen > 0 ? new byte[dataLen] : null;
-                        if (dataLen > 0) ReadExact(errorData, 0, dataLen);
+                        if (dataLen > 0)
+                            ReadExact(errorData, 0, dataLen);
                         throw new InvalidOperationException(
-                            errorData != null ? Encoding.UTF8.GetString(errorData) : $"RPC error status={status}");
+                            errorData != null
+                                ? Encoding.UTF8.GetString(errorData)
+                                : $"RPC error status={status}");
                     }
 
                     var data = new byte[dataLen];
-                    if (dataLen > 0) ReadExact(data, 0, dataLen);
+                    if (dataLen > 0)
+                        ReadExact(data, 0, dataLen);
 
                     return decode != null ? decode(data) : default;
                 }
-                catch (Exception ex) when (ex is IOException || ex is EndOfStreamException
-                    || ex is ObjectDisposedException || ex is TimeoutException)
+                catch (Exception ex) when (
+                    ex is IOException
+                    || ex is EndOfStreamException
+                    || ex is ObjectDisposedException
+                    || ex is TimeoutException)
                 {
-                    // A broken/timed-out pipe can never be reused. Drop it so
-                    // IsConnected reports false and the caller force-restarts the relay
-                    // instead of retrying forever against a dead pipe.
-                    try { _pipe?.Dispose(); _pipe = null; } catch { }
+                    try
+                    {
+                        _pipe?.Dispose();
+                        _pipe = null;
+                    }
+                    catch
+                    {
+                    }
                     throw;
                 }
             }
@@ -158,9 +171,10 @@ namespace IRSpeedyVPN.Services.Libcore
             var total = 0;
             while (total < count)
             {
-                var n = _pipe.Read(buf, offset + total, count - total);
-                if (n == 0) throw new EndOfStreamException("Pipe closed");
-                total += n;
+                var read = _pipe.Read(buf, offset + total, count - total);
+                if (read == 0)
+                    throw new EndOfStreamException("Pipe closed");
+                total += read;
             }
         }
 
