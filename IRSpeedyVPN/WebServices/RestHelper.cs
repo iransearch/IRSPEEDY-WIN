@@ -4,23 +4,24 @@ using IRSpeedyVPN.Interfaces;
 using System;
 using System.Collections.Specialized;
 using System.Net;
+using System.Net.Http;
 using System.Text;
+using System.Web;
 using System.Web.Script.Serialization;
 
 namespace IRSpeedyVPN.WebServices
 {
     internal sealed class RestHelper
     {
+        private static readonly HttpClient Client = CreateClient();
         private readonly string _baseAddress;
-        private readonly CurlHelper _curl;
 
         internal RestHelper(string baseAddress, string curlExePath = null)
         {
-            _baseAddress = baseAddress;
-            _curl = new CurlHelper();
-            if (!string.IsNullOrWhiteSpace(curlExePath))
-                _curl.CurlExePath = curlExePath;
+            _baseAddress = baseAddress ?? throw new ArgumentNullException(nameof(baseAddress));
         }
+
+        internal string BaseAddress => _baseAddress;
 
         internal BaseHttpResponse<T> SendRequest<T>(
             string relPath,
@@ -29,101 +30,119 @@ namespace IRSpeedyVPN.WebServices
             IDecryptor decryptor,
             string token = null)
         {
-            string url = _baseAddress + relPath;
-
-            // Serializer
             var serializer = new JavaScriptSerializer();
             serializer.RegisterConverters(new JavaScriptConverter[]
             {
                 Program.container.GetInstance<JsonConverter>()
             });
 
-            // Headers (same idea as your original RestHelper)
-            var headers = new StringBuilder();
-            headers.AppendLine("User-Agent: Mozilla/5.0 (Windows NT 5.1; rv:52.0) Gecko/20100101 Firefox/52.0");
-            headers.AppendLine("Accept: text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8");
-            headers.AppendLine("Accept-Language: en-US,en;q=0.5");
-            headers.AppendLine("X-Requested-By: GMv0U73qLXINeEmEe0fP8oaSalxfuQVE");
-
-            if (!string.IsNullOrEmpty(token))
-                headers.AppendLine("Authorization: Bearer " + token);
-
-            string method = "GET";
-            string body = null;
-
-            // Decide body + content type
-            if (data != null)
+            var requestUri = new Uri(new Uri(_baseAddress), relPath ?? string.Empty);
+            using (var request = new HttpRequestMessage(data == null ? HttpMethod.Get : HttpMethod.Post, requestUri))
             {
-                method = "POST";
+                request.Headers.TryAddWithoutValidation(
+                    "User-Agent",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) IRSPEEDY/1.0");
+                request.Headers.TryAddWithoutValidation("Accept", "application/json, text/plain, */*");
+                request.Headers.TryAddWithoutValidation("Accept-Language", "en-US,en;q=0.5");
+                request.Headers.TryAddWithoutValidation(
+                    "X-Requested-By",
+                    "GMv0U73qLXINeEmEe0fP8oaSalxfuQVE");
+                if (!string.IsNullOrWhiteSpace(token))
+                    request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
 
-                if (data is string s)
+                if (data != null)
                 {
-                    headers.AppendLine("Content-Type: application/x-www-form-urlencoded");
-                    body = s;
-                }
-                else if (data is NameValueCollection nvc)
-                {
-                    headers.AppendLine("Content-Type: application/x-www-form-urlencoded");
-                    body = nvc.ToString();
-                }
-                else
-                {
-                    headers.AppendLine("Content-Type: application/json");
-                    body = serializer.Serialize(data);
+                    var body = BuildBody(serializer, data, out var mediaType);
+                    if (encryptor != null && body != null)
+                        body = Convert.ToBase64String(encryptor.Encrypt(body.ToUTF8Bytes()));
+                    request.Content = new StringContent(body ?? string.Empty, Encoding.UTF8, mediaType);
                 }
 
-                // Encrypt request body (bytes -> turn into text for curl)
-                if (encryptor != null && body != null)
+                using (var response = Client.SendAsync(request).GetAwaiter().GetResult())
                 {
-                    byte[] encBytes = encryptor.Encrypt(body.ToUTF8Bytes());
+                    var rawResponse = response.Content == null
+                        ? string.Empty
+                        : response.Content.ReadAsStringAsync().GetAwaiter().GetResult();
+                    var responseText = DecryptResponse(rawResponse, decryptor);
 
-                    // IMPORTANT:
-                    // curl sends text; safest is base64 transport.
-                    // If your backend expects raw binary, tell me and I'll switch to --data-binary via temp file.
-                    body = Convert.ToBase64String(encBytes);
+                    T responseData = default(T);
+                    try
+                    {
+                        responseData = serializer.Deserialize<T>(responseText);
+                    }
+                    catch (Exception ex)
+                    {
+                        LogHelper.WriteLog(ex);
+                    }
+
+                    return new BaseHttpResponse<T>
+                    {
+                        StatusCode = response.StatusCode,
+                        Response = rawResponse,
+                        ResponseData = responseData
+                    };
                 }
             }
+        }
 
-            // Send through curl.exe
-            var curlResp = _curl.Send(url, method, headers.ToString(), body);
-            var rawResponse = curlResp.Body;
-            var httpCodeInt = curlResp.HttpCode;
-
-            // Decrypt response if needed
-            string responseText = rawResponse;
-
-            if (decryptor != null)
+        private static HttpClient CreateClient()
+        {
+            var handler = new HttpClientHandler
             {
-                // Try base64 -> decrypt (common when we base64 encrypted body)
-                try
-                {
-                    byte[] b64 = Convert.FromBase64String(rawResponse.Trim());
-                    responseText = decryptor.Decrypt(b64).ToUTF8String();
-                }
-                catch
-                {
-                    // Fallback: treat as UTF8 bytes (matches deobfuscated behavior)
-                    responseText = decryptor.Decrypt(rawResponse.ToUTF8Bytes()).ToUTF8String();
-                }
+                AllowAutoRedirect = true,
+                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+            };
+            return new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
+        }
+
+        private static string BuildBody(
+            JavaScriptSerializer serializer,
+            object data,
+            out string mediaType)
+        {
+            if (data is string text)
+            {
+                mediaType = "application/x-www-form-urlencoded";
+                return text;
             }
 
-            // Parse to T if possible
-            T responseData = default;
+            if (data is NameValueCollection values)
+            {
+                mediaType = "application/x-www-form-urlencoded";
+                var builder = new StringBuilder();
+                foreach (string key in values.AllKeys)
+                {
+                    if (builder.Length > 0)
+                        builder.Append('&');
+                    builder.Append(HttpUtility.UrlEncode(key ?? string.Empty));
+                    builder.Append('=');
+                    builder.Append(HttpUtility.UrlEncode(values[key] ?? string.Empty));
+                }
+                return builder.ToString();
+            }
+
+            mediaType = "application/json";
+            return serializer.Serialize(data);
+        }
+
+        private static string DecryptResponse(string rawResponse, IDecryptor decryptor)
+        {
+            if (decryptor == null)
+                return rawResponse;
+
             try
             {
-                responseData = serializer.Deserialize<T>(responseText);
+                return decryptor.Decrypt(Convert.FromBase64String((rawResponse ?? string.Empty).Trim()))
+                    .ToUTF8String();
             }
             catch
             {
-                // keep default; caller can read Response for debugging
+                return decryptor.Decrypt((rawResponse ?? string.Empty).ToUTF8Bytes())
+                    .ToUTF8String();
             }
-
-            return new BaseHttpResponse<T>
-            {
-                StatusCode = (HttpStatusCode)httpCodeInt,
-                Response = rawResponse,
-                ResponseData = responseData
-            };
         }
     }
 }
