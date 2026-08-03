@@ -13,54 +13,67 @@ namespace IRSpeedyVPN.Services.Fastest
         private static readonly TimeSpan ResultTtl = TimeSpan.FromMinutes(2);
 
         public static FastestRoute SelectFallback(
-            IReadOnlyList<FastestPreparedRoute> routes,
+            IReadOnlyCollection<FastestRoute> routes,
             string username)
         {
             if (routes == null || routes.Count == 0)
                 return null;
 
-            var storedUrl = Read("WinnerUrl", username);
+            var storedKey = Read("WinnerKey", username);
             var storedTicks = ReadLong("WinnerTime", username);
-            var stored = FindByUrl(routes, storedUrl);
-            if (stored != null && storedTicks > 0)
+            var storedRoute = routes.FirstOrDefault(x =>
+                string.Equals(x?.RouteKey, storedKey, StringComparison.Ordinal));
+
+            if (storedRoute != null && TryReadUtc(storedTicks, out var observedAt))
             {
-                var timestamp = new DateTime(storedTicks, DateTimeKind.Utc);
-                if (DateTime.UtcNow - timestamp <= ResultTtl)
-                    return stored;
+                var age = DateTime.UtcNow - observedAt;
+                if (age >= TimeSpan.Zero && age <= ResultTtl)
+                    return storedRoute;
             }
 
             var freshMeasured = routes
-                .Select(x => x.Route)
                 .Where(IsFreshMeasurement)
                 .OrderBy(x => x.Url.latency)
                 .FirstOrDefault();
             if (freshMeasured != null)
                 return freshMeasured;
 
-            if (stored != null)
-                return stored;
-
-            return routes[0].Route;
+            return storedRoute ?? routes.First();
         }
 
-        public static void Remember(FastestRoute route, long latency, string username)
+        public static void RememberObserved(
+            FastestRoute route,
+            long latency,
+            string username)
         {
-            if (route?.Url == null || string.IsNullOrWhiteSpace(route.Link) || latency <= 0)
+            if (route?.Url == null || string.IsNullOrWhiteSpace(route.RouteKey) || latency <= 0)
                 return;
 
             route.Url.latency = latency;
             route.Url.latencychkTime = DateTime.Now;
 
-            Write("WinnerUrl", username, route.Link);
+            Write("WinnerKey", username, route.RouteKey);
             Write("WinnerPing", username, latency.ToString(CultureInfo.InvariantCulture));
             Write("WinnerTime", username, DateTime.UtcNow.Ticks.ToString(CultureInfo.InvariantCulture));
         }
 
+        public static string BuildRouteKey(int serviceId, int urlId, string link)
+        {
+            if (serviceId > 0 && urlId > 0)
+                return serviceId.ToString(CultureInfo.InvariantCulture) + ":" +
+                    urlId.ToString(CultureInfo.InvariantCulture);
+
+            var raw = Encoding.UTF8.GetBytes(link ?? string.Empty);
+            using (var sha = SHA256.Create())
+            {
+                var hash = sha.ComputeHash(raw);
+                return "sha256:" + BitConverter.ToString(hash, 0, 16).Replace("-", string.Empty);
+            }
+        }
+
         private static bool IsFreshMeasurement(FastestRoute route)
         {
-            if (route?.Url == null || route.Url.latency <= 0)
-                return false;
-            if (route.Url.latencychkTime == default(DateTime))
+            if (route?.Url == null || route.Url.latency <= 0 || route.Url.latencychkTime == default(DateTime))
                 return false;
 
             var checkedAt = route.Url.latencychkTime.Kind == DateTimeKind.Utc
@@ -70,16 +83,21 @@ namespace IRSpeedyVPN.Services.Fastest
             return age >= TimeSpan.Zero && age <= ResultTtl;
         }
 
-        private static FastestRoute FindByUrl(
-            IEnumerable<FastestPreparedRoute> routes,
-            string url)
+        private static bool TryReadUtc(long ticks, out DateTime value)
         {
-            if (string.IsNullOrWhiteSpace(url))
-                return null;
+            value = default(DateTime);
+            if (ticks < DateTime.MinValue.Ticks || ticks > DateTime.MaxValue.Ticks)
+                return false;
 
-            return routes
-                .Select(x => x.Route)
-                .FirstOrDefault(x => string.Equals(x.Link, url, StringComparison.OrdinalIgnoreCase));
+            try
+            {
+                value = new DateTime(ticks, DateTimeKind.Utc);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static long ReadLong(string name, string username)
