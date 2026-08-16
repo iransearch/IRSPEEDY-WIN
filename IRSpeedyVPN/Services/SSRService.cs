@@ -72,7 +72,7 @@ namespace IRSpeedyVPN.Services
             this.server = server;
             powerVpnPath = Path.Combine(gInfo.TempPath, "PowerVpn\\powervpn.exe");
             userRulePath = Path.Combine(gInfo.TempPath, "PowerVpn\\user.rule");
-            serviceController = (NewServiceController)Program.container.GetInstance(typeof(NewServiceController));
+            serviceController = AppServices.NewServiceController;
         }
 
         public void Connect(string protocol)
@@ -108,7 +108,7 @@ namespace IRSpeedyVPN.Services
                         {
                             string RuleURL = "http://apichcek-p.isdm.ir/dl/user.zip.txt";
                             File.WriteAllBytes(userRulePath + ".zip", SimpleDownloadManager.DownloadData(RuleURL));
-                            var ResourceManager = ((ResourceManager)Program.container.GetInstance(typeof(ResourceManager)));
+                            var ResourceManager = AppServices.ResourceManager;
                             ResourceManager.Extract(userRulePath + ".zip", Path.GetDirectoryName(powerVpnPath));
                             File.Delete(userRulePath + ".zip");
                         }

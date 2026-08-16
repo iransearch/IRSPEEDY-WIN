@@ -21,7 +21,7 @@ namespace IRSpeedyVPN.WebServices
         public T DecryptFromBase64<T>(string s)
         {
             var serializer = new JavaScriptSerializer();
-            serializer.RegisterConverters(new JavaScriptConverter[] { Program.container.GetInstance<JsonConverter>() });
+            serializer.RegisterConverters(new JavaScriptConverter[] { AppServices.JsonConverter });
             return serializer.Deserialize<T>(DecryptFromBase64String(s));
         }
         public String DecryptFromBase64String(string s)

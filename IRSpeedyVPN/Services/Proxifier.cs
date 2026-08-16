@@ -5,7 +5,6 @@ using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Resource;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.Composition;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
@@ -21,8 +20,7 @@ namespace IRSpeedyVPN.Services
         string proxifierPath = "Proxifier";
         bool isAttached;
         ProxifierType routeType;
-        [Import]
-        public GlobalInfo globalInfo { get; set; }
+        public GlobalInfo globalInfo => AppServices.GlobalInfo;
 
         public ProxifierType ProxyType => routeType;
 

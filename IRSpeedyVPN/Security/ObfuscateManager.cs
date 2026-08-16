@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Reflection;
-using System.Text;
 
 namespace IRSpeedyVPN.Security
 {
@@ -11,33 +8,23 @@ namespace IRSpeedyVPN.Security
     {
         public static bool IsObfucated()
         {
-          
-          
-            File.WriteAllText(".\\types.txt", "");
-            foreach (object[] attributeList in GetAttributes())
-            {
-                foreach (object attribute in attributeList)
-                {
-                    File.AppendAllText(".\\types.txt", attribute.GetType().FullName + "\n");
-                    if (attribute.GetType().FullName == "SmartAssembly.Attributes.PoweredByAttribute")
-                    {
-                        return  true;
-                        
-                    }
-                }
-            }
-            return false;
-        }
-        static IEnumerable<object> GetAttributes()
-        {
-            List<object> attr = new List<object>();
             Assembly cur = Assembly.GetExecutingAssembly();
+
+            if (cur.GetCustomAttributes(false).Any(IsDotfuscatorMarker))
+                return true;
+
             foreach (Type type in cur.GetTypes())
             {
-                yield return type.GetCustomAttributes(false);
+                if (type.GetCustomAttributes(false).Any(IsDotfuscatorMarker))
+                    return true;
             }
-            
 
+            return false;
+        }
+
+        private static bool IsDotfuscatorMarker(object attribute)
+        {
+            return attribute.GetType().FullName.IndexOf("Dotfuscator", StringComparison.OrdinalIgnoreCase) >= 0;
         }
     }
 }

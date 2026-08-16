@@ -318,8 +318,7 @@ namespace IRSpeedyVPN.Services.SingBox
                         outbound.obfs = new HysteriaObfs
                         {
                             password = node.obfs_param,
-                            //type = node.obfs //hint: chcek later why it doesnt support gecko
-                            type = "salamander"
+                            type = node.obfs
                         };
                     }
 
@@ -411,9 +410,12 @@ namespace IRSpeedyVPN.Services.SingBox
                 {
                     foreach (string p in excludeprocesspath)
                     {
-                        var exRule = Utils.FromJson<Rule>(Samples.sg_ExcludeRouteRules);
-                        exRule.process_path = p;
-                        cfg.route.rules.Add(exRule);
+                        if (p != null)
+                        {
+                            var exRule = Utils.FromJson<Rule>(Samples.sg_ExcludeRouteRules);
+                            exRule.process_path = p;
+                            cfg.route.rules.Add(exRule);
+                        }
                     }
 
                 }

@@ -15,5 +15,9 @@ namespace IRSpeedyVPN.Services.Xray
         public string method { get; set; }
         public string domainStrategy { get; set; }
         public List<SocksUser> users { get; set; }
+        public string server { get; set; }
+        public int? server_port { get; set; }
+        public HysteriaObfs obfs { get; set; }
+        public HysteriaTls tls { get; set; }
     }
 }
