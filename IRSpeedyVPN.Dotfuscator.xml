@@ -1,0 +1,211 @@
+<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<!--This config file was generated for IRSpeedyVPN. Use the Dotfuscator Config Editor to modify.-->
+<!DOCTYPE dotfuscator SYSTEM "http://www.preemptive.com/dotfuscator/dtd/dotfuscator_v2.5.dtd">
+<dotfuscator version="2.3">
+  <global>
+  </global>
+  <input>
+    <loadpaths />
+    <asmlist>
+      <inputassembly refid="3e5f8c21-4a7b-4b6e-9d2c-1f4a9b3c8d7e">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <option>transformxaml</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="IRSpeedyVPN.exe" />
+      </inputassembly>
+      <inputassembly refid="58366996-ebce-42d5-a88b-919f9d0212dd">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="Newtonsoft.Json.dll" />
+      </inputassembly>
+      <inputassembly refid="740eef69-1489-4eee-989d-bb7c5807282a">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="DotNetZip.dll" />
+      </inputassembly>
+      <inputassembly refid="e712a3f0-613f-4433-bceb-3bce3d36dd9d">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="DotRas.dll" />
+      </inputassembly>
+      <inputassembly refid="8eb338da-9e3e-4ed5-8e57-354e7972e91c">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="QRCoder.dll" />
+      </inputassembly>
+      <inputassembly refid="56cf72dc-65ed-467b-adf7-b1effb321939">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="System.Buffers.dll" />
+      </inputassembly>
+      <inputassembly refid="0b2e6fe0-7f2d-42a1-9c38-5508b593d8e3">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="System.Memory.dll" />
+      </inputassembly>
+      <inputassembly refid="22d19562-f064-4248-8935-3fd1d6e3a13a">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="System.Numerics.Vectors.dll" />
+      </inputassembly>
+      <inputassembly refid="6b3728bf-fdad-40b6-aee1-668bf4ec415f">
+        <option>honoroas</option>
+        <option>stripoa</option>
+        <option>library</option>
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="System.Runtime.CompilerServices.Unsafe.dll" />
+      </inputassembly>
+    </asmlist>
+  </input>
+  <output>
+    <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48\Obfuscated" />
+  </output>
+  <renaming>
+    <option>enhancedOI</option>
+    <option>xmlserialization</option>
+    <excludelist>
+      <type name="IRSpeedyVPN.Services.CiscoService" />
+      <type name="IRSpeedyVPN.Services.Proxifier" />
+      <type name="IRSpeedyVPN.Services.sslProxyService" />
+      <type name="IRSpeedyVPN.Services.SSRService" />
+      <type name="IRSpeedyVPN.Services.VPNService" />
+      <type name="IRSpeedyVPN.Services.TunnelPlusService" />
+      <type name="IRSpeedyVPN.Services.ServiceFactory" />
+      <type name="IRSpeedyVPN.Models.GlobalInfo" />
+      <type name="IRSpeedyVPN.Components.ServerListControl.PickerItem" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Components.ServerListControl.SmartItem" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Components.ServerListControl.GroupItem" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Components.ServerListControl.UrlItem" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Windows.VGAURDServiceSetting" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Windows.SSRServiceSetting" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Windows.SpeedyShieldSetting" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Windows.ShareVPNSetting" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Windows.DeviceLimitWindow" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Windows.PingResult" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+      <type name="IRSpeedyVPN.Windows.MyMessageBox" excludetype="true">
+        <method name=".*" regex="true" />
+        <field name=".*" regex="true" />
+        <propertymember name=".*" regex="true" />
+        <eventmember name=".*" regex="true" />
+      </type>
+    </excludelist>
+    <mapping>
+      <mapoutput overwrite="true">
+        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48\Obfuscated" name="Map.xml" />
+      </mapoutput>
+    </mapping>
+    <referencerulelist>
+      <referencerule rulekey="{6655B10A-FD58-462d-8D4F-5B1316DFF0FF}" />
+      <referencerule rulekey="{7D9C8B02-2383-420f-8740-A9760394C2C1}" />
+      <referencerule rulekey="{229FD6F8-5BCC-427b-8F72-A7A413ECDF1A}" />
+      <referencerule rulekey="{2B7E7C8C-A39A-4db8-9DFC-6AFD38509061}" />
+      <referencerule rulekey="{494EA3BA-B947-44B5-BEE8-A11CC85AAF9B}" />
+      <referencerule rulekey="{89769974-93E9-4e71-8D92-BE70E855ACFC}" />
+      <referencerule rulekey="{4D81E604-A545-4631-8B6D-C3735F793F80}" />
+      <referencerule rulekey="{62bd3899-7d53-4336-8ca2-4e5dbae187d5}" />
+    </referencerulelist>
+  </renaming>
+  <controlflow level="high" />
+  <stringencrypt />
+  <linking>
+    <linkedassembly>
+      <option>mangleandwarn</option>
+      <primaryinput>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="IRSpeedyVPN.exe" />
+        </assembly>
+      </primaryinput>
+      <assemblylist>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="IRSpeedyVPN.exe" />
+        </assembly>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="Newtonsoft.Json.dll" />
+        </assembly>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="DotNetZip.dll" />
+        </assembly>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="DotRas.dll" />
+        </assembly>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="QRCoder.dll" />
+        </assembly>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="System.Buffers.dll" />
+        </assembly>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="System.Memory.dll" />
+        </assembly>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="System.Numerics.Vectors.dll" />
+        </assembly>
+        <assembly>
+          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="System.Runtime.CompilerServices.Unsafe.dll" />
+        </assembly>
+      </assemblylist>
+      <outputassembly name="IRSpeedyVPN.exe" />
+    </linkedassembly>
+  </linking>
+  <sos />
+  <smartobfuscation>
+    <smartobfuscationreport verbosity="all" overwrite="false" />
+  </smartobfuscation>
+</dotfuscator>

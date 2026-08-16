@@ -5,9 +5,11 @@ using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Resource;
 using IRSpeedyVPN.Services;
 using IRSpeedyVPN.WebServices;
-using SimpleInjector;
 using System;
+using System.IO;
 using System.IO.Pipes;
+using System.Linq;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -17,7 +19,6 @@ namespace IRSpeedyVPN
     static class Program
     {
         private static Mutex mutex;
-        internal static Container container;
 
         private const string MutexName = "{DE02AF2D-7EF7-4604-926A-E0B9023BE634}";
         private const string ShowPipeName = "IRSpeedyVPN_ShowWindow";
@@ -25,6 +26,8 @@ namespace IRSpeedyVPN
         [STAThread]
         static void Main()
         {
+            RegisterEmbeddedAssemblyResolver();
+
             bool createdNew;
             mutex = new Mutex(true, MutexName, out createdNew);
 
@@ -53,14 +56,41 @@ namespace IRSpeedyVPN
 
                 //app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/ToggleSwitchStyles.xaml", UriKind.Relative) });
 
-                container = Bootstrap();
+                AppServices.Initialize();
 
-                RunApplication(app, container);
+                RunApplication(app);
             }
             catch (Exception ex)
             {
                 LogHelper.WriteLog(ex, true);
             }
+        }
+
+        private static void RegisterEmbeddedAssemblyResolver()
+        {
+            AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
+            {
+                var assemblyName = new AssemblyName(args.Name).Name;
+
+                if (assemblyName != "Transitionals")
+                    return null;
+
+                Assembly executing = Assembly.GetExecutingAssembly();
+                string resourceName = executing.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("Transitionals.dll", StringComparison.OrdinalIgnoreCase));
+
+                if (resourceName == null)
+                    return null;
+
+                using (Stream stream = executing.GetManifestResourceStream(resourceName))
+                {
+                    if (stream == null)
+                        return null;
+
+                    byte[] data = new byte[stream.Length];
+                    stream.Read(data, 0, data.Length);
+                    return Assembly.Load(data);
+                }
+            };
         }
 
         private static void StartShowPipeServer()
@@ -141,40 +171,11 @@ namespace IRSpeedyVPN
             }
         }
 
-        private static Container Bootstrap()
-        {
-            var container = new Container();
-
-            container.Options.PropertySelectionBehavior =
-                new ImportPropertySelectionBehavior();
-
-            container.Register<UserControls.UCLogin, UserControls.UCLogin>(Lifestyle.Singleton);
-            container.Register<UserControls.UCLoading, UserControls.UCLoading>(Lifestyle.Singleton);
-            container.Register<UserControls.UCUserInfo, UserControls.UCUserInfo>(Lifestyle.Singleton);
-            container.Register<UserControls.UCServerList, UserControls.UCServerList>(Lifestyle.Singleton);
-            container.Register<UserControls.UCUpdate, UserControls.UCUpdate>(Lifestyle.Singleton);
-            container.Register<UserControls.UCChangePassword, UserControls.UCChangePassword>(Lifestyle.Singleton);
-
-            container.Register<NewServiceController, NewServiceController>(Lifestyle.Singleton);
-            container.Register<IProxifier, Proxifier>(Lifestyle.Singleton);
-            container.Register<ServiceFactory, ServiceFactory>(Lifestyle.Singleton);
-            container.Register<PersianIsoNames, PersianIsoNames>(Lifestyle.Singleton);
-            container.Register<GlobalInfo, GlobalInfo>(Lifestyle.Singleton);
-            container.Register<ResourceManager, ResourceManager>(Lifestyle.Singleton);
-            container.Register<JsonConverter, JsonConverter>(Lifestyle.Singleton);
-
-            container.Register<MainWindow>(Lifestyle.Singleton);
-
-            container.Verify();
-
-            return container;
-        }
-
-        private static void RunApplication(App app, Container container)
+        private static void RunApplication(App app)
         {
             try
             {
-                var mainWindow = container.GetInstance<MainWindow>();
+                var mainWindow = new MainWindow();
 
                 // Start pipe server AFTER MainWindow exists
                 StartShowPipeServer();

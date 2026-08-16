@@ -29,7 +29,7 @@ using v2rayN.Mode;
 
 namespace IRSpeedyVPN.Services
 {
-    class TunnelPlusService : IVPNService
+    class TunnelPlusService : IVPNService, ISmartFastConnection
     {
         NewServiceController serviceController { get; set; }
         GlobalInfo gInfo;
@@ -61,6 +61,7 @@ namespace IRSpeedyVPN.Services
         public Type SettingType => typeof(VGAURDServiceSetting);
         string selectedUrl;
         public string SelectedUrl => selectedUrl ?? server.urls.FirstOrDefault()?.url;
+        string[] _smartFastUrls;
         bool IsConnected=false;
         bool userCancelRequested;
         int reconnecting;
@@ -131,7 +132,7 @@ namespace IRSpeedyVPN.Services
             gInfo = globalInfo;
             this.server = server;
             corePath = ResolveCorePath();
-            serviceController = (NewServiceController)Program.container.GetInstance(typeof(NewServiceController));
+            serviceController = AppServices.NewServiceController;
         }
 
         public void Connect(string protocol)
@@ -141,6 +142,16 @@ namespace IRSpeedyVPN.Services
             IsConnected = false;
             ((Action)(() => RunV2ray(/*SelectedUrl*/))).BeginInvoke(null, null);
         }
+        public bool IsSmartFast => _smartFastUrls != null && _smartFastUrls.Length > 0;
+
+        public void SetSmartFastUrls(string[] successUrls)
+        {
+            _smartFastUrls = (successUrls ?? new string[0])
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+        }
+
         void RunV2ray(string goUrl=null,int port=1080)
         {
             try
@@ -152,22 +163,26 @@ namespace IRSpeedyVPN.Services
                     if (goUrl == null)
                     {
                         KillAll();
-                        UrlTest(SelectedServerUrl != null ? new[] { SelectedServerUrl } : null, true);
-
-                        if (urlTestSpeed < 0)
+                        // smart fast already ran the url test and collected the success urls
+                        if (_smartFastUrls == null || _smartFastUrls.Length == 0)
                         {
-                            TryStopCore();
-                            
-                            if (onConnectDisconnect != null)
-                                onConnectDisconnect.Invoke(this, false, 0, "سروری یافت نشد");
-                            return;
+                            UrlTest(SelectedServerUrl != null ? new[] { SelectedServerUrl } : null, true);
 
+                            if (urlTestSpeed < 0)
+                            {
+                                TryStopCore();
+                                
+                                if (onConnectDisconnect != null)
+                                    onConnectDisconnect.Invoke(this, false, 0, "سروری یافت نشد");
+                                return;
+
+                            }
+                            else if (isVodEnabled)
+                            {
+                                VodUrlTest();
+                            }
+                            //LogHelper.WriteExLog($"ss\t{selectedUrl}\n");
                         }
-                        else if (isVodEnabled)
-                        {
-                            VodUrlTest();
-                        }
-                        //LogHelper.WriteExLog($"ss\t{selectedUrl}\n");
 
                     }
                     StopHysteriaProcess();
@@ -183,14 +198,52 @@ namespace IRSpeedyVPN.Services
                     lastListenPort = port;
                     lastVpnMode = vpnmode;
                     var shieldFiles = GetShieldFiles();
-                    var sniRuntime = GetSniRuntime(lastLink, serviceSniServers, true);
-                    var chainLink = GetChainLink(lastLink);
+                    var isSmartFast = _smartFastUrls != null && _smartFastUrls.Length > 0;
+                    var sniRuntime = isSmartFast ? null : GetSniRuntime(lastLink, serviceSniServers, true);
+                    var chainLink = isSmartFast ? null : GetChainLink(lastLink);
                     var defaultChainLink = GetDefaultChainLink();
                     bool needXray = false;
                     string xrayConfig = null;
                     string singboxLink = lastLink; // Default to lastLink
 
-                    if (Xray.ConfigGenerator.LinkNeedsXray(lastLink))
+                    if (isSmartFast)
+                    {
+                        // smart fast: force every success url into an xray outbound
+                        // (hysteria2 urls included) and let the balancer pick the fastest
+                        var smartUrls = _smartFastUrls
+                            .Where(u => !string.IsNullOrWhiteSpace(u))
+                            .Distinct(StringComparer.Ordinal)
+                            .ToList();
+
+                        if (smartUrls.Count == 0)
+                        {
+                            TryStopCore();
+                            if (onConnectDisconnect != null)
+                                onConnectDisconnect.Invoke(this, false, 0, "سروری یافت نشد");
+                            return;
+                        }
+
+                        needXray = true;
+                        _xraySocksPort = FreePortManager.Dequeue();
+                        var authUser = Guid.NewGuid().ToString("N");
+                        var authPass = Guid.NewGuid().ToString("N");
+
+                        xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(smartUrls, _xraySocksPort, authUser, authPass);
+                        if (string.IsNullOrWhiteSpace(xrayConfig))
+                        {
+                            if (_xraySocksPort > 0) FreePortManager.Enqueue(_xraySocksPort);
+                            _xraySocksPort = 0;
+                            TryStopCore();
+                            if (onConnectDisconnect != null)
+                                onConnectDisconnect.Invoke(this, false, 0, "سروری یافت نشد");
+                            return;
+                        }
+
+                        // sing-box relays the local listener to the xray SOCKS inbound
+                        singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
+                        _singboxLinkOverride = null;
+                    }
+                    else if (Xray.ConfigGenerator.LinkNeedsXray(lastLink))
                     {
                         needXray = true;
                         _xraySocksPort = FreePortManager.Dequeue();
@@ -207,6 +260,7 @@ namespace IRSpeedyVPN.Services
                         singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}?host={address},{downloadAddress}";
                         _singboxLinkOverride = null;
                     }
+                    /*
                     else if (IsHysteria2Link(lastLink))
                     {
                         _hysteriaSocksPort = FreePortManager.Dequeue();
@@ -223,7 +277,7 @@ namespace IRSpeedyVPN.Services
                         singboxLink = $"socks://127.0.0.1:{_hysteriaSocksPort}?host={address}";
                         _singboxLinkOverride = singboxLink;
                     }
-
+                    */
                     // Now generate Sing-box config with the appropriate parameter
                     var configData = SingBox.ConfigGenerator.GetConfig(
                         singboxLink,  // Either lastLink or SOCKS URL
@@ -658,6 +712,7 @@ namespace IRSpeedyVPN.Services
 });
                             socksOverrides[kvp.Key] = Tuple.Create(socksPort, authUser, authPass);
                         }
+                        /*
                         else if (IsHysteria2Link(kvp.Key))
                         {
                             var socksPort = FreePortManager.Dequeue();
@@ -681,7 +736,7 @@ namespace IRSpeedyVPN.Services
                             }
                             if (!socksOverrides.ContainsKey(kvp.Key))
                                 FreePortManager.Enqueue(socksPort);
-                        }
+                        }*/
                     }
 
                     port = FreePortManager.Dequeue();
