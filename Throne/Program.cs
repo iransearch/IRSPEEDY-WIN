@@ -12,18 +12,33 @@ namespace Throne
         private static NamedPipeServerStream _corePipe; // pipe A — Core connects here
         private static NamedPipeServerStream _relayPipe; // pipe B — ThroneControl connects here
         private static volatile bool _running = true;
+        private static StreamWriter _logWriter;
 
-        private const string RelayPipeName = @"\\.\pipe\Throne_relay";
+        private const int CoreConnectTimeoutMs = 15000;
+        private const int RelayConnectTimeoutMs = 15000;
 
         private static int Main(string[] args)
         {
             if (args.Length < 1)
             {
-                Console.Error.WriteLine("Usage: Throne <ThroneCore.exe>");
+                Console.Error.WriteLine("Usage: Throne <ThroneCore.exe> [relayPipeName]");
                 return 1;
             }
 
             var coreExePath = args[0];
+            var relayPipeName = args.Length > 1 && !string.IsNullOrWhiteSpace(args[1]) ? args[1] : "Throne_relay";
+            var logPath = Path.Combine(
+                AppDomain.CurrentDomain.BaseDirectory,
+                "throne_" + Process.GetCurrentProcess().Id + ".log");
+            try
+            {
+                _logWriter = new StreamWriter(logPath, false) { AutoFlush = true };
+            }
+            catch
+            {
+                // Logging is best-effort; never block startup on it.
+            }
+            Log("Throne starting. core={0} relayPipe={1} log={2}", coreExePath, relayPipeName, logPath);
 
             // ————— step 1: internal pipe for Core —————
             var corePipeName = "Throne_int_" + Guid.NewGuid().ToString("N");
@@ -35,6 +50,7 @@ namespace Throne
 
             // ————— step 2: launch Core —————
             Console.Error.WriteLine("Launching Core...");
+            Log("Launching Core...");
             var psi = new ProcessStartInfo(coreExePath)
             {
                 UseShellExecute = false,
@@ -48,30 +64,43 @@ namespace Throne
             _coreProcess = new Process { StartInfo = psi };
             _coreProcess.OutputDataReceived += (s, e) =>
             {
-                if (e.Data != null) Console.WriteLine("[core] {0}", e.Data);
+                if (e.Data != null) { Console.WriteLine("[core] {0}", e.Data); Log("[core] {0}", e.Data); }
             };
             _coreProcess.ErrorDataReceived += (s, e) =>
             {
-                if (e.Data != null) Console.Error.WriteLine("[core-1] {0}", e.Data);
+                if (e.Data != null) { Console.Error.WriteLine("[core-1] {0}", e.Data); Log("[core-1] {0}", e.Data); }
             };
             _coreProcess.Start();
             _coreProcess.BeginOutputReadLine();
             _coreProcess.BeginErrorReadLine();
 
             Console.Error.WriteLine("Waiting for Core to connect...");
-            _corePipe.WaitForConnection();
+            if (!WaitForConnection(_corePipe, CoreConnectTimeoutMs))
+            {
+                Log("Core did not connect to the internal pipe within {0} ms.", CoreConnectTimeoutMs);
+                Console.Error.WriteLine("Core did not connect in time.");
+                return 2;
+            }
             Console.Error.WriteLine("Core connected.");
+            Log("Core connected.");
 
-            // ————— step 3: relay pipe for ThroneControl (fixed name) —————
+            // ————— step 3: relay pipe for ThroneControl (per-instance name) —————
             _relayPipe?.Dispose();
-            _relayPipe = new NamedPipeServerStream("Throne_relay", PipeDirection.InOut,
+            _relayPipe = new NamedPipeServerStream(relayPipeName, PipeDirection.InOut,
                 maxNumberOfServerInstances: 1, PipeTransmissionMode.Byte,
                 PipeOptions.Asynchronous);
 
-            Console.Error.WriteLine("Relay pipe ready: {0}", RelayPipeName);
+            Console.Error.WriteLine("Relay pipe ready: {0}", relayPipeName);
+            Log("Relay pipe ready: {0}", relayPipeName);
             Console.Error.WriteLine("Waiting for ThroneControl to connect...");
-            _relayPipe.WaitForConnection();
+            if (!WaitForConnection(_relayPipe, RelayConnectTimeoutMs))
+            {
+                Log("ThroneControl did not connect to the relay pipe within {0} ms.", RelayConnectTimeoutMs);
+                Console.Error.WriteLine("ThroneControl did not connect in time.");
+                return 3;
+            }
             Console.Error.WriteLine("ThroneControl connected, starting relay.");
+            Log("ThroneControl connected, starting relay.");
 
             // ————— step 4: relay loop —————
             var relayThread = new Thread(RelayLoop) { IsBackground = true };
@@ -161,6 +190,31 @@ namespace Throne
             _running = false;
         }
 
+        private static bool WaitForConnection(NamedPipeServerStream pipe, int timeoutMs)
+        {
+            try
+            {
+                return pipe.WaitForConnectionAsync().Wait(timeoutMs);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static void Log(string format, params object[] args)
+        {
+            try
+            {
+                _logWriter?.WriteLine("{0:yyyy-MM-dd HH:mm:ss.fff} {1}",
+                    DateTime.Now,
+                    string.Format(format, args));
+            }
+            catch
+            {
+            }
+        }
+
         private static int ReadExact(PipeStream pipe, byte[] buf, int offset, int count)
         {
             var total = 0;
@@ -184,6 +238,7 @@ namespace Throne
             _coreProcess?.Dispose();
             _corePipe?.Dispose();
             _relayPipe?.Dispose();
+            try { _logWriter?.Dispose(); } catch { }
         }
     }
 }

@@ -122,9 +122,10 @@ namespace IRSpeedyVPN.Services
         readonly HashSet<int> activeSniPorts = new HashSet<int>();
         const int CorePort = 19810;
         const int VpnCorePort = 19811;
-        const int CoreConnectTimeoutMs = 8000;
+        const int CoreConnectTimeoutMs = 15000;
         const int CoreConnectRetryDelayMs = 200;
         static ThronePipeClient _throneClient;
+        static string _thronePipeName;
         const string SniScheme = "sni://";
         int nextSniListenPort = 40443;
         public TunnelPlusService(IServer server, GlobalInfo globalInfo)
@@ -978,7 +979,8 @@ namespace IRSpeedyVPN.Services
                 }
 
                 var coreDir = Path.GetDirectoryName(corePath);
-                process = ShellExecute.ShellexecAndReturnProcess(thronePath, $"\"{corePath}\"", coreDir);
+                var pipeName = "Throne_relay_" + Guid.NewGuid().ToString("N");
+                process = ShellExecute.ShellexecAndReturnProcess(thronePath, $"\"{corePath}\" {pipeName}", coreDir);
                 owned = true;
                 lastCoreStartUtc = DateTime.UtcNow;
                 if (process != null)
@@ -987,22 +989,29 @@ namespace IRSpeedyVPN.Services
                     process.Exited -= CoreProcess_Exited;
                     process.Exited += CoreProcess_Exited;
                 }
+                _thronePipeName = pipeName;
             }
 
             var sw = Stopwatch.StartNew();
-            while (sw.Elapsed < TimeSpan.FromSeconds(5))
+            Exception lastError = null;
+            while (sw.Elapsed < TimeSpan.FromMilliseconds(CoreConnectTimeoutMs))
             {
+                if (process != null && process.HasExited)
+                    throw new InvalidOperationException(
+                        "Throne relay exited during startup with code " + process.ExitCode + ".");
                 try
                 {
                     EnsureThroneClient();
                     return;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    lastError = ex;
                 }
                 Thread.Sleep(100);
             }
-            throw new TimeoutException("Throne relay did not start in time.");
+            throw new TimeoutException("Throne relay did not start in time."
+                + (lastError != null ? " Last error: " + lastError.Message : string.Empty));
         }
 
         private void EnsureThroneClient()
@@ -1010,7 +1019,7 @@ namespace IRSpeedyVPN.Services
             if (_throneClient != null && _throneClient.IsConnected)
                 return;
             _throneClient?.Dispose();
-            _throneClient = new ThronePipeClient();
+            _throneClient = new ThronePipeClient(_thronePipeName);
             _throneClient.Connect(2000);
         }
 
@@ -1019,7 +1028,6 @@ namespace IRSpeedyVPN.Services
             try
             {
                 SafeStopCore();
-                ShellExecute.KillProccess("Throne");
                 _throneClient = null;
                 if (coreOwned && coreProcess != null)
                 {

@@ -14,6 +14,12 @@ namespace IRSpeedyVPN.Services.Libcore
         private NamedPipeClientStream _pipe;
         private long _nextId;
         private readonly object _lock = new object();
+        private readonly string _pipeName;
+
+        public ThronePipeClient(string pipeName = "Throne_relay")
+        {
+            _pipeName = string.IsNullOrWhiteSpace(pipeName) ? "Throne_relay" : pipeName;
+        }
 
         public void Connect(int timeoutMs = 5000)
         {
@@ -22,7 +28,7 @@ namespace IRSpeedyVPN.Services.Libcore
                 if (_pipe != null && _pipe.IsConnected)
                     return;
                 _pipe?.Dispose();
-                _pipe = new NamedPipeClientStream(".", "Throne_relay", PipeDirection.InOut);
+                _pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut);
                 _pipe.Connect(timeoutMs);
                 _pipe.ReadTimeout = ReadTimeoutMs;
                 _pipe.WriteTimeout = WriteTimeoutMs;
