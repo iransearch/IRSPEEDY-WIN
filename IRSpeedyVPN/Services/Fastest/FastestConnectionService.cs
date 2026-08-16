@@ -50,7 +50,7 @@ namespace IRSpeedyVPN.Services.Fastest
             gInfo = globalInfo ?? throw new ArgumentNullException(nameof(globalInfo));
             selectedProtocol = protocol;
             Name = sourceServices[0].Name;
-            serviceController = (NewServiceController)Program.container.GetInstance(typeof(NewServiceController));
+            serviceController = AppServices.NewServiceController;
         }
 
         public event OnConnectDisconnect onConnectDisconnect;

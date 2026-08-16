@@ -198,5 +198,42 @@ namespace IRSpeedyVPN.Common
                 catch { /* ignore */ }
             }
         }
+
+        public static void KillProcessTree(Process process)
+        {
+            if (process == null)
+                return;
+            try
+            {
+                if (process.HasExited)
+                    return;
+            }
+            catch
+            {
+                return;
+            }
+
+            // taskkill /T walks the child-process tree, which Process.Kill does not.
+            try
+            {
+                using (var taskkill = Process.Start(new ProcessStartInfo
+                {
+                    FileName = "taskkill",
+                    Arguments = "/PID " + process.Id + " /T /F",
+                    CreateNoWindow = true,
+                    UseShellExecute = false
+                }))
+                {
+                    taskkill?.WaitForExit(5000);
+                }
+                return;
+            }
+            catch
+            {
+            }
+
+            try { process.Kill(); }
+            catch { /* ignore */ }
+        }
     }
 }
