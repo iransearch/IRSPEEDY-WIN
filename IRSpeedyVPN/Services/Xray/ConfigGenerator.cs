@@ -1,4 +1,6 @@
 using IRSpeedyVPN.Common;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -243,6 +245,72 @@ namespace IRSpeedyVPN.Services.Xray
                 }
             };
         }
+        public static string GetSmartBalancerConfig(IEnumerable<string> links, int port, string authUser, string authPass)
+        {
+            var root = JObject.Parse(Samples.BalancerConfig);
+            var serializer = new JsonSerializer { NullValueHandling = NullValueHandling.Ignore };
+
+            var inbounds = root["inbounds"] as JArray ?? new JArray();
+            inbounds.Add(JObject.FromObject(new Inbound
+            {
+                listen = "127.0.0.1",
+                port = port,
+                protocol = "socks",
+                tag = "smart-inbound",
+                settings = new InboundSettings
+                {
+                    auth = "password",
+                    udp = true,
+                    accounts = new List<Account>
+                    {
+                        new Account { user = authUser, pass = authPass }
+                    }
+                }
+            }, serializer));
+            root["inbounds"] = inbounds;
+
+            var outbounds = new JArray();
+            int idx = 0;
+            foreach (var link in links)
+            {
+                if (string.IsNullOrWhiteSpace(link))
+                    continue;
+
+                string msg;
+                var item = ShareHandler.ImportFromConfigLink(link, out msg);
+                if (item == null)
+                    continue;
+
+                var proxy = new Outbound { tag = $"smart-proxy-{idx}" };
+                FillOutboundForItem(proxy, item);
+                if (proxy.protocol == null)
+                    continue;
+
+                outbounds.Add(JObject.FromObject(proxy, serializer));
+                idx++;
+            }
+
+            if (idx == 0)
+                return null;
+
+            // routing rules in the balancer sample reference the "direct" and "block" outbounds
+            outbounds.Add(JObject.FromObject(new Outbound
+            {
+                tag = "direct",
+                protocol = "freedom",
+                settings = new OutboundSettings { domainStrategy = "AsIs" }
+            }, serializer));
+            outbounds.Add(JObject.FromObject(new Outbound
+            {
+                tag = "block",
+                protocol = "blackhole"
+            }, serializer));
+
+            root["outbounds"] = outbounds;
+            root.Remove("outbound");
+
+            return root.ToString(Formatting.Indented);
+        }
 
         public static void FillOutboundForItem(Outbound outbound, VmessItem node)
         {
@@ -330,6 +398,31 @@ namespace IRSpeedyVPN.Services.Xray
                             new SocksUser { user = node.security, pass = node.id }
                         };
                     }
+                    outbound.settings = settings;
+                }
+                else if (node.configType == EConfigType.Hysteria2)
+                {
+                    outbound.protocol = "hysteria2";
+                    var settings = new OutboundSettings
+                    {
+                        server = node.address,
+                        server_port = node.port > 0 ? node.port : 443,
+                        password = node.password
+                    };
+                    if (!string.IsNullOrWhiteSpace(node.obfs_param))
+                    {
+                        settings.obfs = new HysteriaObfs
+                        {
+                            type = string.IsNullOrWhiteSpace(node.obfs) ? "salamander" : node.obfs,
+                            password = node.obfs_param
+                        };
+                    }
+                    settings.tls = new HysteriaTls
+                    {
+                        enabled = true,
+                        server_name = string.IsNullOrWhiteSpace(node.sni) ? null : node.sni,
+                        insecure = string.IsNullOrWhiteSpace(node.allowInsecure) ? (bool?)null : Utils.ToBool(node.allowInsecure)
+                    };
                     outbound.settings = settings;
                 }
             }

@@ -58,7 +58,7 @@ namespace IRSpeedyVPN.Common
         {
             try
             {
-                return ((PersianIsoNames)Program.container.GetInstance(typeof(PersianIsoNames))).GetName(countryCode);
+                return AppServices.PersianIsoNames.GetName(countryCode);
             }
             catch
             {
@@ -69,13 +69,13 @@ namespace IRSpeedyVPN.Common
         public static T JsonDeserilize<T>(this string data)
         {
             var serializer = new JavaScriptSerializer();
-            serializer.RegisterConverters(new JavaScriptConverter[] { Program.container.GetInstance<JsonConverter>() });
+            serializer.RegisterConverters(new JavaScriptConverter[] { AppServices.JsonConverter });
             return (T)(serializer.Deserialize<T>(data));
         }
         public static string JsonSerilize(this object data)
         {
             var serializer = new JavaScriptSerializer();
-            serializer.RegisterConverters(new JavaScriptConverter[] { Program.container.GetInstance<JsonConverter>() });
+            serializer.RegisterConverters(new JavaScriptConverter[] { AppServices.JsonConverter });
             return serializer.Serialize(data);
         }
         public static string ToPresianDate(this DateTime d)

@@ -101,7 +101,7 @@ namespace IRSpeedyVPN.WebServices
                 var res = service.SendRequest<DefaultEncryptedResponse<AccountInfoEx>>(
                     "api/server/list/all",
                     BuildAuthPayload(userName, password, deviceName, deviceToken, guid),
-                    null, null);
+                    null, null, null, 20);
 
                 // Keep your original validation:
                 if (IsValidEncryptedServerListResponse(res, guid))

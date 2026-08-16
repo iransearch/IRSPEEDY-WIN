@@ -5,7 +5,6 @@ using IRSpeedyVPN.Services;
 using IRSpeedyVPN.Windows;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.Composition;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -28,8 +27,7 @@ namespace IRSpeedyVPN.UserControls
     public partial class UCUserInfo : UserControl, IHasTitle
     {
 
-        [Import]
-        private IProxifier proxifier { get; set; }
+        private IProxifier proxifier => AppServices.Proxifier;
 
         internal delegate void LoadingRequest(bool Show, string Message);
         internal event LoadingRequest OnLoadingRequest;
@@ -132,10 +130,12 @@ namespace IRSpeedyVPN.UserControls
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
 
-            globalInfo = Program.container.GetInstance<GlobalInfo>();
+            globalInfo = AppServices.GlobalInfo;
             timerTick = 0;
             uiTimer.Change(1000, 1000);
-            txtCountry.Text = globalInfo.CurrentService.Country;
+            txtCountry.Text = (globalInfo.CurrentService is ISmartFastConnection smart && smart.IsSmartFast)
+                ? "سرور هوشمند"
+                : globalInfo.CurrentService.Country;
             txtServiceName.Text = globalInfo.CurrentService.Name + (proxifier.IsAttached() && proxifier.ProxyType.GetDescription().Length > 0 ? " / " + proxifier.ProxyType.GetDescription() : "");
             txtConnectionTime.Text = "00:00:00";
 

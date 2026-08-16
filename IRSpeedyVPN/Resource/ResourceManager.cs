@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.Cryptography;
 using System.Text;
 using System.Web;
 using System.Web.Script.Serialization;
@@ -16,81 +17,360 @@ namespace IRSpeedyVPN.Resource
 {
     public class ResourceManager
     {
-        TripleDesHelper tdes;
+        private readonly TripleDesHelper tdes;
+        private readonly object extractionLock = new object();
+        private readonly string runtimeRoot;
+        private readonly string versionsPath;
+        private readonly string statePath;
+        private readonly string activeVersionPath;
+        private const string SettingFile = "seed.set";
+
         public string TempPath { get; set; }
-        String SettingFile = "seed.set";
         public string Password { get; set; }
         public event EventHandler onResourceExtracted;
+
         public ResourceManager()
         {
-            TempPath =  Path.Combine(Path.GetTempPath(), "IRSpeedy");
-            Directory.CreateDirectory(TempPath);            
-            tdes = new TripleDesHelper(0x1F, 0xaf, "b1", "8a", "aa", "d6", "ef", 0xea, SysThumbPrint.Value());
-            //new Action(ExtractResource).BeginInvoke(null,null);
+            runtimeRoot = Path.Combine(Path.GetTempPath(), "IRSpeedy");
+            versionsPath = Path.Combine(runtimeRoot, "versions");
+            statePath = Path.Combine(runtimeRoot, "state");
+            activeVersionPath = Path.Combine(runtimeRoot, "active.version");
+
+            Directory.CreateDirectory(runtimeRoot);
+            Directory.CreateDirectory(versionsPath);
+            Directory.CreateDirectory(statePath);
+
+            TempPath = ResolveActiveVersionPath() ?? runtimeRoot;
+            tdes = new TripleDesHelper(
+                0x1F,
+                0xaf,
+                "b1",
+                "8a",
+                "aa",
+                "d6",
+                "ef",
+                0xea,
+                SysThumbPrint.Value());
+            MigrateSettingsFile();
         }
+
         public void ExtractResource(bool W84Exit = false)
         {
-            void extraction()
+            var ready = false;
+            lock (extractionLock)
             {
-                byte[] settingsBackup = null;
-                string settingsPath = Path.Combine(TempPath, SettingFile);
-
+                var previousVersion = ReadActiveVersion();
                 try
                 {
-                    // 1) Backup setting file (if exists)
-                    if (File.Exists(settingsPath))
+                    using (var source = Application.GetResourceStream(
+                        new Uri("pack://application:,,,/Resources/Files.zip"))?.Stream)
                     {
-                        settingsBackup = File.ReadAllBytes(settingsPath);
-                    }
+                        if (source == null)
+                            throw new FileNotFoundException("Embedded Resources/Files.zip was not found.");
 
-                    // 2) Extract zip to a temp folder
-                    using (var stream = Application.GetResourceStream(
-                               new Uri("pack://application:,,,/Resources/Files.zip"))?.Stream)
-                    {
-                        if (stream == null) return;
+                        var archiveBytes = ReadAllBytes(source);
+                        var versionId = ComputeVersionId(archiveBytes);
+                        var versionDirectory = Path.Combine(versionsPath, versionId);
 
-                        using (var z = ZipFile.Read(stream))
-                        {
-                            string exPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
-                            Directory.CreateDirectory(exPath);
+                        if (!IsValidRuntime(versionDirectory))
+                            ExtractVersion(archiveBytes, versionDirectory);
 
-                            z.ExtractAll(exPath, ExtractExistingFileAction.OverwriteSilently);
+                        if (!IsValidRuntime(versionDirectory))
+                            throw new InvalidDataException("Extracted runtime is incomplete.");
 
-                            // 3) Replace TempPath content
-                            SafeDeleteDirectory(TempPath);
-                            Directory.CreateDirectory(TempPath);
-                            Tools.CopyDirectory(exPath, TempPath, true);
-
-                            SafeDeleteDirectory(exPath);
-                        }
+                        WriteActiveVersion(versionId);
+                        TempPath = versionDirectory;
+                        MigrateSettingsFile();
+                        CleanupOldVersions(versionId, previousVersion);
+                        ready = true;
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // keep old behavior: swallow
-                }
-                finally
-                {
-                    // 4) Restore setting file (best effort)
-                    try
+                    LogHelper.WriteLog(ex);
+                    var activePath = ResolveActiveVersionPath();
+                    if (IsValidRuntime(activePath))
                     {
-                        if (settingsBackup != null)
-                        {
-                            Directory.CreateDirectory(TempPath);
-                            File.WriteAllBytes(Path.Combine(TempPath, SettingFile), settingsBackup);
-                        }
+                        TempPath = activePath;
+                        ready = true;
                     }
-                    catch { }
-
-                    if (!W84Exit)
-                        onResourceExtracted?.Invoke(this, null);
                 }
             }
 
-            if (W84Exit)
-                extraction();
+            if (!W84Exit && ready)
+                onResourceExtracted?.Invoke(this, EventArgs.Empty);
+        }
+
+        public void Extract(string toExtractPath, string path = "")
+        {
+            using (var stream = File.OpenRead(toExtractPath))
+                Extract(stream, path);
+        }
+
+        public void Extract(Stream toExtractStream, string path = "")
+        {
+            if (toExtractStream == null)
+                throw new ArgumentNullException(nameof(toExtractStream));
+
+            var outputPath = Path.IsPathRooted(path)
+                ? path
+                : Path.Combine(runtimeRoot, path ?? string.Empty);
+            Directory.CreateDirectory(outputPath);
+
+            using (var zip = ZipFile.Read(toExtractStream))
+            {
+                ValidateEntries(zip);
+                zip.ExtractAll(outputPath, ExtractExistingFileAction.OverwriteSilently);
+            }
+        }
+
+        internal AccountInfoEx GetConfig()
+        {
+            try
+            {
+                MigrateSettingsFile();
+                var settingsFile = Path.Combine(statePath, SettingFile);
+                var acc = tdes.Decrypt(File.ReadAllBytes(settingsFile))
+                    .ToUTF8String()
+                    .JsonDeserilize<AccountInfoEx>();
+                var userInfo = tdes.Decrypt(RegHelper.GetSettingValue("UserInfo").FromBase64String())
+                    .ToUTF8String()
+                    .Split('\n');
+                if (userInfo.Length < 2
+                    || userInfo[0] != acc.UserAccount.Username
+                    || (acc.UserAccount.ExpiryDate != null && acc.UserAccount.ExpiryDate.Value < DateTime.Now))
+                    return null;
+
+                Password = userInfo[1];
+                return acc;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal AccountInfoEx GetLocalConfig()
+        {
+            try
+            {
+                var acc = File.ReadAllText("./account.txt").JsonDeserilize<AccountInfoEx>();
+                if (File.Exists("./oneclick.txt"))
+                {
+                    var cfgserver = Encoding.UTF8
+                        .GetString(Convert.FromBase64String(
+                            new System.Net.WebClient().DownloadString(File.ReadAllText("./oneclick.txt"))))
+                        .Split('\n');
+                    acc.groups.Clear();
+                    acc.groups.Add(new Group { title = "OneClick" });
+                    var id = 1;
+                    foreach (var serverLink in cfgserver)
+                    {
+                        if (serverLink.StartsWith("vmess:"))
+                        {
+                            acc.groups[0].servers.Add(new ServerEx
+                            {
+                                urls = new[] { new Url { url = serverLink } }.ToList(),
+                                ID = id++,
+                                Country = ((Dictionary<string, object>)(
+                                    new JavaScriptSerializer().DeserializeObject(
+                                        Encoding.UTF8.GetString(
+                                            Convert.FromBase64String(serverLink.Substring(8))))))["ps"].ToString()
+                            });
+                        }
+                        else if (serverLink.StartsWith("trojan:"))
+                        {
+                            acc.groups[0].servers.Add(new ServerEx
+                            {
+                                urls = new[] { new Url { url = serverLink } }.ToList(),
+                                ID = id++,
+                                Country = HttpUtility.UrlDecode(serverLink)
+                                    .Substring(serverLink.IndexOf('#'))
+                            });
+                        }
+                    }
+                }
+                return acc;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        internal void SaveConfig(AccountInfoEx info, string password)
+        {
+            Directory.CreateDirectory(statePath);
+            RegHelper.SetSettingValue(
+                "UserInfo",
+                tdes.Encrypt(string.Format("{0}\n{1}", info.UserAccount.Username, password).ToUTF8Bytes())
+                    .ToBase64String());
+            File.WriteAllBytes(
+                Path.Combine(statePath, SettingFile),
+                tdes.Encrypt(info.JsonSerilize().ToUTF8Bytes()));
+        }
+
+        internal void RemoveConfig()
+        {
+            RegHelper.SetSettingValue("UserInfo", "");
+        }
+
+        private void ExtractVersion(byte[] archiveBytes, string versionDirectory)
+        {
+            var stagingDirectory = Path.Combine(
+                versionsPath,
+                ".staging-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(stagingDirectory);
+
+            try
+            {
+                using (var memory = new MemoryStream(archiveBytes, false))
+                using (var zip = ZipFile.Read(memory))
+                {
+                    ValidateEntries(zip);
+                    zip.ExtractAll(stagingDirectory, ExtractExistingFileAction.OverwriteSilently);
+                }
+
+                if (!IsValidRuntime(stagingDirectory))
+                    throw new InvalidDataException("The embedded runtime archive is missing required core files.");
+
+                if (Directory.Exists(versionDirectory))
+                    SafeDeleteDirectory(versionDirectory);
+                Directory.Move(stagingDirectory, versionDirectory);
+            }
+            finally
+            {
+                SafeDeleteDirectory(stagingDirectory);
+            }
+        }
+
+        private static void ValidateEntries(ZipFile zip)
+        {
+            foreach (var entry in zip.Entries)
+            {
+                var name = (entry.FileName ?? string.Empty).Replace('\\', '/');
+                if (string.IsNullOrWhiteSpace(name))
+                    continue;
+                if (name.StartsWith("/", StringComparison.Ordinal)
+                    || name.Contains(":")
+                    || name.Split('/').Any(x => x == ".."))
+                {
+                    throw new InvalidDataException("Unsafe path in ZIP archive: " + name);
+                }
+            }
+        }
+
+        private static byte[] ReadAllBytes(Stream stream)
+        {
+            using (var memory = new MemoryStream())
+            {
+                stream.CopyTo(memory);
+                return memory.ToArray();
+            }
+        }
+
+        private static string ComputeVersionId(byte[] archiveBytes)
+        {
+            using (var sha = SHA256.Create())
+            {
+                var hash = sha.ComputeHash(archiveBytes ?? new byte[0]);
+                return BitConverter.ToString(hash, 0, 16).Replace("-", string.Empty);
+            }
+        }
+
+        private bool IsValidRuntime(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
+                return false;
+
+            var throne = Path.Combine(path, "V-Guard", "Throne.exe");
+            var coreName = (Tools.IsWin7OrLower() ? "SGuard7" : "SGuard")
+                + (Environment.Is64BitOperatingSystem ? "64.exe" : "32.exe");
+            var core = Path.Combine(path, "V-Guard", coreName);
+            return File.Exists(throne) && File.Exists(core);
+        }
+
+        private string ResolveActiveVersionPath()
+        {
+            var version = ReadActiveVersion();
+            if (string.IsNullOrWhiteSpace(version))
+                return null;
+            var path = Path.Combine(versionsPath, version);
+            return IsValidRuntime(path) ? path : null;
+        }
+
+        private string ReadActiveVersion()
+        {
+            try
+            {
+                return File.Exists(activeVersionPath)
+                    ? File.ReadAllText(activeVersionPath).Trim()
+                    : null;
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private void WriteActiveVersion(string versionId)
+        {
+            Directory.CreateDirectory(runtimeRoot);
+            var temporary = activeVersionPath + ".new";
+            File.WriteAllText(temporary, versionId ?? string.Empty, Encoding.ASCII);
+            if (File.Exists(activeVersionPath))
+                File.Replace(temporary, activeVersionPath, null);
             else
-                System.Threading.Tasks.Task.Run(extraction);
+                File.Move(temporary, activeVersionPath);
+        }
+
+        private void CleanupOldVersions(string activeVersion, string previousVersion)
+        {
+            var keep = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                activeVersion
+            };
+            if (!string.IsNullOrWhiteSpace(previousVersion))
+                keep.Add(previousVersion);
+
+            try
+            {
+                foreach (var directory in Directory.GetDirectories(versionsPath))
+                {
+                    var name = Path.GetFileName(directory);
+                    if (name.StartsWith(".staging-", StringComparison.OrdinalIgnoreCase)
+                        || !keep.Contains(name))
+                    {
+                        SafeDeleteDirectory(directory);
+                    }
+                }
+            }
+            catch
+            {
+            }
+        }
+
+        private void MigrateSettingsFile()
+        {
+            try
+            {
+                Directory.CreateDirectory(statePath);
+                var destination = Path.Combine(statePath, SettingFile);
+                if (File.Exists(destination))
+                    return;
+
+                var candidates = new[]
+                {
+                    Path.Combine(runtimeRoot, SettingFile),
+                    string.IsNullOrWhiteSpace(TempPath) ? null : Path.Combine(TempPath, SettingFile)
+                };
+                var source = candidates.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x) && File.Exists(x));
+                if (source != null)
+                    File.Copy(source, destination, false);
+            }
+            catch
+            {
+            }
         }
 
         private static void SafeDeleteDirectory(string path)
@@ -100,107 +380,9 @@ namespace IRSpeedyVPN.Resource
                 if (Directory.Exists(path))
                     Directory.Delete(path, true);
             }
-            catch { }
-        }
-
-        public void Extract(string toExtractPath, string path = "")
-        {
-            using (Stream f = File.OpenRead(toExtractPath))
-                Extract(f, path);
-        }
-        public void Extract(Stream toExtractStream,string path="")
-        {
-            Action extraction = new Action(() =>
-            {
-                try
-                {
-                    
-                    
-                    ZipFile z = ZipFile.Read(toExtractStream);
-                    string pOut;
-                    if (path.Contains(":"))
-                        pOut = path;
-                    else
-                        pOut = Path.Combine(TempPath, path);
-                    z.ExtractAll(pOut, ExtractExistingFileAction.OverwriteSilently);
-                }
-                catch {
-                    throw;
-                }
-               
-            });
-            extraction.Invoke();
-
-        }
-        internal AccountInfoEx GetConfig()
-        {
-            try
-            {
-                AccountInfoEx acc = tdes.Decrypt(File.ReadAllBytes(Path.Combine(TempPath, SettingFile))).ToUTF8String().JsonDeserilize<AccountInfoEx>();
-                string[] userInfo = tdes.Decrypt(RegHelper.GetSettingValue("UserInfo").FromBase64String()).ToUTF8String().Split('\n');
-                if (userInfo[0] != acc.UserAccount.Username || (acc.UserAccount.ExpiryDate != null && acc.UserAccount.ExpiryDate.Value < DateTime.Now))
-                    return null;
-                Password = userInfo[1];
-                return acc;
-            }catch
-            {
-
-            }
-            return null;
-        }
-        internal AccountInfoEx GetLocalConfig()
-        {
-            try
-            {
-                AccountInfoEx acc = File.ReadAllText("./account.txt").JsonDeserilize<AccountInfoEx>();
-                if (File.Exists("./oneclick.txt"))
-                {
-                    var cfgserver = Encoding.UTF8.GetString(Convert.FromBase64String(new System.Net.WebClient().DownloadString(File.ReadAllText("./oneclick.txt")))).Split('\n');
-                    acc.groups.Clear();
-                    acc.groups.Add(new Group { title = "OneClick" });
-                    int i = 1;
-                    foreach(string s in cfgserver)
-                    {
-                        if (s.StartsWith("vmess:"))
-                        {
-                            acc.groups[0].servers.Add(new ServerEx()
-                            {
-                                urls = (new Url[] { new Url() { url = s } }).ToList(),
-                                ID = i++,
-                                Country = ((Dictionary<string, object>)(new JavaScriptSerializer().DeserializeObject(Encoding.UTF8.GetString(Convert.FromBase64String(s.Substring(8))))))["ps"].ToString(),
-
-                            });
-                        }
-                        else if (s.StartsWith("trojan:"))
-                        {
-                            acc.groups[0].servers.Add(new ServerEx()
-                            {
-                                urls = (new Url[] { new Url() { url = s } }).ToList(),
-                                ID = i++,                                
-                                Country = HttpUtility.UrlDecode(s).Substring(s.IndexOf('#')),                                
-
-                            });
-                        }
-                    }
-
-                }
-                
-                return acc;
-            }
             catch
             {
-
             }
-            return null;
-        }
-        internal void SaveConfig(AccountInfoEx info,string password)
-        {
-            RegHelper.SetSettingValue("UserInfo", tdes.Encrypt(string.Format("{0}\n{1}", info.UserAccount.Username, password).ToUTF8Bytes()).ToBase64String());
-            File.WriteAllBytes(Path.Combine(TempPath, SettingFile), tdes.Encrypt(info.JsonSerilize().ToUTF8Bytes()));
-        }
-        internal void RemoveConfig()
-        {
-            RegHelper.SetSettingValue("UserInfo", "");
         }
     }
 }

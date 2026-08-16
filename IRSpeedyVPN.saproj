@@ -1,5 +1,5 @@
 <SmartAssemblyProject ProjectId="{4270db2e-1d96-4def-9d45-f1461227c163}" Version="2.0">
-    <MainAssemblyFileName>.\IRSpeedyVPN\bin\Release\net48\IRSpeedyVPN.exe</MainAssemblyFileName>
+    <MainAssemblyFileName>.\IRSpeedyVPN\bin\Debug\net48\IRSpeedyVPN.exe</MainAssemblyFileName>
     <Configuration Name="Release">
         <Options>
             <ExceptionReporting Template="res:{SmartExceptions}.1033.dll" />
@@ -437,7 +437,31 @@
                 <Merging />
                 <Embedding Compress="1" Embed="1" Encrypt="1" />
             </Assembly>
+            <Assembly AssemblyName="SmartTroubleshooting, Culture=neutral, PublicKeyToken=7f465a1c156d4d57">
+                <Merging>
+                    <Obfuscation>
+                        <Exclusion />
+                    </Obfuscation>
+                </Merging>
+            </Assembly>
+            <Assembly AssemblyName="SmartExceptionsCore, Culture=neutral, PublicKeyToken=7f465a1c156d4d57">
+                <Merging>
+                    <Obfuscation>
+                        <Exclusion />
+                    </Obfuscation>
+                </Merging>
+            </Assembly>
+            <Assembly AssemblyName="SmartAssembly.Shared, Culture=neutral, PublicKeyToken=7f465a1c156d4d57">
+                <Merging>
+                    <Obfuscation>
+                        <Exclusion />
+                    </Obfuscation>
+                </Merging>
+            </Assembly>
+            <Assembly AssemblyName="Microsoft.VisualC, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
+                <Merging />
+            </Assembly>
         </Assemblies>
-        <Destination DestinationFileName=".\IRSpeedyVPN\bin\Release\net48\Obfuscated\IRSpeedyVPN.exe" />
+        <Destination DestinationFileName=".\IRSpeedyVPN\bin\Debug\net48\Obfuscated\IRSpeedyVPN.exe" />
     </Configuration>
 </SmartAssemblyProject>

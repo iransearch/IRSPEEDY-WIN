@@ -9,7 +9,6 @@ using IRSpeedyVPN.Services;
 using IRSpeedyVPN.Windows;
 using System;
 using System.Collections.Generic;
-using System.ComponentModel.Composition;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,8 +19,8 @@ namespace IRSpeedyVPN.UserControls
 {
     public partial class UCServerList : UserControl, IHasTitle
     {
-        [Import] private ServiceFactory serviceFactory { get; set; }
-        [Import] private GlobalInfo globalInfo { get; set; }
+        private ServiceFactory serviceFactory => AppServices.ServiceFactory;
+        private GlobalInfo globalInfo => AppServices.GlobalInfo;
 
         public string Title => "لیست سرورها";
 
@@ -167,7 +166,11 @@ namespace IRSpeedyVPN.UserControls
             if (_isLoading && globalInfo?.CurrentService != null
                 && services.Contains(globalInfo.CurrentService))
             {
-                selectedService = globalInfo.CurrentService;
+                // a previous smart fast connection is not tied to any country —
+                // keep the smart (fastest server) selection instead of a random one
+                selectedService = (globalInfo.CurrentService is ISmartFastConnection smart && smart.IsSmartFast)
+                    ? null
+                    : globalInfo.CurrentService;
             }
             else if (selectedService == null || !services.Contains(selectedService))
             {
@@ -240,6 +243,8 @@ namespace IRSpeedyVPN.UserControls
             if (selectedService != null)
             {
                 StopUrlTests();
+                if (selectedService is ISmartFastConnection smart)
+                    smart.SetSmartFastUrls(null);
                 OnConnectRequest.Invoke(this, selectedService, selectedProtocol);
             }
             else
@@ -267,16 +272,42 @@ namespace IRSpeedyVPN.UserControls
                 {
                     services.First().DisconnectAll();
                     var deadline = DateTime.UtcNow.AddSeconds(30);
+                    /*
                     foreach (var service in services)
                     {
                         if (DateTime.UtcNow >= deadline || UrlTestCoordinator.AbortRequested) break;
                         try { service.UrlTest(); service.Disconnect(); } catch { }
                     }
+                    */
+                    OnLoadingRequest?.Invoke(false, null);
+
+                    // smart fast connection: hand every successfully-tested url to the
+                    // service that supports it and continue through the normal connect
+                    // routing (OnConnectRequest -> Connect -> RunV2ray builds the balancer)
+                    var smartService = services.FirstOrDefault(x => x is ISmartFastConnection);
+                    /*
+                    var successUrls = services
+                        .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
+                        .Where(u => u != null && u.latency > 0 && !Sig.IsStale(u))
+                        .Select(u => u.url)
+                        .Where(u => !string.IsNullOrWhiteSpace(u))
+                        .Distinct(StringComparer.Ordinal)
+                        .ToArray();
+                    */
+                    var successUrls = services
+                        .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
+                        .Select(u => u.url)
+                        .ToArray();
+
+                    if (smartService != null && successUrls.Length > 0)
+                    {
+                        ((ISmartFastConnection)smartService).SetSmartFastUrls(successUrls);
+                        OnConnectRequest.Invoke(this, smartService, "");
+                        return;
+                    }
 
                     var fastest = services.Where(x => x.UrlTestSpeed > 0)
                         .OrderBy(x => x.UrlTestSpeed).FirstOrDefault();
-
-                    OnLoadingRequest?.Invoke(false, null);
 
                     if (fastest != null)
                         OnConnectRequest.Invoke(this, fastest, "");
@@ -317,7 +348,15 @@ namespace IRSpeedyVPN.UserControls
         {
             var sService = selectedService ?? GetFallbackService();
             if (sService?.SettingType == null) return;
-            var setting = (Window)Activator.CreateInstance(sService.SettingType);
+
+            Window setting;
+            if (sService.SettingType == typeof(VGAURDServiceSetting))
+                setting = new VGAURDServiceSetting();
+            else if (sService.SettingType == typeof(SSRServiceSetting))
+                setting = new SSRServiceSetting();
+            else
+                return;
+
             setting.Owner = Window.GetWindow(this);
             setting.ShowDialog();
         }

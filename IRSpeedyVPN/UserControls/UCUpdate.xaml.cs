@@ -46,7 +46,7 @@ namespace IRSpeedyVPN.UserControls
         } 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-            ResourceManager = ((ResourceManager)Program.container.GetInstance(typeof(ResourceManager)));
+            ResourceManager = AppServices.ResourceManager;
         }
 
         private void btnDownload_Click(object sender, RoutedEventArgs e)

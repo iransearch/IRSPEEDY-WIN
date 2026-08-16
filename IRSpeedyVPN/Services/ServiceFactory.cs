@@ -5,7 +5,6 @@ using IRSpeedyVPN.Models.Services;
 using System;
 using System.Collections;
 using System.Collections.Generic;
-using System.ComponentModel.Composition;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -18,8 +17,7 @@ namespace IRSpeedyVPN.Services
         internal List<IVPNService> Services  => services;
         List<IVPNService> services;
 
-        [Import]
-        GlobalInfo globalInfo { get; set; }       
+        GlobalInfo globalInfo => AppServices.GlobalInfo;
         public ServiceFactory()
         {       
 

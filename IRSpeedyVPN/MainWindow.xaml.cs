@@ -16,7 +16,6 @@ using System.Windows.Media.Imaging;
 using System.Windows.Navigation;
 using System.Windows.Shapes;
 using IRSpeedyVPN.Services;
-using System.ComponentModel.Composition;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Common;
@@ -40,29 +39,19 @@ namespace IRSpeedyVPN
     public partial class MainWindow : Window
 
     {
-        [Import]
-        UCLogin uCLogin { get; set; }
-        [Import]
-        UCServerList uCServerList { get; set; }
-        [Import]
-        UCUserInfo uCUserInfo { get; set; }
-        [Import]
-        UCUpdate uCUpdate { get; set; }
-        [Import]
-        UCChangePassword uCChangePassword { get; set; }
+        UCLogin uCLogin => AppServices.UCLogin;
+        UCServerList uCServerList => AppServices.UCServerList;
+        UCUserInfo uCUserInfo => AppServices.UCUserInfo;
+        UCUpdate uCUpdate => AppServices.UCUpdate;
+        UCChangePassword uCChangePassword => AppServices.UCChangePassword;
 
-        [Import]
-        NewServiceController serviceController { get; set; }
+        NewServiceController serviceController => AppServices.NewServiceController;
 
-        [Import]
-        private  ServiceFactory serviceFactory { get; set; }
-        [Import]
-        private  IProxifier proxifier { get; set; }
+        private ServiceFactory serviceFactory => AppServices.ServiceFactory;
+        private IProxifier proxifier => AppServices.Proxifier;
 
-        [Import]
-        GlobalInfo gInfo { get; set; }
-        [Import]
-        ResourceManager localResource { get; set; }
+        GlobalInfo gInfo => AppServices.GlobalInfo;
+        ResourceManager localResource => AppServices.ResourceManager;
         System.Windows.Forms.NotifyIcon notify;
         int Initialized = 0;        
         StringSocketListener ManagementListener;

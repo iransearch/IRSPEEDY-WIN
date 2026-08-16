@@ -27,7 +27,8 @@ namespace IRSpeedyVPN.WebServices
             object data,
             IEncryptor encryptor,
             IDecryptor decryptor,
-            string token = null)
+            string token = null,
+            int? timeoutSeconds = null)
         {
             string url = _baseAddress + relPath;
 
@@ -35,7 +36,7 @@ namespace IRSpeedyVPN.WebServices
             var serializer = new JavaScriptSerializer();
             serializer.RegisterConverters(new JavaScriptConverter[]
             {
-                Program.container.GetInstance<JsonConverter>()
+                AppServices.JsonConverter
             });
 
             // Headers (same idea as your original RestHelper)
@@ -85,7 +86,7 @@ namespace IRSpeedyVPN.WebServices
             }
 
             // Send through curl.exe
-            var curlResp = _curl.Send(url, method, headers.ToString(), body);
+            var curlResp = _curl.Send(url, method, headers.ToString(), body, null, timeoutSeconds);
             var rawResponse = curlResp.Body;
             var httpCodeInt = curlResp.HttpCode;
 
