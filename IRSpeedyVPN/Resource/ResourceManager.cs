@@ -228,7 +228,20 @@ namespace IRSpeedyVPN.Resource
                 using (var zip = ZipFile.Read(memory))
                 {
                     ValidateEntries(zip);
-                    zip.ExtractAll(stagingDirectory, ExtractExistingFileAction.OverwriteSilently);
+                    // ExtractAll with OverwriteSilently still throws "Cannot create a
+                    // file when that file already exists" from MoveFileInPlace when the
+                    // archive contains duplicate entries; extract one entry at a time
+                    // and clear the target (attributes included) before each one.
+                    foreach (var entry in zip.Entries)
+                    {
+                        var targetPath = Path.Combine(stagingDirectory, entry.FileName ?? string.Empty);
+                        if (File.Exists(targetPath))
+                        {
+                            File.SetAttributes(targetPath, FileAttributes.Normal);
+                            File.Delete(targetPath);
+                        }
+                        entry.Extract(stagingDirectory, ExtractExistingFileAction.OverwriteSilently);
+                    }
                 }
 
                 if (!IsValidRuntime(stagingDirectory))
@@ -236,6 +249,9 @@ namespace IRSpeedyVPN.Resource
 
                 if (Directory.Exists(versionDirectory))
                     SafeDeleteDirectory(versionDirectory);
+                if (Directory.Exists(versionDirectory))
+                    throw new IOException(
+                        "Unable to replace the runtime directory (files may be in use): " + versionDirectory);
                 Directory.Move(stagingDirectory, versionDirectory);
             }
             finally
@@ -377,8 +393,17 @@ namespace IRSpeedyVPN.Resource
         {
             try
             {
-                if (Directory.Exists(path))
-                    Directory.Delete(path, true);
+                if (!Directory.Exists(path))
+                    return;
+
+                // Hidden/read-only files make the recursive delete throw, which
+                // would later turn Directory.Move into "file already exists".
+                foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
+                {
+                    try { File.SetAttributes(file, FileAttributes.Normal); }
+                    catch { }
+                }
+                Directory.Delete(path, true);
             }
             catch
             {
