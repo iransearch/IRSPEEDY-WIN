@@ -120,7 +120,7 @@ namespace IRSpeedyVPN.Resource
             using (var zip = ZipFile.Read(toExtractStream))
             {
                 ValidateEntries(zip);
-                zip.ExtractAll(outputPath, ExtractExistingFileAction.OverwriteSilently);
+                ExtractZipEntriesSafely(zip, outputPath);
             }
         }
 
@@ -228,20 +228,12 @@ namespace IRSpeedyVPN.Resource
                 using (var zip = ZipFile.Read(memory))
                 {
                     ValidateEntries(zip);
-                    // ExtractAll with OverwriteSilently still throws "Cannot create a
-                    // file when that file already exists" from MoveFileInPlace when the
-                    // archive contains duplicate entries; extract one entry at a time
-                    // and clear the target (attributes included) before each one.
-                    foreach (var entry in zip.Entries)
-                    {
-                        var targetPath = Path.Combine(stagingDirectory, entry.FileName ?? string.Empty);
-                        if (File.Exists(targetPath))
-                        {
-                            File.SetAttributes(targetPath, FileAttributes.Normal);
-                            File.Delete(targetPath);
-                        }
-                        entry.Extract(stagingDirectory, ExtractExistingFileAction.OverwriteSilently);
-                    }
+                    // Do not use ZipEntry.Extract/ExtractAll here. DotNetZip performs a
+                    // temporary-file MoveFileInPlace step which can still fail on Windows
+                    // with ERROR_ALREADY_EXISTS when an archive contains duplicate/case-
+                    // colliding entries or antivirus/indexing software races the rename.
+                    // Stream every entry directly to its final staging path instead.
+                    ExtractZipEntriesSafely(zip, stagingDirectory);
                 }
 
                 if (!IsValidRuntime(stagingDirectory))
@@ -258,6 +250,112 @@ namespace IRSpeedyVPN.Resource
             {
                 SafeDeleteDirectory(stagingDirectory);
             }
+        }
+
+        private static void ExtractZipEntriesSafely(ZipFile zip, string outputPath)
+        {
+            if (zip == null)
+                throw new ArgumentNullException(nameof(zip));
+            if (string.IsNullOrWhiteSpace(outputPath))
+                throw new ArgumentNullException(nameof(outputPath));
+
+            var root = Path.GetFullPath(outputPath)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            Directory.CreateDirectory(root);
+
+            foreach (var entry in zip.Entries)
+            {
+                var entryName = (entry.FileName ?? string.Empty)
+                    .Replace('/', Path.DirectorySeparatorChar)
+                    .Replace('\\', Path.DirectorySeparatorChar)
+                    .TrimStart(Path.DirectorySeparatorChar);
+                if (string.IsNullOrWhiteSpace(entryName))
+                    continue;
+
+                var targetPath = Path.GetFullPath(Path.Combine(root, entryName));
+                if (!IsPathInsideRoot(root, targetPath))
+                    throw new InvalidDataException("Unsafe path in ZIP archive: " + entry.FileName);
+
+                var isDirectory = entry.IsDirectory
+                    || entryName.EndsWith(Path.DirectorySeparatorChar.ToString(), StringComparison.Ordinal);
+                if (isDirectory)
+                {
+                    DeleteFileIfPresent(targetPath);
+                    EnsureDirectoryPath(targetPath, root);
+                    continue;
+                }
+
+                var parent = Path.GetDirectoryName(targetPath);
+                EnsureDirectoryPath(parent, root);
+
+                if (Directory.Exists(targetPath))
+                    SafeDeleteDirectory(targetPath);
+                if (Directory.Exists(targetPath))
+                    throw new IOException("Unable to replace directory with runtime file: " + targetPath);
+
+                DeleteFileIfPresent(targetPath);
+
+                using (var input = entry.OpenReader())
+                using (var output = new FileStream(
+                    targetPath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    64 * 1024,
+                    FileOptions.SequentialScan))
+                {
+                    input.CopyTo(output);
+                    output.Flush();
+                }
+            }
+        }
+
+        private static void EnsureDirectoryPath(string directoryPath, string root)
+        {
+            if (string.IsNullOrWhiteSpace(directoryPath))
+                return;
+
+            directoryPath = Path.GetFullPath(directoryPath);
+            if (!IsPathInsideRoot(root, directoryPath) &&
+                !string.Equals(directoryPath, root, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidDataException("Unsafe directory path while extracting runtime: " + directoryPath);
+            }
+
+            if (Directory.Exists(directoryPath))
+                return;
+
+            var parent = Path.GetDirectoryName(directoryPath);
+            if (!string.IsNullOrWhiteSpace(parent)
+                && !string.Equals(parent, directoryPath, StringComparison.OrdinalIgnoreCase)
+                && !Directory.Exists(parent))
+            {
+                EnsureDirectoryPath(parent, root);
+            }
+
+            DeleteFileIfPresent(directoryPath);
+            Directory.CreateDirectory(directoryPath);
+        }
+
+        private static bool IsPathInsideRoot(string root, string path)
+        {
+            if (string.IsNullOrWhiteSpace(root) || string.IsNullOrWhiteSpace(path))
+                return false;
+
+            var normalizedRoot = Path.GetFullPath(root)
+                .TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)
+                + Path.DirectorySeparatorChar;
+            var normalizedPath = Path.GetFullPath(path);
+            return normalizedPath.StartsWith(normalizedRoot, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static void DeleteFileIfPresent(string path)
+        {
+            if (!File.Exists(path))
+                return;
+
+            File.SetAttributes(path, FileAttributes.Normal);
+            File.Delete(path);
         }
 
         private static void ValidateEntries(ZipFile zip)
@@ -396,13 +494,23 @@ namespace IRSpeedyVPN.Resource
                 if (!Directory.Exists(path))
                     return;
 
-                // Hidden/read-only files make the recursive delete throw, which
-                // would later turn Directory.Move into "file already exists".
+                // Hidden/read-only attributes on either files or directories can make
+                // recursive deletion fail and leave a stale staging/version directory.
                 foreach (var file in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
                 {
                     try { File.SetAttributes(file, FileAttributes.Normal); }
                     catch { }
                 }
+
+                foreach (var directory in Directory.EnumerateDirectories(path, "*", SearchOption.AllDirectories)
+                    .OrderByDescending(x => x.Length))
+                {
+                    try { File.SetAttributes(directory, FileAttributes.Normal); }
+                    catch { }
+                }
+
+                try { File.SetAttributes(path, FileAttributes.Normal); }
+                catch { }
                 Directory.Delete(path, true);
             }
             catch
