@@ -159,6 +159,7 @@ namespace IRSpeedyVPN.Services
                 if (serviceController.CheckUserPermission(gInfo.Username, gInfo.Password))
                 // if (ServiceHelper.CheckAvailabilty(gInfo.Username,gInfo.Password))
                 {
+                    StopAndDrainUrlTests();
                     if (goUrl == null)
                     {
                         KillAll();
@@ -570,12 +571,10 @@ namespace IRSpeedyVPN.Services
             {
 
             }
+            TryStopCore();
             StopSniServers(serviceSniServers);
             ShellExecute.KillProccess("sni");
             ShellExecute.KillProccess("hysteria");
-            ShellExecute.KillProccess("SGUARD64");
-            ShellExecute.KillProccess("SGUARD32");
-            ShellExecute.KillProccess("Throne");
         }
         public void DisconnectAll()
         {
@@ -949,17 +948,39 @@ namespace IRSpeedyVPN.Services
                 if (process != null)
                 {
                     var staleProcess = process;
+                    var hasExited = true;
+                    try
+                    {
+                        hasExited = staleProcess.HasExited;
+                    }
+                    catch
+                    {
+                        hasExited = true;
+                    }
+
+                    if (!hasExited)
+                    {
+                        var probe = Stopwatch.StartNew();
+                        while (probe.Elapsed < TimeSpan.FromSeconds(2))
+                        {
+                            if (ProtorpcClient.CanConnect("127.0.0.1", port, 250))
+                                return;
+                            Thread.Sleep(100);
+                        }
+                    }
+
                     try
                     {
                         staleProcess.Exited -= CoreProcess_Exited;
-                        if (!staleProcess.HasExited)
+                        if (!hasExited && !staleProcess.HasExited)
+                        {
+                            LogHelper.WriteLog(
+                                $"Owned Core process is alive but did not accept connections on 127.0.0.1:{port} after repeated checks; restarting it.");
                             TryKillProcess(staleProcess);
+                        }
                     }
                     catch { }
-                    finally
-                    {
-                        staleProcess.Dispose();
-                    }
+                    finally { staleProcess.Dispose(); }
                     process = null;
                     owned = false;
                 }
@@ -1092,14 +1113,30 @@ namespace IRSpeedyVPN.Services
                 }
                 var client = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs);                
                 SafeStopCore(client);
-               
-                if (coreOwned && coreProcess != null)
-                {
-                    coreProcess.Exited -= CoreProcess_Exited;
-                    TryKillProcess(coreProcess);
-                }
             }
             catch { }
+        }
+
+        private void StopAndDrainUrlTests()
+        {
+            UrlTestCoordinator.CancelAll();
+            try
+            {
+                if (ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
+                {
+                    var client = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs);
+                    client.StopTest();
+                }
+            }
+            catch
+            {
+                // The barrier below still waits for the in-flight call to unwind.
+            }
+
+            lock (grpcLock)
+            {
+                // Wait until any in-flight URL Test RPC has released the shared Core.
+            }
         }
 
         private void SafeStopCore(LibcoreServiceClient client)
@@ -1376,7 +1413,7 @@ namespace IRSpeedyVPN.Services
                 {
                     var exitedProcess = sender as Process;
                     if (exitedProcess != null)
-                        LogHelper.WriteLog($"Core exited during startup. Exit code: {exitedProcess.ExitCode}.");
+                        LogHelper.WriteLog($"Core exited while idle or URL testing. Exit code: {exitedProcess.ExitCode}.");
                 }
                 catch { }
                 return;
