@@ -17,27 +17,27 @@ namespace IRSpeedyVPN.Services.Libcore
 
         public ErrorResp Start(LoadConfigReq req)
         {
-            return Call("Start", LibcoreProto.EncodeLoadConfigReq(req), LibcoreProto.DecodeErrorResp);
+            return Call("LibcoreService.Start", LibcoreProto.EncodeLoadConfigReq(req), LibcoreProto.DecodeErrorResp);
         }
 
         public ErrorResp Stop()
         {
-            return Call("Stop", LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeErrorResp);
+            return Call("LibcoreService.Stop", LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeErrorResp);
         }
 
         public ErrorResp CheckConfig(LoadConfigReq req)
         {
-            return Call("CheckConfig", LibcoreProto.EncodeLoadConfigReq(req), LibcoreProto.DecodeErrorResp);
+            return Call("LibcoreService.CheckConfig", LibcoreProto.EncodeLoadConfigReq(req), LibcoreProto.DecodeErrorResp);
         }
 
         public TestResp Test(TestReq req)
         {
-            return Call("Test", LibcoreProto.EncodeTestReq(req), LibcoreProto.DecodeTestResp);
+            return Call("LibcoreService.Test", LibcoreProto.EncodeTestReq(req), LibcoreProto.DecodeTestResp);
         }
 
         public EmptyResp StopTest()
         {
-            return Call("StopTest", LibcoreProto.EncodeEmptyReq(), data => new EmptyResp());
+            return Call("LibcoreService.StopTest", LibcoreProto.EncodeEmptyReq(), data => new EmptyResp());
         }
 
         public QueryURLTestResponse QueryURLTest()

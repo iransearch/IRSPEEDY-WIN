@@ -15,6 +15,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Packaging;
 using System.Linq;
 using System.Net;
 using System.Net.Sockets;
@@ -23,6 +24,8 @@ using System.Threading;
 using System.Threading.Tasks;
 using System.Web;
 using System.Web.Script.Serialization;
+using System.Web.Security;
+using System.Web.UI.WebControls.WebParts;
 using v2rayN;
 using v2rayN.Handler;
 using v2rayN.Mode;
@@ -38,9 +41,6 @@ namespace IRSpeedyVPN.Services
         long urlTestSpeed;
         DateTime lastUrlTest;
         int _xraySocksPort;
-        int _hysteriaSocksPort;
-        Process _hysteriaProcess;
-        string _hysteriaConfigPath;
         string _singboxLinkOverride;
         public static string selectedChain;
         public static object grpcLock=new object();
@@ -123,8 +123,7 @@ namespace IRSpeedyVPN.Services
         const int CorePort = 19810;
         const int VpnCorePort = 19811;
         const int CoreConnectTimeoutMs = 8000;
-        const int CoreConnectRetryDelayMs = 200;
-        static ThronePipeClient _throneClient;
+        const int CoreConnectRetryDelayMs = 200;        
         const string SniScheme = "sni://";
         int nextSniListenPort = 40443;
         public TunnelPlusService(IServer server, GlobalInfo globalInfo)
@@ -184,8 +183,7 @@ namespace IRSpeedyVPN.Services
                             //LogHelper.WriteExLog($"ss\t{selectedUrl}\n");
                         }
 
-                    }
-                    StopHysteriaProcess();
+                    }                    
                     /* var configData = new V2Ray.V2RayHandler().GetV2RayConfig(server.Address, port);
                      File.WriteAllText(this.configPath, configData);
                      File.SetAttributes(this.configPath, FileAttributes.Hidden);
@@ -291,7 +289,7 @@ namespace IRSpeedyVPN.Services
                         !string.IsNullOrEmpty(defaultChainLink),
                         sniRuntime?.ListenHost,
                         sniRuntime?.ListenPort,
-                        new string[] { ResolveCorePath(),ResolveHysteriaCorePath() }
+                        new string[] { ResolveCorePath() }
                     );
 
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))
@@ -367,7 +365,7 @@ namespace IRSpeedyVPN.Services
             {
                 startResp = ExecuteCoreCall(client =>
                 {
-                    SafeStopCore();
+                    SafeStopCore(client);
                     return client.Start(new LoadConfigReq
                     {
                         CoreConfig = configData ?? "",
@@ -381,7 +379,7 @@ namespace IRSpeedyVPN.Services
                         NeedXray = needXray,
                         XrayConfig = xrayConfig ?? ""
                     });
-                }, true);
+                });
             }
             catch (TimeoutException ex)
             {
@@ -556,10 +554,9 @@ namespace IRSpeedyVPN.Services
                     FreePortManager.Enqueue(_xraySocksPort);
                     _xraySocksPort = 0;
                 }
-                StopHysteriaProcess();
+               
                 _singboxLinkOverride = null;
-                suppressCoreExit = false;
-                _throneClient?.Close();
+                suppressCoreExit = false;                
                 IsConnected = false;
 
                 if (onConnectDisconnect != null && !silent)
@@ -569,20 +566,16 @@ namespace IRSpeedyVPN.Services
         }
         void KillAll()
         {
-            if(IsConnected)
+            if (IsConnected)
             {
 
-            } 
+            }
             StopSniServers(serviceSniServers);
             ShellExecute.KillProccess("sni");
             ShellExecute.KillProccess("hysteria");
             ShellExecute.KillProccess("SGUARD64");
             ShellExecute.KillProccess("SGUARD32");
             ShellExecute.KillProccess("Throne");
-            ShellExecute.KillProccess("hysteria-windows-386");
-            ShellExecute.KillProccess("hysteria-windows-amd64");
-            try { _throneClient?.Dispose(); } catch { }
-            _throneClient = null;
         }
         public void DisconnectAll()
         {
@@ -774,7 +767,7 @@ namespace IRSpeedyVPN.Services
                             TestTimeoutMs = 5000,
                             NeedXray = needXray,
                             XrayConfig = xrayConfig
-                        }), true);
+                        }));
                     }
                     if (resp?.Results != null && !(cancelUrlTest || (!force && UrlTestCoordinator.AbortRequested)))
                     {
@@ -912,7 +905,7 @@ namespace IRSpeedyVPN.Services
                         TestTimeoutMs = 3000,
                         NeedXray = needVodXray,
                         XrayConfig = vodXrayConfig
-                    }), true);
+                    }));
 
                     if (vodResp?.Results != null)
                     {
@@ -948,19 +941,12 @@ namespace IRSpeedyVPN.Services
         {
             lock (coreLock)
             {
-                if (_throneClient != null && _throneClient.IsConnected)
+
+                if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
                 {
                     return;
                 }
-                if (process != null)
-                {
-                    try { process.Exited -= CoreProcess_Exited; } catch { }
-                    TryKillProcess(process);
-                }
-                process = null;
-                owned = false;
-                _throneClient?.Dispose();
-                _throneClient = null;
+
 
                 if (string.IsNullOrEmpty(corePath) || !File.Exists(corePath))
                 {
@@ -971,14 +957,11 @@ namespace IRSpeedyVPN.Services
                     throw new FileNotFoundException("Core executable not found in temp folder.", corePath ?? "");
                 }
 
-                var thronePath = ResolveThronePath();
-                if (string.IsNullOrEmpty(thronePath) || !File.Exists(thronePath))
-                {
-                    throw new FileNotFoundException("Throne relay executable not found.", thronePath ?? "");
-                }
+                
 
                 var coreDir = Path.GetDirectoryName(corePath);
-                process = ShellExecute.ShellexecAndReturnProcess(thronePath, $"\"{corePath}\"", coreDir);
+              
+                process = ShellExecute.ShellexecAndReturnProcess(corePath, $"-port {port}", coreDir);
                 owned = true;
                 lastCoreStartUtc = DateTime.UtcNow;
                 if (process != null)
@@ -992,35 +975,27 @@ namespace IRSpeedyVPN.Services
             var sw = Stopwatch.StartNew();
             while (sw.Elapsed < TimeSpan.FromSeconds(5))
             {
-                try
+                if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
                 {
-                    EnsureThroneClient();
                     return;
-                }
-                catch
-                {
                 }
                 Thread.Sleep(100);
             }
-            throw new TimeoutException("Throne relay did not start in time.");
+            throw new TimeoutException("Core did not start listening in time.");
         }
 
-        private void EnsureThroneClient()
-        {
-            if (_throneClient != null && _throneClient.IsConnected)
-                return;
-            _throneClient?.Dispose();
-            _throneClient = new ThronePipeClient();
-            _throneClient.Connect(2000);
-        }
 
         private void TryStopCore()
         {
             try
             {
-                SafeStopCore();
-                ShellExecute.KillProccess("Throne");
-                _throneClient = null;
+                if (!ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
+                {
+                    return;
+                }
+                var client = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs);                
+                SafeStopCore(client);
+               
                 if (coreOwned && coreProcess != null)
                 {
                     coreProcess.Exited -= CoreProcess_Exited;
@@ -1030,34 +1005,27 @@ namespace IRSpeedyVPN.Services
             catch { }
         }
 
-        private void SafeStopCore()
+        private void SafeStopCore(LibcoreServiceClient client)
         {
             try
             {
-                _throneClient?.Stop();
+                client.Stop();
             }
             catch { }
         }
 
-        private T ExecuteCoreCall<T>(Func<ThronePipeClient, T> call, bool reconnect = false)
+        private T ExecuteCoreCall<T>(Func<LibcoreServiceClient, T> call)
         {
-            for (int attempt = 0; ; attempt++)
+            try
             {
-                try
-                {
-                    if (_throneClient == null || !_throneClient.IsConnected)
-                        EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
-                    return call(_throneClient);
-                }
-                catch (Exception ex) when (ex is IOException || ex is EndOfStreamException || ex is ObjectDisposedException || ex is TimeoutException || ex is InvalidOperationException)
-                {
-                    if (attempt >= (reconnect ? 1 : 0))
-                        throw;
-                    try { _throneClient?.Dispose(); } catch { }
-                    _throneClient = null;
-                    try { EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned); } catch { }
-                    Thread.Sleep(CoreConnectRetryDelayMs);
-                }
+                return call(new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs));
+            }
+            catch (TimeoutException ex)
+            {
+                LogHelper.WriteLog(ex);
+                EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
+                Thread.Sleep(CoreConnectRetryDelayMs);
+                return call(new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs));
             }
         }
 
@@ -1370,15 +1338,6 @@ namespace IRSpeedyVPN.Services
             return filepath;
         }
 
-        private string ResolveThronePath()
-        {
-           
-            var filepath = Path.Combine(gInfo.TempPath, "V-Guard", "Throne.exe");
-            if (File.Exists(filepath))
-                return filepath;
-
-            return null;
-        }
 
         private string ResolveSniCorePath()
         {
@@ -1422,76 +1381,6 @@ namespace IRSpeedyVPN.Services
             public bool Persistent { get; set; }
         }
 
-        private static bool IsHysteria2Link(string link)
-        {
-            if (string.IsNullOrWhiteSpace(link))
-                return false;
-            return link.StartsWith(v2rayN.Global.Hysteria2ProtocolLite, StringComparison.OrdinalIgnoreCase)
-                || link.StartsWith(v2rayN.Global.Hysteria2Protocol, StringComparison.OrdinalIgnoreCase);
-        }
-
-        private bool StartHysteriaProcess(string configPath, int socksPort)
-        {
-            try
-            {
-                var hysteriaPath = ResolveHysteriaCorePath();
-                if (string.IsNullOrEmpty(hysteriaPath) || !File.Exists(hysteriaPath))
-                    throw new FileNotFoundException("Hysteria executable not found.", hysteriaPath ?? "");
-
-                _hysteriaConfigPath = configPath;
-                _hysteriaProcess = ShellExecute.ShellexecAndReturnProcess(hysteriaPath, $"client -c \"{_hysteriaConfigPath}\"");
-                if (_hysteriaProcess == null)
-                    return false;
-
-                if (!WaitForPort("127.0.0.1", socksPort, TimeSpan.FromSeconds(10)))
-                {
-                    TryKillProcess(_hysteriaProcess);
-                    _hysteriaProcess = null;
-                    ConfigGenerator.CleanupConfigFile(configPath);
-                    return false;
-                }
-                ConfigGenerator.CleanupConfigFile(configPath);
-                return true;
-            }
-            catch (Exception ex)
-            {
-                Utils.SaveLog(ex.Message, ex);
-                return false;
-            }
-        }
-
-        private void StopHysteriaProcess()
-        {
-            if (_hysteriaProcess != null)
-            {
-                TryKillProcess(_hysteriaProcess);
-                _hysteriaProcess = null;
-            }
-            ShellExecute.KillProccess("hysteria-windows-386");
-            ShellExecute.KillProccess("hysteria-windows-amd64");
-
-            if (!string.IsNullOrWhiteSpace(_hysteriaConfigPath))
-            {
-                ConfigGenerator.CleanupConfigFile(_hysteriaConfigPath);
-                _hysteriaConfigPath = null;
-            }
-            ConfigGenerator.CleanupAllConfigFile();
-            if (_hysteriaSocksPort > 0)
-            {
-                FreePortManager.Enqueue(_hysteriaSocksPort);
-                _hysteriaSocksPort = 0;
-            }
-        }
-
-        private string ResolveHysteriaCorePath()
-        {
-            var filepath = Path.Combine(gInfo.TempPath, "hysteria", "hysteria-windows-" + (Environment.Is64BitOperatingSystem ? "amd64.exe" : "386.exe"));
-            if (!File.Exists(filepath))
-            {
-                return null;
-            }
-            return filepath;
-        }
 
         private bool WaitForPort(string host, int port, TimeSpan timeout)
         {
