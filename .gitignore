@@ -12,3 +12,9 @@ Throne/obj
 UpdateHelper/bin
 UpdateHelper/publish/
 UpdateHelper/obj
+build-logs/
+dist/
+.builder-backups/
+/Files.zip
+/local-builds/
+IRSpeedyVPN/Resources/Files.zip.bak

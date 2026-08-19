@@ -65,9 +65,9 @@ namespace IRSpeedyVPN.Resource
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // keep old behavior: swallow
+                    LogHelper.WriteLog(ex);
                 }
                 finally
                 {

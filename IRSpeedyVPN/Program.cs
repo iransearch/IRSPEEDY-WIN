@@ -6,6 +6,7 @@ using IRSpeedyVPN.Resource;
 using IRSpeedyVPN.Services;
 using IRSpeedyVPN.WebServices;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.IO.Pipes;
 using System.Linq;
@@ -19,9 +20,13 @@ namespace IRSpeedyVPN
     static class Program
     {
         private static Mutex mutex;
+        private static readonly object embeddedAssemblyLock = new object();
+        private static readonly Dictionary<string, Assembly> embeddedAssemblies =
+            new Dictionary<string, Assembly>(StringComparer.OrdinalIgnoreCase);
 
         private const string MutexName = "{DE02AF2D-7EF7-4604-926A-E0B9023BE634}";
         private const string ShowPipeName = "IRSpeedyVPN_ShowWindow";
+        private const string EmbeddedAssemblyPrefix = "EmbeddedAssemblies.";
 
         [STAThread]
         static void Main()
@@ -68,15 +73,31 @@ namespace IRSpeedyVPN
 
         private static void RegisterEmbeddedAssemblyResolver()
         {
-            AppDomain.CurrentDomain.AssemblyResolve += (sender, args) =>
-            {
-                var assemblyName = new AssemblyName(args.Name).Name;
+            AppDomain.CurrentDomain.AssemblyResolve += ResolveEmbeddedAssembly;
+        }
 
-                if (assemblyName != "Transitionals")
-                    return null;
+        private static Assembly ResolveEmbeddedAssembly(object sender, ResolveEventArgs args)
+        {
+            string assemblyName;
+            try
+            {
+                assemblyName = new AssemblyName(args.Name).Name;
+            }
+            catch
+            {
+                return null;
+            }
+
+            lock (embeddedAssemblyLock)
+            {
+                if (embeddedAssemblies.TryGetValue(assemblyName, out var loaded))
+                    return loaded;
 
                 Assembly executing = Assembly.GetExecutingAssembly();
-                string resourceName = executing.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("Transitionals.dll", StringComparison.OrdinalIgnoreCase));
+                string expectedName = EmbeddedAssemblyPrefix + assemblyName + ".dll";
+                string resourceName = executing.GetManifestResourceNames().FirstOrDefault(n =>
+                    string.Equals(n, expectedName, StringComparison.OrdinalIgnoreCase) ||
+                    n.EndsWith("." + expectedName, StringComparison.OrdinalIgnoreCase));
 
                 if (resourceName == null)
                     return null;
@@ -86,11 +107,15 @@ namespace IRSpeedyVPN
                     if (stream == null)
                         return null;
 
-                    byte[] data = new byte[stream.Length];
-                    stream.Read(data, 0, data.Length);
-                    return Assembly.Load(data);
+                    using (var buffer = new MemoryStream())
+                    {
+                        stream.CopyTo(buffer);
+                        loaded = Assembly.Load(buffer.ToArray());
+                        embeddedAssemblies[assemblyName] = loaded;
+                        return loaded;
+                    }
                 }
-            };
+            }
         }
 
         private static void StartShowPipeServer()

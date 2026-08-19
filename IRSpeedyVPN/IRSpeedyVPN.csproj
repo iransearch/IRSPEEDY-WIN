@@ -121,9 +121,6 @@
     <EmbeddedResource Include="Components\ToggleSwitch\Icons\ToggleSwitch.HorizontalToggleSwitch.Expression.Large.png" />
     <EmbeddedResource Include="Components\ToggleSwitch\Icons\ToggleSwitch.HorizontalToggleSwitch.Expression.Small.png" />
     <EmbeddedResource Include="Components\ToggleSwitch\Icons\ToggleSwitch.HorizontalToggleSwitch.VisualStudio.bmp" />
-    <EmbeddedResource Include="$(NuGetPackageRoot)transitionals\2023.11.15.1\lib\net48\Transitionals.dll">
-      <LogicalName>Transitionals.dll</LogicalName>
-    </EmbeddedResource>
   </ItemGroup>
 
   <ItemGroup>
@@ -150,5 +147,13 @@
     </Exec>
     <Warning Condition="'$(DotfuscatorExitCode)' != '0'" Text="Dotfuscator exited with code $(DotfuscatorExitCode); obfuscated output may be missing. Check the Dotfuscator installation, license, and config (IRSpeedyVPN.Dotfuscator.xml)." />
     <Copy SourceFiles="$(TargetDir)$(TargetName).exe.config" DestinationFolder="$(TargetDir)Obfuscated" Condition="'$(DotfuscatorExitCode)' == '0' And Exists('$(TargetDir)$(TargetName).exe.config')" />
+  </Target>
+
+  <Target Name="EmbedCopyLocalAssemblies" AfterTargets="ResolveReferences" BeforeTargets="CoreCompile">
+    <ItemGroup>
+      <EmbeddedResource Include="@(ReferenceCopyLocalPaths)" Condition="'%(ReferenceCopyLocalPaths.Extension)' == '.dll'">
+        <LogicalName>EmbeddedAssemblies.%(ReferenceCopyLocalPaths.Filename)%(ReferenceCopyLocalPaths.Extension)</LogicalName>
+      </EmbeddedResource>
+    </ItemGroup>
   </Target>
 </Project>
