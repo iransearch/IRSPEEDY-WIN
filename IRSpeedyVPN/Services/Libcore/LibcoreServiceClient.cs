@@ -42,7 +42,7 @@ namespace IRSpeedyVPN.Services.Libcore
 
         public QueryURLTestResponse QueryURLTest()
         {
-            return Call("QueryURLTest", LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeQueryURLTestResponse);
+            return Call("LibcoreService.QueryURLTest", LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeQueryURLTestResponse);
         }
 
         private TResp Call<TResp>(string method, byte[] reqBody, Func<byte[], TResp> decoder)

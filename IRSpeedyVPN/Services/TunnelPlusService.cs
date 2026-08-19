@@ -116,7 +116,7 @@ namespace IRSpeedyVPN.Services
         const int MaxCoreExitsInWindow = 10;
         const int CoreExitWindowSeconds = 30;
         const int ImmediateExitSeconds = 2;
-        readonly object coreLock = new object();
+        static readonly object coreLock = new object();
         readonly object sniLock = new object();
         readonly Dictionary<string, SniRuntime> serviceSniServers = new Dictionary<string, SniRuntime>(StringComparer.OrdinalIgnoreCase);
         readonly HashSet<int> activeSniPorts = new HashSet<int>();
@@ -941,12 +941,28 @@ namespace IRSpeedyVPN.Services
         {
             lock (coreLock)
             {
-
                 if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
                 {
                     return;
                 }
 
+                if (process != null)
+                {
+                    var staleProcess = process;
+                    try
+                    {
+                        staleProcess.Exited -= CoreProcess_Exited;
+                        if (!staleProcess.HasExited)
+                            TryKillProcess(staleProcess);
+                    }
+                    catch { }
+                    finally
+                    {
+                        staleProcess.Dispose();
+                    }
+                    process = null;
+                    owned = false;
+                }
 
                 if (string.IsNullOrEmpty(corePath) || !File.Exists(corePath))
                 {
@@ -957,31 +973,112 @@ namespace IRSpeedyVPN.Services
                     throw new FileNotFoundException("Core executable not found in temp folder.", corePath ?? "");
                 }
 
-                
-
                 var coreDir = Path.GetDirectoryName(corePath);
-              
-                process = ShellExecute.ShellexecAndReturnProcess(corePath, $"-port {port}", coreDir);
+                var diagnostics = new StringBuilder();
+                var diagnosticsLock = new object();
+                var startedProcess = new Process
+                {
+                    StartInfo = new ProcessStartInfo
+                    {
+                        FileName = corePath,
+                        Arguments = $"-port {port}",
+                        WorkingDirectory = coreDir,
+                        UseShellExecute = false,
+                        CreateNoWindow = true,
+                        WindowStyle = ProcessWindowStyle.Hidden,
+                        RedirectStandardOutput = true,
+                        RedirectStandardError = true
+                    },
+                    EnableRaisingEvents = true
+                };
+                startedProcess.OutputDataReceived += (sender, args) =>
+                    AppendCoreDiagnostic(diagnostics, diagnosticsLock, "stdout", args.Data);
+                startedProcess.ErrorDataReceived += (sender, args) =>
+                    AppendCoreDiagnostic(diagnostics, diagnosticsLock, "stderr", args.Data);
+                startedProcess.Exited += CoreProcess_Exited;
+
+                try
+                {
+                    if (!startedProcess.Start())
+                        throw new InvalidOperationException("Core process could not be started.");
+                    startedProcess.BeginOutputReadLine();
+                    startedProcess.BeginErrorReadLine();
+                }
+                catch
+                {
+                    startedProcess.Exited -= CoreProcess_Exited;
+                    startedProcess.Dispose();
+                    throw;
+                }
+
+                process = startedProcess;
                 owned = true;
                 lastCoreStartUtc = DateTime.UtcNow;
-                if (process != null)
-                {
-                    process.EnableRaisingEvents = true;
-                    process.Exited -= CoreProcess_Exited;
-                    process.Exited += CoreProcess_Exited;
-                }
-            }
 
-            var sw = Stopwatch.StartNew();
-            while (sw.Elapsed < TimeSpan.FromSeconds(5))
-            {
-                if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
+                var sw = Stopwatch.StartNew();
+                while (sw.ElapsedMilliseconds < CoreConnectTimeoutMs)
                 {
-                    return;
+                    if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
+                        return;
+
+                    if (startedProcess.HasExited)
+                    {
+                        startedProcess.WaitForExit();
+                        var exitCode = startedProcess.ExitCode;
+                        var message = BuildCoreStartupError(
+                            $"Core exited before listening on 127.0.0.1:{port}. Exit code: {exitCode}.",
+                            corePath,
+                            diagnostics,
+                            diagnosticsLock);
+                        startedProcess.Exited -= CoreProcess_Exited;
+                        startedProcess.Dispose();
+                        process = null;
+                        owned = false;
+                        LogHelper.WriteLog(message);
+                        throw new InvalidOperationException(message);
+                    }
+
+                    Thread.Sleep(100);
                 }
-                Thread.Sleep(100);
+
+                var timeoutMessage = BuildCoreStartupError(
+                    $"Core did not start listening on 127.0.0.1:{port} within {CoreConnectTimeoutMs} ms.",
+                    corePath,
+                    diagnostics,
+                    diagnosticsLock);
+                startedProcess.Exited -= CoreProcess_Exited;
+                TryKillProcess(startedProcess);
+                startedProcess.Dispose();
+                process = null;
+                owned = false;
+                LogHelper.WriteLog(timeoutMessage);
+                throw new TimeoutException(timeoutMessage);
             }
-            throw new TimeoutException("Core did not start listening in time.");
+        }
+
+        private static void AppendCoreDiagnostic(StringBuilder buffer, object sync, string source, string line)
+        {
+            if (string.IsNullOrWhiteSpace(line))
+                return;
+            lock (sync)
+            {
+                if (buffer.Length < 16 * 1024)
+                    buffer.Append('[').Append(source).Append("] ").AppendLine(line);
+            }
+        }
+
+        private static string BuildCoreStartupError(
+            string summary,
+            string executable,
+            StringBuilder diagnostics,
+            object diagnosticsLock)
+        {
+            string output;
+            lock (diagnosticsLock)
+                output = diagnostics.ToString().Trim();
+            if (string.IsNullOrEmpty(output))
+                output = "Core produced no stdout/stderr output.";
+            return $"{summary} Executable: {executable}{Environment.NewLine}{output}";
         }
 
 
@@ -1274,7 +1371,16 @@ namespace IRSpeedyVPN.Services
             if (suppressCoreExit)
                 return;
             if (!IsConnected)
+            {
+                try
+                {
+                    var exitedProcess = sender as Process;
+                    if (exitedProcess != null)
+                        LogHelper.WriteLog($"Core exited during startup. Exit code: {exitedProcess.ExitCode}.");
+                }
+                catch { }
                 return;
+            }
             if (userCancelRequested)
             {
                 DisconnectInternal(true, false, false);
