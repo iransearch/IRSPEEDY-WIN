@@ -29,6 +29,11 @@ namespace IRSpeedyVPN.Services.Libcore
         public string Error { get; set; }
     }
 
+    internal class IsPrivilegedResponse
+    {
+        public bool HasPrivilege { get; set; }
+    }
+
     internal class LoadConfigReq
     {
         public string CoreConfig { get; set; }
