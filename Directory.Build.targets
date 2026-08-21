@@ -23,7 +23,7 @@
 
     <WriteLinesToFile
       File="$(_FilesZipIntegritySourceFile)"
-      Lines="namespace IRSpeedyVPN.Resource { internal static class FilesZipIntegrity { internal const string ExpectedSha256 = &quot;$(_FilesZipHashValue)&quot;; } }"
+      Lines="namespace IRSpeedyVPN.Resource { internal static class FilesZipIntegrity { internal const string ExpectedSha256 = &quot;$(_FilesZipHashValue)&quot;%3B } }"
       Overwrite="true"
       Encoding="UTF-8" />
 
