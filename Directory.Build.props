@@ -1,0 +1,6 @@
+<Project>
+  <ItemGroup Condition="'$(UseCosturaSingleFile)' == 'true' And '$(MSBuildProjectName)' == 'IRSpeedyVPN'">
+    <PackageReference Include="Fody" Version="6.9.3" PrivateAssets="all" />
+    <PackageReference Include="Costura.Fody" Version="6.2.0" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
