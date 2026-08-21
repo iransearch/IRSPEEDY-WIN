@@ -460,6 +460,7 @@ namespace IRSpeedyVPN.Resource
 
             var ready = new ManualResetEventSlim(false);
             var diagnostics = new StringBuilder();
+            var stderrDiagnostics = new StringBuilder();
             var diagnosticsLock = new object();
             string probeHost = null;
             var probePort = 0;
@@ -502,6 +503,7 @@ namespace IRSpeedyVPN.Resource
                     if (args.Data == null) return;
                     lock (diagnosticsLock)
                     {
+                        stderrDiagnostics.AppendLine(args.Data);
                         diagnostics.AppendLine("[stderr] " + args.Data);
                     }
                 };
@@ -523,7 +525,17 @@ namespace IRSpeedyVPN.Resource
                         if (process.HasExited)
                         {
                             process.WaitForExit();
-                            error = "Probe Core exited before PROBE_READY. Exit code: " + process.ExitCode
+                            var exitCode = process.ExitCode;
+                            var stderrText = ReadDiagnostics(stderrDiagnostics, diagnosticsLock);
+                            if (IsLegacyProbeUnsupported(exitCode, stderrText))
+                            {
+                                LogHelper.WriteExLog(
+                                    "Core probe skipped: legacy Core does not support --probe-mode. Exit code="
+                                    + exitCode + ". stderr=" + stderrText + "\r\n");
+                                return true;
+                            }
+
+                            error = "Probe Core exited before PROBE_READY. Exit code: " + exitCode
                                 + ". " + ReadDiagnostics(diagnostics, diagnosticsLock);
                         }
                         else
@@ -594,6 +606,17 @@ namespace IRSpeedyVPN.Resource
                     process.ErrorDataReceived -= stderrHandler;
                 }
             }
+        }
+
+        private static bool IsLegacyProbeUnsupported(int exitCode, string stderr)
+        {
+            if (exitCode != 2 || string.IsNullOrWhiteSpace(stderr))
+                return false;
+
+            var text = stderr.ToLowerInvariant();
+            return text.Contains("flag provided but not defined")
+                || text.Contains("unknown flag")
+                || text.Contains("invalid argument");
         }
 
         private RuntimeState ValidateAndRepairRuntimeStateLocked()
