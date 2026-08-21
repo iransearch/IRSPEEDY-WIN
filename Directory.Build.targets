@@ -1,10 +1,10 @@
 <Project>
   <Target Name="GenerateFilesZipIntegritySource"
           BeforeTargets="CoreCompile"
-          Condition="'$(MSBuildProjectName)' == 'IRSpeedyVPN'">
+          Condition="Exists('$(MSBuildProjectDirectory)\Resource\ResourceManager.cs')">
     <PropertyGroup>
       <_FilesZipPath>$(MSBuildProjectDirectory)\Resources\Files.zip</_FilesZipPath>
-      <_FilesZipIntegritySourceFile>$(IntermediateOutputPath)FilesZipIntegrity.g.cs</_FilesZipIntegritySourceFile>
+      <_FilesZipIntegritySourceFile>$(IntermediateOutputPath)FilesZipIntegrity.$(MSBuildProjectName).g.cs</_FilesZipIntegritySourceFile>
     </PropertyGroup>
 
     <Error Condition="!Exists('$(_FilesZipPath)')"
