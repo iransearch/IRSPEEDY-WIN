@@ -1,0 +1,34 @@
+<Project>
+  <Target Name="GenerateFilesZipIntegritySource"
+          BeforeTargets="CoreCompile"
+          Condition="'$(MSBuildProjectName)' == 'IRSpeedyVPN'">
+    <PropertyGroup>
+      <_FilesZipPath>$(MSBuildProjectDirectory)\Resources\Files.zip</_FilesZipPath>
+      <_FilesZipIntegritySourceFile>$(IntermediateOutputPath)FilesZipIntegrity.g.cs</_FilesZipIntegritySourceFile>
+    </PropertyGroup>
+
+    <Error Condition="!Exists('$(_FilesZipPath)')"
+           Text="Embedded runtime archive was not found: $(_FilesZipPath)" />
+
+    <GetFileHash Files="$(_FilesZipPath)" Algorithm="SHA256" HashEncoding="hex">
+      <Output TaskParameter="Items" ItemName="_FilesZipHash" />
+    </GetFileHash>
+
+    <PropertyGroup>
+      <_FilesZipHashValue>@(_FilesZipHash->'%(FileHash)')</_FilesZipHashValue>
+    </PropertyGroup>
+
+    <Error Condition="'$(_FilesZipHashValue)' == ''"
+           Text="Could not calculate SHA256 for Resources\Files.zip." />
+
+    <WriteLinesToFile
+      File="$(_FilesZipIntegritySourceFile)"
+      Lines="namespace IRSpeedyVPN.Resource { internal static class FilesZipIntegrity { internal const string ExpectedSha256 = &quot;$(_FilesZipHashValue)&quot;; } }"
+      Overwrite="true"
+      Encoding="UTF-8" />
+
+    <ItemGroup>
+      <Compile Include="$(_FilesZipIntegritySourceFile)" />
+    </ItemGroup>
+  </Target>
+</Project>
