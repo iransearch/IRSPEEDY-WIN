@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 
 namespace IRSpeedyVPN.Services.Libcore
 {
@@ -45,12 +46,80 @@ namespace IRSpeedyVPN.Services.Libcore
             return Call("LibcoreService.QueryURLTest", LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeQueryURLTestResponse);
         }
 
+        public IsPrivilegedResponse IsPrivileged()
+        {
+            return Call("LibcoreService.IsPrivileged", LibcoreProto.EncodeEmptyReq(), DecodeIsPrivilegedResponse);
+        }
+
         private TResp Call<TResp>(string method, byte[] reqBody, Func<byte[], TResp> decoder)
         {
             using (var client = ProtorpcClient.Connect(_host, _port, _timeoutMs))
             {
                 return client.Call(method, reqBody, decoder);
             }
+        }
+
+        private static IsPrivilegedResponse DecodeIsPrivilegedResponse(byte[] data)
+        {
+            var response = new IsPrivilegedResponse();
+            if (data == null || data.Length == 0)
+                return response;
+
+            var pos = 0;
+            while (pos < data.Length)
+            {
+                var key = ReadVarint(data, ref pos);
+                var field = (int)(key >> 3);
+                var wireType = (int)(key & 0x7);
+                if (field == 1 && wireType == 0)
+                {
+                    response.HasPrivilege = ReadVarint(data, ref pos) != 0;
+                    continue;
+                }
+                SkipField(data, ref pos, wireType);
+            }
+            return response;
+        }
+
+        private static ulong ReadVarint(byte[] data, ref int pos)
+        {
+            ulong value = 0;
+            var shift = 0;
+            for (var i = 0; i < 10; i++)
+            {
+                if (pos >= data.Length)
+                    throw new EndOfStreamException();
+                var b = data[pos++];
+                value |= (ulong)(b & 0x7f) << shift;
+                if (b < 0x80)
+                    return value;
+                shift += 7;
+            }
+            throw new InvalidDataException("Invalid protobuf varint.");
+        }
+
+        private static void SkipField(byte[] data, ref int pos, int wireType)
+        {
+            switch (wireType)
+            {
+                case 0:
+                    ReadVarint(data, ref pos);
+                    return;
+                case 1:
+                    pos += 8;
+                    break;
+                case 2:
+                    pos += checked((int)ReadVarint(data, ref pos));
+                    break;
+                case 5:
+                    pos += 4;
+                    break;
+                default:
+                    throw new InvalidDataException("Unsupported protobuf wire type: " + wireType);
+            }
+
+            if (pos < 0 || pos > data.Length)
+                throw new EndOfStreamException();
         }
     }
 }
