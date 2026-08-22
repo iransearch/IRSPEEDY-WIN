@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Interfaces;
+using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models.NewService;
 using System;
 using System.Collections.Generic;
@@ -140,17 +140,15 @@ namespace IRSpeedyVPN.Components.ServerListControl
     }
 
     /// <summary>
-    /// One visible row per country. Services can contain multiple API service records,
-    /// and every URL from every record in the country belongs to the country pool.
+    /// One visible numbered country row = one IVPNService/API service record. When an
+    /// API response contains two German records they stay distinct as "آلمان 1" and
+    /// "آلمان 2". Every URL inside that record belongs to this row's Smart pool.
     /// </summary>
     internal class GroupItem : PickerItem
     {
-        public List<IVPNService> Services { get; set; } = new List<IVPNService>();
+        public IVPNService Service { get; set; }
         public string CountryName { get; set; }
         public string CountryCode { get; set; }
-
-        public IVPNService ConnectionService
-            => Services.FirstOrDefault(s => s is ISmartFastConnection) ?? Services.FirstOrDefault();
 
         private bool _isSelectedCountry;
         public bool IsSelectedCountry
@@ -177,8 +175,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         public List<Url> GetUrls()
         {
-            return Services
-                .SelectMany(s => s.GetServerUrls() ?? new List<Url>())
+            return (Service?.GetServerUrls() ?? new List<Url>())
                 .Where(u => u != null)
                 .ToList();
         }
@@ -214,8 +211,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
             var allFresh = urls.Count > 0 && urls.All(u =>
                 u.latencychkTime != default(DateTime) && !Sig.IsStale(u));
 
-            // Gray means not tested/stale. Red means every server in the country was
-            // tested recently and none returned a positive result.
+            // Gray = not tested/stale. Red = every URL in this row was tested recently
+            // and none returned a positive result. Only rows with a positive result can
+            // be selected; blue/yellow/orange are valid just like green.
             Sig.FromLatency(allFresh ? -1 : 0, out var emptyBars, out var emptyColor, out var emptyText);
             SignalBars = emptyBars;
             SignalColor = emptyColor;
@@ -226,10 +224,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
     #endregion
 
     /// <summary>
-    /// Country picker with no per-server expansion. Each country shows the minimum
-    /// positive latency across all of its URLs. A country becomes selectable as soon
-    /// as at least one URL has a positive result. Selecting it sends ALL country URLs
-    /// to the existing Smart Fast Xray balancer; URL-test failures never filter the pool.
+    /// Picker with no per-server expansion. Duplicate countries remain numbered rows.
+    /// Each row shows the minimum positive latency across all URLs in its own service
+    /// record. Selecting it sends ALL URLs in that row to the existing Smart Fast Xray
+    /// leastLoad balancer; failed URL-test results never filter the runtime pool.
     /// </summary>
     public partial class ServerCountryPicker : UserControl
     {
@@ -254,7 +252,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                     return;
                 }
 
-                var group = _groups.FirstOrDefault(g => g.Services.Contains(value));
+                var group = _groups.FirstOrDefault(g => ReferenceEquals(g.Service, value));
                 if (group == null)
                 {
                     Apply(value, null, SelectionKind.None);
@@ -262,7 +260,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 }
 
                 // A country-smart connection marks SelectedServerUrl with one member
-                // of its pool. Rebuild the pool when the protocol/service filter changes.
+                // of its row pool. Rebuild the pool when service/protocol data reloads.
                 if (value is ISmartFastConnection smart && smart.IsSmartFast && value.SelectedServerUrl != null)
                     PrepareCountryPool(group, value);
 
@@ -302,26 +300,24 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             _urlTest = urlTestSupported;
             var arr = services?.ToArray() ?? new IVPNService[0];
-            var previousCountryCode = _selectedGroup?.CountryCode;
+            var previousServiceId = _selectedGroup?.Service?.ID;
 
             _groups = arr
-                .GroupBy(
-                    s => string.IsNullOrWhiteSpace(s.CountryCode) ? (s.Country ?? "") : s.CountryCode,
-                    StringComparer.OrdinalIgnoreCase)
-                .Select(country =>
+                .OrderBy(s => s.Country)
+                .ThenBy(s => s.ID)
+                .Select(service =>
                 {
-                    var members = country.OrderBy(s => s.Country).ToList();
                     var group = new GroupItem
                     {
-                        Services = members,
-                        CountryCode = country.Key,
-                        CountryName = members.Select(s => s.Country)
-                            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? country.Key
+                        Service = service,
+                        CountryCode = service.CountryCode,
+                        CountryName = string.IsNullOrWhiteSpace(service.Country)
+                            ? (service.CountryCode ?? "")
+                            : service.Country
                     };
                     group.RefreshSignals();
                     return group;
                 })
-                .OrderBy(g => g.CountryName)
                 .ToList();
 
             _smart = _urlTest ? new SmartItem() : null;
@@ -339,22 +335,21 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
             var selected = _selectedService == null
                 ? null
-                : _groups.FirstOrDefault(g => g.Services.Contains(_selectedService));
+                : _groups.FirstOrDefault(g => ReferenceEquals(g.Service, _selectedService));
 
-            if (selected == null && !string.IsNullOrWhiteSpace(previousCountryCode))
-                selected = _groups.FirstOrDefault(g =>
-                    string.Equals(g.CountryCode, previousCountryCode, StringComparison.OrdinalIgnoreCase));
+            if (selected == null && previousServiceId.HasValue)
+                selected = _groups.FirstOrDefault(g => g.Service != null && g.Service.ID == previousServiceId.Value);
 
             if (selected != null)
-                Apply(_selectedService ?? selected.ConnectionService, selected, SelectionKind.Country);
+                Apply(_selectedService ?? selected.Service, selected, SelectionKind.Country);
             else
                 Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
         }
 
-        /// <summary>Refresh the country containing a service after that service's URL test completes.</summary>
+        /// <summary>Refresh the numbered row that owns this service after URL testing.</summary>
         public void RefreshGroup(IVPNService service)
         {
-            var group = _groups.FirstOrDefault(g => g.Services.Contains(service));
+            var group = _groups.FirstOrDefault(g => ReferenceEquals(g.Service, service));
             group?.RefreshSignals();
         }
 
@@ -363,9 +358,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (group == null || !group.IsSelectable)
                 return false;
 
-            var connectionService = preferredService is ISmartFastConnection
-                ? preferredService
-                : group.ConnectionService;
+            var connectionService = preferredService ?? group.Service;
             var smart = connectionService as ISmartFastConnection;
             if (smart == null)
                 return false;
@@ -374,12 +367,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (poolUrls.Length == 0)
                 return false;
 
-            // Intentionally send every URL in the country to Xray. URL tests only
-            // decide whether the country is selectable and what minimum latency is shown.
+            // Intentionally send EVERY URL in this numbered row to Xray. URL tests only
+            // decide row availability and the minimum latency shown in the picker.
             smart.SetSmartFastUrls(poolUrls);
 
-            // Marker used by UCServerList to distinguish a country-smart selection
-            // from the global Smart/Fast selection, which keeps SelectedServerUrl null.
+            // Marker used by UCServerList to distinguish a row-scoped Smart connection
+            // from global Smart/Fast, which keeps SelectedServerUrl null.
             connectionService.SelectedServerUrl = group.GetUrls().FirstOrDefault();
             return true;
         }
@@ -462,15 +455,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
             if (item is GroupItem group)
             {
-                // Only a fully red/no-positive country is blocked. Green, blue, yellow
-                // and orange countries all have a positive result and are selectable.
                 if (!group.IsSelectable)
                 {
                     e.Handled = true;
                     return;
                 }
 
-                var connectionService = group.ConnectionService;
+                var connectionService = group.Service;
                 if (!PrepareCountryPool(group, connectionService))
                 {
                     e.Handled = true;
