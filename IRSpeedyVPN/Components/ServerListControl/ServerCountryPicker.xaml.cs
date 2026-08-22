@@ -17,7 +17,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 {
     #region Selection kind
 
-    internal enum SelectionKind { None, Smart, Country, Server }
+    internal enum SelectionKind { None, Smart, Country }
 
     #endregion
 
@@ -63,7 +63,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
     #endregion
 
-    #region Signal helper — per-Url rules (latency is long)
+    #region Signal helper
 
     internal static class Sig
     {
@@ -89,26 +89,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
             return Geometry.Parse(sb.ToString().Trim());
         }
 
-        /// <summary>
-        /// A Url's latency is "stale" if it was checked more than 5 minutes ago.
-        /// NOTE: uses DateTime.Now. If latencychkTime is stored in UTC, swap to
-        /// DateTime.UtcNow (or compare against url.latencychkTime.ToLocalTime()).
-        /// </summary>
         public static bool IsStale(Url u)
         {
-            if (u == null || u.latencychkTime == default) return false;
+            if (u == null || u.latencychkTime == default(DateTime)) return false;
             return (DateTime.Now - u.latencychkTime).TotalMinutes > 5;
         }
 
-        /// <summary>
-        /// latency (long) + staleness → (bars, color, text).
-        ///   stale or 0    → empty bars, "—"
-        ///   -1            → red, full (5 bars), "—"
-        ///   &gt; 2000     → orange, 1 bar
-        ///   &gt; 1000     → yellow, 2 bars
-        ///   &gt; 500      → blue,   3 bars
-        ///   0 &lt; x ≤ 500 → green, full (5 bars)
-        /// </summary>
         public static void Evaluate(long latency, bool stale, out Geometry bars, out Brush color, out string text)
         {
             int level;
@@ -125,9 +111,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
             bars = MakeBars(level);
             color = new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
         }
-
-        public static void FromUrl(Url u, out Geometry bars, out Brush color, out string text)
-            => Evaluate(u?.latency ?? 0, IsStale(u), out bars, out color, out text);
 
         public static void FromLatency(long latency, out Geometry bars, out Brush color, out string text)
             => Evaluate(latency, false, out bars, out color, out text);
@@ -156,22 +139,18 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public string Display => "انتخاب هوشمند سریعترین سرور";
     }
 
-    /// <summary>One IVPNService = one country header.</summary>
+    /// <summary>
+    /// One visible row per country. Services can contain multiple API service records,
+    /// and every URL from every record in the country belongs to the country pool.
+    /// </summary>
     internal class GroupItem : PickerItem
     {
-        public IVPNService Service { get; set; }
+        public List<IVPNService> Services { get; set; } = new List<IVPNService>();
         public string CountryName { get; set; }
         public string CountryCode { get; set; }
 
-        /// <summary>Sub-rows: one per Url from GetServerUrls().</summary>
-        public List<UrlItem> UrlItems { get; set; } = new List<UrlItem>();
-
-        private bool _isExpanded;
-        public bool IsExpanded
-        {
-            get => _isExpanded;
-            set { if (_isExpanded == value) return; _isExpanded = value; On(); }
-        }
+        public IVPNService ConnectionService
+            => Services.FirstOrDefault(s => s is ISmartFastConnection) ?? Services.FirstOrDefault();
 
         private bool _isSelectedCountry;
         public bool IsSelectedCountry
@@ -180,6 +159,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
             set { if (_isSelectedCountry == value) return; _isSelectedCountry = value; On(); }
         }
 
+        private bool _isSelectable;
+        public bool IsSelectable
+        {
+            get => _isSelectable;
+            private set { if (_isSelectable == value) return; _isSelectable = value; On(); }
+        }
+
         private Geometry _signalBars = Geometry.Empty;
         public Geometry SignalBars { get => _signalBars; private set { _signalBars = value; On(); } }
 
@@ -189,78 +175,61 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private string _signalText = "—";
         public string SignalText { get => _signalText; private set { _signalText = value; On(); } }
 
-        /// <summary>Smallest latency that is &gt;0 and not stale; 0 if none.</summary>
-        public long MinValidLatency
+        public List<Url> GetUrls()
         {
-            get
-            {
-                var vals = UrlItems
-                    .Where(u => u.Url != null && u.Url.latency > 0 && !Sig.IsStale(u.Url))
-                    .Select(u => u.Url.latency);
-                return vals.Any() ? vals.Min() : 0L;
-            }
+            return Services
+                .SelectMany(s => s.GetServerUrls() ?? new List<Url>())
+                .Where(u => u != null)
+                .ToList();
         }
 
-        public void UpdateHeaderSignal(long minValidLatency)
+        public string[] GetPoolUrls()
         {
-            Sig.FromLatency(minValidLatency, out var b, out var c, out var t);
-            SignalBars = b; SignalColor = c; SignalText = t;
+            return GetUrls()
+                .Select(u => u.url)
+                .Where(u => !string.IsNullOrWhiteSpace(u))
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
         }
 
-        /// <summary>Re-read every Url's latency (updated by a URL test) and redraw.</summary>
         public void RefreshSignals()
         {
-            foreach (var ui in UrlItems) ui.Refresh();
-            UpdateHeaderSignal(MinValidLatency);
+            var urls = GetUrls();
+            var positive = urls
+                .Where(u => u.latency > 0 && !Sig.IsStale(u))
+                .Select(u => u.latency)
+                .ToArray();
+
+            if (positive.Length > 0)
+            {
+                IsSelectable = true;
+                Sig.FromLatency(positive.Min(), out var bars, out var color, out var text);
+                SignalBars = bars;
+                SignalColor = color;
+                SignalText = text;
+                return;
+            }
+
+            IsSelectable = false;
+            var allFresh = urls.Count > 0 && urls.All(u =>
+                u.latencychkTime != default(DateTime) && !Sig.IsStale(u));
+
+            // Gray means not tested/stale. Red means every server in the country was
+            // tested recently and none returned a positive result.
+            Sig.FromLatency(allFresh ? -1 : 0, out var emptyBars, out var emptyColor, out var emptyText);
+            SignalBars = emptyBars;
+            SignalColor = emptyColor;
+            SignalText = emptyText;
         }
-    }
-
-    /// <summary>One Url under a service — has its own signal. Label = parent name + (position+1).</summary>
-    internal class UrlItem : PickerItem
-    {
-        public Url Url { get; }
-        public GroupItem Parent { get; }
-
-        /// <summary>1-based position of this Url under its parent (from GetServerUrls() order).</summary>
-        public int Index { get; }
-
-        public UrlItem(Url url, GroupItem parent, int index)
-        {
-            Url = url;
-            Parent = parent;
-            Index = index;
-            Refresh();
-        }
-
-        private Geometry _signalBars = Geometry.Empty;
-        public Geometry SignalBars { get => _signalBars; private set { _signalBars = value; On(); } }
-
-        private Brush _signalColor = Brushes.Transparent;
-        public Brush SignalColor { get => _signalColor; private set { _signalColor = value; On(); } }
-
-        private string _signalText = "—";
-        public string SignalText { get => _signalText; private set { _signalText = value; On(); } }
-
-        public void Refresh()
-        {
-            Sig.FromUrl(Url, out var b, out var c, out var t);
-            SignalBars = b; SignalColor = c; SignalText = t;
-        }
-
-        /// <summary>e.g. parent "آلمان" + Index 2 → "آلمان 2".</summary>
-        public string DisplayText => $"سرور {Index}";
     }
 
     #endregion
 
     /// <summary>
-    /// Custom country/server picker.
-    ///   - Each IVPNService = one country header.
-    ///   - Sub-rows come from GetServerUrls() (one Url each, each with its own signal).
-    ///   - Row label = parent country name + (position + 1).
-    ///   - Header signal = the minimum *valid* latency among its Urls.
-    ///   - Selecting a header  → service.SelectedServerUrl = null   (Country-level).
-    ///   - Selecting a sub-row → service.SelectedServerUrl = that Url (Server-level).
+    /// Country picker with no per-server expansion. Each country shows the minimum
+    /// positive latency across all of its URLs. A country becomes selectable as soon
+    /// as at least one URL has a positive result. Selecting it sends ALL country URLs
+    /// to the existing Smart Fast Xray balancer; URL-test failures never filter the pool.
     /// </summary>
     public partial class ServerCountryPicker : UserControl
     {
@@ -269,34 +238,35 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private bool _urlTest;
 
         private IVPNService _selectedService;
-        private Url _selectedUrl;
+        private GroupItem _selectedGroup;
         private SelectionKind _kind = SelectionKind.None;
 
-        private readonly Dictionary<int, bool> _expansion = new Dictionary<int, bool>();
-
-        /// <summary>Raised with the owning service (null = smart). SelectedServerUrl is
-        /// already set on the service before this fires.</summary>
         public event Action<IVPNService> ServerSelected;
 
-        /// <summary>Raised when the user expands a country header (priority URL tests).</summary>
-        public event Action<IVPNService> GroupExpanded;
-
-        /// <summary>
-        /// The owning service. Setting from outside reads service.SelectedServerUrl to
-        /// decide Country- vs Server-level highlight.
-        /// </summary>
         public IVPNService SelectedService
         {
             get => _selectedService;
             set
             {
                 if (value == null)
-                    Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
-                else
                 {
-                    var url = value.SelectedServerUrl;
-                    Apply(value, url, url == null ? SelectionKind.Country : SelectionKind.Server);
+                    Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
+                    return;
                 }
+
+                var group = _groups.FirstOrDefault(g => g.Services.Contains(value));
+                if (group == null)
+                {
+                    Apply(value, null, SelectionKind.None);
+                    return;
+                }
+
+                // A country-smart connection marks SelectedServerUrl with one member
+                // of its pool. Rebuild the pool when the protocol/service filter changes.
+                if (value is ISmartFastConnection smart && smart.IsSmartFast && value.SelectedServerUrl != null)
+                    PrepareCountryPool(group, value);
+
+                Apply(value, group, SelectionKind.Country);
             }
         }
 
@@ -304,9 +274,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             InitializeComponent();
 
-            // StaysOpen="False" alone only closes when keyboard focus actually moves
-            // (clicking a focusable control). Clicks on non-focusable areas leave the
-            // popup open, so close on any mouse-down outside the face/popup too.
             EventManager.RegisterClassHandler(typeof(Window), UIElement.PreviewMouseDownEvent,
                 new MouseButtonEventHandler(OnWindowPreviewMouseDown), true);
         }
@@ -318,7 +285,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
             var source = e.OriginalSource as DependencyObject;
             if (source == null) return;
 
-            // clicks on the face (incl. the toggle) or inside the popup keep it open
             if (IsSelfOrDescendant(source, root) || IsSelfOrDescendant(source, popup.Child))
                 return;
 
@@ -332,29 +298,30 @@ namespace IRSpeedyVPN.Components.ServerListControl
             return false;
         }
 
-        /// <summary>Build the list. Call on every service/protocol change.</summary>
         public void Load(IEnumerable<IVPNService> services, bool urlTestSupported)
         {
             _urlTest = urlTestSupported;
             var arr = services?.ToArray() ?? new IVPNService[0];
+            var previousCountryCode = _selectedGroup?.CountryCode;
 
             _groups = arr
-                .OrderBy(s => s.Country)
-                .Select(s =>
+                .GroupBy(
+                    s => string.IsNullOrWhiteSpace(s.CountryCode) ? (s.Country ?? "") : s.CountryCode,
+                    StringComparer.OrdinalIgnoreCase)
+                .Select(country =>
                 {
-                    var urls = s.GetServerUrls() ?? new List<Url>();
-                    var g = new GroupItem
+                    var members = country.OrderBy(s => s.Country).ToList();
+                    var group = new GroupItem
                     {
-                        Service = s,
-                        CountryName = s.Country ?? "",
-                        CountryCode = s.CountryCode,
-                        IsExpanded = _expansion.TryGetValue(s.ID, out var e) && e
+                        Services = members,
+                        CountryCode = country.Key,
+                        CountryName = members.Select(s => s.Country)
+                            .FirstOrDefault(x => !string.IsNullOrWhiteSpace(x)) ?? country.Key
                     };
-                    // position = order in GetServerUrls(); label uses Index = position + 1
-                    g.UrlItems = urls.Select((u, i) => new UrlItem(u, g, i + 1)).ToList();
-                    g.UpdateHeaderSignal(g.MinValidLatency);
-                    return g;
+                    group.RefreshSignals();
+                    return group;
                 })
+                .OrderBy(g => g.CountryName)
                 .ToList();
 
             _smart = _urlTest ? new SmartItem() : null;
@@ -364,105 +331,96 @@ namespace IRSpeedyVPN.Components.ServerListControl
             items.AddRange(_groups);
             icCountries.ItemsSource = items;
 
-            // restore previous selection with the right kind
             if (_selectedService == null && _urlTest)
-                Apply(null, null, SelectionKind.Smart);
-            else if (_selectedService != null)
             {
-                var url = _selectedService.SelectedServerUrl;
-                Apply(_selectedService, url, url == null ? SelectionKind.Country : SelectionKind.Server);
+                Apply(null, null, SelectionKind.Smart);
+                return;
             }
+
+            var selected = _selectedService == null
+                ? null
+                : _groups.FirstOrDefault(g => g.Services.Contains(_selectedService));
+
+            if (selected == null && !string.IsNullOrWhiteSpace(previousCountryCode))
+                selected = _groups.FirstOrDefault(g =>
+                    string.Equals(g.CountryCode, previousCountryCode, StringComparison.OrdinalIgnoreCase));
+
+            if (selected != null)
+                Apply(_selectedService ?? selected.ConnectionService, selected, SelectionKind.Country);
             else
-                Apply(null, null, SelectionKind.None);
+                Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
         }
 
-        /// <summary>Re-read the Url latencies for one service (after a URL test) and redraw.</summary>
+        /// <summary>Refresh the country containing a service after that service's URL test completes.</summary>
         public void RefreshGroup(IVPNService service)
         {
-            var g = _groups.FirstOrDefault(x => x.Service == service);
-            g?.RefreshSignals();
+            var group = _groups.FirstOrDefault(g => g.Services.Contains(service));
+            group?.RefreshSignals();
         }
 
-        private void Apply(IVPNService svc, Url url, SelectionKind kind)
+        private bool PrepareCountryPool(GroupItem group, IVPNService preferredService = null)
         {
-            _selectedService = svc;
-            _selectedUrl = url;
+            if (group == null || !group.IsSelectable)
+                return false;
+
+            var connectionService = preferredService is ISmartFastConnection
+                ? preferredService
+                : group.ConnectionService;
+            var smart = connectionService as ISmartFastConnection;
+            if (smart == null)
+                return false;
+
+            var poolUrls = group.GetPoolUrls();
+            if (poolUrls.Length == 0)
+                return false;
+
+            // Intentionally send every URL in the country to Xray. URL tests only
+            // decide whether the country is selectable and what minimum latency is shown.
+            smart.SetSmartFastUrls(poolUrls);
+
+            // Marker used by UCServerList to distinguish a country-smart selection
+            // from the global Smart/Fast selection, which keeps SelectedServerUrl null.
+            connectionService.SelectedServerUrl = group.GetUrls().FirstOrDefault();
+            return true;
+        }
+
+        private void Apply(IVPNService service, GroupItem group, SelectionKind kind)
+        {
+            _selectedService = service;
+            _selectedGroup = group;
             _kind = kind;
             ApplySelection();
         }
 
         private void ApplySelection()
         {
-            // clear everything
             if (_smart != null) _smart.IsSelected = false;
-            foreach (var g in _groups)
+            foreach (var group in _groups)
+                group.IsSelectedCountry = false;
+
+            if (_kind == SelectionKind.Smart)
             {
-                g.IsSelectedCountry = false;
-                foreach (var u in g.UrlItems) u.IsSelected = false;
+                if (_smart != null) _smart.IsSelected = true;
             }
-
-            var group = _selectedService == null
-                ? null
-                : _groups.FirstOrDefault(g => g.Service == _selectedService);
-
-            switch (_kind)
+            else if (_kind == SelectionKind.Country && _selectedGroup != null)
             {
-                case SelectionKind.Smart:
-                    if (_smart != null) _smart.IsSelected = true;
-                    break;
-
-                case SelectionKind.Country:
-                    // header star only — NO sub-row dot
-                    if (group != null) group.IsSelectedCountry = true;
-                    break;
-
-                case SelectionKind.Server:
-                    // sub-row dot + header star (the country is active)
-                    if (group != null)
-                    {
-                        group.IsSelectedCountry = true;
-                        var ui = group.UrlItems.FirstOrDefault(u => u.Url == _selectedUrl);
-                        if (ui != null) ui.IsSelected = true;
-                    }
-                    break;
+                _selectedGroup.IsSelectedCountry = true;
             }
-
-            foreach (var g in _groups)
-                g.UpdateHeaderSignal(g.MinValidLatency);
 
             UpdateFace();
         }
 
         private void UpdateFace()
         {
-            var group = _selectedService == null
-                ? null
-                : _groups.FirstOrDefault(g => g.Service == _selectedService);
-
             if (_kind == SelectionKind.Smart || (_selectedService == null && _urlTest))
             {
                 faceBolt.Visibility = Visibility.Visible;
                 faceText.Text = _smart?.Display ?? "";
+                return;
             }
-            else if (_kind == SelectionKind.Server && _selectedUrl != null)
-            {
-                // face shows the same label as the selected row: parent name + index
-                faceBolt.Visibility = Visibility.Collapsed;
-                var ui = group?.UrlItems.FirstOrDefault(u => u.Url == _selectedUrl);
-                faceText.Text = ui != null
-        ? $"{group.CountryName} - سرور {ui.Index}"
-        : (group?.CountryName ?? "");
-            }
-            else if (group != null)
-            {
-                faceBolt.Visibility = Visibility.Collapsed;
-                faceText.Text = group.CountryName;
-            }
-            else
-            {
-                faceBolt.Visibility = Visibility.Collapsed;
-                faceText.Text = _groups.FirstOrDefault()?.CountryName ?? "";
-            }
+
+            faceBolt.Visibility = Visibility.Collapsed;
+            faceText.Text = _selectedGroup?.CountryName ?? _selectedService?.Country ?? "";
         }
 
         #region Popup open / close
@@ -479,60 +437,50 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         #endregion
 
-        #region Click routing — chevron toggles, everything else selects
+        #region Click routing
 
         private void OnListClick(object sender, MouseButtonEventArgs e)
         {
-            string tag = null;
             PickerItem item = null;
-
-            var dep = e.OriginalSource as DependencyObject;
-            while (dep != null)
+            for (var dep = e.OriginalSource as DependencyObject; dep != null; dep = VisualTreeHelper.GetParent(dep))
             {
-                if (dep is FrameworkElement fe)
+                if (dep is FrameworkElement element && element.DataContext is PickerItem pickerItem)
                 {
-                    if (tag == null && fe.Tag is string t) tag = t;
-                    if (item == null && fe.DataContext is PickerItem pi) item = pi;
+                    item = pickerItem;
+                    break;
                 }
-                dep = VisualTreeHelper.GetParent(dep);
             }
 
-            if (item == null) return;
-
-            if (tag == "Expander" && item is GroupItem gExp)
+            if (item is SmartItem)
             {
-                // ONLY the chevron toggles. Popup stays open. No selection change.
-                gExp.IsExpanded = !gExp.IsExpanded;
-                _expansion[gExp.Service.ID] = gExp.IsExpanded;
-                if (gExp.IsExpanded)
-                    GroupExpanded?.Invoke(gExp.Service);
+                Apply(null, null, SelectionKind.Smart);
+                ServerSelected?.Invoke(null);
+                ClosePopup();
                 e.Handled = true;
                 return;
             }
 
-            switch (item)
+            if (item is GroupItem group)
             {
-                case SmartItem _:
-                    Apply(null, null, SelectionKind.Smart);
-                    ServerSelected?.Invoke(null);
-                    ClosePopup();
-                    break;
+                // Only a fully red/no-positive country is blocked. Green, blue, yellow
+                // and orange countries all have a positive result and are selectable.
+                if (!group.IsSelectable)
+                {
+                    e.Handled = true;
+                    return;
+                }
 
-                case UrlItem ui:
-                    // row pick → store the Url on its service, highlight that row
-                    ui.Parent.Service.SelectedServerUrl = ui.Url;
-                    Apply(ui.Parent.Service, ui.Url, SelectionKind.Server);
-                    ServerSelected?.Invoke(ui.Parent.Service);
-                    ClosePopup();
-                    break;
+                var connectionService = group.ConnectionService;
+                if (!PrepareCountryPool(group, connectionService))
+                {
+                    e.Handled = true;
+                    return;
+                }
 
-                case GroupItem gBody:
-                    // header pick → country-level: clear the Url, star on header, NO row dot
-                    gBody.Service.SelectedServerUrl = null;
-                    Apply(gBody.Service, null, SelectionKind.Country);
-                    ServerSelected?.Invoke(gBody.Service);
-                    ClosePopup();
-                    break;
+                Apply(connectionService, group, SelectionKind.Country);
+                ServerSelected?.Invoke(connectionService);
+                ClosePopup();
+                e.Handled = true;
             }
         }
 
