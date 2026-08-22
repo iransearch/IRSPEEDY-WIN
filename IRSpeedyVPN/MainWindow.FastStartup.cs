@@ -42,6 +42,7 @@ namespace IRSpeedyVPN
             uCServerList.OnLoadingRequest += OnLoadingRequest;
             uCServerList.Loaded += FastStartup_ServerListLoaded;
             uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
+            uCLogin.Loaded += FastStartup_LoginLoaded;
             uCUserInfo.OnChangeServerRequest += UCUserInfo_OnChangeServerRequest;
             uCUserInfo.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;
             uCUserInfo.OnLoadingRequest += OnLoadingRequest;
@@ -276,6 +277,22 @@ namespace IRSpeedyVPN
         {
             if (IsUserLogin)
                 StartSessionMaintenance();
+        }
+
+        private void FastStartup_LoginLoaded(object sender, RoutedEventArgs e)
+        {
+            if (IsUserLogin)
+                return;
+
+            sessionMaintenanceUser = null;
+            Interlocked.Exchange(ref sessionMaintenanceTick, 0);
+            try
+            {
+                sessionMaintenanceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            }
+            catch
+            {
+            }
         }
 
         private void StartSessionMaintenance()
