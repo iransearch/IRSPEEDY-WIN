@@ -1,10 +1,4 @@
-﻿using IRSpeedyVPN.Common;
-using IRSpeedyVPN.Common.Json;
-using IRSpeedyVPN.Interfaces;
-using IRSpeedyVPN.Models;
-using IRSpeedyVPN.Resource;
-using IRSpeedyVPN.Services;
-using IRSpeedyVPN.WebServices;
+using IRSpeedyVPN.Common;
 using System;
 using System.IO;
 using System.IO.Pipes;
@@ -42,21 +36,24 @@ namespace IRSpeedyVPN
                 var app = new App();
                 app.InitializeComponent();
 
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"/IRSpeedyVPN;component/Themes/DefaultThemeColor.xaml", UriKind.Relative) });
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"/IRSpeedyVPN;component/Themes/DefaultTheme.xaml", UriKind.Relative) });
+                // App.xaml already loads the base/theme dictionaries. Keep only the two
+                // dictionaries that are not declared there; loading every theme twice was
+                // unnecessary work on the critical startup path.
+                app.Resources.MergedDictionaries.Add(new ResourceDictionary
+                {
+                    Source = new Uri(@"Themes/Theme.Progressbar.xaml", UriKind.Relative)
+                });
+                app.Resources.MergedDictionaries.Add(new ResourceDictionary
+                {
+                    Source = new Uri(@"Components/ToggleSwitch/Themes/Generic.xaml", UriKind.Relative)
+                });
 
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/Theme.Button.xaml", UriKind.Relative) });
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/Theme.TextBox.xaml", UriKind.Relative) });
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/Theme.TextBoxButton.xaml", UriKind.Relative) });
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/Theme.ComboBox.xaml", UriKind.Relative) });
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/Theme.TextBlock.xaml", UriKind.Relative) });
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/Theme.LabelButton.xaml", UriKind.Relative) });
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/Theme.Progressbar.xaml", UriKind.Relative) });
-                app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Components/ToggleSwitch/Themes/Generic.xaml", UriKind.Relative) });
+                // Construct only dependencies required for the first visible Login frame.
+                AppServices.InitializeFast();
 
-                //app.Resources.MergedDictionaries.Add(new ResourceDictionary { Source = new Uri(@"Themes/ToggleSwitchStyles.xaml", UriKind.Relative) });
-
-                AppServices.Initialize();
+                // Runtime validation, filesystem cleanup and SysThumbPrint/WMI now run in
+                // parallel with window construction instead of blocking first paint.
+                AppServices.BeginDeferredInitialize();
 
                 RunApplication(app);
             }
@@ -76,7 +73,8 @@ namespace IRSpeedyVPN
                     return null;
 
                 Assembly executing = Assembly.GetExecutingAssembly();
-                string resourceName = executing.GetManifestResourceNames().FirstOrDefault(n => n.EndsWith("Transitionals.dll", StringComparison.OrdinalIgnoreCase));
+                string resourceName = executing.GetManifestResourceNames()
+                    .FirstOrDefault(n => n.EndsWith("Transitionals.dll", StringComparison.OrdinalIgnoreCase));
 
                 if (resourceName == null)
                     return null;
@@ -107,17 +105,14 @@ namespace IRSpeedyVPN
                             1))
                         {
                             server.WaitForConnection();
-
                             server.ReadByte();
 
                             var dispatcher = Application.Current?.Dispatcher;
-
                             if (dispatcher != null && !dispatcher.HasShutdownStarted)
                             {
                                 dispatcher.BeginInvoke((Action)(() =>
                                 {
                                     var window = Application.Current?.MainWindow;
-
                                     if (window != null)
                                     {
                                         window.Visibility = Visibility.Visible;
@@ -157,10 +152,8 @@ namespace IRSpeedyVPN
                         PipeDirection.Out))
                     {
                         client.Connect(1000);
-
                         client.WriteByte(1);
                         client.Flush();
-
                         return;
                     }
                 }
@@ -177,9 +170,11 @@ namespace IRSpeedyVPN
             {
                 var mainWindow = new MainWindow();
 
-                // Start pipe server AFTER MainWindow exists
-                StartShowPipeServer();
+                // Suppress the old Activated-time heavy path and put the Login control in
+                // place before the first Show. Deferred work resumes after first render.
+                mainWindow.PrepareFastStartup();
 
+                StartShowPipeServer();
                 app.Run(mainWindow);
             }
             catch (Exception ex)
