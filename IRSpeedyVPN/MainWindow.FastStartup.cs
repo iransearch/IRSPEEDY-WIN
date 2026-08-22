@@ -50,19 +50,18 @@ namespace IRSpeedyVPN
             lblPremium.Visibility = Visibility.Visible;
 #endif
 
+            // This hint is only an HKCU read / oneclick.txt existence check and does not
+            // require WMI or ResourceManager. Put the auto-login overlay in place BEFORE
+            // the first window paint so remembered users never see blank credentials.
+            if (HasRememberedLoginHint())
+                ShowDeferredAutoLogin();
+
             ContentRendered += FastStartup_ContentRendered;
         }
 
         private void FastStartup_ContentRendered(object sender, EventArgs e)
         {
             ContentRendered -= FastStartup_ContentRendered;
-
-            // A remembered-login hint is intentionally cheap: reading HKCU and checking
-            // oneclick.txt does not require ResourceManager, Files.zip or the WMI device
-            // fingerprint. Cover the empty credential fields immediately so users do not
-            // see them become populated a few seconds later.
-            if (HasRememberedLoginHint())
-                ShowDeferredAutoLogin();
 
             // Never put the first paint behind filesystem/WMI/network work.
             Task.Run((Action)CompleteDeferredStartup);
