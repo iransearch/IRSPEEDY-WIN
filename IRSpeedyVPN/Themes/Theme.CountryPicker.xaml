@@ -114,9 +114,10 @@
                             Margin="0,0,12,0">
                     <Path Data="{StaticResource IconStar}" Fill="#F59E0B"
                           Stretch="Uniform" Width="13" Height="13"
-                          Margin="0,0,6,0" VerticalAlignment="Center" Opacity="0">
+                          Margin="0,0,6,0" VerticalAlignment="Center">
                         <Path.Style>
                             <Style TargetType="Path">
+                                <Setter Property="Opacity" Value="0"/>
                                 <Style.Triggers>
                                     <DataTrigger Binding="{Binding IsSelectedCountry}" Value="True">
                                         <Setter Property="Opacity" Value="1"/>
