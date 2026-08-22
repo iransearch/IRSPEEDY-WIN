@@ -44,10 +44,6 @@ namespace IRSpeedyVPN.UserControls
                 selectedService = svc;
                 UpdateHeaderIcons();
             };
-            countryPicker.GroupExpanded += svc =>
-            {
-                RunBackgroundUrlTests(_currentServices ?? new IVPNService[0], svc);
-            };
         }
 
         #region Lifecycle
@@ -136,29 +132,17 @@ namespace IRSpeedyVPN.UserControls
                 .Where(x => x.Name == serviceName && (protocol == null || x.Protocols.Contains(protocol)))
                 .OrderBy(x => x.Country).ToArray();
 
-            AssignCountryIndices(services);
             _isUrlTestSupported = services.Any(x => x.IsUrlTestSupported);
-
             ResolveSelectedService(services);
 
             _currentServices = services;
             countryPicker.Load(services, _isUrlTestSupported);
             countryPicker.SelectedService = selectedService;
 
-            RunBackgroundUrlTests(services, null);
+            RunBackgroundUrlTests(services);
 
             _isLoading = false;
             UpdateHeaderIcons();
-        }
-
-        private static void AssignCountryIndices(IVPNService[] services)
-        {
-            foreach (var s in services) s.CountryIndex = 0;
-            foreach (var s in services)
-            {
-                if (services.Count(x => x.CountryCode == s.CountryCode) > 1 && s.CountryIndex == 0)
-                    s.CountryIndex = (byte)(services.Count(x => x.CountryCode == s.CountryCode && x.CountryIndex > 0) + 1);
-            }
         }
 
         private void ResolveSelectedService(IVPNService[] services)
@@ -166,11 +150,15 @@ namespace IRSpeedyVPN.UserControls
             if (_isLoading && globalInfo?.CurrentService != null
                 && services.Contains(globalInfo.CurrentService))
             {
-                // a previous smart fast connection is not tied to any country —
-                // keep the smart (fastest server) selection instead of a random one
-                selectedService = (globalInfo.CurrentService is ISmartFastConnection smart && smart.IsSmartFast)
+                var current = globalInfo.CurrentService;
+
+                // Global Smart/Fast has no country marker. Country Smart uses one URL
+                // only as a scope marker; the actual connection still uses the full pool.
+                selectedService = (current is ISmartFastConnection smart
+                                   && smart.IsSmartFast
+                                   && current.SelectedServerUrl == null)
                     ? null
-                    : globalInfo.CurrentService;
+                    : current;
             }
             else if (selectedService == null || !services.Contains(selectedService))
             {
@@ -185,12 +173,19 @@ namespace IRSpeedyVPN.UserControls
 
         #region Background URL tests
 
-        /// <summary>True when any of the service's Urls has a valid (non-stale, &gt;0) latency.</summary>
-        private static bool HasValidLatency(IVPNService service)
+        /// <summary>
+        /// A service is fresh only when every URL has a recent test result. Failed URLs
+        /// also receive latencychkTime, so they are not retried continuously during the
+        /// five-minute freshness window.
+        /// </summary>
+        private static bool HasFreshResultsForAllUrls(IVPNService service)
         {
             var urls = service.GetServerUrls();
             if (urls == null || urls.Count == 0) return false;
-            return urls.Any(u => u != null && u.latency > 0 && !Sig.IsStale(u));
+
+            return urls.All(u => u != null
+                && u.latencychkTime != default(DateTime)
+                && !Sig.IsStale(u));
         }
 
         private void StopUrlTests()
@@ -200,11 +195,11 @@ namespace IRSpeedyVPN.UserControls
         }
 
         /// <summary>
-        /// Tests services lacking valid latency in the background and refreshes the
-        /// picker as each result lands. <paramref name="priorityFirst"/> (the country
-        /// the user just opened) is tested first, then the rest.
+        /// Test every server represented by the current service/protocol filter. The
+        /// country picker groups these service records by CountryCode and displays only
+        /// the minimum positive result for each country.
         /// </summary>
-        private void RunBackgroundUrlTests(IVPNService[] services, IVPNService priorityFirst)
+        private void RunBackgroundUrlTests(IVPNService[] services)
         {
             _urlTestCts?.Cancel();
             _urlTestCts = new CancellationTokenSource();
@@ -212,22 +207,19 @@ namespace IRSpeedyVPN.UserControls
 
             UrlTestCoordinator.BeginBatch();
 
-            var ordered = new List<IVPNService>();
-            if (priorityFirst != null && services.Contains(priorityFirst))
-                ordered.Add(priorityFirst);
-            ordered.AddRange(services.Where(s => s != priorityFirst));
-
             Task.Run(() =>
             {
-                foreach (var service in ordered)
+                foreach (var service in services)
                 {
                     if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
                         break;
-                    if (!HasValidLatency(service))
+
+                    if (!HasFreshResultsForAllUrls(service))
                     {
                         try { service.UrlTest(); } catch { }
-                        Dispatcher.BeginInvoke(new Action(() => countryPicker.RefreshGroup(service)));
                     }
+
+                    Dispatcher.BeginInvoke(new Action(() => countryPicker.RefreshGroup(service)));
                 }
             });
         }
@@ -242,25 +234,30 @@ namespace IRSpeedyVPN.UserControls
 
             if (selectedService != null)
             {
+                // A country selection has already loaded ALL URLs from that country into
+                // ISmartFastConnection. Do not clear them here; RunV2ray must build the
+                // same Xray leastLoad balancer used by global Fast Connection.
                 StopUrlTests();
-                if (selectedService is ISmartFastConnection smart)
-                    smart.SetSmartFastUrls(null);
                 OnConnectRequest.Invoke(this, selectedService, selectedProtocol);
             }
             else
+            {
                 ConnectToFastestServer();
+            }
         }
 
         private void ConnectToFastestServer()
         {
             if (cmbService.SelectedItem == null) return;
 
-            // stop any background tests, but allow this fastest-search to run its own
             _urlTestCts?.Cancel();
             UrlTestCoordinator.BeginBatch();
 
+            var serviceName = cmbService.SelectedItem.ToString();
             var services = serviceFactory.Services
-                .Where(x => x.IsUrlTestSupported && x.Name == cmbService.SelectedItem.ToString())
+                .Where(x => x.IsUrlTestSupported
+                    && x.Name == serviceName
+                    && (string.IsNullOrEmpty(selectedProtocol) || x.Protocols.Contains(selectedProtocol)))
                 .Randomize().ToList();
 
             if (!services.Any()) return;
@@ -271,38 +268,25 @@ namespace IRSpeedyVPN.UserControls
                 try
                 {
                     services.First().DisconnectAll();
-                    var deadline = DateTime.UtcNow.AddSeconds(30);
-                    /*
-                    foreach (var service in services)
-                    {
-                        if (DateTime.UtcNow >= deadline || UrlTestCoordinator.AbortRequested) break;
-                        try { service.UrlTest(); service.Disconnect(); } catch { }
-                    }
-                    */
                     OnLoadingRequest?.Invoke(false, null);
 
-                    // smart fast connection: hand every successfully-tested url to the
-                    // service that supports it and continue through the normal connect
-                    // routing (OnConnectRequest -> Connect -> RunV2ray builds the balancer)
                     var smartService = services.FirstOrDefault(x => x is ISmartFastConnection);
-                    /*
-                    var successUrls = services
+
+                    // Global Fast intentionally sends every URL to Xray. URL test state
+                    // is not a pool filter; Xray's observatory/leastLoad owns runtime choice.
+                    var allUrls = services
                         .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
-                        .Where(u => u != null && u.latency > 0 && !Sig.IsStale(u))
+                        .Where(u => u != null)
                         .Select(u => u.url)
                         .Where(u => !string.IsNullOrWhiteSpace(u))
                         .Distinct(StringComparer.Ordinal)
                         .ToArray();
-                    */
-                    var successUrls = services
-                        .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
-                        .Select(u => u.url)
-                        .ToArray();
 
-                    if (smartService != null && successUrls.Length > 0)
+                    if (smartService != null && allUrls.Length > 0)
                     {
-                        ((ISmartFastConnection)smartService).SetSmartFastUrls(successUrls);
-                        OnConnectRequest.Invoke(this, smartService, "");
+                        smartService.SelectedServerUrl = null; // marks global Smart, not a country pool
+                        ((ISmartFastConnection)smartService).SetSmartFastUrls(allUrls);
+                        OnConnectRequest.Invoke(this, smartService, selectedProtocol ?? "");
                         return;
                     }
 
@@ -310,11 +294,14 @@ namespace IRSpeedyVPN.UserControls
                         .OrderBy(x => x.UrlTestSpeed).FirstOrDefault();
 
                     if (fastest != null)
-                        OnConnectRequest.Invoke(this, fastest, "");
+                        OnConnectRequest.Invoke(this, fastest, selectedProtocol ?? "");
                     else
                         Dispatcher.Invoke((Action)(() => GetMainWindow()?.ShowUserMessage("سرور یافت نشد")));
                 }
-                catch { OnLoadingRequest?.Invoke(false, null); }
+                catch
+                {
+                    OnLoadingRequest?.Invoke(false, null);
+                }
             };
 
             action.BeginInvoke(null, null);
