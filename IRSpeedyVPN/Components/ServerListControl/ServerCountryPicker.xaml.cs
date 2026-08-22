@@ -92,7 +92,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public static bool IsStale(Url u)
         {
             if (u == null || u.latencychkTime == default(DateTime)) return false;
-            return (DateTime.Now - u.latencychkTime).TotalMinutes > 5;
+            return (DateTime.Now - u.latencychkTime).TotalMinutes > 15;
         }
 
         public static void Evaluate(long latency, bool stale, out Geometry bars, out Brush color, out string text)
