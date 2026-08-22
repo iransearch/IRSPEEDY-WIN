@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Components.ServerListControl;
 using IRSpeedyVPN.Events;
 using IRSpeedyVPN.Interfaces;
@@ -132,11 +132,10 @@ namespace IRSpeedyVPN.UserControls
                 .Where(x => x.Name == serviceName && (protocol == null || x.Protocols.Contains(protocol)))
                 .OrderBy(x => x.Country).ToArray();
 
-            // Older picker versions numbered duplicate service records inside a country.
-            // Country grouping now owns that multiplicity, so force the display name back
-            // to one unsuffixed row per CountryCode.
-            foreach (var service in services)
-                service.CountryIndex = 0;
+            // Preserve distinct API service records for the same CountryCode. If two
+            // German records exist they are shown again as "آلمان 1" and "آلمان 2";
+            // each row owns its own full URL pool and minimum-latency result.
+            AssignCountryIndices(services);
 
             _isUrlTestSupported = services.Any(x => x.IsUrlTestSupported);
             ResolveSelectedService(services);
@@ -151,6 +150,22 @@ namespace IRSpeedyVPN.UserControls
             UpdateHeaderIcons();
         }
 
+        private static void AssignCountryIndices(IVPNService[] services)
+        {
+            foreach (var service in services)
+                service.CountryIndex = 0;
+
+            foreach (var service in services)
+            {
+                if (services.Count(x => x.CountryCode == service.CountryCode) > 1
+                    && service.CountryIndex == 0)
+                {
+                    service.CountryIndex = (byte)(services.Count(x =>
+                        x.CountryCode == service.CountryCode && x.CountryIndex > 0) + 1);
+                }
+            }
+        }
+
         private void ResolveSelectedService(IVPNService[] services)
         {
             if (_isLoading && globalInfo?.CurrentService != null
@@ -158,8 +173,8 @@ namespace IRSpeedyVPN.UserControls
             {
                 var current = globalInfo.CurrentService;
 
-                // Global Smart/Fast has no country marker. Country Smart uses one URL
-                // only as a scope marker; the actual connection still uses the full pool.
+                // Global Smart/Fast has no row marker. A numbered country Smart pool
+                // keeps SelectedServerUrl non-null only as its scope marker.
                 selectedService = (current is ISmartFastConnection smart
                                    && smart.IsSmartFast
                                    && current.SelectedServerUrl == null)
@@ -180,9 +195,9 @@ namespace IRSpeedyVPN.UserControls
         #region Background URL tests
 
         /// <summary>
-        /// A service is fresh only when every URL has a recent test result. Failed URLs
-        /// also receive latencychkTime, so they are not retried continuously during the
-        /// five-minute freshness window.
+        /// A row is fresh only when every URL belonging to that service record has a
+        /// recent test result. Failed URLs also receive latencychkTime, so they are not
+        /// retried continuously during the five-minute freshness window.
         /// </summary>
         private static bool HasFreshResultsForAllUrls(IVPNService service)
         {
@@ -201,9 +216,8 @@ namespace IRSpeedyVPN.UserControls
         }
 
         /// <summary>
-        /// Test every server represented by the current service/protocol filter. The
-        /// country picker groups these service records by CountryCode and displays only
-        /// the minimum positive result for each country.
+        /// Tests every URL of every visible numbered country row. The picker displays
+        /// only the minimum positive latency for that row.
         /// </summary>
         private void RunBackgroundUrlTests(IVPNService[] services)
         {
@@ -240,9 +254,8 @@ namespace IRSpeedyVPN.UserControls
 
             if (selectedService != null)
             {
-                // A country selection has already loaded ALL URLs from that country into
-                // ISmartFastConnection. Do not clear them here; RunV2ray must build the
-                // same Xray leastLoad balancer used by global Fast Connection.
+                // A numbered country row has already loaded ALL URLs belonging to that
+                // row into ISmartFastConnection. Keep the pool intact for Xray leastLoad.
                 StopUrlTests();
                 OnConnectRequest.Invoke(this, selectedService, selectedProtocol);
             }
