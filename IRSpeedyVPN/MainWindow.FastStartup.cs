@@ -63,10 +63,9 @@ namespace IRSpeedyVPN
         {
             try
             {
-                // Program starts this task before showing the window. If a very fast
-                // machine reaches ContentRendered first, this waits only on this worker.
-                var resource = AppServices.ResourceManager;
-
+                // These are cheap and independent of ResourceManager. Run them directly
+                // after first paint instead of leaving the previous system proxy active
+                // while hardware/runtime initialization completes.
                 try
                 {
                     SystemProxy.Disable();
@@ -76,17 +75,21 @@ namespace IRSpeedyVPN
                     LogHelper.WriteLog(ex);
                 }
 
+                if (File.Exists("./debug.txt"))
+                    ShellExecute.HideWindow = false;
+
+                LoadLocal = File.Exists("./oneclick.txt");
+
+                // Program starts this task before showing the window. If a very fast
+                // machine reaches ContentRendered first, only this worker waits.
+                var resource = AppServices.ResourceManager;
+
                 AppDomain.CurrentDomain.AssemblyResolve += CurrentDomain_AssemblyResolve;
                 resource.onResourceExtracted += LocalResource_onResourceExtracted;
 
                 // ExtractResource is asynchronous itself. Existing active runtime remains
                 // usable immediately; validation/activation proceeds off the UI thread.
                 resource.ExtractResource();
-
-                if (File.Exists("./debug.txt"))
-                    ShellExecute.HideWindow = false;
-
-                LoadLocal = File.Exists("./oneclick.txt");
 
                 if (LoadLocal)
                 {
