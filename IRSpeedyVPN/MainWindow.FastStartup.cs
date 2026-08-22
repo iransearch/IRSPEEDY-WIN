@@ -1,4 +1,5 @@
 using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Resource;
 using Shadowsocks.Controller;
 using System;
 using System.IO;
@@ -11,6 +12,7 @@ namespace IRSpeedyVPN
     public partial class MainWindow
     {
         private int fastStartupPrepared;
+        private int deferredAutoLoginVisible;
 
         /// <summary>
         /// Installs the minimum UI/event wiring required for the first Login frame and
@@ -55,8 +57,44 @@ namespace IRSpeedyVPN
         {
             ContentRendered -= FastStartup_ContentRendered;
 
+            // A remembered-login hint is intentionally cheap: reading HKCU and checking
+            // oneclick.txt does not require ResourceManager, Files.zip or the WMI device
+            // fingerprint. Cover the empty credential fields immediately so users do not
+            // see them become populated a few seconds later.
+            if (HasRememberedLoginHint())
+                ShowDeferredAutoLogin();
+
             // Never put the first paint behind filesystem/WMI/network work.
             Task.Run((Action)CompleteDeferredStartup);
+        }
+
+        private static bool HasRememberedLoginHint()
+        {
+            try
+            {
+                return File.Exists("./oneclick.txt")
+                    || !string.IsNullOrWhiteSpace(RegHelper.GetSettingValue("UserInfo"));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private void ShowDeferredAutoLogin()
+        {
+            if (Interlocked.Exchange(ref deferredAutoLoginVisible, 1) != 0)
+                return;
+
+            ShowLoading("در حال ورود خودکار...");
+        }
+
+        private void HideDeferredAutoLogin()
+        {
+            if (Interlocked.Exchange(ref deferredAutoLoginVisible, 0) == 0)
+                return;
+
+            Dispatcher.BeginInvoke((Action)(() => uCLoading.Visibility = Visibility.Hidden));
         }
 
         private void CompleteDeferredStartup()
@@ -99,45 +137,77 @@ namespace IRSpeedyVPN
                         var password = resource.Password;
                         Dispatcher.BeginInvoke((Action)(() =>
                         {
-                            IsRememberChecked = true;
-                            ProcessInfo(localAccount, password);
+                            try
+                            {
+                                IsRememberChecked = true;
+                                ProcessInfo(localAccount, password);
+                            }
+                            finally
+                            {
+                                HideDeferredAutoLogin();
+                            }
                         }));
+                    }
+                    else
+                    {
+                        HideDeferredAutoLogin();
                     }
                     return;
                 }
 
-                // Device fingerprint + decrypting the remembered account now happen on
-                // this worker. The Login page has already been painted and is interactive.
+                // Device fingerprint + decrypting the remembered account happen on this
+                // worker. If a remembered account exists, the user sees only the small
+                // automatic-login state rather than empty username/password fields.
                 var account = resource.GetConfig();
                 if (account == null)
+                {
+                    HideDeferredAutoLogin();
                     return;
+                }
 
                 var username = account.UserAccount?.Username;
                 var passwordValue = resource.Password;
                 if (string.IsNullOrWhiteSpace(username))
+                {
+                    HideDeferredAutoLogin();
                     return;
+                }
 
                 Dispatcher.BeginInvoke((Action)(() =>
                 {
                     // Do not race an explicit login the user already started while the
                     // deferred remembered-account read was running.
                     if (IsUserLogin || !string.IsNullOrEmpty(lastLoginUsername))
+                    {
+                        HideDeferredAutoLogin();
                         return;
+                    }
 
+                    // Keep the credentials ready underneath the overlay. If automatic
+                    // login fails, the overlay is removed and the populated form is ready
+                    // for a manual retry instead of flashing from empty to filled.
                     uCLogin.SetUserPassword(username, passwordValue);
                     RunAsync(() =>
                     {
-                        if (!Login(username, passwordValue, true))
+                        try
                         {
-                            var fallback = resource.GetConfig();
-                            if (fallback != null)
-                                ProcessInfo(fallback, resource.Password);
+                            if (!Login(username, passwordValue, true))
+                            {
+                                var fallback = resource.GetConfig();
+                                if (fallback != null)
+                                    ProcessInfo(fallback, resource.Password);
+                            }
                         }
-                    });
+                        finally
+                        {
+                            HideDeferredAutoLogin();
+                        }
+                    }, false);
                 }));
             }
             catch (Exception ex)
             {
+                HideDeferredAutoLogin();
                 LogHelper.WriteLog(ex);
             }
         }
