@@ -20,8 +20,8 @@ namespace IRSpeedyVPN
         private int serverRefreshBusy;
         private string sessionMaintenanceUser;
 
-        private const int SessionMaintenancePeriodMs = 30 * 1000;
-        private const int ServerRefreshTicks = 60; // 60 x 30 seconds = 30 minutes
+        private const int SessionMaintenancePeriodMs = 30 * 60 * 1000;
+        private const int ServerRefreshTicks = 1; // one maintenance pass every 30 minutes
 
         /// <summary>
         /// Installs the minimum UI/event wiring required for the first Login frame and
@@ -111,7 +111,7 @@ namespace IRSpeedyVPN
         /// <summary>
         /// A valid remembered account is trusted at startup. No Login2/GetSettings call is
         /// made on the critical startup path; the encrypted cached groups/settings are used
-        /// immediately and the server list is refreshed later by the 30-minute maintenance
+        /// immediately and credentials/session are validated by the 30-minute maintenance
         /// task. Manual login behavior is unchanged.
         /// </summary>
         private bool TryApplyCachedAccount(AccountInfoEx account, string password)
@@ -157,7 +157,7 @@ namespace IRSpeedyVPN
                 serviceFactory.RenewServiceList(account.groups);
 
                 // Disable the legacy 10-minute Login() renew loop. Session maintenance
-                // below performs local expiry checks and server-list refresh separately.
+                // below validates credentials/session and refreshes servers every 30 min.
                 mainTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
                 btnSettings.Visibility = Visibility.Visible;
@@ -332,35 +332,16 @@ namespace IRSpeedyVPN
 
         private void SessionMaintenanceCallback(object state)
         {
-            if (!IsUserLogin)
+            if (!IsUserLogin || LoadLocal)
                 return;
 
             try
             {
-                // Keep the cheap local expiry guard. This does not touch the network and
-                // only disconnects when the cached account has actually expired.
-                if (gInfo?.ExpiryDate != null && gInfo.ExpiryDate.Value < DateTime.Now)
-                {
-                    Dispatcher.BeginInvoke((Action)(() =>
-                    {
-                        if (IsUserLogin
-                            && gInfo?.ExpiryDate != null
-                            && gInfo.ExpiryDate.Value < DateTime.Now)
-                        {
-                            RechareLogout();
-                        }
-                    }));
-                    return;
-                }
-
-                if (LoadLocal || isUpdateAvailable)
-                    return;
-
                 if (Interlocked.Increment(ref sessionMaintenanceTick) < ServerRefreshTicks)
                     return;
 
                 Interlocked.Exchange(ref sessionMaintenanceTick, 0);
-                RefreshServerListWithoutDisconnect();
+                ValidateSessionAndRefreshServerList();
             }
             catch (Exception ex)
             {
@@ -368,12 +349,41 @@ namespace IRSpeedyVPN
             }
         }
 
+        private static bool IsExplicitSessionFailure(HttpStatusCode statusCode)
+        {
+            return statusCode == HttpStatusCode.Unauthorized
+                || statusCode == HttpStatusCode.Forbidden
+                || statusCode == HttpStatusCode.NotAcceptable;
+        }
+
+        private void LogoutInvalidSession(string message)
+        {
+            if (!IsUserLogin)
+                return;
+
+            try
+            {
+                sessionMaintenanceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            }
+            catch
+            {
+            }
+
+            Logout(
+                string.IsNullOrWhiteSpace(message)
+                    ? "نشست کاربری معتبر نیست، لطفاً دوباره وارد شوید"
+                    : message,
+                false);
+        }
+
         /// <summary>
-        /// Refresh only account metadata and the server list. It intentionally does not
-        /// call ProcessInfo, DisconnectAll, CurrentService.Disconnect or proxifier.Detach,
-        /// so an active VPN session is left untouched while fresh servers are cached.
+        /// Every 30 minutes Login2 validates username, password and the device/session
+        /// token in the same authenticated server-list request. Explicit auth/session
+        /// failures log the user out. Network/server failures are treated as transient and
+        /// never cause a false logout. A valid response refreshes the server list without
+        /// disconnecting the live VPN session.
         /// </summary>
-        private void RefreshServerListWithoutDisconnect()
+        private void ValidateSessionAndRefreshServerList()
         {
             if (Interlocked.Exchange(ref serverRefreshBusy, 1) != 0)
                 return;
@@ -383,18 +393,56 @@ namespace IRSpeedyVPN
                 var username = gInfo?.Username;
                 var password = gInfo?.Password;
                 if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
+                {
+                    LogoutInvalidSession("نشست کاربری معتبر نیست، لطفاً دوباره وارد شوید");
                     return;
+                }
 
                 var response = serviceController.Login2(username, password);
-                if (response == null || response.StatusCode != HttpStatusCode.OK)
+                if (response == null)
                     return;
+
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    // Do not log out on timeouts, endpoint outages, 5xx responses, etc.
+                    // Only statuses that explicitly mean authentication/session rejection
+                    // terminate the local login session.
+                    if (IsExplicitSessionFailure(response.StatusCode))
+                        LogoutInvalidSession(response.ResponseData?.message);
+                    return;
+                }
 
                 var account = response.ResponseData?.Decrypted;
-                if (account?.groups == null)
+                if (account?.UserAccount == null || account.groups == null)
                     return;
 
-                if (account.UserAccount != null)
-                    account.UserAccount.Username = username;
+                account.UserAccount.Username = username;
+
+                if (account.UserAccount.ExpiryDate != null
+                    && account.UserAccount.ExpiryDate.Value < DateTime.Now)
+                {
+                    RechareLogout(false);
+                    return;
+                }
+
+                var status = account.UserAccount.Status;
+                if (status == "Expired")
+                {
+                    RechareLogout(false);
+                    return;
+                }
+
+                // AuthServerError means the validation service itself is unavailable;
+                // it is not proof that the user's credentials/session are invalid.
+                if (status == "AuthServerError")
+                    return;
+
+                var validStatus = status == "OK" || status == "FirstUse" || status == null;
+                if (!validStatus)
+                {
+                    LogoutInvalidSession("نام کاربری یا رمز عبور صحیح نیست");
+                    return;
+                }
 
                 // Login2 may not carry the separate settings payload. Keep the currently
                 // active settings so the cache remains complete without a GetSettings call.
@@ -403,8 +451,9 @@ namespace IRSpeedyVPN
 
                 var currentService = gInfo.CurrentService;
 
-                // ServiceFactory is UI-facing. Replace its list on the dispatcher, but
-                // keep GlobalInfo.CurrentService pointing at the live connection object.
+                // Replace only the list/account cache. Keep CurrentService pointing at the
+                // exact live object so a successful 30-minute refresh cannot disconnect or
+                // replace the currently running VPN session.
                 Dispatcher.Invoke((Action)(() =>
                 {
                     serviceFactory.RenewServiceList(account.groups);
@@ -419,8 +468,9 @@ namespace IRSpeedyVPN
             }
             catch (Exception ex)
             {
-                // A refresh failure must never tear down a working connection. Keep the
-                // current server list/cache and simply retry at the next 30-minute cycle.
+                // DNS/timeout/failover/decryption/server errors are transient here. Never
+                // log out a valid user unless the API explicitly rejected credentials,
+                // session/device token, or returned an invalid account status.
                 LogHelper.WriteLog(ex);
             }
             finally
