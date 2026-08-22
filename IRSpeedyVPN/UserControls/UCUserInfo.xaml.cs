@@ -133,9 +133,18 @@ namespace IRSpeedyVPN.UserControls
             globalInfo = AppServices.GlobalInfo;
             timerTick = 0;
             uiTimer.Change(1000, 1000);
-            txtCountry.Text = (globalInfo.CurrentService is ISmartFastConnection smart && smart.IsSmartFast)
+
+            // Global Fast has no country scope marker (SelectedServerUrl == null).
+            // A country-scoped Smart connection deliberately keeps one URL as a marker,
+            // so show the actual numbered country (e.g. آلمان 1) instead of "سرور هوشمند".
+            var smart = globalInfo.CurrentService as ISmartFastConnection;
+            var isGlobalSmart = smart != null
+                && smart.IsSmartFast
+                && globalInfo.CurrentService.SelectedServerUrl == null;
+            txtCountry.Text = isGlobalSmart
                 ? "سرور هوشمند"
                 : globalInfo.CurrentService.Country;
+
             txtServiceName.Text = globalInfo.CurrentService.Name + (proxifier.IsAttached() && proxifier.ProxyType.GetDescription().Length > 0 ? " / " + proxifier.ProxyType.GetDescription() : "");
             txtConnectionTime.Text = "00:00:00";
 
