@@ -1,27 +1,25 @@
-﻿
 using System;
 using System.Management;
 using System.Security.Cryptography;
-using System.Security;
-using System.Collections;
 using System.Text;
-using System.IO;
 
 namespace IRSpeedyVPN.Security
 {
-    /// 
-
-    /// Generates a 16 byte Unique Identification code of a computer
-    /// Example: 4876-8DB5-EE85-69D3-FE52-8CF7-395D-2EA9
-    /// 
+    /// <summary>
+    /// Generates the legacy device fingerprint used by existing accounts/settings.
+    /// The fingerprint algorithm is intentionally unchanged; initialization is merely
+    /// serialized so deferred startup and a very fast manual login cannot run the same
+    /// expensive WMI scan twice in parallel.
+    /// </summary>
     public class SysThumbPrint
     {
         private static byte[] fingerPrint = null;
+        private static readonly object fingerPrintLock = new object();
+
         public static string GetComputerName()
         {
-            return GetSystemModel();// + " - " + Environment.MachineName;
+            return GetSystemModel();
         }
-
 
         public static string GetSystemModel()
         {
@@ -43,47 +41,79 @@ namespace IRSpeedyVPN.Security
             return null;
         }
 
-
-    public static string ValueString()
+        public static string ValueString()
         {
             byte[] value = Value();
             return BitConverter.ToString(value).Replace("-", "");
         }
+
         public static byte[] Value()
         {
-            if (fingerPrint==null)
+            if (fingerPrint != null)
+                return fingerPrint;
+
+            lock (fingerPrintLock)
             {
-                string data = "CPU >> " + cpuId() + "\nBIOS >> " +
-   biosId() + "\nBASE >> " + baseId() +
-   //+"\nDISK >> "+ diskId() + "\nVIDEO >> " + 
-   videoId();
-              //  File.AppendAllText("./hash.txt",data + "\n---------\n");
-                fingerPrint = GetHash(data);
+                if (fingerPrint == null)
+                {
+                    // Keep this exact field order/content for backward compatibility
+                    // with encrypted seed.set/UserInfo and server-side device tokens.
+                    string data = "CPU >> " + cpuId() + "\nBIOS >> " +
+                        biosId() + "\nBASE >> " + baseId() +
+                        videoId();
+                    fingerPrint = GetHash(data);
+                }
+                return fingerPrint;
             }
-            return fingerPrint;
         }
+
         private static byte[] GetHash(string s)
         {
-            MD5 sec = new MD5CryptoServiceProvider();
-            ASCIIEncoding enc = new ASCIIEncoding();
-            byte[] bt = enc.GetBytes(s);
-            return sec.ComputeHash(bt);
+            using (MD5 sec = new MD5CryptoServiceProvider())
+            {
+                ASCIIEncoding enc = new ASCIIEncoding();
+                byte[] bt = enc.GetBytes(s);
+                return sec.ComputeHash(bt);
+            }
         }
- 
+
         #region Original Device ID Getting Code
-        //Return a hardware identifier
-        private static string identifier
-  (string wmiClass, string wmiProperty, string wmiMustBeTrue)
+
+        private static string identifier(string wmiClass, string wmiProperty, string wmiMustBeTrue)
         {
             string result = "";
-            System.Management.ManagementClass mc =
-  new System.Management.ManagementClass(wmiClass);
-            System.Management.ManagementObjectCollection moc = mc.GetInstances();
-            foreach (System.Management.ManagementObject mo in moc)
+            using (System.Management.ManagementClass mc = new System.Management.ManagementClass(wmiClass))
+            using (System.Management.ManagementObjectCollection moc = mc.GetInstances())
             {
-                if (mo[wmiMustBeTrue].ToString() == "True")
+                foreach (System.Management.ManagementObject mo in moc)
                 {
-                    //Only get the first one
+                    if (mo[wmiMustBeTrue].ToString() == "True")
+                    {
+                        if (result == "")
+                        {
+                            try
+                            {
+                                result = mo[wmiProperty].ToString();
+                                break;
+                            }
+                            catch
+                            {
+                            }
+                        }
+                    }
+                }
+            }
+            return result;
+        }
+
+        private static string identifier(string wmiClass, string wmiProperty)
+        {
+            string result = "";
+            using (System.Management.ManagementClass mc = new System.Management.ManagementClass(wmiClass))
+            using (System.Management.ManagementObjectCollection moc = mc.GetInstances())
+            {
+                foreach (System.Management.ManagementObject mo in moc)
+                {
                     if (result == "")
                     {
                         try
@@ -99,89 +129,63 @@ namespace IRSpeedyVPN.Security
             }
             return result;
         }
-        //Return a hardware identifier
-        private static string identifier(string wmiClass, string wmiProperty)
-        {
-            string result = "";
-            System.Management.ManagementClass mc =
-  new System.Management.ManagementClass(wmiClass);
-            System.Management.ManagementObjectCollection moc = mc.GetInstances();
-            foreach (System.Management.ManagementObject mo in moc)
-            {
-                //Only get the first one
-                if (result == "")
-                {
-                    try
-                    {
-                        result = mo[wmiProperty].ToString();
-                        break;
-                    }
-                    catch
-                    {
-                    }
-                }
-            }
-            return result;
-        }
+
         private static string cpuId()
         {
-            //Uses first CPU identifier available in order of preference
-            //Don't get all identifiers, as it is very time consuming
             string retVal = identifier("Win32_Processor", "UniqueId");
-            if (retVal == "") //If no UniqueID, use ProcessorID
+            if (retVal == "")
             {
                 retVal = identifier("Win32_Processor", "ProcessorId");
-                if (retVal == "") //If no ProcessorId, use Name
+                if (retVal == "")
                 {
                     retVal = identifier("Win32_Processor", "Name");
-                    if (retVal == "") //If no Name, use Manufacturer
+                    if (retVal == "")
                     {
                         retVal = identifier("Win32_Processor", "Manufacturer");
                     }
-                    //Add clock speed for extra security
                     retVal += identifier("Win32_Processor", "MaxClockSpeed");
                 }
             }
             return retVal;
         }
-        //BIOS Identifier
+
         private static string biosId()
         {
             return identifier("Win32_BIOS", "Manufacturer")
-            + identifier("Win32_BIOS", "SMBIOSBIOSVersion")
-            + identifier("Win32_BIOS", "IdentificationCode")
-            + identifier("Win32_BIOS", "SerialNumber")
-            + identifier("Win32_BIOS", "ReleaseDate")
-            + identifier("Win32_BIOS", "Version");
+                + identifier("Win32_BIOS", "SMBIOSBIOSVersion")
+                + identifier("Win32_BIOS", "IdentificationCode")
+                + identifier("Win32_BIOS", "SerialNumber")
+                + identifier("Win32_BIOS", "ReleaseDate")
+                + identifier("Win32_BIOS", "Version");
         }
-        //Main physical hard drive ID
+
         private static string diskId()
         {
             return identifier("Win32_DiskDrive", "Model")
-            + identifier("Win32_DiskDrive", "Manufacturer")
-            + identifier("Win32_DiskDrive", "Signature")
-            + identifier("Win32_DiskDrive", "TotalHeads");
+                + identifier("Win32_DiskDrive", "Manufacturer")
+                + identifier("Win32_DiskDrive", "Signature")
+                + identifier("Win32_DiskDrive", "TotalHeads");
         }
-        //Motherboard ID
+
         private static string baseId()
         {
             return identifier("Win32_BaseBoard", "Model")
-            + identifier("Win32_BaseBoard", "Manufacturer")
-            + identifier("Win32_BaseBoard", "Name")
-            + identifier("Win32_BaseBoard", "SerialNumber");
+                + identifier("Win32_BaseBoard", "Manufacturer")
+                + identifier("Win32_BaseBoard", "Name")
+                + identifier("Win32_BaseBoard", "SerialNumber");
         }
-        //Primary video controller ID
+
         private static string videoId()
         {
             return identifier("Win32_VideoController", "DriverVersion")
-            + identifier("Win32_VideoController", "Name");
+                + identifier("Win32_VideoController", "Name");
         }
-        //First enabled network card ID
+
         private static string macId()
         {
-            return identifier("Win32_NetworkAdapterConfiguration",
-    "MACAddress", "IPEnabled");
+            return identifier("Win32_NetworkAdapterConfiguration", "MACAddress", "IPEnabled");
         }
+
         #endregion
     }
 }
