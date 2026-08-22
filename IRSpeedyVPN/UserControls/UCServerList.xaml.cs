@@ -132,6 +132,12 @@ namespace IRSpeedyVPN.UserControls
                 .Where(x => x.Name == serviceName && (protocol == null || x.Protocols.Contains(protocol)))
                 .OrderBy(x => x.Country).ToArray();
 
+            // Older picker versions numbered duplicate service records inside a country.
+            // Country grouping now owns that multiplicity, so force the display name back
+            // to one unsuffixed row per CountryCode.
+            foreach (var service in services)
+                service.CountryIndex = 0;
+
             _isUrlTestSupported = services.Any(x => x.IsUrlTestSupported);
             ResolveSelectedService(services);
 
