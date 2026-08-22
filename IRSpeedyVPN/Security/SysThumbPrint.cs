@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Management;
 using System.Security.Cryptography;
 using System.Text;
@@ -7,14 +8,17 @@ namespace IRSpeedyVPN.Security
 {
     /// <summary>
     /// Generates the legacy device fingerprint used by existing accounts/settings.
-    /// The fingerprint algorithm is intentionally unchanged; initialization is merely
-    /// serialized so deferred startup and a very fast manual login cannot run the same
-    /// expensive WMI scan twice in parallel.
+    /// The fingerprint byte-for-byte input format is intentionally unchanged. WMI class
+    /// results are cached so repeated property reads do not enumerate the same class over
+    /// and over during startup.
     /// </summary>
     public class SysThumbPrint
     {
         private static byte[] fingerPrint = null;
         private static readonly object fingerPrintLock = new object();
+        private static readonly object wmiCacheLock = new object();
+        private static readonly Dictionary<string, List<Dictionary<string, object>>> wmiCache
+            = new Dictionary<string, List<Dictionary<string, object>>>(StringComparer.OrdinalIgnoreCase);
 
         public static string GetComputerName()
         {
@@ -79,27 +83,70 @@ namespace IRSpeedyVPN.Security
 
         #region Original Device ID Getting Code
 
-        private static string identifier(string wmiClass, string wmiProperty, string wmiMustBeTrue)
+        /// <summary>
+        /// Snapshot one WMI class once. The old code opened the same class separately for
+        /// every requested property (BIOS alone did six full enumerations). We still use
+        /// each property's original ToString() value and first-instance ordering, so the
+        /// fingerprint input remains unchanged while startup performs far fewer WMI calls.
+        /// </summary>
+        private static List<Dictionary<string, object>> GetWmiSnapshot(string wmiClass)
         {
-            string result = "";
-            using (System.Management.ManagementClass mc = new System.Management.ManagementClass(wmiClass))
-            using (System.Management.ManagementObjectCollection moc = mc.GetInstances())
+            lock (wmiCacheLock)
             {
-                foreach (System.Management.ManagementObject mo in moc)
+                if (wmiCache.TryGetValue(wmiClass, out var cached))
+                    return cached;
+
+                var rows = new List<Dictionary<string, object>>();
+                using (var mc = new ManagementClass(wmiClass))
+                using (var moc = mc.GetInstances())
                 {
-                    if (mo[wmiMustBeTrue].ToString() == "True")
+                    foreach (ManagementObject mo in moc)
                     {
-                        if (result == "")
+                        var row = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+                        foreach (PropertyData property in mo.Properties)
                         {
                             try
                             {
-                                result = mo[wmiProperty].ToString();
-                                break;
+                                row[property.Name] = property.Value;
                             }
                             catch
                             {
+                                // The legacy identifier ignored failures while reading the
+                                // requested property and continued to the next instance.
                             }
                         }
+                        rows.Add(row);
+                    }
+                }
+
+                wmiCache[wmiClass] = rows;
+                return rows;
+            }
+        }
+
+        private static string identifier(string wmiClass, string wmiProperty, string wmiMustBeTrue)
+        {
+            string result = "";
+            foreach (var row in GetWmiSnapshot(wmiClass))
+            {
+                if (!row.TryGetValue(wmiMustBeTrue, out var required)
+                    || required == null
+                    || required.ToString() != "True")
+                {
+                    continue;
+                }
+
+                if (result == "")
+                {
+                    try
+                    {
+                        if (!row.TryGetValue(wmiProperty, out var value) || value == null)
+                            continue;
+                        result = value.ToString();
+                        break;
+                    }
+                    catch
+                    {
                     }
                 }
             }
@@ -109,21 +156,19 @@ namespace IRSpeedyVPN.Security
         private static string identifier(string wmiClass, string wmiProperty)
         {
             string result = "";
-            using (System.Management.ManagementClass mc = new System.Management.ManagementClass(wmiClass))
-            using (System.Management.ManagementObjectCollection moc = mc.GetInstances())
+            foreach (var row in GetWmiSnapshot(wmiClass))
             {
-                foreach (System.Management.ManagementObject mo in moc)
+                if (result == "")
                 {
-                    if (result == "")
+                    try
                     {
-                        try
-                        {
-                            result = mo[wmiProperty].ToString();
-                            break;
-                        }
-                        catch
-                        {
-                        }
+                        if (!row.TryGetValue(wmiProperty, out var value) || value == null)
+                            continue;
+                        result = value.ToString();
+                        break;
+                    }
+                    catch
+                    {
                     }
                 }
             }
