@@ -181,7 +181,7 @@ namespace IRSpeedyVPN.Services.Xray
         /// private. Returns the reason such an outbound would be refused, or null when
         /// the core will accept it.
         /// </summary>
-        private static string CoreRefusalReason(Outbound proxy)
+        public static string CoreRefusalReason(Outbound proxy)
         {
             if (proxy == null)
                 return null;
