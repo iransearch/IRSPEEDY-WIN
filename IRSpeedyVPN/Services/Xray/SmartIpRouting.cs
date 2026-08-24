@@ -10,33 +10,30 @@ using v2rayN.Handler;
 namespace IRSpeedyVPN.Services.Xray
 {
     /// <summary>
-    /// SMART IP: dedicated leastLoad balancers for VOD and AI traffic, mirroring
-    /// the Exclave balancer configuration used by the Android client.
-    /// Both services are gated by the single VOD/AI settings toggle.
+    /// SMART IP: dedicated leastLoad balancers for VOD and AI traffic inside the
+    /// smart connection config. Both services are gated by the single VOD/AI toggle.
+    ///
+    /// The Throne core only accepts a single burstObservatory and its leastLoad
+    /// strategy has no observerTag field, so all three services share one health
+    /// probe. Their selection stays independent: each keeps its own balancer,
+    /// selector prefix and maxRTT.
     /// </summary>
     public static class SmartIpRouting
     {
         public const string SmartProxyPrefix = "smart-proxy-";
         public const string SmartBalancerTag = "smart-balancer-1";
-        public const string SmartObserverTag = "smart-observer-1";
 
         public const string VodProxyPrefix = "vod-proxy-";
         public const string VodBalancerTag = "vod-balancer";
-        public const string VodObserverTag = "vod-observer-1";
 
         public const string AiProxyPrefix = "ai-proxy-";
         public const string AiBalancerTag = "ai-balancer";
-        public const string AiObserverTag = "ai-observer-1";
 
         private const string SettingKey = "VGAURDVodService";
 
-        private const string SmartTestUrl = "https://connectivitycheck.gstatic.com/generate_204";
-        private const string VodTestUrl = "https://www.irancell.ir";
-        public const string AiTestUrl = "https://www.google.com/generate_204";
-
-        private const string SmartMaxRtt = "3s";
+        // The smart balancer keeps the 3s ceiling from the config template;
+        // VOD and AI tolerate more latency.
         private const string ServiceMaxRtt = "5s";
-        public const string ObserverInterval = "60m";
 
         // AI links are hard-coded on purpose: unlike VOD they are not served by
         // the API, so rotating them requires an application update.
@@ -167,50 +164,26 @@ namespace IRSpeedyVPN.Services.Xray
         }
 
         /// <summary>
-        /// Builds the multiObservatory block. Each service gets its own burst observer
-        /// so health results never bleed between the three balancers.
+        /// Adds the active service prefixes to the single burstObservatory selector,
+        /// so its health probe covers the VOD and AI outbounds too. The Throne core
+        /// has no multi-observer support, hence one probe for all three services.
         /// </summary>
-        public static JObject MultiObservatory(bool vodActive, bool aiActive)
+        public static void ExtendObservatorySelector(JObject root, bool vodActive, bool aiActive)
         {
-            var observers = new JArray
-            {
-                Observer(SmartObserverTag, SmartProxyPrefix, SmartTestUrl, SmartMaxRtt)
-            };
+            var selector = root?["burstObservatory"]?["subjectSelector"] as JArray;
+            if (selector == null)
+                return;
 
             if (vodActive)
-                observers.Add(Observer(VodObserverTag, VodProxyPrefix, VodTestUrl, ServiceMaxRtt));
+                selector.Add(VodProxyPrefix);
             if (aiActive)
-                observers.Add(Observer(AiObserverTag, AiProxyPrefix, AiTestUrl, ServiceMaxRtt));
-
-            return new JObject { ["observers"] = observers };
-        }
-
-        private static JObject Observer(string tag, string selectorPrefix, string destination, string timeout)
-        {
-            return new JObject
-            {
-                ["type"] = "burst",
-                ["settings"] = new JObject
-                {
-                    ["pingConfig"] = new JObject
-                    {
-                        ["connectivity"] = "",
-                        ["destination"] = destination,
-                        ["interval"] = ObserverInterval,
-                        ["sampling"] = 1,
-                        ["timeout"] = timeout
-                    },
-                    ["subjectSelector"] = new JArray { selectorPrefix }
-                },
-                ["tag"] = tag
-            };
+                selector.Add(AiProxyPrefix);
         }
 
         public static JObject LeastLoadBalancer(
             string tag,
             string selectorPrefix,
             string fallbackTag,
-            string observerTag,
             string maxRtt)
         {
             return new JObject
@@ -221,9 +194,9 @@ namespace IRSpeedyVPN.Services.Xray
                 {
                     ["settings"] = new JObject
                     {
-                        ["observerTag"] = observerTag,
                         ["expected"] = 5,
-                        ["maxRTT"] = maxRtt
+                        ["maxRTT"] = maxRtt,
+                        ["tolerance"] = 0.2
                     },
                     ["type"] = "leastLoad"
                 },
@@ -233,12 +206,12 @@ namespace IRSpeedyVPN.Services.Xray
 
         public static JObject VodBalancer(string fallbackTag)
         {
-            return LeastLoadBalancer(VodBalancerTag, VodProxyPrefix, fallbackTag, VodObserverTag, ServiceMaxRtt);
+            return LeastLoadBalancer(VodBalancerTag, VodProxyPrefix, fallbackTag, ServiceMaxRtt);
         }
 
         public static JObject AiBalancer(string fallbackTag)
         {
-            return LeastLoadBalancer(AiBalancerTag, AiProxyPrefix, fallbackTag, AiObserverTag, ServiceMaxRtt);
+            return LeastLoadBalancer(AiBalancerTag, AiProxyPrefix, fallbackTag, ServiceMaxRtt);
         }
 
         /// <summary>Routing rule sending the given domains to a balancer.</summary>

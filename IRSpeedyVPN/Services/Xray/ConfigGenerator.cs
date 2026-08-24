@@ -343,10 +343,10 @@ namespace IRSpeedyVPN.Services.Xray
             var vodActive = vodOutbounds != null && vodOutbounds.Count > 0 && vodFallbackTag != null;
             var aiActive = aiOutbounds != null && aiOutbounds.Count > 0 && aiFallbackTag != null;
 
-            root["multiObservatory"] = SmartIpRouting.MultiObservatory(vodActive, aiActive);
-
             if (!vodActive && !aiActive)
                 return;
+
+            SmartIpRouting.ExtendObservatorySelector(root, vodActive, aiActive);
 
             var balancers = root["routing"]?["balancers"] as JArray;
             var rules = root["routing"]?["rules"] as JArray;

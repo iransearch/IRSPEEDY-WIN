@@ -8,9 +8,23 @@ namespace IRSpeedyVPN.Services.Xray
 {
     public  class Samples
     {
-        // The multiObservatory block is generated at runtime by SmartIpRouting so the
-        // VOD and AI observers only appear when those services are active.
+        // SmartIpRouting appends the vod-proxy-/ai-proxy- prefixes to the
+        // burstObservatory selector when those services are active. The Throne
+        // core accepts only this one observatory, so the probe is shared.
         public static string BalancerConfig= @"{
+			""burstObservatory"": {
+				""pingConfig"": {
+					""connectivity"": """",
+					""destination"": ""https://connectivitycheck.gstatic.com/generate_204"",
+					""httpMethod"": ""HEAD"",
+					""interval"": ""60m"",
+					""sampling"": 1,
+					""timeout"": ""5s""
+				},
+				""subjectSelector"": [
+					""smart-proxy-""
+				]
+			},
 			""inbounds"": [],
 			""outbound"": [],
 			""remarks"": ""SMART SERVER"",
@@ -23,9 +37,9 @@ namespace IRSpeedyVPN.Services.Xray
 						],
 						""strategy"": {
 							""settings"": {
-								""observerTag"": ""smart-observer-1"",
 								""expected"": 5,
-								""maxRTT"": ""3s""
+								""maxRTT"": ""3s"",
+								""tolerance"": 0.2
 							},
 							""type"": ""leastLoad""
 						},
