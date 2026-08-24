@@ -238,7 +238,7 @@
                                 Margin="0,0,10,0"/>
 
                             <TextBlock Grid.Column="1"
-                                       Text="سرویس VOD/AI"
+                                       Text="VOD/AI"
                                        FontSize="18"
                                        FontWeight="Bold"
                                        HorizontalAlignment="Right"
