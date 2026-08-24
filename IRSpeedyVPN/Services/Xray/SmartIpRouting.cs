@@ -5,6 +5,8 @@ using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 using v2rayN.Handler;
 
 namespace IRSpeedyVPN.Services.Xray
@@ -150,6 +152,16 @@ namespace IRSpeedyVPN.Services.Xray
                     continue;
                 }
 
+                var refusal = CoreRefusalReason(proxy);
+                if (refusal != null)
+                {
+                    // The core refuses to build the whole config over one bad outbound,
+                    // which would take the smart connection down with it. Drop the link
+                    // instead and let the remaining ones carry the service.
+                    LogHelper.WriteExLog($"SMART IP {label} outbound rejected: {tag} ({refusal})");
+                    continue;
+                }
+
                 outbounds.Add(JObject.FromObject(proxy, serializer));
                 if (fallbackTag == null)
                     fallbackTag = tag;
@@ -161,6 +173,88 @@ namespace IRSpeedyVPN.Services.Xray
                 + $", mode={(outbounds.Count > 0 ? "leastLoad" : "disabled")}");
 
             return outbounds;
+        }
+
+        /// <summary>
+        /// Mirrors the core's own outbound validation: it rejects VLESS without TLS,
+        /// Reality or encryption, and Trojan without TLS, unless the server address is
+        /// private. Returns the reason such an outbound would be refused, or null when
+        /// the core will accept it.
+        /// </summary>
+        private static string CoreRefusalReason(Outbound proxy)
+        {
+            if (proxy == null)
+                return null;
+
+            var security = proxy.streamSettings == null ? null : proxy.streamSettings.security;
+            var hasTransportSecurity = !string.IsNullOrWhiteSpace(security)
+                && !string.Equals(security, "none", StringComparison.OrdinalIgnoreCase);
+            if (hasTransportSecurity)
+                return null;
+
+            var address = proxy.settings == null ? null : proxy.settings.address;
+            if (!RequiresTransportSecurity(address))
+                return null;
+
+            if (string.Equals(proxy.protocol, "vless", StringComparison.OrdinalIgnoreCase))
+            {
+                var encryption = proxy.settings == null ? null : proxy.settings.encryption;
+                var hasEncryption = !string.IsNullOrWhiteSpace(encryption)
+                    && !string.Equals(encryption, "none", StringComparison.OrdinalIgnoreCase);
+                if (!hasEncryption)
+                    return "vless without TLS, Reality or encryption";
+            }
+            else if (string.Equals(proxy.protocol, "trojan", StringComparison.OrdinalIgnoreCase))
+            {
+                return "trojan without TLS";
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// True when the address is public, so the core demands transport security.
+        /// Deliberately conservative: anything not clearly private counts as public,
+        /// because dropping a usable link is far cheaper than a config the core
+        /// refuses to build.
+        /// </summary>
+        private static bool RequiresTransportSecurity(string address)
+        {
+            if (string.IsNullOrWhiteSpace(address))
+                return false;
+
+            var value = address.Trim().Trim('[', ']');
+
+            IPAddress ip;
+            if (IPAddress.TryParse(value, out ip))
+            {
+                if (IPAddress.IsLoopback(ip))
+                    return false;
+
+                if (ip.AddressFamily == AddressFamily.InterNetwork)
+                {
+                    var b = ip.GetAddressBytes();
+                    if (b[0] == 10) return false;                                   // 10.0.0.0/8
+                    if (b[0] == 172 && b[1] >= 16 && b[1] <= 31) return false;      // 172.16.0.0/12
+                    if (b[0] == 192 && b[1] == 168) return false;                   // 192.168.0.0/16
+                    if (b[0] == 169 && b[1] == 254) return false;                   // 169.254.0.0/16
+                    return true;
+                }
+
+                if (ip.AddressFamily == AddressFamily.InterNetworkV6)
+                    return !ip.IsIPv6LinkLocal && !ip.IsIPv6SiteLocal && (ip.GetAddressBytes()[0] & 0xFE) != 0xFC;
+
+                return true;
+            }
+
+            var domain = value.ToLowerInvariant().TrimEnd('.');
+            if (domain == "localhost")
+                return false;
+            if (domain.EndsWith(".localhost") || domain.EndsWith(".local")
+                || domain.EndsWith(".localdomain") || domain.EndsWith(".home.arpa"))
+                return false;
+
+            return true;
         }
 
         /// <summary>
