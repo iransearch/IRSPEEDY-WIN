@@ -245,7 +245,7 @@ namespace IRSpeedyVPN.Services.Xray
                 }
             };
         }
-        public static string GetSmartBalancerConfig(IEnumerable<string> links, int port, string authUser, string authPass, IEnumerable<string> vodLinks = null)
+        public static string GetSmartBalancerConfig(IEnumerable<string> links, int port, string authUser, string authPass)
         {
             var root = JObject.Parse(Samples.BalancerConfig);
             var serializer = new JsonSerializer { NullValueHandling = NullValueHandling.Ignore };
@@ -303,7 +303,7 @@ namespace IRSpeedyVPN.Services.Xray
             if (idx == 0)
                 return null;
 
-            ApplySmartIpRouting(root, outbounds, vodLinks, serializer);
+            ApplySmartIpRouting(root, outbounds, serializer);
 
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
             outbounds.Add(JObject.FromObject(new Outbound
@@ -325,64 +325,37 @@ namespace IRSpeedyVPN.Services.Xray
         }
 
         /// <summary>
-        /// Adds the VOD and AI leastLoad balancers next to the main smart balancer.
-        /// Both services share the single VOD/AI toggle; when it is off, or when no
-        /// link survives parsing, the config is left exactly as it was.
+        /// Adds the AI leastLoad balancer next to the main smart balancer. Gated by
+        /// the VOD/AI toggle; when it is off, or when no AI link survives, the config
+        /// is left exactly as it was.
         /// </summary>
-        private static void ApplySmartIpRouting(
-            JObject root,
-            JArray outbounds,
-            IEnumerable<string> vodLinks,
-            JsonSerializer serializer)
+        private static void ApplySmartIpRouting(JObject root, JArray outbounds, JsonSerializer serializer)
         {
-            var enabled = SmartIpRouting.IsEnabled();
-
-            string vodFallbackTag = null;
-            string aiFallbackTag = null;
-            JArray vodOutbounds = null;
-            JArray aiOutbounds = null;
-
-            if (enabled)
-            {
-                vodOutbounds = SmartIpRouting.BuildOutbounds(
-                    vodLinks, SmartIpRouting.VodProxyPrefix, "VOD", serializer, out vodFallbackTag);
-                aiOutbounds = SmartIpRouting.BuildOutbounds(
-                    SmartIpRouting.AiLinks, SmartIpRouting.AiProxyPrefix, "AI", serializer, out aiFallbackTag);
-            }
-
-            var vodActive = vodOutbounds != null && vodOutbounds.Count > 0 && vodFallbackTag != null;
-            var aiActive = aiOutbounds != null && aiOutbounds.Count > 0 && aiFallbackTag != null;
-
-            if (!vodActive && !aiActive)
+            if (!SmartIpRouting.IsEnabled())
                 return;
 
-            SmartIpRouting.ExtendObservatorySelector(root, vodActive, aiActive);
+            string aiFallbackTag;
+            var aiOutbounds = SmartIpRouting.BuildOutbounds(
+                SmartIpRouting.AiLinks, SmartIpRouting.AiProxyPrefix, "AI", serializer, out aiFallbackTag);
+
+            if (aiOutbounds.Count == 0 || aiFallbackTag == null)
+                return;
 
             var balancers = root["routing"]?["balancers"] as JArray;
             var rules = root["routing"]?["rules"] as JArray;
             if (balancers == null || rules == null)
                 return;
 
-            // AI and VOD rules run ahead of the geoip/geosite checks and the catch-all
-            // so their traffic never reaches the main balancer. The first rule is the
+            SmartIpRouting.ExtendObservatorySelector(root);
+
+            foreach (var outbound in aiOutbounds)
+                outbounds.Add(outbound);
+            balancers.Add(SmartIpRouting.AiBalancer(aiFallbackTag));
+
+            // The AI rule runs ahead of the geoip/geosite checks and the catch-all so
+            // its traffic never reaches the main balancer. The first rule is the
             // UDP/443 block, which must stay first.
-            var insertAt = rules.Count > 0 ? 1 : 0;
-
-            if (aiActive)
-            {
-                foreach (var outbound in aiOutbounds)
-                    outbounds.Add(outbound);
-                balancers.Add(SmartIpRouting.AiBalancer(aiFallbackTag));
-                rules.Insert(insertAt++, SmartIpRouting.AiRule());
-            }
-
-            if (vodActive)
-            {
-                foreach (var outbound in vodOutbounds)
-                    outbounds.Add(outbound);
-                balancers.Add(SmartIpRouting.VodBalancer(vodFallbackTag));
-                rules.Insert(insertAt, SmartIpRouting.VodRule());
-            }
+            rules.Insert(rules.Count > 0 ? 1 : 0, SmartIpRouting.AiRule());
         }
 
         public static void FillOutboundForItem(Outbound outbound, VmessItem node)

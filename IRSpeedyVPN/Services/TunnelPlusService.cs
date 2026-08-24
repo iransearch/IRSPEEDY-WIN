@@ -183,6 +183,13 @@ namespace IRSpeedyVPN.Services
                             }
                             //LogHelper.WriteExLog($"ss\t{selectedUrl}\n");
                         }
+                        else if (isVodEnabled)
+                        {
+                            // A smart or country pool runs its own url test, so the
+                            // branch above is skipped and VOD would keep a stale link
+                            // from an earlier connection, or none at all.
+                            VodUrlTest();
+                        }
 
                     }                    
                     /* var configData = new V2Ray.V2RayHandler().GetV2RayConfig(server.Address, port);
@@ -228,7 +235,7 @@ namespace IRSpeedyVPN.Services
                         var authPass = Guid.NewGuid().ToString("N");
 
                         xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
-                            smartUrls, _xraySocksPort, authUser, authPass, GetVodLinks());
+                            smartUrls, _xraySocksPort, authUser, authPass);
                         if (string.IsNullOrWhiteSpace(xrayConfig))
                         {
                             if (_xraySocksPort > 0) FreePortManager.Enqueue(_xraySocksPort);
@@ -843,31 +850,10 @@ namespace IRSpeedyVPN.Services
             }*/
         }
 
-        /// <summary>Distinct VOD links advertised by the API, or an empty list.</summary>
-        private List<string> GetVodLinks()
-        {
-            try
-            {
-                if (gInfo?.Vods == null)
-                    return new List<string>();
-
-                return gInfo.Vods
-                    .Where(v => v != null && !string.IsNullOrWhiteSpace(v.url))
-                    .Select(v => v.url)
-                    .Distinct(StringComparer.Ordinal)
-                    .ToList();
-            }
-            catch (Exception ex)
-            {
-                LogHelper.WriteLog(ex);
-                return new List<string>();
-            }
-        }
-
         private void VodUrlTest()
         {
             lastVodLink = null;
-            if (urlTestSpeed <= 0)
+            if (!IsSmartFast && urlTestSpeed <= 0)
                 return;
 
             try
