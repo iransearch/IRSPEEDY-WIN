@@ -12,19 +12,23 @@ using v2rayN.Handler;
 namespace IRSpeedyVPN.Services.Xray
 {
     /// <summary>
-    /// SMART IP: a dedicated leastLoad balancer for AI traffic inside the smart
-    /// connection config, gated by the shared VOD/AI toggle. VOD keeps its own
-    /// long-standing outbound on the sing-box side of the same core config, where
-    /// its plain VLESS links are accepted.
+    /// SMART IP: dedicated leastLoad balancers for VOD and AI traffic inside the
+    /// smart connection config, mirroring the Android client. Both services are
+    /// gated by the single VOD/AI toggle.
     ///
-    /// The core takes a single burstObservatory and its leastLoad strategy has no
-    /// observerTag field, so the AI outbounds share the pool's health probe. AI
-    /// still keeps its own balancer, selector prefix and maxRTT.
+    /// Two details differ from Android because the core will not accept them: it
+    /// takes a single burstObservatory rather than multiObservatory, and its
+    /// leastLoad strategy has no observerTag field, so the three services share one
+    /// health probe. Their selection stays independent - each keeps its own
+    /// balancer, selector prefix and maxRTT.
     /// </summary>
     public static class SmartIpRouting
     {
         public const string SmartProxyPrefix = "smart-proxy-";
         public const string SmartBalancerTag = "smart-balancer-1";
+
+        public const string VodProxyPrefix = "vod-proxy-";
+        public const string VodBalancerTag = "vod-balancer";
 
         public const string AiProxyPrefix = "ai-proxy-";
         public const string AiBalancerTag = "ai-balancer";
@@ -75,6 +79,17 @@ namespace IRSpeedyVPN.Services.Xray
             "icloud.com",
             "showip.net",
             "cdn-apple.com"
+        };
+
+        public static readonly string[] VodDomains =
+        {
+            "filimo.com",
+            "namava.ir",
+            "tamashakhoneh.ir",
+            "tmk.ir",
+            "gapfilm.ir",
+            "digitoon.tv",
+            "filmnet.ir"
         };
 
         /// <summary>Reads the shared VOD/AI toggle. Both services follow it.</summary>
@@ -245,14 +260,19 @@ namespace IRSpeedyVPN.Services.Xray
         }
 
         /// <summary>
-        /// Adds the AI prefix to the single burstObservatory selector so its health
-        /// probe covers the AI outbounds too. The core has no multi-observer support,
-        /// hence one probe for both the pool and AI.
+        /// Adds the active service prefixes to the single burstObservatory selector
+        /// so its health probe covers the VOD and AI outbounds too. The core has no
+        /// multi-observer support, hence one probe for all three services.
         /// </summary>
-        public static void ExtendObservatorySelector(JObject root)
+        public static void ExtendObservatorySelector(JObject root, bool vodActive, bool aiActive)
         {
             var selector = root?["burstObservatory"]?["subjectSelector"] as JArray;
-            if (selector != null)
+            if (selector == null)
+                return;
+
+            if (vodActive)
+                selector.Add(VodProxyPrefix);
+            if (aiActive)
                 selector.Add(AiProxyPrefix);
         }
 
@@ -278,6 +298,11 @@ namespace IRSpeedyVPN.Services.Xray
                 },
                 ["tag"] = tag
             };
+        }
+
+        public static JObject VodBalancer(string fallbackTag)
+        {
+            return LeastLoadBalancer(VodBalancerTag, VodProxyPrefix, fallbackTag, ServiceMaxRtt);
         }
 
         public static JObject AiBalancer(string fallbackTag)
@@ -306,6 +331,11 @@ namespace IRSpeedyVPN.Services.Xray
         public static JObject AiRule()
         {
             return DomainRule(AiBalancerTag, AiDomains);
+        }
+
+        public static JObject VodRule()
+        {
+            return DomainRule(VodBalancerTag, VodDomains);
         }
 
     }
