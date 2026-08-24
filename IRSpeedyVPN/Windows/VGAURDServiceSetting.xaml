@@ -223,7 +223,7 @@
                         </Grid>
                     </Border>
 
-                    <!-- VOD (independent) -->
+                    <!-- VOD/AI (independent) -->
                     <Border Style="{StaticResource SettingRowBorder}">
                         <Grid>
                             <Grid.ColumnDefinitions>
@@ -238,7 +238,7 @@
                                 Margin="0,0,10,0"/>
 
                             <TextBlock Grid.Column="1"
-                                       Text="سرویس VOD"
+                                       Text="سرویس VOD/AI"
                                        FontSize="18"
                                        FontWeight="Bold"
                                        HorizontalAlignment="Right"

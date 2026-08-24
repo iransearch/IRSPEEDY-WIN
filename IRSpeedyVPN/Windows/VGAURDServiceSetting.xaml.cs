@@ -34,7 +34,7 @@ namespace IRSpeedyVPN.Windows
             RegHelper.SetSettingValue(KEY_SYSTEM_PROXY, IsOn(SystemProxy) ? "1" : "0");
             RegHelper.SetSettingValue(KEY_TELEGRAM_PROXY, IsOn(TelegramRouteProxy) ? "1" : "0");
 
-            // VOD is independent
+            // VOD/AI is independent
             RegHelper.SetSettingValue(KEY_VOD, IsOn(VodService) ? "1" : "0");
 
             Close();
@@ -63,7 +63,7 @@ namespace IRSpeedyVPN.Windows
         }
 
         // --------------------------
-        // Mutual exclusivity (except VOD)
+        // Mutual exclusivity (except VOD/AI)
         // --------------------------
         private void NormalizeExclusiveGroup()
         {
@@ -97,7 +97,7 @@ namespace IRSpeedyVPN.Windows
             try
             {
                 TurnOffOthers(keepOn);
-                // VOD intentionally untouched
+                // VOD/AI intentionally untouched
             }
             finally
             {
@@ -133,7 +133,7 @@ namespace IRSpeedyVPN.Windows
         private void SystemProxy_Unchecked(object sender, RoutedEventArgs e) { }
         private void TelegramRouteProxy_Unchecked(object sender, RoutedEventArgs e) { }
 
-        // VOD independent
+        // VOD/AI independent
         private void VodService_Checked(object sender, RoutedEventArgs e) { }
         private void VodService_Unchecked(object sender, RoutedEventArgs e) { }
 
