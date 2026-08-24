@@ -259,10 +259,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
                     return;
                 }
 
-                // A country-smart connection marks SelectedServerUrl with one member
-                // of its row pool. Rebuild the pool when service/protocol data reloads.
-                if (value is ISmartFastConnection smart && smart.IsSmartFast && value.SelectedServerUrl != null)
-                    PrepareCountryPool(group, value);
+                // Any matched row is a country selection, so it always owns a live pool.
+                // Rebuilding it unconditionally matters on startup and on service
+                // reloads: the connection service is fresh there, so IsSmartFast is
+                // still false and a guarded rebuild would leave the row with no pool.
+                // Without a pool the connection skips the smart balancer config, and
+                // the VOD and AI balancers that live in it never reach the core.
+                PrepareCountryPool(group, value);
 
                 Apply(value, group, SelectionKind.Country);
             }
@@ -341,7 +344,11 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 selected = _groups.FirstOrDefault(g => g.Service != null && g.Service.ID == previousServiceId.Value);
 
             if (selected != null)
-                Apply(_selectedService ?? selected.Service, selected, SelectionKind.Country);
+            {
+                var service = _selectedService ?? selected.Service;
+                PrepareCountryPool(selected, service);
+                Apply(service, selected, SelectionKind.Country);
+            }
             else
                 Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
         }
