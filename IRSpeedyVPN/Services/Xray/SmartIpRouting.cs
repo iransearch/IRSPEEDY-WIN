@@ -32,11 +32,11 @@ namespace IRSpeedyVPN.Services.Xray
 
         private const string SmartTestUrl = "https://connectivitycheck.gstatic.com/generate_204";
         private const string VodTestUrl = "https://www.irancell.ir";
-        private const string AiTestUrl = "https://www.google.com/generate_204";
+        public const string AiTestUrl = "https://www.google.com/generate_204";
 
         private const string SmartMaxRtt = "3s";
         private const string ServiceMaxRtt = "5s";
-        private const string ObserverInterval = "60m";
+        public const string ObserverInterval = "60m";
 
         // AI links are hard-coded on purpose: unlike VOD they are not served by
         // the API, so rotating them requires an application update.

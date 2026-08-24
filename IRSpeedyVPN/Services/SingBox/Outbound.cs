@@ -43,6 +43,12 @@ namespace IRSpeedyVPN.Services.SingBox
         public string packet_encoding { get; set; }
         public string detour { get; set; }
 
+        // urltest outbound: picks the lowest-latency member of "outbounds"
+        public List<string> outbounds { get; set; }
+        public string url { get; set; }
+        public string interval { get; set; }
+        public int? tolerance { get; set; }
+
 
 
     }

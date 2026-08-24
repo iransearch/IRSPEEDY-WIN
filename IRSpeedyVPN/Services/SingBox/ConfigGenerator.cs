@@ -374,6 +374,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 FillInbound(cfg, item, port, vpnmode,isShareActive);
                 Filloutbound(cfg, item, overrideServer, overrideServerPort);
                 ApplyChainOutbound(cfg, chainLink, defaultChainLink);
+                ApplyAiOutbound(cfg, hasDefaultchain);
                 ApplyVodOutbound(cfg, vodLink, hasDefaultchain);
                 FillRoute(cfg, item, vpnmode, shieldFiles, hasDefaultchain,excludeprocesspath);
                 FillLog(cfg, "vgaurd.txt");
@@ -584,6 +585,80 @@ namespace IRSpeedyVPN.Services.SingBox
                 chainOutbound.tls.insecure = false;
 
             return chainOutbound;
+        }
+
+        /// <summary>
+        /// Routes AI traffic through the hard-coded SMART IP links. A sing-box urltest
+        /// outbound keeps picking the lowest-latency link, mirroring the leastLoad
+        /// balancer the Xray smart-fast path uses. Shares the VOD/AI settings toggle.
+        /// </summary>
+        private static void ApplyAiOutbound(SingBoxConfig cfg, bool hasDefaultChain)
+        {
+            if (cfg == null || cfg.outbounds == null || cfg.route?.rules == null)
+                return;
+            if (!Xray.SmartIpRouting.IsEnabled())
+                return;
+
+            try
+            {
+                var tags = new List<string>();
+                foreach (var link in Xray.SmartIpRouting.AiLinks)
+                {
+                    var tag = $"ai-proxy-{tags.Count + 1}";
+
+                    string msg;
+                    var item = ShareHandler.ImportFromConfigLink(link, out msg);
+                    if (item == null)
+                    {
+                        LogHelper.WriteExLog($"SMART IP AI outbound rejected: {tag}");
+                        continue;
+                    }
+
+                    var aiOutbound = new Outbound();
+                    FillOutboundForItem(aiOutbound, item);
+                    if (hasDefaultChain)
+                        aiOutbound.detour = "chain-default-1";
+                    aiOutbound.tag = tag;
+
+                    cfg.outbounds.Add(aiOutbound);
+                    tags.Add(tag);
+                }
+
+                LogHelper.WriteExLog(
+                    $"SMART IP AI routing: requested={Xray.SmartIpRouting.AiLinks.Length}"
+                    + $", accepted={tags.Count}"
+                    + $", mode={(tags.Count > 0 ? "urltest" : "disabled")}");
+
+                if (tags.Count == 0)
+                    return;
+
+                cfg.outbounds.Add(new Outbound
+                {
+                    tag = "ai",
+                    type = "urltest",
+                    outbounds = tags,
+                    url = Xray.SmartIpRouting.AiTestUrl,
+                    interval = Xray.SmartIpRouting.ObserverInterval
+                });
+
+                var domains = Xray.SmartIpRouting.AiDomains;
+                cfg.route.rules.Insert(cfg.route.rules.Count() - 1, new Rule
+                {
+                    action = "route",
+                    outbound = "ai",
+                    domain = domains.ToList()
+                });
+                cfg.route.rules.Insert(cfg.route.rules.Count() - 1, new Rule
+                {
+                    action = "route",
+                    outbound = "ai",
+                    domain_suffix = domains.Select(x => (object)("." + x)).ToList()
+                });
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteLog(ex);
+            }
         }
 
         private static void ApplyVodOutbound(SingBoxConfig cfg, string vodLink,bool hasDefualtChain)
