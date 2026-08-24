@@ -423,7 +423,8 @@ namespace IRSpeedyVPN.Services.SingBox
 			"tmk.ir",
 			"gapfilm.ir",
 			"digitoon.tv",
-			"filmnet.ir"
+			"filmnet.ir",
+			"ipmyp.ir"
 		};
 
 		public static string[] sg_vodDomainSuffix = new[]
@@ -435,7 +436,8 @@ namespace IRSpeedyVPN.Services.SingBox
 			".tmk.ir",
 			".gapfilm.ir",
 			".digitoon.tv",
-			".filmnet.ir"
+			".filmnet.ir",
+			".ipmyp.ir"
 		};
 	}
 }

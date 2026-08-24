@@ -89,7 +89,8 @@ namespace IRSpeedyVPN.Services.Xray
             "tmk.ir",
             "gapfilm.ir",
             "digitoon.tv",
-            "filmnet.ir"
+            "filmnet.ir",
+            "ipmyp.ir"
         };
 
         /// <summary>Reads the shared VOD/AI toggle. Both services follow it.</summary>
