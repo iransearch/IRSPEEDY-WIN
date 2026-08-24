@@ -227,7 +227,8 @@ namespace IRSpeedyVPN.Services
                         var authUser = Guid.NewGuid().ToString("N");
                         var authPass = Guid.NewGuid().ToString("N");
 
-                        xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(smartUrls, _xraySocksPort, authUser, authPass);
+                        xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
+                            smartUrls, _xraySocksPort, authUser, authPass, GetVodLinks());
                         if (string.IsNullOrWhiteSpace(xrayConfig))
                         {
                             if (_xraySocksPort > 0) FreePortManager.Enqueue(_xraySocksPort);
@@ -840,6 +841,27 @@ namespace IRSpeedyVPN.Services
                     TryKillProcess(coreProcess);
                 }
             }*/
+        }
+
+        /// <summary>Distinct VOD links advertised by the API, or an empty list.</summary>
+        private List<string> GetVodLinks()
+        {
+            try
+            {
+                if (gInfo?.Vods == null)
+                    return new List<string>();
+
+                return gInfo.Vods
+                    .Where(v => v != null && !string.IsNullOrWhiteSpace(v.url))
+                    .Select(v => v.url)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteLog(ex);
+                return new List<string>();
+            }
         }
 
         private void VodUrlTest()
