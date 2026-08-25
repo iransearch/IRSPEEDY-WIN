@@ -163,6 +163,13 @@ namespace IRSpeedyVPN.Services
                     if (goUrl == null)
                     {
                         KillAll();
+
+                        // Start each fresh connect with no VOD link. VodUrlTest below
+                        // repopulates it only while VOD is enabled; otherwise it stays
+                        // null so a link left over from an earlier VOD-on connection
+                        // does not keep the irancell outbound alive after VOD is off.
+                        lastVodLink = null;
+
                         // smart fast already ran the url test and collected the success urls
                         if (_smartFastUrls == null || _smartFastUrls.Length == 0)
                         {
