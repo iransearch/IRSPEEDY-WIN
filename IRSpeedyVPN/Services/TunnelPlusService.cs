@@ -867,6 +867,16 @@ namespace IRSpeedyVPN.Services
                 if (vodUrls.Count == 0)
                     return;
 
+                // With a single VOD link the latency probe only re-confirms that one
+                // link, adding seconds to the connect for no selection benefit. Use it
+                // directly; ApplyVodOutbound still validates it when the config is
+                // built. The probe only earns its cost when it picks among several.
+                if (vodUrls.Count == 1)
+                {
+                    lastVodLink = vodUrls.Keys.First();
+                    return;
+                }
+
                 // Separate xhttp links for Xray processing in VOD test
                 var vodXhttpInfos = new List<Xray.ConfigGenerator.XraySocksInfo>();
                 var vodSocksOverrides = new Dictionary<string, Tuple<int, string, string>>();
