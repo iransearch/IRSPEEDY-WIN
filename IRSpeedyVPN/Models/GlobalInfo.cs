@@ -18,6 +18,7 @@ namespace IRSpeedyVPN.Models
         public IVPNService CurrentService;
         public string ServerResponse { get; set; }
         public List<Url> Vods { get; set; }
+        public List<Url> Ais { get; set; }
 
         public void Import(AccountInfoEx acc, string password,String tempPath)
         {
@@ -32,6 +33,7 @@ namespace IRSpeedyVPN.Models
             TempPath = tempPath;
             settings = acc.Settings;
             Vods = acc.vods;
+            Ais = acc.ais;
         }
         /*
         public String GetSetting(string Name)

@@ -245,7 +245,7 @@ namespace IRSpeedyVPN.Services.Xray
                 }
             };
         }
-        public static string GetSmartBalancerConfig(IEnumerable<string> links, int port, string authUser, string authPass)
+        public static string GetSmartBalancerConfig(IEnumerable<string> links, int port, string authUser, string authPass, IEnumerable<string> aiLinks = null)
         {
             var root = JObject.Parse(Samples.BalancerConfig);
             var serializer = new JsonSerializer { NullValueHandling = NullValueHandling.Ignore };
@@ -303,7 +303,7 @@ namespace IRSpeedyVPN.Services.Xray
             if (idx == 0)
                 return null;
 
-            ApplySmartIpRouting(root, outbounds, serializer);
+            ApplySmartIpRouting(root, outbounds, aiLinks, serializer);
 
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
             outbounds.Add(JObject.FromObject(new Outbound
@@ -326,18 +326,19 @@ namespace IRSpeedyVPN.Services.Xray
 
         /// <summary>
         /// Adds the AI leastLoad balancer next to the main smart balancer, as the
-        /// Android client does. Gated by the VOD/AI toggle. VOD is not handled here:
-        /// the API serves plain VLESS on a public IP, which the core refuses to build
-        /// as an Xray outbound, so VOD stays on its sing-box outbound instead.
+        /// Android client does, using the AI links supplied by the API. Gated by the
+        /// VOD/AI toggle. VOD is not handled here: the API serves plain VLESS on a
+        /// public IP, which the core refuses to build as an Xray outbound, so VOD
+        /// stays on its sing-box outbound instead.
         /// </summary>
-        private static void ApplySmartIpRouting(JObject root, JArray outbounds, JsonSerializer serializer)
+        private static void ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer)
         {
             if (!SmartIpRouting.IsEnabled())
                 return;
 
             string aiFallbackTag;
             var aiOutbounds = SmartIpRouting.BuildOutbounds(
-                SmartIpRouting.AiLinks, SmartIpRouting.AiProxyPrefix, "AI", serializer, out aiFallbackTag);
+                aiLinks, SmartIpRouting.AiProxyPrefix, "AI", serializer, out aiFallbackTag);
 
             if (aiOutbounds.Count == 0 || aiFallbackTag == null)
                 return;

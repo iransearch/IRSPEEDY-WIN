@@ -242,7 +242,7 @@ namespace IRSpeedyVPN.Services
                         var authPass = Guid.NewGuid().ToString("N");
 
                         xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
-                            smartUrls, _xraySocksPort, authUser, authPass);
+                            smartUrls, _xraySocksPort, authUser, authPass, GetAiLinks());
                         if (string.IsNullOrWhiteSpace(xrayConfig))
                         {
                             if (_xraySocksPort > 0) FreePortManager.Enqueue(_xraySocksPort);
@@ -855,6 +855,27 @@ namespace IRSpeedyVPN.Services
                     TryKillProcess(coreProcess);
                 }
             }*/
+        }
+
+        /// <summary>Distinct AI links advertised by the API, or an empty list.</summary>
+        private List<string> GetAiLinks()
+        {
+            try
+            {
+                if (gInfo?.Ais == null)
+                    return new List<string>();
+
+                return gInfo.Ais
+                    .Where(a => a != null && !string.IsNullOrWhiteSpace(a.url))
+                    .Select(a => a.url)
+                    .Distinct(StringComparer.Ordinal)
+                    .ToList();
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteLog(ex);
+                return new List<string>();
+            }
         }
 
         private void VodUrlTest()
