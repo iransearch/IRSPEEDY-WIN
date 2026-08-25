@@ -1,127 +1,59 @@
-<UserControl x:Class="IRSpeedyVPN.UserControls.UCServerList"
+﻿<UserControl x:Class="IRSpeedyVPN.UserControls.UCServerList"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
              xmlns:local="clr-namespace:IRSpeedyVPN.Components.ServerListControl"
-             mc:Ignorable="d"
-             Loaded="UserControl_Loaded"
+             mc:Ignorable="d" 
+             Loaded="UserControl_Loaded" 
              IsVisibleChanged="UserControl_IsVisibleChanged">
 
-    <!-- ============================================================
-         SMART-connection main screen, restyled to match the Android
-         client: coral circular connect button over a navy ground with
-         pill-style selectors. Every x:Name and handler is preserved so
-         the existing code-behind keeps working unchanged.
-         ============================================================ -->
-    <UserControl.Resources>
-
-        <!-- circular connect button -->
-        <Style x:Key="ConnectCircle" TargetType="{x:Type Button}">
-            <Setter Property="Width" Value="118"/>
-            <Setter Property="Height" Value="118"/>
-            <Setter Property="Foreground" Value="#EA515A"/>
-            <Setter Property="FontFamily" Value="{StaticResource fa_ProLight}"/>
-            <Setter Property="FontSize" Value="44"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="{x:Type Button}">
-                        <Grid>
-                            <Ellipse x:Name="ring" Stroke="#33FFFFFF" StrokeThickness="2">
-                                <Ellipse.Fill>
-                                    <RadialGradientBrush>
-                                        <GradientStop Color="#1D2C66" Offset="0"/>
-                                        <GradientStop Color="#0F1A42" Offset="1"/>
-                                    </RadialGradientBrush>
-                                </Ellipse.Fill>
-                            </Ellipse>
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Grid>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="ring" Property="Stroke" Value="#EA515A"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="ring" Property="Stroke" Value="#EA111A"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- flat combo that sits inside a pill -->
-        <Style x:Key="PillCombo" TargetType="{x:Type ComboBox}">
-            <Setter Property="FontFamily" Value="Arial"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="#FFFFFF"/>
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderBrush" Value="{x:Null}"/>
-            <Setter Property="FlowDirection" Value="RightToLeft"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-        </Style>
-    </UserControl.Resources>
-
     <Grid>
-        <Grid Margin="0,8,0,0" x:Name="mainGrd">
-            <StackPanel VerticalAlignment="Stretch">
+        <Border Background="Transparent" CornerRadius="5">
+            <Grid Margin="0,30,0,0" x:Name="mainGrd">
+                <StackPanel Margin="0">
+                    <StackPanel Margin="40,0" Height="160">
 
-                <!-- ── connect button + status ── -->
-                <StackPanel HorizontalAlignment="Center" Margin="0,4,0,10">
-                    <Button x:Name="btnConnect"
-                            Style="{StaticResource ConnectCircle}"
-                            Click="btnConnect_Click"
-                            IsCancel="True"
-                            Content="&#xf011;"/>
-                    <TextBlock Text="اتصال"
-                               Foreground="#B9C0DA" FontSize="14"
-                               HorizontalAlignment="Center" Margin="0,10,0,0"/>
-                </StackPanel>
-
-                <!-- ── selectors (pills) ── -->
-                <StackPanel Margin="34,0,34,0">
-
-                    <!-- سرویس -->
-                    <Border Background="#14FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1"
-                            CornerRadius="14" Height="50" Margin="0,6">
-                        <Grid Margin="10,0">
-                            <TextBlock Text="سرویس" Foreground="#8A93BE" FontSize="12"
+                        <Grid Margin="4">
+                            <TextBlock FontSize="17" FontWeight="Bold" Text="سرویس"
                                        HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="cmbService" Style="{StaticResource PillCombo}"
-                                      Width="150" HorizontalAlignment="Left" VerticalAlignment="Center"
+                            <ComboBox Width="230" x:Name="cmbService"
+                                      FontFamily="Arial" FontSize="14" FontWeight="Bold"
+                                      FlowDirection="RightToLeft" HorizontalAlignment="Left"
+                                      Background="White" BorderBrush="{x:Null}"
                                       SelectionChanged="cmbService_SelectionChanged"/>
                         </Grid>
-                    </Border>
 
-                    <!-- پروتکل -->
-                    <Border x:Name="gProtocol" Background="#14FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1"
-                            CornerRadius="14" Height="50" Margin="0,6">
-                        <Grid Margin="10,0">
-                            <TextBlock Text="پروتکل" Foreground="#8A93BE" FontSize="12"
+                        <Grid x:Name="gProtocol" Margin="4">
+                            <TextBlock FontSize="17" FontWeight="Bold" Text="پروتکل"
                                        HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                            <ComboBox x:Name="cmbProtocol" Style="{StaticResource PillCombo}"
-                                      Width="150" HorizontalAlignment="Left" VerticalAlignment="Center"
+                            <ComboBox Width="230" x:Name="cmbProtocol"
+                                      FontFamily="Arial" FontSize="14" FontWeight="Bold"
+                                      FlowDirection="RightToLeft" HorizontalAlignment="Left"
+                                      Background="White" BorderBrush="{x:Null}"
                                       SelectionChanged="cmbProtocol_SelectionChanged"/>
                         </Grid>
-                    </Border>
 
-                    <!-- کشور -->
-                    <Border Background="#14FFFFFF" BorderBrush="#22FFFFFF" BorderThickness="1"
-                            CornerRadius="14" Height="50" Margin="0,6">
-                        <Grid Margin="10,0">
-                            <TextBlock Text="کشور" Foreground="#8A93BE" FontSize="12"
+                        <!-- ─── Country = the new custom picker ─── -->
+                        <Grid Margin="4">
+                            <TextBlock FontSize="17" FontWeight="Bold" Text="کشور"
                                        HorizontalAlignment="Right" VerticalAlignment="Center"/>
                             <local:ServerCountryPicker x:Name="countryPicker"
-                                                       Width="150"
-                                                       HorizontalAlignment="Left"
-                                                       VerticalAlignment="Center"/>
+                                                         Width="230"
+                                                         HorizontalAlignment="Left"/>
                         </Grid>
-                    </Border>
 
+                        <Grid Margin="0,10"/>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                        <Button x:Name="btnConnect" Margin="10,0,10,10"
+                                Style="{StaticResource RoundCorner}"
+                                Click="btnConnect_Click"
+                                Content="اتصال" IsCancel="True" FontSize="20"/>
+                    </StackPanel>
                 </StackPanel>
-            </StackPanel>
-        </Grid>
+            </Grid>
+        </Border>
     </Grid>
 </UserControl>
