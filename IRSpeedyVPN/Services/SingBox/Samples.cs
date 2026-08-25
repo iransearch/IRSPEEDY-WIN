@@ -170,7 +170,7 @@ namespace IRSpeedyVPN.Services.SingBox
         ""servers"": [
             {
                 ""tag"": ""dns-direct"",
-                ""address"": ""tls://8.8.8.8"",
+                ""address"": ""tls://1.1.1.1"",
                 ""detour"": ""proxy""
             }
         ]
