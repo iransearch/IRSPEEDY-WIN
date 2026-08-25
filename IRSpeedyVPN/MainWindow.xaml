@@ -14,16 +14,16 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
      TextElement.FontWeight="Regular"
      TextElement.FontSize="13"
       TextOptions.TextFormattingMode="Display"
-      WindowStyle="None" WindowStartupLocation="CenterScreen" Width="391.408" Height="359.311" Background="Transparent" AllowsTransparency="True" Title="IRSpeedy VPN" ResizeMode="NoResize">
+      WindowStyle="None" WindowStartupLocation="CenterScreen" Width="391.408" Height="520" Background="Transparent" AllowsTransparency="True" Title="IRSpeedy VPN" ResizeMode="NoResize">
     <Window.Resources>
         <ResourceDictionary>
 
         </ResourceDictionary>
     </Window.Resources>
-    <Border BorderBrush="Black"
+    <Border BorderBrush="#0F1A42"
              BorderThickness="1.5"
              CornerRadius="20"
-             Background="WhiteSmoke">
+             Background="#152153">
         <Grid>
 
 
@@ -63,7 +63,7 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
 
                     <uc:UCLoading x:Name="uCLoading" Visibility="Hidden"  Panel.ZIndex="1" Margin="0,-1,0,-256"/>
 
-                    <transc:TransitionElement  Height="250" x:Name="TransitionBox" Panel.ZIndex="0" Margin="0,99,0,-250">
+                    <transc:TransitionElement  Height="410" x:Name="TransitionBox" Panel.ZIndex="0" Margin="0,99,0,-410">
 
                     </transc:TransitionElement>
                 </Grid>
