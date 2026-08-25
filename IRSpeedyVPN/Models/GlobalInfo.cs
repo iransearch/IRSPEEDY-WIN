@@ -34,16 +34,6 @@ namespace IRSpeedyVPN.Models
             settings = acc.Settings;
             Vods = acc.vods;
             Ais = acc.ais;
-
-            // Diagnostic: shows whether the API delivered the vods/ais arrays. A fresh
-            // login that logs "ais=0" while "vods>0" means the server list response has
-            // no ais field; both zero from startup usually means a pre-ais cached login.
-            try
-            {
-                Common.LogHelper.WriteExLog(
-                    $"Account links imported: vods={(acc.vods?.Count ?? 0)}, ais={(acc.ais?.Count ?? 0)}");
-            }
-            catch { }
         }
         /*
         public String GetSetting(string Name)
