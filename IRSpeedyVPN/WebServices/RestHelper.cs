@@ -85,8 +85,24 @@ namespace IRSpeedyVPN.WebServices
                 }
             }
 
+            // Resolve the host over DoH first so a poisoned or blocked system
+            // resolver cannot stop login. On any failure this returns null and the
+            // request goes out on the system resolver exactly as before.
+            string resolveOverride = null;
+            try
+            {
+                var uri = new Uri(url);
+                var ip = DohResolver.Resolve(uri.Host);
+                if (!string.IsNullOrEmpty(ip))
+                    resolveOverride = uri.Host + ":" + (uri.Port > 0 ? uri.Port : 443) + ":" + ip;
+            }
+            catch
+            {
+                resolveOverride = null;
+            }
+
             // Send through curl.exe
-            var curlResp = _curl.Send(url, method, headers.ToString(), body, null, timeoutSeconds);
+            var curlResp = _curl.Send(url, method, headers.ToString(), body, null, timeoutSeconds, resolveOverride);
             var rawResponse = curlResp.Body;
             var httpCodeInt = curlResp.HttpCode;
 

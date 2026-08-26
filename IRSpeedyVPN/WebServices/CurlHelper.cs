@@ -23,7 +23,7 @@ namespace IRSpeedyVPN.WebServices
             string body,
             string proxy=null)
         {
-            string output = ShellExecute.ShellexecAndReturnStringOutput(CurlExePath, BuildArgs(url, method, headers, body, proxy, null));
+            string output = ShellExecute.ShellexecAndReturnStringOutput(CurlExePath, BuildArgs(url, method, headers, body, proxy, null, null));
             Parse(output, out string responseBody, out int httpCode);
 
             return new CurlResponse(responseBody, httpCode);
@@ -35,9 +35,10 @@ namespace IRSpeedyVPN.WebServices
             string headers,
             string body,
             string proxy,
-            int? timeoutSeconds)
+            int? timeoutSeconds,
+            string resolveOverride = null)
         {
-            string output = ShellExecute.ShellexecAndReturnStringOutput(CurlExePath, BuildArgs(url, method, headers, body, proxy, timeoutSeconds));
+            string output = ShellExecute.ShellexecAndReturnStringOutput(CurlExePath, BuildArgs(url, method, headers, body, proxy, timeoutSeconds, resolveOverride));
             Parse(output, out string responseBody, out int httpCode);
             return new CurlResponse(responseBody, httpCode);
         }
@@ -60,7 +61,8 @@ namespace IRSpeedyVPN.WebServices
             string headers,
             string body,
             string proxy,
-            int? timeoutSeconds)
+            int? timeoutSeconds,
+            string resolveOverride)
         {
             var args = new StringBuilder();
             args.Append(" -sS -L ");
@@ -68,6 +70,14 @@ namespace IRSpeedyVPN.WebServices
             bool isPost = string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase);
             if (isPost)
                 args.Append(" -X POST ");
+
+            // DoH-resolved address: pin the host to this IP so a poisoned system
+            // resolver is bypassed while SNI and the Host header stay intact.
+            if (!string.IsNullOrWhiteSpace(resolveOverride))
+            {
+                args.Append(" --resolve ");
+                args.Append(EscapeArg(resolveOverride));
+            }
 
             if (!string.IsNullOrWhiteSpace(proxy))
             {
