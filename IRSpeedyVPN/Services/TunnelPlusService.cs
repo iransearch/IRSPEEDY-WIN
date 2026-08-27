@@ -208,6 +208,13 @@ namespace IRSpeedyVPN.Services
                     //vprocess.StandardInput.Close();
                     bool vpnmode =  (RegHelper.GetSettingValue("VGAURDVPNMode") != "0");
                     lastLink = goUrl ?? SelectedUrl;
+                    // The local listen port must actually be bindable. On machines
+                    // where Windows has reserved 1080 (Hyper-V / WSL / Docker dynamic
+                    // port ranges) the core fails with WSAEACCES and never starts, so
+                    // fall back to an OS-assigned free port. The chosen port flows on
+                    // to the sing-box inbound, the system proxy and Proxifier because
+                    // they all read it from here.
+                    port = ResolveListenPort(port);
                     lastListenPort = port;
                     lastVpnMode = vpnmode;
                     var shieldFiles = GetShieldFiles();
@@ -1383,6 +1390,37 @@ namespace IRSpeedyVPN.Services
                 {
                     listener?.Stop();
                 }
+                catch { }
+            }
+        }
+
+        /// <summary>
+        /// Returns a loopback port that can actually be bound. The preferred port is
+        /// kept when it is free; when it is taken or blocked by a Windows reserved
+        /// range (WSAEACCES), the OS is asked for a free port instead, which it never
+        /// draws from an excluded range.
+        /// </summary>
+        private int ResolveListenPort(int preferred)
+        {
+            if (preferred > 0 && IsPortAvailable(preferred))
+                return preferred;
+
+            TcpListener listener = null;
+            try
+            {
+                listener = new TcpListener(IPAddress.Loopback, 0);
+                listener.Start();
+                int assigned = ((IPEndPoint)listener.LocalEndpoint).Port;
+                LogHelper.WriteExLog($"Listen port {preferred} unavailable; using {assigned} instead.");
+                return assigned;
+            }
+            catch
+            {
+                return preferred;
+            }
+            finally
+            {
+                try { listener?.Stop(); }
                 catch { }
             }
         }
