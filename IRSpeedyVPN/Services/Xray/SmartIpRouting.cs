@@ -92,13 +92,11 @@ namespace IRSpeedyVPN.Services.Xray
             if (links == null)
                 return outbounds;
 
-            int requested = 0;
             foreach (var link in links)
             {
                 if (string.IsNullOrWhiteSpace(link))
                     continue;
 
-                requested++;
                 var tag = tagPrefix + (outbounds.Count + 1);
 
                 Outbound proxy = null;
@@ -119,30 +117,18 @@ namespace IRSpeedyVPN.Services.Xray
                 }
 
                 if (proxy == null || proxy.protocol == null)
-                {
-                    LogHelper.WriteExLog($"SMART IP {label} outbound rejected: {tag}");
                     continue;
-                }
 
-                var refusal = CoreRefusalReason(proxy);
-                if (refusal != null)
-                {
-                    // The core refuses to build the whole config over one bad outbound,
-                    // which would take the smart connection down with it. Drop the link
-                    // instead and let the remaining ones carry the service.
-                    LogHelper.WriteExLog($"SMART IP {label} outbound rejected: {tag} ({refusal})");
+                // The core refuses to build the whole config over one bad outbound,
+                // which would take the smart connection down with it. Drop the link
+                // instead and let the remaining ones carry the service.
+                if (CoreRefusalReason(proxy) != null)
                     continue;
-                }
 
                 outbounds.Add(JObject.FromObject(proxy, serializer));
                 if (fallbackTag == null)
                     fallbackTag = tag;
             }
-
-            LogHelper.WriteExLog(
-                $"SMART IP {label} routing: requested={requested}"
-                + $", accepted={outbounds.Count}"
-                + $", mode={(outbounds.Count > 0 ? "leastLoad" : "disabled")}");
 
             return outbounds;
         }

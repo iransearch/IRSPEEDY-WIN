@@ -289,12 +289,8 @@ namespace IRSpeedyVPN.Services.Xray
                 // The pool skips the per-link LinkNeedsXray decision and hands every
                 // URL to Xray, so a link the core refuses would abort the whole config
                 // build and take the connection down. Drop it and keep the rest.
-                var refusal = SmartIpRouting.CoreRefusalReason(proxy);
-                if (refusal != null)
-                {
-                    LogHelper.WriteExLog($"Smart pool outbound rejected: {proxy.tag} ({refusal})");
+                if (SmartIpRouting.CoreRefusalReason(proxy) != null)
                     continue;
-                }
 
                 outbounds.Add(JObject.FromObject(proxy, serializer));
                 idx++;
