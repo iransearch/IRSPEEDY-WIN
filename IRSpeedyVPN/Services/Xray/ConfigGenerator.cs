@@ -274,7 +274,12 @@ namespace IRSpeedyVPN.Services.Xray
                 sniffing = new Sniffing
                 {
                     enabled = true,
-                    destOverride = new List<string> { "tls", "http", "quic" }
+                    // tls (SNI) + http (Host) are enough to recover the hostname for AI
+                    // domain matching. "quic" is intentionally left out: UDP/443 is blocked
+                    // by the balancer anyway, and sniffing QUIC only made Xray wait on
+                    // packets it then drops, which in TUN mode showed up as a 10-15s stall
+                    // while the browser gave up on QUIC before falling back to TCP.
+                    destOverride = new List<string> { "tls", "http" }
                 }
             }, serializer));
             root["inbounds"] = inbounds;
