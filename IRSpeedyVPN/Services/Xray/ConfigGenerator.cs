@@ -265,6 +265,16 @@ namespace IRSpeedyVPN.Services.Xray
                     {
                         new Account { user = authUser, pass = authPass }
                     }
+                },
+                // In VPN (TUN) mode sing-box forwards the original IP as the SOCKS target,
+                // so without sniffing Xray never sees the hostname and the AI domain rules
+                // cannot match. Sniffing lets Xray recover the SNI/Host itself and route
+                // AI traffic correctly. In proxy mode the target is already the hostname,
+                // so this is a no-op there.
+                sniffing = new Sniffing
+                {
+                    enabled = true,
+                    destOverride = new List<string> { "tls", "http", "quic" }
                 }
             }, serializer));
             root["inbounds"] = inbounds;
