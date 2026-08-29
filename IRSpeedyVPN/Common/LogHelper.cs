@@ -10,8 +10,10 @@ namespace IRSpeedyVPN.Common
     {
         public static void WriteExLog(string Message)
         {
+            // Kept as a separate entry point, but writes to the single log.txt so
+            // there is only one log file to collect.
             lock (Locks.Log)
-                File.AppendAllText(".\\Exlog.txt", string.Format("{0:s} : {1}\n", DateTime.Now, Message.Replace("api1.isdm.ir", "[ServerUrl]").Replace("apichcek-p.isdm.ir", "[ProxyUrl]")));
+                File.AppendAllText(".\\log.txt", string.Format("{0:s} : {1}\n", DateTime.Now, Message.Replace("api1.isdm.ir", "[ServerUrl]").Replace("apichcek-p.isdm.ir", "[ProxyUrl]")));
 
         }
         public static void WriteLog(string Message)
