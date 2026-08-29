@@ -404,6 +404,20 @@ namespace IRSpeedyVPN.Services.SingBox
             if (vpnmode)
             {
                 cfg.route.find_process = true;
+
+                // Fail QUIC (UDP/443) fast instead of black-holing it. In TUN mode Firefox
+                // and Chrome try HTTP/3 first; when those packets are silently dropped the
+                // browser waits ~10-15s before falling back to TCP, which showed up as a
+                // stall on websites while Telegram (TCP only) was instant. "reject" replies
+                // with ICMP unreachable so the browser abandons QUIC immediately and uses
+                // TCP. Only needed in VPN mode; proxy mode never carries QUIC.
+                cfg.route.rules.Add(new Rule
+                {
+                    network = "udp",
+                    port = 443,
+                    action = "reject"
+                });
+
                 cfg.route.rules.Add(Utils.FromJson<Rule>(Samples.sg_vpnRouteRules));
                 
                 if (excludeprocesspath != null && excludeprocesspath.Length > 0)
