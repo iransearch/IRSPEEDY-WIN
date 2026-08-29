@@ -930,9 +930,27 @@ namespace IRSpeedyVPN
 
         private bool CheckUpdateExist()
         {
-            bool ret = gInfo?.settings?.last_version!=null;
+            bool ret = false;
+            var lastVersion = gInfo?.settings?.last_version;
+            if (lastVersion != null)
+            {
+                // Only prompt when the advertised version is actually newer than what
+                // is running. Without this comparison a last_version left over in the
+                // cached seed.set keeps asking an already-updated app to update on
+                // every launch. Unknown formats fall back to the previous behavior so
+                // a real update is never hidden.
+                if (Version.TryParse(lastVersion.version_number, out var latest)
+                    && Version.TryParse(Assembly.GetExecutingAssembly().GetName().Version.ToString(), out var current))
+                {
+                    ret = latest > current;
+                }
+                else
+                {
+                    ret = true;
+                }
+            }
             isUpdateAvailable = ret;
-            return ret;           
+            return ret;
         }
         private void DisconnectAll()
         {
