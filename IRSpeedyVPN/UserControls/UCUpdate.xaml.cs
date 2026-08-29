@@ -87,9 +87,24 @@ namespace IRSpeedyVPN.UserControls
 
                     ResourceManager.Extract(file);
                     file.Close();
-                    File.Delete(e.UserState.ToString());
+
                     string helperAddress = ResourceManager.TempPath + "\\misc\\udh.exe";
-                    ShellExecute.ShellexecAndReturnProcess(helperAddress, $"\"{Process.GetCurrentProcess().MainModule.FileName}\"");                                                            
+
+                    // The external helper swaps the running exe after we exit. If it is
+                    // missing — most often because antivirus quarantined it during
+                    // extraction — closing the app now would leave the user with the old
+                    // exe removed and nothing to replace it. Keep the working app instead
+                    // and ask them to update manually.
+                    if (!File.Exists(helperAddress))
+                    {
+                        txbTitle.Text = "بروزرسانی کامل نشد. لطفاً نسخهٔ جدید را دستی دریافت کنید.";
+                        txbProgress.Text = "فایل بروزرسانی روی این سیستم در دسترس نیست (احتمالاً توسط آنتی‌ویروس حذف شده).";
+                        btnDownload.IsEnabled = true;
+                        return;
+                    }
+
+                    File.Delete(e.UserState.ToString());
+                    ShellExecute.ShellexecAndReturnProcess(helperAddress, $"\"{Process.GetCurrentProcess().MainModule.FileName}\"");
                     Environment.Exit(0);
                 }
                 else
