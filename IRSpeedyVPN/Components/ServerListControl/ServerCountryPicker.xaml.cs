@@ -173,6 +173,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private string _signalText = "—";
         public string SignalText { get => _signalText; private set { _signalText = value; On(); } }
 
+        // Best (lowest) positive latency in this row, used to order the list from
+        // fastest to slowest. Rows with no positive result sink to the bottom.
+        public long SortKey { get; private set; } = long.MaxValue;
+
         public List<Url> GetUrls()
         {
             return (Service?.GetServerUrls() ?? new List<Url>())
@@ -200,7 +204,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (positive.Length > 0)
             {
                 IsSelectable = true;
-                Sig.FromLatency(positive.Min(), out var bars, out var color, out var text);
+                var best = positive.Min();
+                SortKey = best;
+                Sig.FromLatency(best, out var bars, out var color, out var text);
                 SignalBars = bars;
                 SignalColor = color;
                 SignalText = text;
@@ -208,6 +214,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             }
 
             IsSelectable = false;
+            SortKey = long.MaxValue;
             var allFresh = urls.Count > 0 && urls.All(u =>
                 u.latencychkTime != default(DateTime) && !Sig.IsStale(u));
 
@@ -330,6 +337,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
             items.AddRange(_groups);
             icCountries.ItemsSource = items;
 
+            // Order by any results already cached from a previous session.
+            ResortGroups();
+
             if (_selectedService == null && _urlTest)
             {
                 Apply(null, null, SelectionKind.Smart);
@@ -357,7 +367,36 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public void RefreshGroup(IVPNService service)
         {
             var group = _groups.FirstOrDefault(g => ReferenceEquals(g.Service, service));
-            group?.RefreshSignals();
+            if (group == null)
+                return;
+
+            group.RefreshSignals();
+            ResortGroups();
+        }
+
+        /// <summary>
+        /// Reorders the rows from fastest to slowest as their tests come in, keeping
+        /// the Smart row on top. The list is rebound only when the order actually
+        /// changes, and the row objects are reused so the current selection and its
+        /// highlight are preserved.
+        /// </summary>
+        private void ResortGroups()
+        {
+            var ordered = _groups
+                .OrderBy(g => g.SortKey)
+                .ThenBy(g => g.CountryName, StringComparer.CurrentCulture)
+                .ThenBy(g => g.Service?.ID ?? int.MaxValue)
+                .ToList();
+
+            if (ordered.SequenceEqual(_groups))
+                return;
+
+            _groups = ordered;
+
+            var items = new List<object>();
+            if (_smart != null) items.Add(_smart);
+            items.AddRange(_groups);
+            icCountries.ItemsSource = items;
         }
 
         private bool PrepareCountryPool(GroupItem group, IVPNService preferredService = null)
