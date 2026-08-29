@@ -15,6 +15,11 @@ namespace IRSpeedyVPN.WebServices
     {
         private const string ChangePasswordKey = "5LCzP4gMSpZ5nMMmuCXnkWJwwGWgEWcJ";
 
+        // Server-list payload key version. The server encrypts its response with the key
+        // matching this value; an old server that does not read "kv" keeps using the
+        // legacy key, and the client tries both keys on decrypt, so nothing breaks.
+        private const int ServerListKeyVersion = 2;
+
         // ----------------------------
         // NEW API (failover endpoints)
         // ----------------------------
@@ -215,7 +220,8 @@ namespace IRSpeedyVPN.WebServices
                 pwd = password,
                 id = guid,
                 device_name = deviceName,
-                device_token = deviceToken
+                device_token = deviceToken,
+                kv = ServerListKeyVersion
             };
         }
 
