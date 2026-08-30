@@ -347,7 +347,7 @@
                 Height="26"
                 Padding="10,0"
                 Margin="0,0,8,0"
-                MinWidth="50"
+                MinWidth="62"
                 VerticalAlignment="Center">
             <Border.Background>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -442,7 +442,7 @@
                 Height="26"
                 Padding="10,0"
                 Margin="0,0,8,0"
-                MinWidth="50"
+                MinWidth="62"
                 VerticalAlignment="Center">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
