@@ -28,18 +28,18 @@ namespace IRSpeedyVPN.Services.SingBox
                 return Environment.Is64BitOperatingSystem ? CoreType.NekoBox : CoreType.SingBox;
             }
         }
-        public static string GetConfig(string Link, int port, bool VpnMode, bool isShareActive, string[] shieldFiles, string chainLink, string[] defaultChainLink, string vodLink, bool hasDefaultchain, string overrideServer = null, int? overrideServerPort = null, string[] excludeprocesspath = null)
+        public static string GetConfig(string Link, int port, bool VpnMode, bool isShareActive, string[] shieldFiles, string chainLink, string[] defaultChainLink, string vodLink, bool hasDefaultchain, string overrideServer = null, int? overrideServerPort = null, string[] excludeprocesspath = null, bool gameMode = false)
         {
-            var result = GetConfigEx(Link, port, VpnMode, false, "", false, isShareActive, shieldFiles, chainLink, defaultChainLink, vodLink,hasDefaultchain, overrideServer, overrideServerPort, excludeprocesspath);
+            var result = GetConfigEx(Link, port, VpnMode, false, "", false, isShareActive, shieldFiles, chainLink, defaultChainLink, vodLink,hasDefaultchain, overrideServer, overrideServerPort, excludeprocesspath, gameMode);
             return result;
         }
 
-        public static string GetConfigEx(string Link, int port, bool VpnMode, bool addExtraInbounds, string chain, bool legacyDNS, bool isShareActive, string[] shieldFiles, string chainLink, string[] defaultChainLink, string vodLink, bool hasDefaultchain, string overrideServer = null, int? overrideServerPort = null, string[] excludeprocesspath = null)
+        public static string GetConfigEx(string Link, int port, bool VpnMode, bool addExtraInbounds, string chain, bool legacyDNS, bool isShareActive, string[] shieldFiles, string chainLink, string[] defaultChainLink, string vodLink, bool hasDefaultchain, string overrideServer = null, int? overrideServerPort = null, string[] excludeprocesspath = null, bool gameMode = false)
         {
             SingBoxConfig cfg;
             if (Link.StartsWith("local://"))
             {
-                cfg = GenerateConfig(null, port, true, addExtraInbounds, chain, legacyDNS, isShareActive, shieldFiles, chainLink, defaultChainLink, vodLink, hasDefaultchain, overrideServer, overrideServerPort);
+                cfg = GenerateConfig(null, port, true, addExtraInbounds, chain, legacyDNS, isShareActive, shieldFiles, chainLink, defaultChainLink, vodLink, hasDefaultchain, overrideServer, overrideServerPort, null, gameMode);
                 Random random = new Random(Environment.TickCount);
                 if (cfg.inbounds != null && cfg.inbounds.Count > 0)
                     cfg.inbounds[0].interface_name = $"irspeedy-tun-{random.Next(4095).ToString("X")}";
@@ -48,7 +48,7 @@ namespace IRSpeedyVPN.Services.SingBox
             {
                 string msg;
                 var item = ShareHandler.ImportFromConfigLink(Link, out msg);
-                cfg = GenerateConfig(item, port, VpnMode, addExtraInbounds, chain, legacyDNS, isShareActive, shieldFiles, chainLink, defaultChainLink, vodLink, hasDefaultchain, overrideServer, overrideServerPort,excludeprocesspath);
+                cfg = GenerateConfig(item, port, VpnMode, addExtraInbounds, chain, legacyDNS, isShareActive, shieldFiles, chainLink, defaultChainLink, vodLink, hasDefaultchain, overrideServer, overrideServerPort,excludeprocesspath, gameMode);
             }
 
             string res = Utils.ToJson(cfg);
@@ -362,7 +362,7 @@ namespace IRSpeedyVPN.Services.SingBox
         }
        
 
-        private static SingBoxConfig GenerateConfig(VmessItem item, int port, bool vpnmode, bool addExtraInbounds, string chain, bool legacyDNS, bool isShareActive, string[] shieldFiles, string chainLink, string[] defaultChainLink, string vodLink, bool hasDefaultchain, string overrideServer = null, int? overrideServerPort = null,string[] excludeprocesspath=null)
+        private static SingBoxConfig GenerateConfig(VmessItem item, int port, bool vpnmode, bool addExtraInbounds, string chain, bool legacyDNS, bool isShareActive, string[] shieldFiles, string chainLink, string[] defaultChainLink, string vodLink, bool hasDefaultchain, string overrideServer = null, int? overrideServerPort = null,string[] excludeprocesspath=null, bool gameMode=false)
         {
             var serilizer = new JavaScriptSerializer();
             SingBoxConfig cfg = null;
@@ -375,7 +375,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 Filloutbound(cfg, item, overrideServer, overrideServerPort);
                 ApplyChainOutbound(cfg, chainLink, defaultChainLink);
                 ApplyVodOutbound(cfg, vodLink, hasDefaultchain);
-                FillRoute(cfg, item, vpnmode, shieldFiles, hasDefaultchain,excludeprocesspath);
+                FillRoute(cfg, item, vpnmode, shieldFiles, hasDefaultchain,excludeprocesspath, gameMode);
                 FillLog(cfg, "vgaurd.txt");
             }
             else
@@ -399,7 +399,7 @@ namespace IRSpeedyVPN.Services.SingBox
             }
         }
 
-        private static void FillRoute(SingBoxConfig cfg, VmessItem item, bool vpnmode, string[] shieldFiles, bool hasDefaultChain, string[] excludeprocesspath = null)
+        private static void FillRoute(SingBoxConfig cfg, VmessItem item, bool vpnmode, string[] shieldFiles, bool hasDefaultChain, string[] excludeprocesspath = null, bool gameMode = false)
         {
             if (vpnmode)
             {
@@ -435,6 +435,25 @@ namespace IRSpeedyVPN.Services.SingBox
                 }
                 
                
+            }
+
+            if (gameMode && cfg.route != null)
+            {
+                // Game Mode (a.k.a. DNS filtering): send only DNS, VOD and AI through the
+                // tunnel and let everything else go direct for low latency. DNS is already
+                // hijacked and resolved via dns-remote (proxy), and VOD domains are already
+                // routed to "irancell" by ApplyVodOutbound. Add the AI domains (when VOD/AI
+                // is enabled) so they keep tunnelling, then make the catch-all direct.
+                if (IRSpeedyVPN.Services.Xray.SmartIpRouting.IsEnabled() && cfg.route.rules != null)
+                {
+                    cfg.route.rules.Add(new Rule
+                    {
+                        action = "route",
+                        outbound = "proxy",
+                        domain_suffix = IRSpeedyVPN.Services.Xray.SmartIpRouting.AiDomains.ToList<object>()
+                    });
+                }
+                cfg.route.final = "direct";
             }
 
             if (hasDefaultChain)

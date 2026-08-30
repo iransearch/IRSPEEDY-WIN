@@ -207,6 +207,11 @@ namespace IRSpeedyVPN.Services
                     //vprocess.StandardInput.Write(configData);
                     //vprocess.StandardInput.Close();
                     bool vpnmode =  (RegHelper.GetSettingValue("VGAURDVPNMode") != "0");
+                    // Game Mode routes only DNS/VOD/AI through the tunnel and everything else
+                    // direct. It only makes sense over TUN, so it forces VPN mode on.
+                    bool gameMode = RegHelper.GetSettingValue("VGAURDGameMode") == "1";
+                    if (gameMode)
+                        vpnmode = true;
                     lastLink = goUrl ?? SelectedUrl;
                     // The local listen port must actually be bindable. On machines
                     // where Windows has reserved 1080 (Hyper-V / WSL / Docker dynamic
@@ -312,7 +317,8 @@ namespace IRSpeedyVPN.Services
                         !string.IsNullOrEmpty(defaultChainLink),
                         sniRuntime?.ListenHost,
                         sniRuntime?.ListenPort,
-                        new string[] { ResolveCorePath() }
+                        new string[] { ResolveCorePath() },
+                        gameMode
                     );
 
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))

@@ -14,6 +14,7 @@ namespace IRSpeedyVPN.Windows
         private const string KEY_SYSTEM_PROXY = "VGAURDSystemProxy";
         private const string KEY_TELEGRAM_PROXY = "ProxifierTelegramRoute"; // 1 = on, 0 = off
         private const string KEY_VOD = "VGAURDVodService";
+        private const string KEY_GAME = "VGAURDGameMode";
 
         public VGAURDServiceSetting()
         {
@@ -37,6 +38,9 @@ namespace IRSpeedyVPN.Windows
             // VOD/AI is independent
             RegHelper.SetSettingValue(KEY_VOD, IsOn(VodService) ? "1" : "0");
 
+            // Game Mode is independent, but forces VPN mode (persisted above as VPN=1).
+            RegHelper.SetSettingValue(KEY_GAME, IsOn(GameMode) ? "1" : "0");
+
             Close();
         }
 
@@ -53,6 +57,7 @@ namespace IRSpeedyVPN.Windows
                 SetChecked(SystemProxy, RegHelper.GetSettingValue(KEY_SYSTEM_PROXY) == "1");
                 SetChecked(TelegramRouteProxy, RegHelper.GetSettingValue(KEY_TELEGRAM_PROXY) == "1");
                 SetChecked(VodService, RegHelper.GetSettingValue(KEY_VOD) == "1");
+                SetChecked(GameMode, RegHelper.GetSettingValue(KEY_GAME) == "1");
             }
             finally
             {
@@ -60,6 +65,44 @@ namespace IRSpeedyVPN.Windows
             }
 
             NormalizeExclusiveGroup();
+            ApplyGameModeLock(IsOn(GameMode));
+        }
+
+        // --------------------------
+        // Game Mode: only makes sense over TUN, so it forces VPN mode on and locks the
+        // connection-mode switches while it is enabled.
+        // --------------------------
+        private void ApplyGameModeLock(bool gameOn)
+        {
+            _isUpdating = true;
+            try
+            {
+                if (gameOn)
+                {
+                    SetChecked(VPNMode, true);
+                    TurnOffOthers(VPNMode);
+                }
+
+                SetModeSwitchesEnabled(!gameOn);
+            }
+            finally
+            {
+                _isUpdating = false;
+            }
+        }
+
+        private void SetModeSwitchesEnabled(bool enabled)
+        {
+            SetEnabled(VPNMode, enabled);
+            SetEnabled(GlobalProxy, enabled);
+            SetEnabled(SystemProxy, enabled);
+            SetEnabled(TelegramRouteProxy, enabled);
+        }
+
+        private static void SetEnabled(ToggleSwitch.HorizontalToggleSwitch toggle, bool enabled)
+        {
+            if (toggle == null) return;
+            try { toggle.IsEnabled = enabled; } catch { }
         }
 
         // --------------------------
@@ -136,6 +179,18 @@ namespace IRSpeedyVPN.Windows
         // VOD/AI independent
         private void VodService_Checked(object sender, RoutedEventArgs e) { }
         private void VodService_Unchecked(object sender, RoutedEventArgs e) { }
+
+        // Game Mode: on -> force VPN and lock the mode switches; off -> unlock them.
+        private void GameMode_Checked(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdating) return;
+            ApplyGameModeLock(true);
+        }
+        private void GameMode_Unchecked(object sender, RoutedEventArgs e)
+        {
+            if (_isUpdating) return;
+            ApplyGameModeLock(false);
+        }
 
         // --------------------------
         // Helpers

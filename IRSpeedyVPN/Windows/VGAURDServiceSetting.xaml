@@ -246,6 +246,29 @@
                         </Grid>
                     </Border>
 
+                    <!-- Game Mode (independent; forces VPN mode) -->
+                    <Border Style="{StaticResource SettingRowBorder}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <ToggleSwitch:HorizontalToggleSwitch
+                                x:Name="GameMode"
+                                Checked="GameMode_Checked"
+                                Unchecked="GameMode_Unchecked"
+                                Margin="0,0,10,0"/>
+
+                            <TextBlock Grid.Column="1"
+                                       Text="Game Mode"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       HorizontalAlignment="Right"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+                    </Border>
+
                 </StackPanel>
 
                 <!-- OK -->
