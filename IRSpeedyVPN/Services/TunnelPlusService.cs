@@ -222,14 +222,16 @@ namespace IRSpeedyVPN.Services
                     // fall back to an OS-assigned free port. The chosen port flows on
                     // to the sing-box inbound, the system proxy and Proxifier because
                     // they all read it from here.
-                    // A reconnect (toggling Share VPN, or TryReconnect) restarts the core
-                    // on the port it is already using, but the old core is still holding
-                    // that port at this point. Re-resolving would see it as taken and move
-                    // to a different port, dropping every client already pointed at the
-                    // current one. Only resolve when no live core is holding it.
-                    port = (IsConnected && lastListenPort > 0)
-                        ? lastListenPort
-                        : ResolveListenPort(port);
+                    // A reconnect (toggling Share VPN, or TryReconnect) keeps the old core
+                    // running until the new config is applied, so the port probe below would
+                    // see our own listener and needlessly move the port. Release it first so
+                    // the probe reflects reality; the port then stays put across reconnects.
+                    // This matters most for Share VPN, which rebinds the inbound from
+                    // loopback to 0.0.0.0 and so must be probed on that address for real.
+                    if (goUrl != null && IsConnected)
+                        TryStopCore();
+
+                    port = ResolveListenPort(port);
                     lastListenPort = port;
                     lastVpnMode = vpnmode;
                     var shieldFiles = GetShieldFiles();
@@ -333,6 +335,13 @@ namespace IRSpeedyVPN.Services
 
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))
                     {
+                        LogHelper.WriteExLog(
+                            "Core failed to start; connection dropped."
+                            + " share=" + IsShareActive
+                            + " vpnMode=" + vpnmode
+                            + " gameMode=" + gameMode
+                            + " port=" + port
+                            + " error=" + startError);
                         StopSniServers(serviceSniServers);
                         if (needXray && _xraySocksPort > 0) FreePortManager.Enqueue(_xraySocksPort);
                         _xraySocksPort = 0;
@@ -1469,10 +1478,11 @@ namespace IRSpeedyVPN.Services
         {
             try { RegHelper.SetSettingValue(ListenPortKey, chosen.ToString()); }
             catch { }
-            // Falling back is expected on machines where 1080 is reserved; keep it out of
-            // the user log and only record it when debug logging is enabled.
-            if (File.Exists(".\\slog.txt"))
-                LogHelper.WriteExLog($"Listen port {preferred} unavailable; using {chosen} instead.");
+            // The default port is chosen to be bindable, so a fallback now means something
+            // really is holding it. That changes the Share VPN address, so it is worth
+            // recording rather than hiding.
+            LogHelper.WriteExLog(
+                $"Listen port {preferred} unavailable (share={IsShareActive}); using {chosen} instead.");
             return chosen;
         }
 
