@@ -1417,7 +1417,11 @@ namespace IRSpeedyVPN.Services
                 listener = new TcpListener(IPAddress.Loopback, 0);
                 listener.Start();
                 int assigned = ((IPEndPoint)listener.LocalEndpoint).Port;
-                LogHelper.WriteExLog($"Listen port {preferred} unavailable; using {assigned} instead.");
+                // Falling back to a free port is normal on machines where 1080 is reserved
+                // (Hyper-V/WSL/Docker) — it is not an error, so keep it out of the user log
+                // and only record it when debug logging is enabled.
+                if (File.Exists(".\\slog.txt"))
+                    LogHelper.WriteExLog($"Listen port {preferred} unavailable; using {assigned} instead.");
                 return assigned;
             }
             catch
