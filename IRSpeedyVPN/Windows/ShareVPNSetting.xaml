@@ -357,7 +357,7 @@
             </Border.Background>
             <TextBlock x:Name="txtPortHttp"
                        FlowDirection="LeftToRight"
-                       Text="8080"
+                       Text="10808"
                        FontSize="13"
                        Foreground="White"
                        VerticalAlignment="Center"
@@ -452,7 +452,7 @@
                                 </Border.Background>
                                 <TextBlock x:Name="txtPortSocks"
                        FlowDirection="LeftToRight"
-                       Text="8080"
+                       Text="10808"
                        FontSize="13"
                        Foreground="White"
                        VerticalAlignment="Center"

@@ -129,9 +129,15 @@ namespace IRSpeedyVPN.Windows
                     if (Service.IsShareActive)
                     {
                         Dispatcher.Invoke(UpdateIpTexts);
-                        Dispatcher.Invoke(UpdatePortTexts);
                     }
                     Service.ApplyShareSetting();
+                    if (Service.IsShareActive)
+                    {
+                        // Read the ports only after ApplyShareSetting has actually resolved
+                        // the listen port (lastListenPort), so the popup never shows a
+                        // stale/default value on first activation.
+                        Dispatcher.Invoke(UpdatePortTexts);
+                    }
                     Dispatcher.Invoke(() =>
                     {
                         pnlShowIP.Visibility = Service.IsShareActive ? Visibility.Visible : Visibility.Collapsed;
@@ -158,8 +164,8 @@ namespace IRSpeedyVPN.Windows
         {
             var httpPort = Service?.HttpPort;
             var socksPort = Service?.SocksPort;
-            txtPortHttp.Text = httpPort.HasValue ? httpPort.Value.ToString() : "1080";
-            txtPortSocks.Text = socksPort.HasValue ? socksPort.Value.ToString() : "1080";
+            txtPortHttp.Text = httpPort.HasValue ? httpPort.Value.ToString() : "10808";
+            txtPortSocks.Text = socksPort.HasValue ? socksPort.Value.ToString() : "10808";
         }
 
         private void UpdateIpTexts()

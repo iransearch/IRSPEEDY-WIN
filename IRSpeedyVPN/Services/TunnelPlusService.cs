@@ -108,7 +108,7 @@ namespace IRSpeedyVPN.Services
         string sniCorePath;
         string lastLink;
         string lastVodLink;
-        int lastListenPort = 1080;
+        int lastListenPort = 10808;
         bool lastVpnMode;
         DateTime lastCoreStartUtc;
         readonly Queue<DateTime> recentCoreExitsUtc = new Queue<DateTime>();
