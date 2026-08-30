@@ -1406,10 +1406,30 @@ namespace IRSpeedyVPN.Services
         /// range (WSAEACCES), the OS is asked for a free port instead, which it never
         /// draws from an excluded range.
         /// </summary>
+        // Deterministic fallbacks tried (in order) when the preferred port is reserved,
+        // so the chosen port stays predictable rather than a random ephemeral one.
+        private static readonly int[] ListenPortFallbacks = { 10808, 18080, 18443, 10800, 19080 };
+        private const string ListenPortKey = "VGAURDListenPort";
+
         private int ResolveListenPort(int preferred)
         {
+            // The preferred port (used by the local proxy AND the Share VPN endpoint) is
+            // best, but on machines where 1080 is reserved (Hyper-V/WSL/Docker) it cannot
+            // bind. In that case the port MUST stay stable across reconnects, otherwise a
+            // shared VPN endpoint keeps changing under the user. So: reuse the previously
+            // chosen port while it is still bindable, and only pick a new one when forced.
             if (preferred > 0 && IsPortAvailable(preferred))
                 return preferred;
+
+            if (int.TryParse(RegHelper.GetSettingValue(ListenPortKey), out var saved)
+                && saved > 0 && IsPortAvailable(saved))
+                return saved;
+
+            foreach (var candidate in ListenPortFallbacks)
+            {
+                if (IsPortAvailable(candidate))
+                    return PersistListenPort(preferred, candidate);
+            }
 
             TcpListener listener = null;
             try
@@ -1417,12 +1437,7 @@ namespace IRSpeedyVPN.Services
                 listener = new TcpListener(IPAddress.Loopback, 0);
                 listener.Start();
                 int assigned = ((IPEndPoint)listener.LocalEndpoint).Port;
-                // Falling back to a free port is normal on machines where 1080 is reserved
-                // (Hyper-V/WSL/Docker) — it is not an error, so keep it out of the user log
-                // and only record it when debug logging is enabled.
-                if (File.Exists(".\\slog.txt"))
-                    LogHelper.WriteExLog($"Listen port {preferred} unavailable; using {assigned} instead.");
-                return assigned;
+                return PersistListenPort(preferred, assigned);
             }
             catch
             {
@@ -1433,6 +1448,17 @@ namespace IRSpeedyVPN.Services
                 try { listener?.Stop(); }
                 catch { }
             }
+        }
+
+        private int PersistListenPort(int preferred, int chosen)
+        {
+            try { RegHelper.SetSettingValue(ListenPortKey, chosen.ToString()); }
+            catch { }
+            // Falling back is expected on machines where 1080 is reserved; keep it out of
+            // the user log and only record it when debug logging is enabled.
+            if (File.Exists(".\\slog.txt"))
+                LogHelper.WriteExLog($"Listen port {preferred} unavailable; using {chosen} instead.");
+            return chosen;
         }
 
         private bool WaitForSniPort(string host, int port, TimeSpan timeout)
