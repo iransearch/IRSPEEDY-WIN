@@ -20,6 +20,7 @@ namespace IRSpeedyVPN
         [STAThread]
         static void Main()
         {
+            RegisterCrashHandlers();
             RegisterEmbeddedAssemblyResolver();
 
             bool createdNew;
@@ -35,6 +36,11 @@ namespace IRSpeedyVPN
             {
                 var app = new App();
                 app.InitializeComponent();
+
+                // An exception raised inside the dispatcher loop is not covered by the
+                // try/catch around Main, so log it before WPF tears the process down.
+                app.DispatcherUnhandledException += (sender, args) =>
+                    LogHelper.WriteLog(args.Exception, true);
 
                 // App.xaml already loads the base/theme dictionaries. Keep only the two
                 // dictionaries that are not declared there; loading every theme twice was
@@ -61,6 +67,29 @@ namespace IRSpeedyVPN
             {
                 LogHelper.WriteLog(ex, true);
             }
+        }
+
+        /// <summary>
+        /// Without these, a fault on a background thread ends the process silently: the
+        /// app just vanishes and nothing reaches log.txt, because the try/catch in Main
+        /// only covers the main thread.
+        /// </summary>
+        private static void RegisterCrashHandlers()
+        {
+            AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
+            {
+                var exception = args.ExceptionObject as Exception;
+                if (exception != null)
+                    LogHelper.WriteLog(exception, true);
+                else
+                    LogHelper.WriteLog("[Crashed] Unhandled fault: " + args.ExceptionObject);
+            };
+
+            TaskScheduler.UnobservedTaskException += (sender, args) =>
+            {
+                LogHelper.WriteLog(args.Exception, false);
+                args.SetObserved();
+            };
         }
 
         private static void RegisterEmbeddedAssemblyResolver()
