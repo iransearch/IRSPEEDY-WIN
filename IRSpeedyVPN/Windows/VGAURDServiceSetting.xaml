@@ -7,7 +7,7 @@
         mc:Ignorable="d"
         Title="تنظیمات سرویس"
         Width="330"
-        Height="399"
+        Height="455"
         Background="Transparent"
         WindowStyle="None"
         AllowsTransparency="True"
