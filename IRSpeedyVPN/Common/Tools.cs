@@ -181,28 +181,6 @@ namespace IRSpeedyVPN.Common
             Random rnd = new Random();
             return source.OrderBy<T, int>((item) => rnd.Next());
         }
-
-        /// <summary>
-        /// Orders server URLs fastest-first using the latency the app has already measured.
-        /// The smart balancer sends everything through its fallback - the first outbound in
-        /// the pool - until its own probes produce data, so leading with the best known
-        /// server keeps the first seconds of a connection usable. Nothing is filtered out:
-        /// untested URLs sit behind measured ones and ahead of URLs whose last test failed,
-        /// and the sort is stable so equally ranked URLs keep the order they arrived in.
-        /// </summary>
-        public static IEnumerable<Models.NewService.Url> OrderByMeasuredLatency(
-            this IEnumerable<Models.NewService.Url> source)
-        {
-            if (source == null)
-                return Enumerable.Empty<Models.NewService.Url>();
-
-            // latency: positive = measured, 0 = never tested, negative = last test failed.
-            return source.OrderBy(u =>
-                u == null ? long.MaxValue
-                : u.latency > 0 ? u.latency
-                : u.latency == 0 ? long.MaxValue - 2
-                : long.MaxValue - 1);
-        }
         public static string GetJsonString(this string jsonString, string path)
         {
             try
