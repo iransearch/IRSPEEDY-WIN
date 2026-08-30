@@ -151,7 +151,10 @@ namespace IRSpeedyVPN.Services
                 .ToArray();
         }
 
-        void RunV2ray(string goUrl=null,int port=1080)
+        // Fixed local listen port for the proxy and the Share VPN endpoint. Kept constant
+        // (not 1080, which is reserved on Hyper-V/WSL/Docker machines and forced a fallback)
+        // so the shared address never changes between connects.
+        void RunV2ray(string goUrl=null,int port=10808)
         {
             try
             {
@@ -1408,7 +1411,7 @@ namespace IRSpeedyVPN.Services
         /// </summary>
         // Deterministic fallbacks tried (in order) when the preferred port is reserved,
         // so the chosen port stays predictable rather than a random ephemeral one.
-        private static readonly int[] ListenPortFallbacks = { 10808, 18080, 18443, 10800, 19080 };
+        private static readonly int[] ListenPortFallbacks = { 18080, 18443, 10800, 19080 };
         private const string ListenPortKey = "VGAURDListenPort";
 
         private int ResolveListenPort(int preferred)
