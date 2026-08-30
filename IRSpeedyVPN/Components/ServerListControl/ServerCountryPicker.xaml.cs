@@ -1,4 +1,5 @@
 using IRSpeedyVPN.Interfaces;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Models.NewService;
 using System;
 using System.Collections.Generic;
@@ -187,6 +188,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public string[] GetPoolUrls()
         {
             return GetUrls()
+                // hy2 first, so the balancer's fallback outbound is one that comes up
+                // quickly while its own probes are still warming up.
+                .OrderByHysteriaFirst()
                 .Select(u => u.url)
                 .Where(u => !string.IsNullOrWhiteSpace(u))
                 .Distinct(StringComparer.Ordinal)

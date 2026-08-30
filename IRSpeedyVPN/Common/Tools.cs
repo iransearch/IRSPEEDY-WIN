@@ -181,6 +181,31 @@ namespace IRSpeedyVPN.Common
             Random rnd = new Random();
             return source.OrderBy<T, int>((item) => rnd.Next());
         }
+
+        /// <summary>
+        /// Puts hysteria2 servers at the front of a smart pool. The balancer sends
+        /// everything through its fallback - the first outbound in the pool - until its own
+        /// probes produce data, and hy2 endpoints come up fastest, so leading with them
+        /// makes the opening seconds of a connection usable. Ordering only: nothing is
+        /// dropped, and the sort is stable so every other server keeps the order it
+        /// arrived in.
+        /// </summary>
+        public static IEnumerable<Models.NewService.Url> OrderByHysteriaFirst(
+            this IEnumerable<Models.NewService.Url> source)
+        {
+            if (source == null)
+                return Enumerable.Empty<Models.NewService.Url>();
+
+            return source.OrderBy(u => IsHysteria2Link(u?.url) ? 0 : 1);
+        }
+
+        private static bool IsHysteria2Link(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+                return false;
+            return url.StartsWith("hy2://", StringComparison.OrdinalIgnoreCase)
+                || url.StartsWith("hysteria2://", StringComparison.OrdinalIgnoreCase);
+        }
         public static string GetJsonString(this string jsonString, string path)
         {
             try
