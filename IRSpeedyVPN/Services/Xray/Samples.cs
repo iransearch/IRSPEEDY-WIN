@@ -19,7 +19,7 @@ namespace IRSpeedyVPN.Services.Xray
 					""httpMethod"": ""HEAD"",
 					""interval"": ""60m"",
 					""sampling"": 1,
-					""timeout"": ""5s""
+					""timeout"": ""3s""
 				},
 				""subjectSelector"": [
 					""smart-proxy-""
