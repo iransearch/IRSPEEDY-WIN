@@ -33,9 +33,8 @@ namespace IRSpeedyVPN.Services.Xray
 
         private const string SettingKey = "VGAURDVodService";
 
-        // The smart balancer keeps the 3s ceiling from the config template;
-        // VOD and AI tolerate more latency.
-        private const string ServiceMaxRtt = "5s";
+        // Same 3s ceiling the smart balancer uses in the config template.
+        private const string ServiceMaxRtt = "3s";
 
         public static readonly string[] AiDomains =
         {

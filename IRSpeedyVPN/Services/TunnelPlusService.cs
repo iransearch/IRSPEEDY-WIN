@@ -844,7 +844,7 @@ namespace IRSpeedyVPN.Services
                             //UseDefaultOutbound = false,
                             Url = gInfo?.settings?.setting?.url_test ?? "https://www.google.com/generate_204",
                             //TestCurrent = false,
-                            MaxConcurrency = 10,
+                            MaxConcurrency = 15,
                             TestTimeoutMs = 5000,
                             NeedXray = needXray,
                             XrayConfig = xrayConfig
