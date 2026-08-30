@@ -296,6 +296,9 @@ namespace IRSpeedyVPN.UserControls
                     var allUrls = services
                         .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
                         .Where(u => u != null)
+                        // Fastest known server first, so the balancer's fallback outbound
+                        // is a good one while its own probes are still warming up.
+                        .OrderByMeasuredLatency()
                         .Select(u => u.url)
                         .Where(u => !string.IsNullOrWhiteSpace(u))
                         .Distinct(StringComparer.Ordinal)
