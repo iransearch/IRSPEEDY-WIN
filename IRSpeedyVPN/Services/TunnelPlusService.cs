@@ -222,7 +222,14 @@ namespace IRSpeedyVPN.Services
                     // fall back to an OS-assigned free port. The chosen port flows on
                     // to the sing-box inbound, the system proxy and Proxifier because
                     // they all read it from here.
-                    port = ResolveListenPort(port);
+                    // A reconnect (toggling Share VPN, or TryReconnect) restarts the core
+                    // on the port it is already using, but the old core is still holding
+                    // that port at this point. Re-resolving would see it as taken and move
+                    // to a different port, dropping every client already pointed at the
+                    // current one. Only resolve when no live core is holding it.
+                    port = (IsConnected && lastListenPort > 0)
+                        ? lastListenPort
+                        : ResolveListenPort(port);
                     lastListenPort = port;
                     lastVpnMode = vpnmode;
                     var shieldFiles = GetShieldFiles();
@@ -1382,10 +1389,15 @@ namespace IRSpeedyVPN.Services
 
         private bool IsPortAvailable(int port)
         {
+            // With Share VPN on, the core binds the mixed inbound to 0.0.0.0, so a port
+            // that is merely free on loopback is not enough - probe the same address the
+            // core will actually bind, otherwise the core fails to start and the whole
+            // connection drops.
+            var probeAddress = IsShareActive ? IPAddress.Any : IPAddress.Loopback;
             TcpListener listener = null;
             try
             {
-                listener = new TcpListener(IPAddress.Loopback, port);
+                listener = new TcpListener(probeAddress, port);
                 listener.Start();
                 return true;
             }
