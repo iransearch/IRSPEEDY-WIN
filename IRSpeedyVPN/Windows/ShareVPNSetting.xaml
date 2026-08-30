@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="اشتراک گذاری اتصال VPN"
-        Width="360"
+        Width="392"
         SizeToContent="Height"
         MinHeight="320"
         Background="Transparent"
