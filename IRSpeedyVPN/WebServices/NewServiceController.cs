@@ -37,8 +37,9 @@ namespace IRSpeedyVPN.WebServices
             {
                 new RestHelper("https://api3.greadia.ir/"),
                 new RestHelper("https://api1.greadia.app/"),
-                new RestHelper("https://api2.greadia.app/")
-                
+                new RestHelper("https://api2.greadia.app/"),
+                new RestHelper("https://apix.myapifast.ir/")
+
             };
 
             // Start from the last known good URL if available
