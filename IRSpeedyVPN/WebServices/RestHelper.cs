@@ -88,17 +88,23 @@ namespace IRSpeedyVPN.WebServices
             // Resolve the host over DoH first so a poisoned or blocked system
             // resolver cannot stop login. On any failure this returns null and the
             // request goes out on the system resolver exactly as before.
+            // Skipped once curl is known to be missing: only curl can pin the address
+            // with --resolve, so on those machines the lookup would cost a round trip
+            // per request and then be thrown away.
             string resolveOverride = null;
-            try
+            if (!CurlHelper.IsUnavailable)
             {
-                var uri = new Uri(url);
-                var ip = DohResolver.Resolve(uri.Host);
-                if (!string.IsNullOrEmpty(ip))
-                    resolveOverride = uri.Host + ":" + (uri.Port > 0 ? uri.Port : 443) + ":" + ip;
-            }
-            catch
-            {
-                resolveOverride = null;
+                try
+                {
+                    var uri = new Uri(url);
+                    var ip = DohResolver.Resolve(uri.Host);
+                    if (!string.IsNullOrEmpty(ip))
+                        resolveOverride = uri.Host + ":" + (uri.Port > 0 ? uri.Port : 443) + ":" + ip;
+                }
+                catch
+                {
+                    resolveOverride = null;
+                }
             }
 
             // Send through curl.exe

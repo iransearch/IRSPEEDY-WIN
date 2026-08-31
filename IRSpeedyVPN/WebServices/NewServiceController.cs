@@ -7,6 +7,7 @@ using System;
 using System.Collections.Generic;
 using System.Net;
 using System.Reflection;
+using System.Runtime.ExceptionServices;
 using v2rayN;
 
 namespace IRSpeedyVPN.WebServices
@@ -194,7 +195,15 @@ namespace IRSpeedyVPN.WebServices
                     break;
             }
 
-            throw lastException ?? new Exception("All service endpoints failed.");
+            if (lastException != null)
+            {
+                // Rethrow with the original stack intact. Plain "throw lastException"
+                // resets it, which is why a field report of this failing only showed the
+                // failover frame and not the call that actually threw.
+                ExceptionDispatchInfo.Capture(lastException).Throw();
+            }
+
+            throw new Exception("All service endpoints failed.");
         }
 
         private static bool IsRetriableFailure<TResponse>(BaseHttpResponse<TResponse> result)
