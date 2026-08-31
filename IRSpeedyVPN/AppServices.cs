@@ -56,6 +56,25 @@ namespace IRSpeedyVPN
             }
         }
 
+        /// <summary>
+        /// Returns a non-blocking snapshot for diagnostics. Network logging must never
+        /// wait for the deferred runtime initializer or acquire the runtime mutex.
+        /// </summary>
+        internal static void GetRuntimeSnapshot(
+            out bool isReady,
+            out string runtimePath,
+            out string initializationError)
+        {
+            lock (initLock)
+            {
+                isReady = resourceManager != null;
+                runtimePath = resourceManager == null ? null : resourceManager.TempPath;
+                initializationError = resourceManagerError == null
+                    ? null
+                    : resourceManagerError.GetType().FullName + ": " + resourceManagerError.Message;
+            }
+        }
+
         public static JsonConverter JsonConverter { get; private set; }
         public static PersianIsoNames PersianIsoNames { get; private set; }
         public static NewServiceController NewServiceController { get; private set; }
