@@ -25,6 +25,13 @@ namespace IRSpeedyVPN.Services
         private TcpListener listener;
         private CancellationTokenSource cancellation;
 
+        // The relay used to swallow every per-connection failure, so a second device that
+        // could not browse produced an empty log. These counters make the path observable
+        // without flooding log.txt when a browser opens dozens of sockets at once.
+        private static int acceptedCount;
+        private static long lastProblemLogTicks;
+        private static int suppressedProblems;
+
         public IPAddress ListenAddress { get; private set; }
         public int Port { get; private set; }
 
@@ -62,6 +69,8 @@ namespace IRSpeedyVPN.Services
                     cancellation = new CancellationTokenSource();
 
                     var token = cancellation.Token;
+                    Interlocked.Exchange(ref acceptedCount, 0);
+                    LogHelper.WriteExLog("Share relay listening on " + listenAddress + ":" + port);
                     ObserveFaults(Task.Run(() => AcceptLoopAsync(started, port, token)));
                     return true;
                 }
@@ -106,6 +115,14 @@ namespace IRSpeedyVPN.Services
                     return;
                 }
 
+                var accepted = Interlocked.Increment(ref acceptedCount);
+                if (accepted == 1 || accepted % 25 == 0)
+                {
+                    LogHelper.WriteExLog(
+                        "Share relay accepted connection #" + accepted
+                        + " from " + DescribeRemote(inbound));
+                }
+
                 ObserveFaults(Task.Run(() => PumpAsync(inbound, targetPort, token)));
             }
         }
@@ -113,11 +130,23 @@ namespace IRSpeedyVPN.Services
         private static async Task PumpAsync(TcpClient inbound, int targetPort, CancellationToken token)
         {
             TcpClient outbound = null;
+            var remote = DescribeRemote(inbound);
             try
             {
                 inbound.NoDelay = true;
                 outbound = new TcpClient { NoDelay = true };
-                await outbound.ConnectAsync(IPAddress.Loopback, targetPort).ConfigureAwait(false);
+
+                try
+                {
+                    await outbound.ConnectAsync(IPAddress.Loopback, targetPort).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    LogProblem(
+                        "Share relay could not reach the core at 127.0.0.1:" + targetPort
+                        + " for " + remote + " - " + ex.Message);
+                    return;
+                }
 
                 var inboundStream = inbound.GetStream();
                 var outboundStream = outbound.GetStream();
@@ -128,14 +157,30 @@ namespace IRSpeedyVPN.Services
                 // connection on the first half to finish would cut off a response still
                 // being delivered - which is why web pages failed while Telegram, whose
                 // connection stays open in both directions, kept working.
-                await Task.WhenAll(
-                    CopyThenHalfCloseAsync(inboundStream, outboundStream, outbound.Client, token),
-                    CopyThenHalfCloseAsync(outboundStream, inboundStream, inbound.Client, token))
-                    .ConfigureAwait(false);
+                var upstream = CopyThenHalfCloseAsync(
+                    inboundStream, outboundStream, outbound.Client, token);
+                var downstream = CopyThenHalfCloseAsync(
+                    outboundStream, inboundStream, inbound.Client, token);
+
+                await Task.WhenAll(upstream, downstream).ConfigureAwait(false);
+
+                var sent = upstream.Result;
+                var received = downstream.Result;
+
+                // A connection that carried nothing in a direction never really worked;
+                // that is the difference between "blocked before the core" and "data
+                // flowed, then something broke".
+                if (sent == 0 || received == 0)
+                {
+                    LogProblem(
+                        "Share relay connection carried no data for " + remote
+                        + " (toCore=" + sent + " bytes, fromCore=" + received + " bytes)");
+                }
             }
-            catch
+            catch (Exception ex)
             {
                 // A client going away, or the core restarting, only ends this one connection.
+                LogProblem("Share relay connection failed for " + remote + " - " + ex.Message);
             }
             finally
             {
@@ -144,18 +189,58 @@ namespace IRSpeedyVPN.Services
             }
         }
 
+        private static string DescribeRemote(TcpClient client)
+        {
+            try { return client?.Client?.RemoteEndPoint?.ToString() ?? "?"; }
+            catch { return "?"; }
+        }
+
+        /// <summary>
+        /// Reports an abnormal connection at most once every few seconds. A failing page
+        /// load opens dozens of sockets at once, and one line each would bury the log.
+        /// </summary>
+        private static void LogProblem(string message)
+        {
+            var now = DateTime.UtcNow.Ticks;
+            var previous = Interlocked.Read(ref lastProblemLogTicks);
+            if (now - previous < TimeSpan.FromSeconds(3).Ticks
+                || Interlocked.CompareExchange(ref lastProblemLogTicks, now, previous) != previous)
+            {
+                Interlocked.Increment(ref suppressedProblems);
+                return;
+            }
+
+            var alsoSuppressed = Interlocked.Exchange(ref suppressedProblems, 0);
+            LogHelper.WriteExLog(
+                alsoSuppressed > 0
+                    ? message + " (+" + alsoSuppressed + " more like this)"
+                    : message);
+        }
+
         /// <summary>
         /// Copies one direction to EOF, then shuts down only the peer's send side so it
         /// sees a clean end-of-stream while the opposite direction keeps draining. Never
         /// throws, so the Task.WhenAll above always completes.
         /// </summary>
-        private static async Task CopyThenHalfCloseAsync(
+        private static async Task<long> CopyThenHalfCloseAsync(
             Stream from, Stream to, Socket toSocket, CancellationToken token)
         {
+            long copied = 0;
             try
             {
-                await from.CopyToAsync(to, BufferSize, token).ConfigureAwait(false);
-                await to.FlushAsync(token).ConfigureAwait(false);
+                // Copied by hand rather than with Stream.CopyToAsync so the byte count is
+                // available for the diagnostics above.
+                var buffer = new byte[BufferSize];
+                while (true)
+                {
+                    var read = await from.ReadAsync(buffer, 0, buffer.Length, token)
+                        .ConfigureAwait(false);
+                    if (read <= 0)
+                        break;
+
+                    await to.WriteAsync(buffer, 0, read, token).ConfigureAwait(false);
+                    copied += read;
+                }
             }
             catch
             {
@@ -164,6 +249,7 @@ namespace IRSpeedyVPN.Services
             }
 
             try { toSocket.Shutdown(SocketShutdown.Send); } catch { }
+            return copied;
         }
 
         private static void ObserveFaults(Task task)
