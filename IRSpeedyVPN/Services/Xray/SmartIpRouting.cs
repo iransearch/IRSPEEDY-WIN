@@ -37,42 +37,29 @@ namespace IRSpeedyVPN.Services.Xray
         // VOD and AI tolerate more latency.
         private const string ServiceMaxRtt = "5s";
 
-        /// <summary>
-        /// Domains sent to the AI balancer. Every entry is matched as "domain:", so it
-        /// covers subdomains too - which is why these have to stay narrow. The list used
-        /// to carry umbrella entries (google.com, googleapis.com, gstatic.com,
-        /// google-analytics.com, googleusercontent.com, googlevideo.com, ggpht.com,
-        /// apple.com, icloud.com). Those match a large share of ordinary browsing -
-        /// Google Fonts, Analytics, YouTube video, every Google-hosted asset on any
-        /// site, all Apple traffic - and funnelled it through the handful of AI
-        /// outbounds instead of the main pool, so turning AI on made the whole browser
-        /// slow. The Android geosite AI category scopes the same services precisely
-        /// (gemini.gstatic.com rather than gstatic.com); this mirrors that.
-        /// </summary>
         public static readonly string[] AiDomains =
         {
-            // Google / Gemini
             "labs.google",
+            "google.com",
+            "googleapis.com",
+            "gstatic.com",
+            "google-analytics.com",
+            "googleusercontent.com",
             "generativelanguage.googleapis.com",
-            "aida.googleapis.com",
-            "aisandbox-pa.googleapis.com",
-            "alkalimakersuite-pa.clients6.google.com",
             "ai.google.dev",
             "bard.google.com",
             "gemini.google.com",
-            "gemini.gstatic.com",
             "makersuite.google.com",
             "aistudio.google.com",
-            // OpenAI
+            "googlevideo.com",
+            "ggpht.com",
+            "withgoogle.com",
             "openai.com",
             "chatgpt.com",
-            "oaistatic.com",
-            "oaiusercontent.com",
-            // Other assistants
-            "anthropic.com",
-            "claude.ai",
-            "grok.com",
-            "perplexity.ai"
+            "apple.com",
+            "icloud.com",
+            "showip.net",
+            "cdn-apple.com"
         };
 
         /// <summary>Reads the shared VOD/AI toggle. Both services follow it.</summary>

@@ -64,8 +64,7 @@ namespace IRSpeedyVPN.Services.Xray
 							""domain:ipwho.is"",
 							""domain:ifconfig.me"",
 							""domain:icanhazip.com"",
-							""domain:ip.sb"",
-							""domain:showip.net""
+							""domain:ip.sb""
 						],
 						""type"": ""field""
 					},
