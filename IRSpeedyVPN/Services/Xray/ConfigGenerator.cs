@@ -279,7 +279,13 @@ namespace IRSpeedyVPN.Services.Xray
                     // by the balancer anyway, and sniffing QUIC only made Xray wait on
                     // packets it then drops, which in TUN mode showed up as a 10-15s stall
                     // while the browser gave up on QUIC before falling back to TCP.
-                    destOverride = new List<string> { "tls", "http" }
+                    destOverride = new List<string> { "tls", "http" },
+                    // Route on the sniffed hostname but keep dialing the original
+                    // address, as the Android client does. Without this Xray replaces
+                    // the destination with the hostname and every website connection
+                    // costs the remote server a DNS lookup.
+                    routeOnly = true,
+                    metadataOnly = false
                 }
             }, serializer));
             root["inbounds"] = inbounds;
