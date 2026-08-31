@@ -112,7 +112,6 @@ namespace IRSpeedyVPN.Services
         bool lastVpnMode;
         DateTime lastCoreStartUtc;
         readonly Queue<DateTime> recentCoreExitsUtc = new Queue<DateTime>();
-        readonly ShareRelay shareRelay = new ShareRelay();
         readonly object reconnectLock = new object();
         const int MaxCoreExitsInWindow = 10;
         const int CoreExitWindowSeconds = 30;
@@ -322,9 +321,7 @@ namespace IRSpeedyVPN.Services
                         singboxLink,  // Either lastLink or SOCKS URL
                         port,
                         vpnmode,
-                        // The core always listens on loopback. Sharing is served by
-                        // ShareRelay, so toggling it never reloads the core config.
-                        false,
+                        IsShareActive,
                         shieldFiles,
                         chainLink,
                         new string[] { defaultChainLink, selectedChain },
@@ -353,8 +350,6 @@ namespace IRSpeedyVPN.Services
                     }
 
                     IsConnected = true;
-                    // A fresh connect may have moved the listen port, so re-point the relay.
-                    ApplyShareRelay();
                     if (vpnmode)
                     {                      
                         useSystemProxy = false;
@@ -401,41 +396,12 @@ namespace IRSpeedyVPN.Services
                 {
                     onConnectDisconnect?.Invoke(this, false, 0, startError);
                 }*/
-                ApplyShareRelay();
+                RunV2ray(lastLink ?? SelectedUrl);
             }
             catch (Exception ex)
             {
                 LogHelper.WriteLog(ex);
             }
-        }
-
-        /// <summary>
-        /// Brings the LAN relay in line with IsShareActive. The core is left untouched, so
-        /// turning sharing on or off does not reconnect and does not drop live connections.
-        /// </summary>
-        private void ApplyShareRelay()
-        {
-            if (!IsShareActive || !IsConnected)
-            {
-                shareRelay.Stop();
-                return;
-            }
-
-            var ip = Windows.ShareVPNSetting.GetInternetInterfaceIp();
-            IPAddress address;
-            // The helper falls back to 127.0.0.1 when it finds no LAN adapter. Binding that
-            // would collide with the core's own listener and would not be reachable from
-            // another device anyway, so treat it as "nothing to share on".
-            if (string.IsNullOrWhiteSpace(ip)
-                || !IPAddress.TryParse(ip, out address)
-                || IPAddress.IsLoopback(address))
-            {
-                shareRelay.Stop();
-                LogHelper.WriteExLog("Share VPN is on but no local network address was found.");
-                return;
-            }
-
-            shareRelay.Start(address, lastListenPort);
         }
 
         private bool TryStartCoreWithConfig(string configData, out string error, bool needXray = false, string xrayConfig = null)
@@ -640,7 +606,6 @@ namespace IRSpeedyVPN.Services
                 _singboxLinkOverride = null;
                 suppressCoreExit = false;                
                 IsConnected = false;
-                shareRelay.Stop();
 
                 if (onConnectDisconnect != null && !silent)
                     onConnectDisconnect.Invoke(this, false, 0, "");
@@ -1433,12 +1398,15 @@ namespace IRSpeedyVPN.Services
 
         private bool IsPortAvailable(int port)
         {
-            // The core only ever binds loopback (sharing is served by ShareRelay), so this
-            // is the address to probe.
+            // With Share VPN on, the core binds the mixed inbound to 0.0.0.0, so a port
+            // that is merely free on loopback is not enough - probe the same address the
+            // core will actually bind, otherwise the core fails to start and the whole
+            // connection drops.
+            var probeAddress = IsShareActive ? IPAddress.Any : IPAddress.Loopback;
             TcpListener listener = null;
             try
             {
-                listener = new TcpListener(IPAddress.Loopback, port);
+                listener = new TcpListener(probeAddress, port);
                 listener.Start();
                 return true;
             }

@@ -177,7 +177,7 @@ namespace IRSpeedyVPN.Windows
 
 
 
-internal static string GetInternetInterfaceIp()
+private static string GetInternetInterfaceIp()
     {
         try
         {
