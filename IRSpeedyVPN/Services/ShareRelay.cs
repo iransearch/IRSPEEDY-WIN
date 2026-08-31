@@ -1,5 +1,6 @@
 ﻿using IRSpeedyVPN.Common;
 using System;
+using System.IO;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -118,18 +119,19 @@ namespace IRSpeedyVPN.Services
                 outbound = new TcpClient { NoDelay = true };
                 await outbound.ConnectAsync(IPAddress.Loopback, targetPort).ConfigureAwait(false);
 
-                using (var inboundStream = inbound.GetStream())
-                using (var outboundStream = outbound.GetStream())
-                {
-                    var upstream = inboundStream.CopyToAsync(outboundStream, BufferSize, token);
-                    var downstream = outboundStream.CopyToAsync(inboundStream, BufferSize, token);
-                    ObserveFaults(upstream);
-                    ObserveFaults(downstream);
+                var inboundStream = inbound.GetStream();
+                var outboundStream = outbound.GetStream();
 
-                    // Once either direction ends the connection is over; closing the sockets
-                    // in the finally block unblocks the other copy.
-                    await Task.WhenAny(upstream, downstream).ConfigureAwait(false);
-                }
+                // A TCP connection has two independent halves. Each direction runs to its
+                // own EOF and then half-closes the peer, and the sockets are closed (in the
+                // finally below) only once BOTH halves are done. Ending the whole
+                // connection on the first half to finish would cut off a response still
+                // being delivered - which is why web pages failed while Telegram, whose
+                // connection stays open in both directions, kept working.
+                await Task.WhenAll(
+                    CopyThenHalfCloseAsync(inboundStream, outboundStream, outbound.Client, token),
+                    CopyThenHalfCloseAsync(outboundStream, inboundStream, inbound.Client, token))
+                    .ConfigureAwait(false);
             }
             catch
             {
@@ -140,6 +142,28 @@ namespace IRSpeedyVPN.Services
                 try { inbound.Close(); } catch { }
                 try { outbound?.Close(); } catch { }
             }
+        }
+
+        /// <summary>
+        /// Copies one direction to EOF, then shuts down only the peer's send side so it
+        /// sees a clean end-of-stream while the opposite direction keeps draining. Never
+        /// throws, so the Task.WhenAll above always completes.
+        /// </summary>
+        private static async Task CopyThenHalfCloseAsync(
+            Stream from, Stream to, Socket toSocket, CancellationToken token)
+        {
+            try
+            {
+                await from.CopyToAsync(to, BufferSize, token).ConfigureAwait(false);
+                await to.FlushAsync(token).ConfigureAwait(false);
+            }
+            catch
+            {
+                // The peer went away mid-transfer; the half-close below still ends the
+                // other direction.
+            }
+
+            try { toSocket.Shutdown(SocketShutdown.Send); } catch { }
         }
 
         private static void ObserveFaults(Task task)
