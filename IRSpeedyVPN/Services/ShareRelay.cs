@@ -29,6 +29,7 @@ namespace IRSpeedyVPN.Services
         // could not browse produced an empty log. These counters make the path observable
         // without flooding log.txt when a browser opens dozens of sockets at once.
         private static int acceptedCount;
+        private static readonly TimeSpan StallReportAfter = TimeSpan.FromSeconds(10);
         private static long lastProblemLogTicks;
         private static int suppressedProblems;
 
@@ -157,12 +158,29 @@ namespace IRSpeedyVPN.Services
                 // connection on the first half to finish would cut off a response still
                 // being delivered - which is why web pages failed while Telegram, whose
                 // connection stays open in both directions, kept working.
+                var toCore = new ByteCounter();
+                var fromCore = new ByteCounter();
                 var upstream = CopyThenHalfCloseAsync(
-                    inboundStream, outboundStream, outbound.Client, token);
+                    inboundStream, outboundStream, outbound.Client, token, toCore);
                 var downstream = CopyThenHalfCloseAsync(
-                    outboundStream, inboundStream, inbound.Client, token);
+                    outboundStream, inboundStream, inbound.Client, token, fromCore);
 
-                await Task.WhenAll(upstream, downstream).ConfigureAwait(false);
+                var both = Task.WhenAll(upstream, downstream);
+
+                // A connection that just sits there never reaches the completion report
+                // below, so say so while it is still open. This is what separates "the
+                // core never answered" from "the connection worked".
+                var timeout = Task.Delay(StallReportAfter, token);
+                if (await Task.WhenAny(both, timeout).ConfigureAwait(false) != both)
+                {
+                    LogProblem(
+                        "Share relay connection still open after "
+                        + (int)StallReportAfter.TotalSeconds + "s for " + remote
+                        + " (toCore=" + Interlocked.Read(ref toCore.Value)
+                        + " bytes, fromCore=" + Interlocked.Read(ref fromCore.Value) + " bytes)");
+                }
+
+                await both.ConfigureAwait(false);
 
                 var sent = upstream.Result;
                 var received = downstream.Result;
@@ -222,8 +240,13 @@ namespace IRSpeedyVPN.Services
         /// sees a clean end-of-stream while the opposite direction keeps draining. Never
         /// throws, so the Task.WhenAll above always completes.
         /// </summary>
+        private sealed class ByteCounter
+        {
+            public long Value;
+        }
+
         private static async Task<long> CopyThenHalfCloseAsync(
-            Stream from, Stream to, Socket toSocket, CancellationToken token)
+            Stream from, Stream to, Socket toSocket, CancellationToken token, ByteCounter progress)
         {
             long copied = 0;
             try
@@ -240,6 +263,7 @@ namespace IRSpeedyVPN.Services
 
                     await to.WriteAsync(buffer, 0, read, token).ConfigureAwait(false);
                     copied += read;
+                    Interlocked.Add(ref progress.Value, read);
                 }
             }
             catch
