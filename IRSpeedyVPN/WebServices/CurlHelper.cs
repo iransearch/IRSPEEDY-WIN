@@ -11,72 +11,26 @@ namespace IRSpeedyVPN.WebServices
 {
     internal sealed class CurlHelper
     {
-        // Set once a launch has failed with "file not found", so the remaining requests
-        // go straight to the managed stack instead of paying a failed CreateProcess each.
+        // Reflects the most recent request. Send still resolves the ordered candidates on
+        // every call, because the versioned runtime may become ready after CurlHelper was
+        // constructed.
         private static volatile bool _curlUnavailable;
         private static int _diagnosticSequence;
 
         /// <summary>
-        /// True once curl has been found missing. Callers use it to skip work that only
-        /// helps the curl path, such as resolving the host over DoH to pin it with
-        /// --resolve, which the managed fallback cannot honour anyway.
+        /// True when the most recent request exhausted both ordered curl candidates.
+        /// Callers use it to skip work that only helps the curl path, such as resolving
+        /// the host over DoH to pin it with --resolve, which the managed fallback cannot
+        /// honour anyway.
         /// </summary>
         internal static bool IsUnavailable
         {
             get { return _curlUnavailable; }
         }
 
-        public string CurlExePath { get; set; } = GetDefaultCurlPath();
-
-        private static string GetDefaultCurlPath()
-        {
-            foreach (string candidate in CurlCandidates())
-            {
-                try
-                {
-                    if (!string.IsNullOrEmpty(candidate) && File.Exists(candidate))
-                        return candidate;
-                }
-                catch
-                {
-                }
-            }
-
-            // Last resort: let CreateProcess search PATH. On Windows 7 and 8.1 there is
-            // usually nothing to find, which is what HttpFallback is for.
-            return "curl";
-        }
-
-        /// <summary>
-        /// Full paths are preferred over bare "curl" because a damaged user PATH is one
-        /// of the ways this went wrong in the field.
-        /// </summary>
-        private static string[] CurlCandidates()
-        {
-            string system = null;
-            string windows = null;
-            try
-            {
-                system = Environment.GetFolderPath(Environment.SpecialFolder.System);
-                windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-            }
-            catch
-            {
-            }
-
-            return new[]
-            {
-                // Windows ships curl.exe from Windows 10 1803 onwards. This app builds as
-                // x86, so on 64-bit Windows SpecialFolder.System is SysWOW64 and the file
-                // system redirector sends a System32 path there too - Sysnative is the
-                // only way a 32-bit process reaches the real System32.
-                system == null ? null : Path.Combine(system, "curl.exe"),
-                windows == null ? null : Path.Combine(windows, "Sysnative", "curl.exe"),
-
-                // Kept for a build that ships its own copy; nothing populates it today.
-                Path.Combine(Path.GetTempPath(), "IRSpeedy", "curl", "curl.exe"),
-            };
-        }
+        // Kept settable for source compatibility with existing tests/callers. Send
+        // always replaces it with the candidate selected by the ordered policy.
+        public string CurlExePath { get; set; }
 
         public CurlResponse Send(
             string url,
@@ -98,47 +52,98 @@ namespace IRSpeedyVPN.WebServices
             string resolveOverride = null)
         {
             var diagnostic = SafeCaptureDiagnostics(url, method);
+            List<CurlCandidate> candidates = ResolveOrderedCandidates(diagnostic);
+            Exception lastFailure = null;
+            string args = BuildArgs(
+                url, method, headers, body, proxy, timeoutSeconds, resolveOverride);
 
-            if (_curlUnavailable)
+            foreach (CurlCandidate candidate in candidates)
             {
-                WriteDiagnostics(diagnostic, "managed-fallback: curl was marked unavailable", null);
-                return HttpFallback.Send(url, method, headers, body, proxy, timeoutSeconds);
-            }
-
-            string output;
-            try
-            {
-                output = ShellExecute.ShellexecAndReturnStringOutput(
-                    CurlExePath, BuildArgs(url, method, headers, body, proxy, timeoutSeconds, resolveOverride));
-            }
-            catch (Win32Exception ex)
-            {
-                // ERROR_FILE_NOT_FOUND / ERROR_PATH_NOT_FOUND: there is no curl.exe on
-                // this machine, which is the normal state on Windows 7 and 8.1. Every
-                // later request skips the launch entirely.
-                if (ex.NativeErrorCode == 2 || ex.NativeErrorCode == 3)
+                if (!IsExistingFile(candidate.Path))
                 {
-                    _curlUnavailable = true;
-                    LogHelper.WriteExLog(
-                        "curl.exe is unavailable (" + CurlExePath + "); using the managed HTTP client instead.");
+                    diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                        + " outcome=missing");
+                    continue;
                 }
 
-                WriteDiagnostics(diagnostic, "curl launch failed; using managed fallback", ex);
+                CurlExePath = candidate.Path;
+                diagnostic.ConfiguredPath = candidate.Path;
 
-                return HttpFallback.Send(url, method, headers, body, proxy, timeoutSeconds);
+                try
+                {
+                    CurlProcessResult processResult = ExecuteCurl(
+                        candidate.Path, args, timeoutSeconds);
+                    diagnostic.ExitCode = processResult.ExitCode;
+                    diagnostic.StderrLength = processResult.StderrLength;
+
+                    if (processResult.ExitCode != 0)
+                    {
+                        lastFailure = new InvalidOperationException(
+                            "curl exited with code " + processResult.ExitCode
+                            + " (stderrLength=" + processResult.StderrLength + ").");
+                        diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                            + " outcome=exit-failure exitCode=" + processResult.ExitCode
+                            + " stderrLength=" + processResult.StderrLength);
+                        continue;
+                    }
+
+                    Parse(processResult.Output, out string responseBody, out int httpCode);
+                    diagnostic.HttpCode = httpCode;
+
+                    // All CurlHelper callers use HTTP(S). A zero status means curl did
+                    // not produce a valid HTTP response even if the process itself
+                    // happened to return zero, so continue through the transport chain.
+                    if (httpCode == 0)
+                    {
+                        lastFailure = new InvalidOperationException(
+                            "curl completed without an HTTP status code.");
+                        diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                            + " outcome=no-http-status exitCode=0");
+                        continue;
+                    }
+
+                    _curlUnavailable = false;
+                    diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                        + " outcome=success exitCode=0 httpCode=" + httpCode);
+                    WriteDiagnostics(diagnostic,
+                        "curl completed via " + candidate.Role, null);
+                    return new CurlResponse(responseBody, httpCode);
+                }
+                catch (Exception ex)
+                {
+                    lastFailure = ex;
+                    diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                        + " outcome=launch-or-transport-failure type="
+                        + ex.GetType().FullName + " hresult=0x"
+                        + ex.HResult.ToString("X8") + GetNativeErrorSuffix(ex));
+                }
             }
-            catch (Exception ex)
+
+            // Do not permanently short-circuit later calls. A newly activated runtime
+            // can make its packaged curl available after this request completes.
+            _curlUnavailable = true;
+            WriteDiagnostics(diagnostic,
+                "managed-fallback: ordered curl candidates exhausted", lastFailure);
+            return HttpFallback.Send(url, method, headers, body, proxy, timeoutSeconds);
+        }
+
+        private sealed class CurlCandidate
+        {
+            internal CurlCandidate(string role, string path)
             {
-                // Something else stopped the process from running - this once. Serve the
-                // request from the managed stack without writing curl off for good.
-                WriteDiagnostics(diagnostic, "curl launch failed; using managed fallback", ex);
-                return HttpFallback.Send(url, method, headers, body, proxy, timeoutSeconds);
+                Role = role;
+                Path = path;
             }
 
-            Parse(output, out string responseBody, out int httpCode);
-            diagnostic.HttpCode = httpCode;
-            WriteDiagnostics(diagnostic, "curl completed", null);
-            return new CurlResponse(responseBody, httpCode);
+            internal string Role { get; private set; }
+            internal string Path { get; private set; }
+        }
+
+        private sealed class CurlProcessResult
+        {
+            internal string Output;
+            internal int ExitCode;
+            internal int StderrLength;
         }
 
         private sealed class CurlDiagnostics
@@ -153,9 +158,11 @@ namespace IRSpeedyVPN.WebServices
             internal string RuntimeStateDescription;
             internal string RuntimeInitializationError;
             internal bool RuntimeManagerReady;
-            internal int PathEntryCount;
             internal int? HttpCode;
+            internal int? ExitCode;
+            internal int StderrLength;
             internal readonly List<string> Candidates = new List<string>();
+            internal readonly List<string> Attempts = new List<string>();
         }
 
         private CurlDiagnostics SafeCaptureDiagnostics(string url, string method)
@@ -171,7 +178,8 @@ namespace IRSpeedyVPN.WebServices
                     RequestId = Interlocked.Increment(ref _diagnosticSequence).ToString("x8"),
                     Method = string.IsNullOrWhiteSpace(method) ? "unknown" : method,
                     ConfiguredPath = CurlExePath,
-                    ResolvedNow = "<diagnostic capture failed>"
+                    ResolvedNow = "<diagnostic capture failed>",
+                    PathCurlMatch = "<not used by policy>"
                 };
                 result.Candidates.Add("diagnostic-capture error="
                     + ex.GetType().FullName + ": " + ex.Message);
@@ -185,7 +193,8 @@ namespace IRSpeedyVPN.WebServices
             {
                 RequestId = Interlocked.Increment(ref _diagnosticSequence).ToString("x8"),
                 Method = string.IsNullOrWhiteSpace(method) ? "unknown" : method,
-                ConfiguredPath = CurlExePath
+                ConfiguredPath = "<resolved per request>",
+                PathCurlMatch = "<not used by policy>"
             };
 
             try
@@ -211,68 +220,186 @@ namespace IRSpeedyVPN.WebServices
 
             CaptureRuntimeStateFile(result);
 
-            var candidates = new List<string>();
-            AddCandidate(candidates, result.ConfiguredPath);
-
-            // The embedded runtime is versioned. Record both conventional locations and
-            // every curl.exe actually present below the active directory, so the log
-            // proves where Files.zip placed the executable without assuming its layout.
-            AddRuntimeCandidates(candidates, result.ActiveRuntimePath, result, "resource-manager");
-
-            string baseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            AddCandidate(candidates, Path.Combine(baseDirectory, "curl", "curl.exe"));
-            AddCandidate(candidates, Path.Combine(baseDirectory, "curl.exe"));
-
-            foreach (string candidate in CurlCandidates())
-                AddCandidate(candidates, candidate);
-
-            result.PathCurlMatch = AddPathMatch(candidates, result);
-
-            foreach (string candidate in candidates)
-            {
-                result.Candidates.Add(DescribeCandidate(candidate));
-                if (result.ResolvedNow == null && IsExistingFile(candidate))
-                    result.ResolvedNow = candidate;
-            }
-
-            if (result.ResolvedNow == null)
-                result.ResolvedNow = "<none; bare curl would rely on CreateProcess search>";
-
             return result;
         }
 
-        private static string AddPathMatch(
-            List<string> candidates,
-            CurlDiagnostics diagnostic)
+        private List<CurlCandidate> ResolveOrderedCandidates(CurlDiagnostics diagnostic)
         {
-            string path = null;
+            CurlExePath = null;
+            string runtimePath = diagnostic.ActiveRuntimePath;
+
+            // Request execution is allowed to wait for deferred runtime initialization.
+            // This prevents the first login request from permanently missing the
+            // versioned curl simply because ResourceManager was still starting.
             try
             {
-                path = Environment.GetEnvironmentVariable("PATH");
-                if (string.IsNullOrWhiteSpace(path))
-                    return "<none>";
-
-                foreach (string rawEntry in path.Split(Path.PathSeparator))
-                {
-                    string entry = rawEntry == null ? null : rawEntry.Trim().Trim('"');
-                    if (string.IsNullOrWhiteSpace(entry))
-                        continue;
-
-                    diagnostic.PathEntryCount++;
-                    string candidate = Path.Combine(entry, "curl.exe");
-                    if (!IsExistingFile(candidate))
-                        continue;
-
-                    AddCandidate(candidates, candidate);
-                    return candidate;
-                }
+                runtimePath = AppServices.ResourceManager.TempPath;
+                diagnostic.RuntimeManagerReady = true;
+                diagnostic.ActiveRuntimePath = runtimePath;
+                diagnostic.RuntimeInitializationError = null;
             }
             catch (Exception ex)
             {
-                return "<search failed: " + ex.GetType().FullName + ": " + ex.Message + ">";
+                diagnostic.RuntimeInitializationError = ex.GetType().FullName
+                    + ": " + ex.Message;
             }
 
-            return "<none>";
+            CaptureRuntimeStateFile(diagnostic);
+
+            var candidates = new List<CurlCandidate>();
+            if (!string.IsNullOrWhiteSpace(runtimePath))
+            {
+                AddOrderedCandidate(candidates, "active-runtime",
+                    Path.Combine(runtimePath, "curl", "curl.exe"));
+            }
+            else
+            {
+                diagnostic.Attempts.Add(
+                    "active-runtime path=<unresolved> outcome=runtime-unavailable");
+            }
+
+            string systemCurlPath = GetSystemCurlPath();
+            if (!string.IsNullOrWhiteSpace(systemCurlPath))
+            {
+                AddOrderedCandidate(candidates, "windows-system32", systemCurlPath);
+            }
+            else
+            {
+                diagnostic.Attempts.Add(
+                    "windows-system32 path=<unresolved> outcome=windows-folder-unavailable");
+            }
+
+            diagnostic.ResolvedNow = null;
+            foreach (CurlCandidate candidate in candidates)
+            {
+                diagnostic.Candidates.Add("role=" + candidate.Role + " "
+                    + DescribeCandidate(candidate.Path));
+                if (diagnostic.ResolvedNow == null && IsExistingFile(candidate.Path))
+                    diagnostic.ResolvedNow = candidate.Path;
+            }
+
+            if (diagnostic.ResolvedNow == null)
+                diagnostic.ResolvedNow = "<none; managed fallback will be used>";
+
+            return candidates;
+        }
+
+        private static void AddOrderedCandidate(
+            List<CurlCandidate> candidates,
+            string role,
+            string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return;
+
+            foreach (CurlCandidate existing in candidates)
+            {
+                if (string.Equals(existing.Path, path, StringComparison.OrdinalIgnoreCase))
+                    return;
+            }
+
+            candidates.Add(new CurlCandidate(role, path));
+        }
+
+        private static string GetSystemCurlPath()
+        {
+            try
+            {
+                string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+                if (string.IsNullOrWhiteSpace(windows))
+                    windows = Environment.GetEnvironmentVariable("SystemRoot");
+                if (string.IsNullOrWhiteSpace(windows))
+                    return null;
+
+                // A 32-bit process on 64-bit Windows is redirected away from the native
+                // System32 directory. Sysnative is the supported alias that reaches the
+                // same native System32 curl requested by the policy.
+                if (Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess)
+                    return Path.Combine(windows, "Sysnative", "curl.exe");
+
+                return Path.Combine(windows, "System32", "curl.exe");
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        private static CurlProcessResult ExecuteCurl(
+            string executablePath,
+            string arguments,
+            int? timeoutSeconds)
+        {
+            var output = new StringBuilder();
+            int stderrLength = 0;
+
+            using (var process = new Process())
+            {
+                process.StartInfo = new ProcessStartInfo
+                {
+                    FileName = executablePath,
+                    Arguments = arguments,
+                    WorkingDirectory = Path.GetDirectoryName(executablePath),
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    WindowStyle = ProcessWindowStyle.Hidden,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+
+                process.OutputDataReceived += (sender, args) =>
+                {
+                    if (args.Data != null)
+                        output.AppendLine(args.Data);
+                };
+                process.ErrorDataReceived += (sender, args) =>
+                {
+                    if (args.Data != null)
+                        Interlocked.Add(ref stderrLength, args.Data.Length + 2);
+                };
+
+                if (!process.Start())
+                    throw new InvalidOperationException("curl process could not be started.");
+
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                bool exited;
+                if (timeoutSeconds.HasValue && timeoutSeconds.Value > 0)
+                {
+                    long waitMilliseconds = ((long)timeoutSeconds.Value + 5L) * 1000L;
+                    if (waitMilliseconds > int.MaxValue)
+                        waitMilliseconds = int.MaxValue;
+                    exited = process.WaitForExit((int)waitMilliseconds);
+                }
+                else
+                {
+                    process.WaitForExit();
+                    exited = true;
+                }
+
+                if (!exited)
+                {
+                    try { process.Kill(); }
+                    catch { }
+                    throw new TimeoutException("curl process did not exit before the timeout.");
+                }
+
+                // Flush asynchronous stdout/stderr event handlers before reading results.
+                process.WaitForExit();
+                return new CurlProcessResult
+                {
+                    Output = output.ToString(),
+                    ExitCode = process.ExitCode,
+                    StderrLength = stderrLength
+                };
+            }
+        }
+
+        private static string GetNativeErrorSuffix(Exception exception)
+        {
+            var win32 = exception as Win32Exception;
+            return win32 == null ? "" : " nativeErrorCode=" + win32.NativeErrorCode;
         }
 
         private static void CaptureRuntimeStateFile(CurlDiagnostics diagnostic)
@@ -297,49 +424,6 @@ namespace IRSpeedyVPN.WebServices
                 diagnostic.RuntimeStateDescription = "path=" + (statePath ?? "<unresolved>")
                     + " inspectionError=" + ex.GetType().FullName + ": " + ex.Message;
             }
-        }
-
-        private static void AddRuntimeCandidates(
-            List<string> candidates,
-            string runtimePath,
-            CurlDiagnostics diagnostic,
-            string source)
-        {
-            if (string.IsNullOrWhiteSpace(runtimePath))
-                return;
-
-            try
-            {
-                AddCandidate(candidates, Path.Combine(runtimePath, "curl", "curl.exe"));
-                AddCandidate(candidates, Path.Combine(runtimePath, "curl.exe"));
-
-                if (!Directory.Exists(runtimePath))
-                    return;
-
-                foreach (string discovered in Directory.GetFiles(
-                    runtimePath, "curl.exe", SearchOption.AllDirectories))
-                {
-                    AddCandidate(candidates, discovered);
-                }
-            }
-            catch (Exception ex)
-            {
-                diagnostic.Candidates.Add(source + "-runtime-search error="
-                    + ex.GetType().FullName + ": " + ex.Message);
-            }
-        }
-
-        private static void AddCandidate(List<string> candidates, string candidate)
-        {
-            if (string.IsNullOrWhiteSpace(candidate))
-                return;
-
-            foreach (string existing in candidates)
-            {
-                if (string.Equals(existing, candidate, StringComparison.OrdinalIgnoreCase))
-                    return;
-            }
-            candidates.Add(candidate);
         }
 
         private static bool IsExistingFile(string path)
@@ -407,14 +491,21 @@ namespace IRSpeedyVPN.WebServices
                     .Append(typeof(CurlHelper).Assembly.GetName().Version)
                     .Append(" process64Bit=").Append(Environment.Is64BitProcess)
                     .Append(" os64Bit=").Append(Environment.Is64BitOperatingSystem)
-                    .Append(" PATHEntriesChecked=").Append(diagnostic.PathEntryCount);
+                    .Append(" pathPolicy=").Append(diagnostic.PathCurlMatch);
 
                 if (diagnostic.HttpCode.HasValue)
                     message.Append(" httpCode=").Append(diagnostic.HttpCode.Value);
+                if (diagnostic.ExitCode.HasValue)
+                    message.Append(" curlExitCode=").Append(diagnostic.ExitCode.Value)
+                        .Append(" stderrLength=").Append(diagnostic.StderrLength);
 
                 message.Append("\r\nCandidates:");
                 foreach (string candidate in diagnostic.Candidates)
                     message.Append("\r\n - ").Append(candidate);
+
+                message.Append("\r\nAttempts:");
+                foreach (string attempt in diagnostic.Attempts)
+                    message.Append("\r\n - ").Append(attempt);
 
                 if (exception != null)
                 {
