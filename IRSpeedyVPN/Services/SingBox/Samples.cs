@@ -28,28 +28,16 @@ namespace IRSpeedyVPN.Services.SingBox
 ],
         ""servers"":[
             {
-                ""address"":""1.1.1.1"",
-                ""address_resolver"":""dns-local"",
+                ""type"":""udp"",
+                ""server"":""1.1.1.1"",
                 ""detour"":""proxy"",
-                ""tag"":""dns-remote"",
-                ""strategy"": ""prefer_ipv4""
+                ""tag"":""dns-remote""
             },
             {
-                ""address"":""1.1.1.1"",
+                ""type"":""udp"",
+                ""server"":""1.1.1.1"",
                 ""detour"":""direct"",
                 ""tag"":""dns-direct""
-            },
-            {
-                ""address"":""rcode://success"",
-                ""tag"":""dns-block"",
-                ""strategy"": ""prefer_ipv4""
-            },
-            {
-                ""address"":""1.1.1.1"",
-                ""detour"":""direct"",
-                ""tag"":""dns-local"",
-                ""strategy"": ""prefer_ipv4""
-
             }
         ]
     },    
@@ -73,6 +61,10 @@ namespace IRSpeedyVPN.Services.SingBox
     ],
     ""route"":{
         ""auto_detect_interface"":true,
+        ""default_domain_resolver"":{
+            ""server"":""dns-direct"",
+            ""strategy"":""prefer_ipv4""
+        },
         ""final"":""proxy"",
         ""find_process"":false,
         ""rules"":[
@@ -170,7 +162,8 @@ namespace IRSpeedyVPN.Services.SingBox
         ""servers"": [
             {
                 ""tag"": ""dns-direct"",
-                ""address"": ""tls://1.1.1.1"",
+                ""type"": ""tls"",
+                ""server"": ""1.1.1.1"",
                 ""detour"": ""proxy""
             }
         ]
