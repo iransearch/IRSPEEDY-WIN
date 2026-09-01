@@ -1,3 +1,4 @@
+using IRSpeedyVPN.Common;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -13,8 +14,8 @@ namespace IRSpeedyVPN.WebServices
     ///
     /// The DoH endpoints are addressed by IP literal, so they need no bootstrap
     /// DNS of their own, and their TLS certificates cover those IPs. Results are
-    /// cached briefly, and every failure falls back to the system resolver by
-    /// returning null, so DoH can only help the connection, never break it.
+    /// cached briefly, timed-out providers enter a short cooldown, and every
+    /// failure ultimately falls back to the system resolver by returning null.
     /// </summary>
     internal static class DohResolver
     {
@@ -28,6 +29,7 @@ namespace IRSpeedyVPN.WebServices
 
         private const int TtlSeconds = 300;
         private const int TimeoutSeconds = 6;
+        private const int ProviderCooldownSeconds = 300;
 
         private sealed class Entry
         {
@@ -35,8 +37,16 @@ namespace IRSpeedyVPN.WebServices
             public DateTime ExpiresUtc;
         }
 
+        private sealed class ProviderQueryResult
+        {
+            public string Ip;
+            public bool TimedOut;
+        }
+
         private static readonly Dictionary<string, Entry> _cache =
             new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
+        private static readonly Dictionary<string, DateTime> _providerCooldownUntilUtc =
+            new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
         private static readonly object _lock = new object();
 
         /// <summary>
@@ -61,26 +71,56 @@ namespace IRSpeedyVPN.WebServices
             }
 
             string ip = null;
-            foreach (var provider in Providers)
+            foreach (string provider in Providers)
             {
-                ip = QueryProvider(provider, host);
-                if (ip != null)
+                int cooldownRemainingSeconds;
+                if (TryGetProviderCooldown(provider, out cooldownRemainingSeconds))
+                {
+                    WriteProviderDiagnostic(
+                        provider,
+                        "cooldown-skip",
+                        "cooldownRemainingSeconds=" + cooldownRemainingSeconds);
+                    continue;
+                }
+
+                ProviderQueryResult result = QueryProvider(provider, host);
+                if (result.TimedOut)
+                {
+                    SetProviderCooldown(provider);
+                    WriteProviderDiagnostic(
+                        provider,
+                        "timeout",
+                        "cooldownSeconds=" + ProviderCooldownSeconds);
+                    continue;
+                }
+
+                if (result.Ip != null)
+                {
+                    ClearProviderCooldown(provider);
+                    ip = result.Ip;
                     break;
+                }
             }
 
             if (ip != null)
             {
                 lock (_lock)
                 {
-                    _cache[host] = new Entry { Ip = ip, ExpiresUtc = DateTime.UtcNow.AddSeconds(TtlSeconds) };
+                    _cache[host] = new Entry
+                    {
+                        Ip = ip,
+                        ExpiresUtc = DateTime.UtcNow.AddSeconds(TtlSeconds)
+                    };
                 }
             }
 
             return ip;
         }
 
-        private static string QueryProvider(string providerUrl, string host)
+        private static ProviderQueryResult QueryProvider(string providerUrl, string host)
         {
+            var result = new ProviderQueryResult();
+
             try
             {
                 var curl = new CurlHelper();
@@ -90,22 +130,25 @@ namespace IRSpeedyVPN.WebServices
                     "Accept: application/dns-json\r\n",
                     null,
                     null,
-                    TimeoutSeconds);
+                    TimeoutSeconds,
+                    null,
+                    true);
 
                 if (resp == null || string.IsNullOrWhiteSpace(resp.Body))
-                    return null;
+                    return result;
 
-                var root = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(resp.Body);
+                var root = new JavaScriptSerializer()
+                    .Deserialize<Dictionary<string, object>>(resp.Body);
                 if (root == null)
-                    return null;
+                    return result;
 
                 object answerObj;
                 if (!root.TryGetValue("Answer", out answerObj))
-                    return null;
+                    return result;
 
                 var answers = answerObj as IEnumerable;
                 if (answers == null)
-                    return null;
+                    return result;
 
                 foreach (var item in answers)
                 {
@@ -130,16 +173,96 @@ namespace IRSpeedyVPN.WebServices
                         && IPAddress.TryParse(text.Trim(), out parsed)
                         && parsed.AddressFamily == AddressFamily.InterNetwork)
                     {
-                        return text.Trim();
+                        result.Ip = text.Trim();
+                        return result;
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Any failure falls back to the system resolver.
+                result.TimedOut = IsTimeout(ex);
             }
 
-            return null;
+            return result;
+        }
+
+        private static bool IsTimeout(Exception exception)
+        {
+            Exception current = exception;
+            while (current != null)
+            {
+                if (current is TimeoutException)
+                    return true;
+
+                var webException = current as WebException;
+                if (webException != null && webException.Status == WebExceptionStatus.Timeout)
+                    return true;
+
+                current = current.InnerException;
+            }
+
+            return false;
+        }
+
+        private static bool TryGetProviderCooldown(
+            string providerUrl,
+            out int remainingSeconds)
+        {
+            remainingSeconds = 0;
+
+            lock (_lock)
+            {
+                DateTime cooldownUntilUtc;
+                if (!_providerCooldownUntilUtc.TryGetValue(
+                    providerUrl, out cooldownUntilUtc))
+                {
+                    return false;
+                }
+
+                TimeSpan remaining = cooldownUntilUtc - DateTime.UtcNow;
+                if (remaining.TotalSeconds <= 0)
+                {
+                    _providerCooldownUntilUtc.Remove(providerUrl);
+                    return false;
+                }
+
+                remainingSeconds = Math.Max(1, (int)Math.Ceiling(remaining.TotalSeconds));
+                return true;
+            }
+        }
+
+        private static void SetProviderCooldown(string providerUrl)
+        {
+            lock (_lock)
+            {
+                _providerCooldownUntilUtc[providerUrl] =
+                    DateTime.UtcNow.AddSeconds(ProviderCooldownSeconds);
+            }
+        }
+
+        private static void ClearProviderCooldown(string providerUrl)
+        {
+            lock (_lock)
+            {
+                _providerCooldownUntilUtc.Remove(providerUrl);
+            }
+        }
+
+        private static void WriteProviderDiagnostic(
+            string providerUrl,
+            string outcome,
+            string detail)
+        {
+            try
+            {
+                string providerHost = new Uri(providerUrl).Host;
+                LogHelper.WriteExLog("[DohDiagnostic] provider=" + providerHost
+                    + " outcome=" + outcome + " " + detail);
+            }
+            catch
+            {
+                // Diagnostics must not change resolver behavior.
+            }
         }
     }
 }
