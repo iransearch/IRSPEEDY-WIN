@@ -302,6 +302,12 @@ namespace IRSpeedyVPN.Services.Xray
                 if (item == null)
                     continue;
 
+                // Hysteria2 uses the native sing-box schema in core_config. Sending the
+                // sing-box protocol id through xray_config makes the updated Throne/Xray
+                // core reject the whole pool with "unknown config id: hysteria2".
+                if (item.configType == EConfigType.Hysteria2)
+                    continue;
+
                 var proxy = new Outbound { tag = $"smart-proxy-{idx}" };
                 FillOutboundForItem(proxy, item);
                 if (proxy.protocol == null)
@@ -463,31 +469,6 @@ namespace IRSpeedyVPN.Services.Xray
                             new SocksUser { user = node.security, pass = node.id }
                         };
                     }
-                    outbound.settings = settings;
-                }
-                else if (node.configType == EConfigType.Hysteria2)
-                {
-                    outbound.protocol = "hysteria2";
-                    var settings = new OutboundSettings
-                    {
-                        server = node.address,
-                        server_port = node.port > 0 ? node.port : 443,
-                        password = node.password
-                    };
-                    if (!string.IsNullOrWhiteSpace(node.obfs_param))
-                    {
-                        settings.obfs = new HysteriaObfs
-                        {
-                            type = string.IsNullOrWhiteSpace(node.obfs) ? "salamander" : node.obfs,
-                            password = node.obfs_param
-                        };
-                    }
-                    settings.tls = new HysteriaTls
-                    {
-                        enabled = true,
-                        server_name = string.IsNullOrWhiteSpace(node.sni) ? null : node.sni,
-                        insecure = string.IsNullOrWhiteSpace(node.allowInsecure) ? (bool?)null : Utils.ToBool(node.allowInsecure)
-                    };
                     outbound.settings = settings;
                 }
             }

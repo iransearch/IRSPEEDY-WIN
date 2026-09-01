@@ -34,6 +34,139 @@ namespace IRSpeedyVPN.Services.SingBox
             return result;
         }
 
+        /// <summary>
+        /// Builds the Smart Fast core_config. Hysteria2 remains a native sing-box
+        /// outbound; the optional SOCKS member represents the Xray smart pool. An
+        /// official sing-box URLTest outbound selects between those members.
+        /// </summary>
+        public static string GetSmartConfig(
+            IEnumerable<string> hysteriaLinks,
+            int port,
+            bool vpnMode,
+            bool isShareActive,
+            string[] shieldFiles,
+            string[] defaultChainLink,
+            string vodLink,
+            bool hasDefaultChain,
+            string[] excludeProcessPath,
+            bool gameMode,
+            int? xraySocksPort,
+            string xrayAuthUser,
+            string xrayAuthPass)
+        {
+            var hysteriaItems = new List<VmessItem>();
+            foreach (string link in (hysteriaLinks ?? Enumerable.Empty<string>())
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.Ordinal))
+            {
+                string msg;
+                var item = ShareHandler.ImportFromConfigLink(link, out msg);
+                if (item != null && item.configType == EConfigType.Hysteria2)
+                    hysteriaItems.Add(item);
+            }
+
+            if (hysteriaItems.Count == 0)
+                return null;
+
+            var cfg = GenerateConfig(
+                hysteriaItems[0],
+                port,
+                vpnMode,
+                false,
+                "",
+                false,
+                isShareActive,
+                shieldFiles,
+                null,
+                defaultChainLink,
+                vodLink,
+                hasDefaultChain,
+                null,
+                null,
+                excludeProcessPath,
+                gameMode);
+
+            if (cfg == null || cfg.outbounds == null)
+                return null;
+
+            var primary = cfg.outbounds.FirstOrDefault(x =>
+                x != null && string.Equals(x.tag, "proxy", StringComparison.Ordinal));
+            if (primary == null || !string.Equals(primary.type, "hysteria2", StringComparison.OrdinalIgnoreCase))
+                return null;
+
+            bool hasXrayMember = xraySocksPort.HasValue && xraySocksPort.Value > 0;
+            if (hysteriaItems.Count == 1 && !hasXrayMember)
+                return Utils.ToJson(cfg);
+
+            string commonDetour = primary.detour;
+            var memberTags = new List<string>();
+
+            primary.tag = "smart-core-0";
+            memberTags.Add(primary.tag);
+
+            for (int i = 1; i < hysteriaItems.Count; i++)
+            {
+                var outbound = new Outbound();
+                FillOutboundForItem(outbound, hysteriaItems[i]);
+                if (!string.Equals(outbound.type, "hysteria2", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                outbound.tag = "smart-core-" + i;
+                outbound.detour = commonDetour;
+                cfg.outbounds.Add(outbound);
+                memberTags.Add(outbound.tag);
+            }
+
+            if (hasXrayMember)
+            {
+                const string xrayTag = "smart-xray";
+                cfg.outbounds.Add(CreateXraySocksOutbound(
+                    xrayTag,
+                    xraySocksPort.Value,
+                    xrayAuthUser,
+                    xrayAuthPass));
+                memberTags.Add(xrayTag);
+                RouteSmartAiThroughXray(cfg, xrayTag);
+            }
+
+            cfg.outbounds.Insert(0, new Outbound
+            {
+                type = "urltest",
+                tag = "proxy",
+                outbounds = memberTags,
+                url = "https://www.gstatic.com/generate_204",
+                interval = "3m",
+                tolerance = 50,
+                idle_timeout = "30m",
+                interrupt_exist_connections = false
+            });
+
+            return Utils.ToJson(cfg);
+        }
+
+        private static void RouteSmartAiThroughXray(SingBoxConfig cfg, string xrayTag)
+        {
+            if (cfg?.route?.rules == null || string.IsNullOrWhiteSpace(xrayTag))
+                return;
+
+            foreach (var rule in cfg.route.rules)
+            {
+                if (rule == null
+                    || !string.Equals(rule.outbound, "proxy", StringComparison.Ordinal)
+                    || rule.domain_suffix == null)
+                {
+                    continue;
+                }
+
+                bool isAiRule = rule.domain_suffix.Any(value =>
+                    IRSpeedyVPN.Services.Xray.SmartIpRouting.AiDomains.Contains(
+                        Convert.ToString(value),
+                        StringComparer.OrdinalIgnoreCase));
+                if (isAiRule)
+                    rule.outbound = xrayTag;
+            }
+        }
+
         public static string GetConfigEx(string Link, int port, bool VpnMode, bool addExtraInbounds, string chain, bool legacyDNS, bool isShareActive, string[] shieldFiles, string chainLink, string[] defaultChainLink, string vodLink, bool hasDefaultchain, string overrideServer = null, int? overrideServerPort = null, string[] excludeprocesspath = null, bool gameMode = false)
         {
             SingBoxConfig cfg;

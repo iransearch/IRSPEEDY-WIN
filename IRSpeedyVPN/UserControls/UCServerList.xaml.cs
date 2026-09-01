@@ -255,7 +255,7 @@ namespace IRSpeedyVPN.UserControls
             if (selectedService != null)
             {
                 // A numbered country row has already loaded ALL URLs belonging to that
-                // row into ISmartFastConnection. Keep the pool intact for Xray leastLoad.
+                // row into ISmartFastConnection. Keep the mixed sing-box/Xray pool intact.
                 StopUrlTests();
                 OnConnectRequest.Invoke(this, selectedService, selectedProtocol);
             }
@@ -291,8 +291,8 @@ namespace IRSpeedyVPN.UserControls
 
                     var smartService = services.FirstOrDefault(x => x is ISmartFastConnection);
 
-                    // Global Fast intentionally sends every URL to Xray. URL test state
-                    // is not a pool filter; Xray's observatory/leastLoad owns runtime choice.
+                    // Global Fast keeps every URL. Native protocols stay in sing-box;
+                    // Xray-compatible links use its observatory/leastLoad pool.
                     var allUrls = services
                         .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
                         .Where(u => u != null)

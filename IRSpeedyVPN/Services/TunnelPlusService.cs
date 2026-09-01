@@ -242,11 +242,10 @@ namespace IRSpeedyVPN.Services
                     bool needXray = false;
                     string xrayConfig = null;
                     string singboxLink = lastLink; // Default to lastLink
+                    string configData = null;
 
                     if (isSmartFast)
                     {
-                        // smart fast: force every success url into an xray outbound
-                        // (hysteria2 urls included) and let the balancer pick the fastest
                         var smartUrls = _smartFastUrls
                             .Where(u => !string.IsNullOrWhiteSpace(u))
                             .Distinct(StringComparer.Ordinal)
@@ -260,25 +259,85 @@ namespace IRSpeedyVPN.Services
                             return;
                         }
 
-                        needXray = true;
-                        _xraySocksPort = FreePortManager.Dequeue();
-                        var authUser = Guid.NewGuid().ToString("N");
-                        var authPass = Guid.NewGuid().ToString("N");
-
-                        xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
-                            smartUrls, _xraySocksPort, authUser, authPass, GetAiLinks());
-                        if (string.IsNullOrWhiteSpace(xrayConfig))
+                        // Hysteria2 is a native sing-box outbound. The updated Xray core
+                        // does not accept the sing-box id "hysteria2" in xray_config.
+                        // Keep those links in core_config and build the Xray pool only
+                        // from links whose schema belongs there.
+                        var hysteriaUrls = new List<string>();
+                        var xrayUrls = new List<string>();
+                        foreach (string smartUrl in smartUrls)
                         {
-                            if (_xraySocksPort > 0) FreePortManager.Enqueue(_xraySocksPort);
-                            _xraySocksPort = 0;
+                            if (IsHysteria2Link(smartUrl))
+                                hysteriaUrls.Add(smartUrl);
+                            else
+                                xrayUrls.Add(smartUrl);
+                        }
+                        string authUser = null;
+                        string authPass = null;
+
+                        if (xrayUrls.Count > 0)
+                        {
+                            _xraySocksPort = FreePortManager.Dequeue();
+                            authUser = Guid.NewGuid().ToString("N");
+                            authPass = Guid.NewGuid().ToString("N");
+                            xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
+                                xrayUrls, _xraySocksPort, authUser, authPass, GetAiLinks());
+                            needXray = !string.IsNullOrWhiteSpace(xrayConfig);
+
+                            if (!needXray)
+                            {
+                                if (_xraySocksPort > 0)
+                                    FreePortManager.Enqueue(_xraySocksPort);
+                                _xraySocksPort = 0;
+                            }
+                        }
+
+                        if (hysteriaUrls.Count > 0)
+                        {
+                            configData = SingBox.ConfigGenerator.GetSmartConfig(
+                                hysteriaUrls,
+                                port,
+                                vpnmode,
+                                IsShareActive,
+                                shieldFiles,
+                                new string[] { defaultChainLink, selectedChain },
+                                lastVodLink,
+                                !string.IsNullOrEmpty(defaultChainLink),
+                                new string[] { ResolveCorePath() },
+                                gameMode,
+                                needXray ? (int?)_xraySocksPort : null,
+                                authUser,
+                                authPass);
+                        }
+                        else if (needXray)
+                        {
+                            // No native members: preserve the previous Xray-only pool.
+                            singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
+                        }
+
+                        if (string.IsNullOrWhiteSpace(configData) && needXray)
+                        {
+                            // If native config construction ever fails, keep the usable
+                            // Xray members instead of submitting a partial mixed config.
+                            singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
+                        }
+
+                        if (string.IsNullOrWhiteSpace(configData) && !needXray)
+                        {
                             TryStopCore();
                             if (onConnectDisconnect != null)
                                 onConnectDisconnect.Invoke(this, false, 0, "سروری یافت نشد");
                             return;
                         }
 
-                        // sing-box relays the local listener to the xray SOCKS inbound
-                        singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
+                        string smartCoreMode = !string.IsNullOrWhiteSpace(configData)
+                            ? ((hysteriaUrls.Count > 1 || needXray) ? "sing-box-urltest" : "sing-box-hysteria2")
+                            : "xray-only";
+                        LogHelper.WriteExLog(
+                            "Smart config prepared. mode=" + smartCoreMode
+                            + " coreHysteria=" + hysteriaUrls.Count
+                            + " xrayCandidates=" + xrayUrls.Count
+                            + " xrayEnabled=" + needXray);
                         _singboxLinkOverride = null;
                     }
                     else if (Xray.ConfigGenerator.LinkNeedsXray(lastLink))
@@ -316,22 +375,26 @@ namespace IRSpeedyVPN.Services
                         _singboxLinkOverride = singboxLink;
                     }
                     */
-                    // Now generate Sing-box config with the appropriate parameter
-                    var configData = SingBox.ConfigGenerator.GetConfig(
-                        singboxLink,  // Either lastLink or SOCKS URL
-                        port,
-                        vpnmode,
-                        IsShareActive,
-                        shieldFiles,
-                        chainLink,
-                        new string[] { defaultChainLink, selectedChain },
-                        lastVodLink,
-                        !string.IsNullOrEmpty(defaultChainLink),
-                        sniRuntime?.ListenHost,
-                        sniRuntime?.ListenPort,
-                        new string[] { ResolveCorePath() },
-                        gameMode
-                    );
+                    // Standard connections and Xray-only Smart pools still use the
+                    // existing single-outbound core_config path.
+                    if (string.IsNullOrWhiteSpace(configData))
+                    {
+                        configData = SingBox.ConfigGenerator.GetConfig(
+                            singboxLink,  // Either lastLink or SOCKS URL
+                            port,
+                            vpnmode,
+                            IsShareActive,
+                            shieldFiles,
+                            chainLink,
+                            new string[] { defaultChainLink, selectedChain },
+                            lastVodLink,
+                            !string.IsNullOrEmpty(defaultChainLink),
+                            sniRuntime?.ListenHost,
+                            sniRuntime?.ListenPort,
+                            new string[] { ResolveCorePath() },
+                            gameMode
+                        );
+                    }
 
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))
                     {
@@ -887,6 +950,23 @@ namespace IRSpeedyVPN.Services
                     TryKillProcess(coreProcess);
                 }
             }*/
+        }
+
+        private static bool IsHysteria2Link(string link)
+        {
+            if (string.IsNullOrWhiteSpace(link))
+                return false;
+
+            try
+            {
+                string message;
+                var item = ShareHandler.ImportFromConfigLink(link, out message);
+                return item != null && item.configType == EConfigType.Hysteria2;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         /// <summary>Distinct AI links advertised by the API, or an empty list.</summary>

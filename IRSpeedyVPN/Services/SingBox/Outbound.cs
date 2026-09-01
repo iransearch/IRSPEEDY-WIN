@@ -43,6 +43,15 @@ namespace IRSpeedyVPN.Services.SingBox
         public string packet_encoding { get; set; }
         public string detour { get; set; }
 
+        // URLTest outbound fields. Smart Fast uses this official sing-box outbound to
+        // choose between native Hysteria2 members and the local Xray pool.
+        public List<string> outbounds { get; set; }
+        public string url { get; set; }
+        public string interval { get; set; }
+        public int? tolerance { get; set; }
+        public string idle_timeout { get; set; }
+        public bool? interrupt_exist_connections { get; set; }
+
 
 
     }
