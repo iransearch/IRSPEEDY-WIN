@@ -57,10 +57,36 @@ namespace IRSpeedyVPN.WebServices
             int? timeoutSeconds,
             string resolveOverride = null)
         {
+            return Send(
+                url,
+                method,
+                headers,
+                body,
+                proxy,
+                timeoutSeconds,
+                resolveOverride,
+                false);
+        }
+
+        /// <summary>
+        /// DoH probes can skip the managed retry only after curl has already timed out.
+        /// API requests use the public overload above and retain the normal fallback.
+        /// </summary>
+        internal CurlResponse Send(
+            string url,
+            string method,
+            string headers,
+            string body,
+            string proxy,
+            int? timeoutSeconds,
+            string resolveOverride,
+            bool skipHttpFallbackOnTimeout)
+        {
             var diagnostic = SafeCaptureDiagnostics(url, method);
             List<CurlCandidate> candidates = ResolveOrderedCandidates(diagnostic);
             Exception lastFailure = null;
             bool bundledCurlUnavailable = true;
+            bool curlRequestTimedOut = false;
             string fallbackStage = "managed-fallback: bundled curl unavailable";
             string args = BuildArgs(
                 url, method, headers, body, proxy, timeoutSeconds, resolveOverride);
@@ -124,6 +150,7 @@ namespace IRSpeedyVPN.WebServices
                     if (processResult.ExitCode != 0)
                     {
                         bool requestTimedOut = processResult.ExitCode == 28;
+                        curlRequestTimedOut = requestTimedOut;
                         fallbackStage = requestTimedOut
                             ? "managed-fallback: bundled curl request timed out"
                             : "managed-fallback: bundled curl request failed";
@@ -165,6 +192,7 @@ namespace IRSpeedyVPN.WebServices
                 catch (Exception ex)
                 {
                     bundledCurlUnavailable = !processStarted;
+                    curlRequestTimedOut = processStarted && ex is TimeoutException;
                     fallbackStage = processStarted
                         ? (ex is TimeoutException
                             ? "managed-fallback: bundled curl request timed out"
@@ -185,6 +213,15 @@ namespace IRSpeedyVPN.WebServices
             // A request-level failure does not disable DoH pinning on the next request.
             // Missing/invalid/unlaunchable binaries are re-evaluated on every Send, so a
             // newly activated runtime can still recover without recreating CurlHelper.
+            if (skipHttpFallbackOnTimeout && curlRequestTimedOut)
+            {
+                return ThrowAfterSkippingHttpFallback(
+                    diagnostic,
+                    fallbackStage,
+                    bundledCurlUnavailable,
+                    lastFailure);
+            }
+
             return SendViaHttpFallback(
                 url,
                 method,
@@ -569,6 +606,28 @@ namespace IRSpeedyVPN.WebServices
             }
         }
 
+        private CurlResponse ThrowAfterSkippingHttpFallback(
+            CurlDiagnostics diagnostic,
+            string fallbackStage,
+            bool bundledCurlUnavailable,
+            Exception curlFailure)
+        {
+            _curlUnavailable = bundledCurlUnavailable;
+            diagnostic.BundledCurlUnavailable = bundledCurlUnavailable;
+            diagnostic.HttpFallbackOutcome = "skipped-timeout-policy";
+            diagnostic.Attempts.Add(
+                "http-fallback outcome=skipped reason=doh-timeout-policy");
+            WriteDiagnostics(
+                diagnostic,
+                fallbackStage + "; HttpFallback skipped for DoH timeout",
+                curlFailure,
+                "CurlFailure");
+
+            throw new TimeoutException(
+                "The DoH curl request timed out; HttpFallback was skipped so the next provider can be tried.",
+                curlFailure);
+        }
+
         private static string GetNativeErrorSuffix(Exception exception)
         {
             var win32 = exception as Win32Exception;
@@ -691,12 +750,13 @@ namespace IRSpeedyVPN.WebServices
                 if (diagnostic.ExitCode.HasValue)
                     message.Append(" curlExitCode=").Append(diagnostic.ExitCode.Value)
                         .Append(" stderrLength=").Append(diagnostic.StderrLength);
-                if (diagnostic.HttpFallbackElapsedMilliseconds.HasValue)
+                if (!string.IsNullOrWhiteSpace(diagnostic.HttpFallbackOutcome))
                 {
                     message.Append(" httpFallbackOutcome=")
-                        .Append(diagnostic.HttpFallbackOutcome ?? "<unknown>")
-                        .Append(" httpFallbackElapsedMs=")
-                        .Append(diagnostic.HttpFallbackElapsedMilliseconds.Value);
+                        .Append(diagnostic.HttpFallbackOutcome);
+                    if (diagnostic.HttpFallbackElapsedMilliseconds.HasValue)
+                        message.Append(" httpFallbackElapsedMs=")
+                            .Append(diagnostic.HttpFallbackElapsedMilliseconds.Value);
                     if (diagnostic.HttpFallbackHttpCode.HasValue)
                         message.Append(" httpFallbackHttpCode=")
                             .Append(diagnostic.HttpFallbackHttpCode.Value);
