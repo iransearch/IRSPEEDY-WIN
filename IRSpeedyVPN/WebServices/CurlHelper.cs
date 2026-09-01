@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
+using System.Net;
 using System.Text;
 using System.Threading;
 
@@ -21,8 +22,9 @@ namespace IRSpeedyVPN.WebServices
         private static int _diagnosticSequence;
 
         /// <summary>
-        /// True when the most recent request could not use the architecture-specific
-        /// curl packaged in the active runtime.
+        /// True when the architecture-specific curl packaged in the active runtime is
+        /// missing, invalid, has the wrong architecture, or cannot be launched.
+        /// Request-level failures such as network timeouts do not make curl unavailable.
         /// Callers use it to skip work that only helps the curl path, such as resolving
         /// the host over DoH to pin it with --resolve, which the managed fallback cannot
         /// honour anyway.
@@ -58,13 +60,19 @@ namespace IRSpeedyVPN.WebServices
             var diagnostic = SafeCaptureDiagnostics(url, method);
             List<CurlCandidate> candidates = ResolveOrderedCandidates(diagnostic);
             Exception lastFailure = null;
+            bool bundledCurlUnavailable = true;
+            string fallbackStage = "managed-fallback: bundled curl unavailable";
             string args = BuildArgs(
                 url, method, headers, body, proxy, timeoutSeconds, resolveOverride);
 
             foreach (CurlCandidate candidate in candidates)
             {
+                CurlExePath = candidate.Path;
+                diagnostic.ConfiguredPath = candidate.Path;
+
                 if (!IsExistingFile(candidate.Path))
                 {
+                    fallbackStage = "managed-fallback: bundled curl missing";
                     diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
                         + " outcome=missing");
                     continue;
@@ -74,6 +82,7 @@ namespace IRSpeedyVPN.WebServices
                 string peFailure;
                 if (!TryReadPeMachine(candidate.Path, out actualMachine, out peFailure))
                 {
+                    fallbackStage = "managed-fallback: bundled curl invalid";
                     lastFailure = new InvalidDataException(
                         "Bundled curl is not a valid PE executable (" + peFailure + ").");
                     diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
@@ -85,6 +94,8 @@ namespace IRSpeedyVPN.WebServices
 
                 if (actualMachine != candidate.ExpectedMachine)
                 {
+                    fallbackStage =
+                        "managed-fallback: bundled curl architecture mismatch";
                     lastFailure = new BadImageFormatException(
                         "Bundled curl architecture does not match the Windows architecture.");
                     diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
@@ -99,23 +110,29 @@ namespace IRSpeedyVPN.WebServices
                     + FormatPeMachine(candidate.ExpectedMachine)
                     + " actualMachine=" + FormatPeMachine(actualMachine));
 
-                CurlExePath = candidate.Path;
-                diagnostic.ConfiguredPath = candidate.Path;
-
+                bool processStarted = false;
                 try
                 {
                     CurlProcessResult processResult = ExecuteCurl(
-                        candidate.Path, args, timeoutSeconds);
+                        candidate.Path, args, timeoutSeconds, out processStarted);
+                    // Process.Start succeeded. Any failure from this point describes
+                    // this request or transport, not availability of the executable.
+                    bundledCurlUnavailable = false;
                     diagnostic.ExitCode = processResult.ExitCode;
                     diagnostic.StderrLength = processResult.StderrLength;
 
                     if (processResult.ExitCode != 0)
                     {
+                        bool requestTimedOut = processResult.ExitCode == 28;
+                        fallbackStage = requestTimedOut
+                            ? "managed-fallback: bundled curl request timed out"
+                            : "managed-fallback: bundled curl request failed";
                         lastFailure = new InvalidOperationException(
                             "curl exited with code " + processResult.ExitCode
                             + " (stderrLength=" + processResult.StderrLength + ").");
                         diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
-                            + " outcome=exit-failure exitCode=" + processResult.ExitCode
+                            + " outcome=" + (requestTimedOut ? "timeout" : "exit-failure")
+                            + " exitCode=" + processResult.ExitCode
                             + " stderrLength=" + processResult.StderrLength);
                         continue;
                     }
@@ -128,6 +145,8 @@ namespace IRSpeedyVPN.WebServices
                     // happened to return zero, so continue through the transport chain.
                     if (httpCode == 0)
                     {
+                        fallbackStage =
+                            "managed-fallback: bundled curl returned no HTTP status";
                         lastFailure = new InvalidOperationException(
                             "curl completed without an HTTP status code.");
                         diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
@@ -136,6 +155,7 @@ namespace IRSpeedyVPN.WebServices
                     }
 
                     _curlUnavailable = false;
+                    diagnostic.BundledCurlUnavailable = false;
                     diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
                         + " outcome=success exitCode=0 httpCode=" + httpCode);
                     WriteDiagnostics(diagnostic,
@@ -144,20 +164,38 @@ namespace IRSpeedyVPN.WebServices
                 }
                 catch (Exception ex)
                 {
+                    bundledCurlUnavailable = !processStarted;
+                    fallbackStage = processStarted
+                        ? (ex is TimeoutException
+                            ? "managed-fallback: bundled curl request timed out"
+                            : "managed-fallback: bundled curl request execution failed")
+                        : "managed-fallback: bundled curl launch failed";
                     lastFailure = ex;
                     diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
-                        + " outcome=launch-or-transport-failure type="
+                        + " outcome=" + (processStarted
+                            ? "request-execution-failure"
+                            : "launch-failure")
+                        + " processStarted=" + processStarted
+                        + " type="
                         + ex.GetType().FullName + " hresult=0x"
                         + ex.HResult.ToString("X8") + GetNativeErrorSuffix(ex));
                 }
             }
 
-            // Do not permanently short-circuit later calls. A newly activated runtime
-            // can make its packaged curl available after this request completes.
-            _curlUnavailable = true;
-            WriteDiagnostics(diagnostic,
-                "managed-fallback: bundled curl unavailable", lastFailure);
-            return HttpFallback.Send(url, method, headers, body, proxy, timeoutSeconds);
+            // A request-level failure does not disable DoH pinning on the next request.
+            // Missing/invalid/unlaunchable binaries are re-evaluated on every Send, so a
+            // newly activated runtime can still recover without recreating CurlHelper.
+            return SendViaHttpFallback(
+                url,
+                method,
+                headers,
+                body,
+                proxy,
+                timeoutSeconds,
+                diagnostic,
+                fallbackStage,
+                bundledCurlUnavailable,
+                lastFailure);
         }
 
         private sealed class CurlCandidate
@@ -194,6 +232,10 @@ namespace IRSpeedyVPN.WebServices
             internal string RuntimeInitializationError;
             internal string SelectedWindowsArchitecture;
             internal string SelectedBundledFileName;
+            internal bool? BundledCurlUnavailable;
+            internal string HttpFallbackOutcome;
+            internal int? HttpFallbackHttpCode;
+            internal long? HttpFallbackElapsedMilliseconds;
             internal bool RuntimeManagerReady;
             internal int? HttpCode;
             internal int? ExitCode;
@@ -403,8 +445,10 @@ namespace IRSpeedyVPN.WebServices
         private static CurlProcessResult ExecuteCurl(
             string executablePath,
             string arguments,
-            int? timeoutSeconds)
+            int? timeoutSeconds,
+            out bool processStarted)
         {
+            processStarted = false;
             var output = new StringBuilder();
             int stderrLength = 0;
 
@@ -436,6 +480,7 @@ namespace IRSpeedyVPN.WebServices
                 if (!process.Start())
                     throw new InvalidOperationException("curl process could not be started.");
 
+                processStarted = true;
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
@@ -471,10 +516,71 @@ namespace IRSpeedyVPN.WebServices
             }
         }
 
+        private CurlResponse SendViaHttpFallback(
+            string url,
+            string method,
+            string headers,
+            string body,
+            string proxy,
+            int? timeoutSeconds,
+            CurlDiagnostics diagnostic,
+            string fallbackStage,
+            bool bundledCurlUnavailable,
+            Exception curlFailure)
+        {
+            _curlUnavailable = bundledCurlUnavailable;
+            diagnostic.BundledCurlUnavailable = bundledCurlUnavailable;
+
+            var stopwatch = Stopwatch.StartNew();
+            try
+            {
+                CurlResponse response = HttpFallback.Send(
+                    url, method, headers, body, proxy, timeoutSeconds);
+                stopwatch.Stop();
+
+                diagnostic.HttpFallbackOutcome = "success";
+                diagnostic.HttpFallbackHttpCode = response.HttpCode;
+                diagnostic.HttpFallbackElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
+                diagnostic.Attempts.Add("http-fallback outcome=success httpCode="
+                    + response.HttpCode + " elapsedMs=" + stopwatch.ElapsedMilliseconds);
+                WriteDiagnostics(
+                    diagnostic,
+                    fallbackStage + "; HttpFallback completed",
+                    curlFailure,
+                    "CurlFailure");
+                return response;
+            }
+            catch (Exception ex)
+            {
+                stopwatch.Stop();
+
+                diagnostic.HttpFallbackOutcome = "failure";
+                diagnostic.HttpFallbackElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
+                diagnostic.Attempts.Add("http-fallback outcome=failure elapsedMs="
+                    + stopwatch.ElapsedMilliseconds + " type=" + ex.GetType().FullName
+                    + " hresult=0x" + ex.HResult.ToString("X8")
+                    + GetNativeErrorSuffix(ex) + GetWebExceptionSuffix(ex));
+                WriteDiagnostics(
+                    diagnostic,
+                    fallbackStage + "; HttpFallback failed",
+                    ex,
+                    "HttpFallbackException");
+                throw;
+            }
+        }
+
         private static string GetNativeErrorSuffix(Exception exception)
         {
             var win32 = exception as Win32Exception;
             return win32 == null ? "" : " nativeErrorCode=" + win32.NativeErrorCode;
+        }
+
+        private static string GetWebExceptionSuffix(Exception exception)
+        {
+            var webException = exception as WebException;
+            return webException == null
+                ? ""
+                : " webExceptionStatus=" + webException.Status;
         }
 
         private static void CaptureRuntimeStateFile(CurlDiagnostics diagnostic)
@@ -539,7 +645,11 @@ namespace IRSpeedyVPN.WebServices
             return description.ToString();
         }
 
-        private static void WriteDiagnostics(CurlDiagnostics diagnostic, string stage, Exception exception)
+        private static void WriteDiagnostics(
+            CurlDiagnostics diagnostic,
+            string stage,
+            Exception exception,
+            string exceptionLabel = "Exception")
         {
             try
             {
@@ -558,6 +668,10 @@ namespace IRSpeedyVPN.WebServices
                     .Append(diagnostic.SelectedWindowsArchitecture ?? "<unavailable>")
                     .Append(" selectedBundledFile=")
                     .Append(diagnostic.SelectedBundledFileName ?? "<unavailable>")
+                    .Append(" bundledCurlUnavailable=")
+                    .Append(diagnostic.BundledCurlUnavailable.HasValue
+                        ? diagnostic.BundledCurlUnavailable.Value.ToString()
+                        : "<undetermined>")
                     .Append(" runtimeInitializationError=")
                     .Append(diagnostic.RuntimeInitializationError ?? "<none>").Append("\r\n")
                     .Append("runtimeState=")
@@ -577,6 +691,16 @@ namespace IRSpeedyVPN.WebServices
                 if (diagnostic.ExitCode.HasValue)
                     message.Append(" curlExitCode=").Append(diagnostic.ExitCode.Value)
                         .Append(" stderrLength=").Append(diagnostic.StderrLength);
+                if (diagnostic.HttpFallbackElapsedMilliseconds.HasValue)
+                {
+                    message.Append(" httpFallbackOutcome=")
+                        .Append(diagnostic.HttpFallbackOutcome ?? "<unknown>")
+                        .Append(" httpFallbackElapsedMs=")
+                        .Append(diagnostic.HttpFallbackElapsedMilliseconds.Value);
+                    if (diagnostic.HttpFallbackHttpCode.HasValue)
+                        message.Append(" httpFallbackHttpCode=")
+                            .Append(diagnostic.HttpFallbackHttpCode.Value);
+                }
 
                 message.Append("\r\nCandidates:");
                 foreach (string candidate in diagnostic.Candidates)
@@ -588,9 +712,11 @@ namespace IRSpeedyVPN.WebServices
 
                 if (exception != null)
                 {
-                    message.Append("\r\nException type=").Append(exception.GetType().FullName)
+                    message.Append("\r\n").Append(exceptionLabel)
+                        .Append(" type=").Append(exception.GetType().FullName)
                         .Append(" hresult=0x").Append(exception.HResult.ToString("X8"))
-                        .Append(" message=").Append(exception.Message);
+                        .Append(" message=").Append(exception.Message)
+                        .Append(GetWebExceptionSuffix(exception));
 
                     var win32 = exception as Win32Exception;
                     if (win32 != null)
@@ -598,7 +724,8 @@ namespace IRSpeedyVPN.WebServices
 
                     if (exception.InnerException != null)
                     {
-                        message.Append("\r\nInnerException type=")
+                        message.Append("\r\n").Append(exceptionLabel)
+                            .Append(".InnerException type=")
                             .Append(exception.InnerException.GetType().FullName)
                             .Append(" hresult=0x").Append(exception.InnerException.HResult.ToString("X8"))
                             .Append(" message=").Append(exception.InnerException.Message);
