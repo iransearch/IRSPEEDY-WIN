@@ -11,14 +11,18 @@ namespace IRSpeedyVPN.WebServices
 {
     internal sealed class CurlHelper
     {
-        // Reflects the most recent request. Send still resolves the ordered candidates on
-        // every call, because the versioned runtime may become ready after CurlHelper was
+        private const ushort PeMachineI386 = 0x014C;
+        private const ushort PeMachineAmd64 = 0x8664;
+
+        // Reflects the most recent request. Send still resolves the bundled curl on every
+        // call, because the versioned runtime may become ready after CurlHelper was
         // constructed.
         private static volatile bool _curlUnavailable;
         private static int _diagnosticSequence;
 
         /// <summary>
-        /// True when the most recent request exhausted both ordered curl candidates.
+        /// True when the most recent request could not use the architecture-specific
+        /// curl packaged in the active runtime.
         /// Callers use it to skip work that only helps the curl path, such as resolving
         /// the host over DoH to pin it with --resolve, which the managed fallback cannot
         /// honour anyway.
@@ -29,7 +33,7 @@ namespace IRSpeedyVPN.WebServices
         }
 
         // Kept settable for source compatibility with existing tests/callers. Send
-        // always replaces it with the candidate selected by the ordered policy.
+        // always replaces it with the candidate selected by the bundled-curl policy.
         public string CurlExePath { get; set; }
 
         public CurlResponse Send(
@@ -65,6 +69,35 @@ namespace IRSpeedyVPN.WebServices
                         + " outcome=missing");
                     continue;
                 }
+
+                ushort actualMachine;
+                string peFailure;
+                if (!TryReadPeMachine(candidate.Path, out actualMachine, out peFailure))
+                {
+                    lastFailure = new InvalidDataException(
+                        "Bundled curl is not a valid PE executable (" + peFailure + ").");
+                    diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                        + " outcome=invalid-pe expectedMachine="
+                        + FormatPeMachine(candidate.ExpectedMachine)
+                        + " reason=" + peFailure);
+                    continue;
+                }
+
+                if (actualMachine != candidate.ExpectedMachine)
+                {
+                    lastFailure = new BadImageFormatException(
+                        "Bundled curl architecture does not match the Windows architecture.");
+                    diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                        + " outcome=architecture-mismatch expectedMachine="
+                        + FormatPeMachine(candidate.ExpectedMachine)
+                        + " actualMachine=" + FormatPeMachine(actualMachine));
+                    continue;
+                }
+
+                diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                    + " outcome=pe-validated expectedMachine="
+                    + FormatPeMachine(candidate.ExpectedMachine)
+                    + " actualMachine=" + FormatPeMachine(actualMachine));
 
                 CurlExePath = candidate.Path;
                 diagnostic.ConfiguredPath = candidate.Path;
@@ -123,20 +156,22 @@ namespace IRSpeedyVPN.WebServices
             // can make its packaged curl available after this request completes.
             _curlUnavailable = true;
             WriteDiagnostics(diagnostic,
-                "managed-fallback: ordered curl candidates exhausted", lastFailure);
+                "managed-fallback: bundled curl unavailable", lastFailure);
             return HttpFallback.Send(url, method, headers, body, proxy, timeoutSeconds);
         }
 
         private sealed class CurlCandidate
         {
-            internal CurlCandidate(string role, string path)
+            internal CurlCandidate(string role, string path, ushort expectedMachine)
             {
                 Role = role;
                 Path = path;
+                ExpectedMachine = expectedMachine;
             }
 
             internal string Role { get; private set; }
             internal string Path { get; private set; }
+            internal ushort ExpectedMachine { get; private set; }
         }
 
         private sealed class CurlProcessResult
@@ -157,6 +192,8 @@ namespace IRSpeedyVPN.WebServices
             internal string ActiveRuntimePath;
             internal string RuntimeStateDescription;
             internal string RuntimeInitializationError;
+            internal string SelectedWindowsArchitecture;
+            internal string SelectedBundledFileName;
             internal bool RuntimeManagerReady;
             internal int? HttpCode;
             internal int? ExitCode;
@@ -179,7 +216,7 @@ namespace IRSpeedyVPN.WebServices
                     Method = string.IsNullOrWhiteSpace(method) ? "unknown" : method,
                     ConfiguredPath = CurlExePath,
                     ResolvedNow = "<diagnostic capture failed>",
-                    PathCurlMatch = "<not used by policy>"
+                    PathCurlMatch = "active-runtime-architecture-specific-only"
                 };
                 result.Candidates.Add("diagnostic-capture error="
                     + ex.GetType().FullName + ": " + ex.Message);
@@ -194,7 +231,7 @@ namespace IRSpeedyVPN.WebServices
                 RequestId = Interlocked.Increment(ref _diagnosticSequence).ToString("x8"),
                 Method = string.IsNullOrWhiteSpace(method) ? "unknown" : method,
                 ConfiguredPath = "<resolved per request>",
-                PathCurlMatch = "<not used by policy>"
+                PathCurlMatch = "active-runtime-architecture-specific-only"
             };
 
             try
@@ -247,10 +284,16 @@ namespace IRSpeedyVPN.WebServices
             CaptureRuntimeStateFile(diagnostic);
 
             var candidates = new List<CurlCandidate>();
+            bool is64BitWindows = Environment.Is64BitOperatingSystem;
+            string bundledFileName = is64BitWindows ? "curl64.exe" : "curl32.exe";
+            ushort expectedMachine = is64BitWindows ? PeMachineAmd64 : PeMachineI386;
+            diagnostic.SelectedWindowsArchitecture = is64BitWindows ? "x64" : "x86";
+            diagnostic.SelectedBundledFileName = bundledFileName;
+
             if (!string.IsNullOrWhiteSpace(runtimePath))
             {
-                AddOrderedCandidate(candidates, "active-runtime",
-                    Path.Combine(runtimePath, "curl", "curl.exe"));
+                AddOrderedCandidate(candidates, "active-runtime-architecture-match",
+                    Path.Combine(runtimePath, "curl", bundledFileName), expectedMachine);
             }
             else
             {
@@ -258,21 +301,11 @@ namespace IRSpeedyVPN.WebServices
                     "active-runtime path=<unresolved> outcome=runtime-unavailable");
             }
 
-            string systemCurlPath = GetSystemCurlPath();
-            if (!string.IsNullOrWhiteSpace(systemCurlPath))
-            {
-                AddOrderedCandidate(candidates, "windows-system32", systemCurlPath);
-            }
-            else
-            {
-                diagnostic.Attempts.Add(
-                    "windows-system32 path=<unresolved> outcome=windows-folder-unavailable");
-            }
-
             diagnostic.ResolvedNow = null;
             foreach (CurlCandidate candidate in candidates)
             {
                 diagnostic.Candidates.Add("role=" + candidate.Role + " "
+                    + "expectedMachine=" + FormatPeMachine(candidate.ExpectedMachine) + " "
                     + DescribeCandidate(candidate.Path));
                 if (diagnostic.ResolvedNow == null && IsExistingFile(candidate.Path))
                     diagnostic.ResolvedNow = candidate.Path;
@@ -287,7 +320,8 @@ namespace IRSpeedyVPN.WebServices
         private static void AddOrderedCandidate(
             List<CurlCandidate> candidates,
             string role,
-            string path)
+            string path,
+            ushort expectedMachine)
         {
             if (string.IsNullOrWhiteSpace(path))
                 return;
@@ -298,31 +332,72 @@ namespace IRSpeedyVPN.WebServices
                     return;
             }
 
-            candidates.Add(new CurlCandidate(role, path));
+            candidates.Add(new CurlCandidate(role, path, expectedMachine));
         }
 
-        private static string GetSystemCurlPath()
+        private static bool TryReadPeMachine(
+            string path,
+            out ushort machine,
+            out string failure)
         {
+            machine = 0;
+            failure = null;
+
             try
             {
-                string windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
-                if (string.IsNullOrWhiteSpace(windows))
-                    windows = Environment.GetEnvironmentVariable("SystemRoot");
-                if (string.IsNullOrWhiteSpace(windows))
-                    return null;
+                using (var stream = new FileStream(
+                    path,
+                    FileMode.Open,
+                    FileAccess.Read,
+                    FileShare.ReadWrite | FileShare.Delete))
+                using (var reader = new BinaryReader(stream))
+                {
+                    if (stream.Length < 64L)
+                    {
+                        failure = "file-too-small";
+                        return false;
+                    }
 
-                // A 32-bit process on 64-bit Windows is redirected away from the native
-                // System32 directory. Sysnative is the supported alias that reaches the
-                // same native System32 curl requested by the policy.
-                if (Environment.Is64BitOperatingSystem && !Environment.Is64BitProcess)
-                    return Path.Combine(windows, "Sysnative", "curl.exe");
+                    if (reader.ReadUInt16() != 0x5A4D)
+                    {
+                        failure = "missing-mz-signature";
+                        return false;
+                    }
 
-                return Path.Combine(windows, "System32", "curl.exe");
+                    stream.Position = 0x3C;
+                    int peOffset = reader.ReadInt32();
+                    if (peOffset < 64 || peOffset > stream.Length - 6L)
+                    {
+                        failure = "invalid-pe-offset";
+                        return false;
+                    }
+
+                    stream.Position = peOffset;
+                    if (reader.ReadUInt32() != 0x00004550)
+                    {
+                        failure = "missing-pe-signature";
+                        return false;
+                    }
+
+                    machine = reader.ReadUInt16();
+                    return true;
+                }
             }
-            catch
+            catch (Exception ex)
             {
-                return null;
+                failure = "inspection-failed type=" + ex.GetType().FullName
+                    + " hresult=0x" + ex.HResult.ToString("X8");
+                return false;
             }
+        }
+
+        private static string FormatPeMachine(ushort machine)
+        {
+            if (machine == PeMachineI386)
+                return "0x014C(I386)";
+            if (machine == PeMachineAmd64)
+                return "0x8664(AMD64)";
+            return "0x" + machine.ToString("X4") + "(unknown)";
         }
 
         private static CurlProcessResult ExecuteCurl(
@@ -479,6 +554,10 @@ namespace IRSpeedyVPN.WebServices
                     .Append(diagnostic.PathCurlMatch ?? "<unavailable>").Append("\r\n")
                     .Append("runtimeManagerReady=").Append(diagnostic.RuntimeManagerReady)
                     .Append(" activeRuntimePath=").Append(diagnostic.ActiveRuntimePath ?? "<null>")
+                    .Append(" selectedWindowsArchitecture=")
+                    .Append(diagnostic.SelectedWindowsArchitecture ?? "<unavailable>")
+                    .Append(" selectedBundledFile=")
+                    .Append(diagnostic.SelectedBundledFileName ?? "<unavailable>")
                     .Append(" runtimeInitializationError=")
                     .Append(diagnostic.RuntimeInitializationError ?? "<none>").Append("\r\n")
                     .Append("runtimeState=")
