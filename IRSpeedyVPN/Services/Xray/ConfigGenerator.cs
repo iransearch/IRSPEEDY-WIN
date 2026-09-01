@@ -247,6 +247,20 @@ namespace IRSpeedyVPN.Services.Xray
         }
         public static string GetSmartBalancerConfig(IEnumerable<string> links, int port, string authUser, string authPass, IEnumerable<string> aiLinks = null)
         {
+            bool aiRoutingEnabled;
+            return GetSmartBalancerConfig(
+                links, port, authUser, authPass, aiLinks, out aiRoutingEnabled);
+        }
+
+        public static string GetSmartBalancerConfig(
+            IEnumerable<string> links,
+            int port,
+            string authUser,
+            string authPass,
+            IEnumerable<string> aiLinks,
+            out bool aiRoutingEnabled)
+        {
+            aiRoutingEnabled = false;
             var root = JObject.Parse(Samples.BalancerConfig);
             var serializer = new JsonSerializer { NullValueHandling = NullValueHandling.Ignore };
 
@@ -326,7 +340,7 @@ namespace IRSpeedyVPN.Services.Xray
             if (idx == 0)
                 return null;
 
-            ApplySmartIpRouting(root, outbounds, aiLinks, serializer);
+            aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer);
 
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
             outbounds.Add(JObject.FromObject(new Outbound
@@ -354,22 +368,22 @@ namespace IRSpeedyVPN.Services.Xray
         /// public IP, which the core refuses to build as an Xray outbound, so VOD
         /// stays on its sing-box outbound instead.
         /// </summary>
-        private static void ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer)
+        private static bool ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer)
         {
             if (!SmartIpRouting.IsEnabled())
-                return;
+                return false;
 
             string aiFallbackTag;
             var aiOutbounds = SmartIpRouting.BuildOutbounds(
                 aiLinks, SmartIpRouting.AiProxyPrefix, "AI", serializer, out aiFallbackTag);
 
             if (aiOutbounds.Count == 0 || aiFallbackTag == null)
-                return;
+                return false;
 
             var balancers = root["routing"]?["balancers"] as JArray;
             var rules = root["routing"]?["rules"] as JArray;
             if (balancers == null || rules == null)
-                return;
+                return false;
 
             SmartIpRouting.ExtendObservatorySelector(root);
 
@@ -381,6 +395,7 @@ namespace IRSpeedyVPN.Services.Xray
             // its traffic never reaches the main balancer. The first rule is the
             // UDP/443 block, which must stay first.
             rules.Insert(rules.Count > 0 ? 1 : 0, SmartIpRouting.AiRule());
+            return true;
         }
 
         public static void FillOutboundForItem(Outbound outbound, VmessItem node)

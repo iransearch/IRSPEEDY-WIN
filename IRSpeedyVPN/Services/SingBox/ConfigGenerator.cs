@@ -52,7 +52,8 @@ namespace IRSpeedyVPN.Services.SingBox
             bool gameMode,
             int? xraySocksPort,
             string xrayAuthUser,
-            string xrayAuthPass)
+            string xrayAuthPass,
+            bool routeAiThroughXray = false)
         {
             var hysteriaItems = new List<VmessItem>();
             foreach (string link in (hysteriaLinks ?? Enumerable.Empty<string>())
@@ -126,7 +127,8 @@ namespace IRSpeedyVPN.Services.SingBox
                     xrayAuthUser,
                     xrayAuthPass));
                 memberTags.Add(xrayTag);
-                RouteSmartAiThroughXray(cfg, xrayTag);
+                if (routeAiThroughXray)
+                    RouteSmartAiThroughXray(cfg, xrayTag);
             }
 
             cfg.outbounds.Insert(0, new Outbound
@@ -163,8 +165,24 @@ namespace IRSpeedyVPN.Services.SingBox
                         Convert.ToString(value),
                         StringComparer.OrdinalIgnoreCase));
                 if (isAiRule)
+                {
+                    rule.action = "route";
                     rule.outbound = xrayTag;
+                    return;
+                }
             }
+
+            // In normal mode FillRoute has no dedicated AI rule because its final
+            // outbound is already "proxy". For a mixed Smart Fast config that proxy is
+            // a sing-box URLTest containing both Hysteria2 and Xray, so add an explicit
+            // rule to preserve the pre-Core-update behavior: AI always enters Xray and
+            // is then handled by its API-provided AI pool.
+            cfg.route.rules.Add(new Rule
+            {
+                action = "route",
+                outbound = xrayTag,
+                domain_suffix = IRSpeedyVPN.Services.Xray.SmartIpRouting.AiDomains.ToList<object>()
+            });
         }
 
         public static string GetConfigEx(string Link, int port, bool VpnMode, bool addExtraInbounds, string chain, bool legacyDNS, bool isShareActive, string[] shieldFiles, string chainLink, string[] defaultChainLink, string vodLink, bool hasDefaultchain, string overrideServer = null, int? overrideServerPort = null, string[] excludeprocesspath = null, bool gameMode = false)

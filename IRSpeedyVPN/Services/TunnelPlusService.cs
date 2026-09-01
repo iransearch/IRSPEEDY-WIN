@@ -274,6 +274,7 @@ namespace IRSpeedyVPN.Services
                         }
                         string authUser = null;
                         string authPass = null;
+                        bool aiRoutingEnabled = false;
 
                         if (xrayUrls.Count > 0)
                         {
@@ -281,7 +282,12 @@ namespace IRSpeedyVPN.Services
                             authUser = Guid.NewGuid().ToString("N");
                             authPass = Guid.NewGuid().ToString("N");
                             xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
-                                xrayUrls, _xraySocksPort, authUser, authPass, GetAiLinks());
+                                xrayUrls,
+                                _xraySocksPort,
+                                authUser,
+                                authPass,
+                                GetAiLinks(),
+                                out aiRoutingEnabled);
                             needXray = !string.IsNullOrWhiteSpace(xrayConfig);
 
                             if (!needXray)
@@ -307,7 +313,8 @@ namespace IRSpeedyVPN.Services
                                 gameMode,
                                 needXray ? (int?)_xraySocksPort : null,
                                 authUser,
-                                authPass);
+                                authPass,
+                                aiRoutingEnabled);
                         }
                         else if (needXray)
                         {
@@ -337,7 +344,8 @@ namespace IRSpeedyVPN.Services
                             "Smart config prepared. mode=" + smartCoreMode
                             + " coreHysteria=" + hysteriaUrls.Count
                             + " xrayCandidates=" + xrayUrls.Count
-                            + " xrayEnabled=" + needXray);
+                            + " xrayEnabled=" + needXray
+                            + " aiRoutingEnabled=" + aiRoutingEnabled);
                         _singboxLinkOverride = null;
                     }
                     else if (Xray.ConfigGenerator.LinkNeedsXray(lastLink))
