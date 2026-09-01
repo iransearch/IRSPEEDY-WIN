@@ -36,7 +36,6 @@ namespace IRSpeedyVPN.Services.SingBox
             {
                 ""type"":""udp"",
                 ""server"":""1.1.1.1"",
-                ""detour"":""direct"",
                 ""tag"":""dns-direct""
             }
         ]
