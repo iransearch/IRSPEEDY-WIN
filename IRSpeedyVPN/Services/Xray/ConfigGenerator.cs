@@ -248,8 +248,17 @@ namespace IRSpeedyVPN.Services.Xray
         public static string GetSmartBalancerConfig(IEnumerable<string> links, int port, string authUser, string authPass, IEnumerable<string> aiLinks = null)
         {
             bool aiRoutingEnabled;
+            int poolMemberCount;
+            int hysteriaMemberCount;
             return GetSmartBalancerConfig(
-                links, port, authUser, authPass, aiLinks, out aiRoutingEnabled);
+                links,
+                port,
+                authUser,
+                authPass,
+                aiLinks,
+                out aiRoutingEnabled,
+                out poolMemberCount,
+                out hysteriaMemberCount);
         }
 
         public static string GetSmartBalancerConfig(
@@ -260,7 +269,32 @@ namespace IRSpeedyVPN.Services.Xray
             IEnumerable<string> aiLinks,
             out bool aiRoutingEnabled)
         {
+            int poolMemberCount;
+            int hysteriaMemberCount;
+            return GetSmartBalancerConfig(
+                links,
+                port,
+                authUser,
+                authPass,
+                aiLinks,
+                out aiRoutingEnabled,
+                out poolMemberCount,
+                out hysteriaMemberCount);
+        }
+
+        public static string GetSmartBalancerConfig(
+            IEnumerable<string> links,
+            int port,
+            string authUser,
+            string authPass,
+            IEnumerable<string> aiLinks,
+            out bool aiRoutingEnabled,
+            out int poolMemberCount,
+            out int hysteriaMemberCount)
+        {
             aiRoutingEnabled = false;
+            poolMemberCount = 0;
+            hysteriaMemberCount = 0;
             var root = JObject.Parse(Samples.BalancerConfig);
             var serializer = new JsonSerializer { NullValueHandling = NullValueHandling.Ignore };
 
@@ -316,12 +350,6 @@ namespace IRSpeedyVPN.Services.Xray
                 if (item == null)
                     continue;
 
-                // Hysteria2 uses the native sing-box schema in core_config. Sending the
-                // sing-box protocol id through xray_config makes the updated Throne/Xray
-                // core reject the whole pool with "unknown config id: hysteria2".
-                if (item.configType == EConfigType.Hysteria2)
-                    continue;
-
                 var proxy = new Outbound { tag = $"smart-proxy-{idx}" };
                 FillOutboundForItem(proxy, item);
                 if (proxy.protocol == null)
@@ -335,11 +363,14 @@ namespace IRSpeedyVPN.Services.Xray
 
                 outbounds.Add(JObject.FromObject(proxy, serializer));
                 idx++;
+                if (item.configType == EConfigType.Hysteria2)
+                    hysteriaMemberCount++;
             }
 
             if (idx == 0)
                 return null;
 
+            poolMemberCount = idx;
             aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer);
 
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
@@ -485,6 +516,90 @@ namespace IRSpeedyVPN.Services.Xray
                         };
                     }
                     outbound.settings = settings;
+                }
+                else if (node.configType == EConfigType.Hysteria2)
+                {
+                    var obfsType = string.IsNullOrWhiteSpace(node.obfs)
+                        ? "salamander"
+                        : node.obfs.Trim();
+                    if (!string.IsNullOrWhiteSpace(node.obfs_param)
+                        && !string.Equals(obfsType, "salamander", StringComparison.OrdinalIgnoreCase))
+                    {
+                        LogHelper.WriteExLog(
+                            "Xray Hysteria2 outbound skipped: unsupported obfs type.");
+                        return;
+                    }
+
+                    var serverPort = node.port > 0 ? node.port : 443;
+                    outbound.protocol = "hysteria";
+                    outbound.settings = new OutboundSettings
+                    {
+                        version = 2,
+                        address = node.address,
+                        port = serverPort
+                    };
+
+                    var stream = new StreamSettings
+                    {
+                        method = "hysteria",
+                        security = "tls",
+                        hysteriaSettings = new HysteriaSettings
+                        {
+                            version = 2,
+                            auth = node.password,
+                            udpIdleTimeout = 60
+                        },
+                        tlsSettings = new TlsSettings
+                        {
+                            allowInsecure = string.IsNullOrWhiteSpace(node.allowInsecure)
+                                ? (bool?)null
+                                : Utils.ToBool(node.allowInsecure),
+                            serverName = string.IsNullOrWhiteSpace(node.sni) ? null : node.sni,
+                            alpn = node.GetAlpn(),
+                            fingerprint = string.IsNullOrWhiteSpace(node.fingerPrint) ? null : node.fingerPrint,
+                            pinnedPeerCertSha256 = string.IsNullOrWhiteSpace(node.certSha256) ? null : node.certSha256
+                        },
+                        sockopt = new Sockopt
+                        {
+                            domainStrategy = "UseIP"
+                        }
+                    };
+
+                    HysteriaFinalMask finalMask = null;
+                    if (!string.IsNullOrWhiteSpace(node.obfs_param))
+                    {
+                        finalMask = new HysteriaFinalMask
+                        {
+                            udp = new List<HysteriaFinalMaskLayer>
+                            {
+                                new HysteriaFinalMaskLayer
+                                {
+                                    type = "salamander",
+                                    settings = new HysteriaFinalMaskLayerSettings
+                                    {
+                                        password = node.obfs_param
+                                    }
+                                }
+                            }
+                        };
+                    }
+
+                    if (node.portEnd > serverPort)
+                    {
+                        if (finalMask == null)
+                            finalMask = new HysteriaFinalMask();
+                        finalMask.quicParams = new HysteriaQuicParams
+                        {
+                            udpHop = new HysteriaUdpHop
+                            {
+                                ports = serverPort + "-" + node.portEnd,
+                                interval = 30
+                            }
+                        };
+                    }
+
+                    stream.finalmask = finalMask;
+                    outbound.streamSettings = stream;
                 }
             }
             catch (Exception ex)

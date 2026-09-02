@@ -4,6 +4,7 @@ namespace IRSpeedyVPN.Services.Xray
 {
     public class OutboundSettings
     {
+        public int? version { get; set; }
         public string address { get; set; }
         public int? port { get; set; }
         public string id { get; set; }

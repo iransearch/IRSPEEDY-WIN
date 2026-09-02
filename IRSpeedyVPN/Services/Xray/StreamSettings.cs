@@ -3,6 +3,7 @@ namespace IRSpeedyVPN.Services.Xray
     public class StreamSettings
     {
         public string network { get; set; }
+        public string method { get; set; }
         public string security { get; set; }
         public TlsSettings tlsSettings { get; set; }
         public RealitySettings realitySettings { get; set; }
@@ -15,6 +16,8 @@ namespace IRSpeedyVPN.Services.Xray
         public GrpcSettings grpcSettings { get; set; }
         public XhttpSettings xhttpSettings { get; set; }
         public HttpupgradeSettings httpupgradeSettings { get; set; }
+        public HysteriaSettings hysteriaSettings { get; set; }
+        public HysteriaFinalMask finalmask { get; set; }
         public Sockopt sockopt { get; set; }
     }
 }

@@ -259,92 +259,46 @@ namespace IRSpeedyVPN.Services
                             return;
                         }
 
-                        // Hysteria2 is a native sing-box outbound. The updated Xray core
-                        // does not accept the sing-box id "hysteria2" in xray_config.
-                        // Keep those links in core_config and build the Xray pool only
-                        // from links whose schema belongs there.
-                        var hysteriaUrls = new List<string>();
-                        var xrayUrls = new List<string>();
-                        foreach (string smartUrl in smartUrls)
-                        {
-                            if (IsHysteria2Link(smartUrl))
-                                hysteriaUrls.Add(smartUrl);
-                            else
-                                xrayUrls.Add(smartUrl);
-                        }
-                        string authUser = null;
-                        string authPass = null;
+                        // Preserve the pre-Core-update Smart topology: every supplied
+                        // server is an independent member of one Xray leastLoad pool.
+                        // Hysteria2 is translated to Xray's protocol="hysteria",
+                        // version=2 schema by the generator; no outer sing-box URLTest
+                        // is allowed to collapse the whole pool into one member.
+                        needXray = true;
+                        _xraySocksPort = FreePortManager.Dequeue();
+                        var authUser = Guid.NewGuid().ToString("N");
+                        var authPass = Guid.NewGuid().ToString("N");
                         bool aiRoutingEnabled = false;
-
-                        if (xrayUrls.Count > 0)
+                        int poolMemberCount;
+                        int hysteriaMemberCount;
+                        xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
+                            smartUrls,
+                            _xraySocksPort,
+                            authUser,
+                            authPass,
+                            GetAiLinks(),
+                            out aiRoutingEnabled,
+                            out poolMemberCount,
+                            out hysteriaMemberCount);
+                        if (string.IsNullOrWhiteSpace(xrayConfig))
                         {
-                            _xraySocksPort = FreePortManager.Dequeue();
-                            authUser = Guid.NewGuid().ToString("N");
-                            authPass = Guid.NewGuid().ToString("N");
-                            xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
-                                xrayUrls,
-                                _xraySocksPort,
-                                authUser,
-                                authPass,
-                                GetAiLinks(),
-                                out aiRoutingEnabled);
-                            needXray = !string.IsNullOrWhiteSpace(xrayConfig);
-
-                            if (!needXray)
-                            {
-                                if (_xraySocksPort > 0)
-                                    FreePortManager.Enqueue(_xraySocksPort);
-                                _xraySocksPort = 0;
-                            }
-                        }
-
-                        if (hysteriaUrls.Count > 0)
-                        {
-                            configData = SingBox.ConfigGenerator.GetSmartConfig(
-                                hysteriaUrls,
-                                port,
-                                vpnmode,
-                                IsShareActive,
-                                shieldFiles,
-                                new string[] { defaultChainLink, selectedChain },
-                                lastVodLink,
-                                !string.IsNullOrEmpty(defaultChainLink),
-                                new string[] { ResolveCorePath() },
-                                gameMode,
-                                needXray ? (int?)_xraySocksPort : null,
-                                authUser,
-                                authPass,
-                                aiRoutingEnabled);
-                        }
-                        else if (needXray)
-                        {
-                            // No native members: preserve the previous Xray-only pool.
-                            singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
-                        }
-
-                        if (string.IsNullOrWhiteSpace(configData) && needXray)
-                        {
-                            // If native config construction ever fails, keep the usable
-                            // Xray members instead of submitting a partial mixed config.
-                            singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
-                        }
-
-                        if (string.IsNullOrWhiteSpace(configData) && !needXray)
-                        {
+                            if (_xraySocksPort > 0)
+                                FreePortManager.Enqueue(_xraySocksPort);
+                            _xraySocksPort = 0;
                             TryStopCore();
                             if (onConnectDisconnect != null)
                                 onConnectDisconnect.Invoke(this, false, 0, "سروری یافت نشد");
                             return;
                         }
 
-                        string smartCoreMode = !string.IsNullOrWhiteSpace(configData)
-                            ? ((hysteriaUrls.Count > 1 || needXray) ? "sing-box-urltest" : "sing-box-hysteria2")
-                            : "xray-only";
+                        singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
                         LogHelper.WriteExLog(
-                            "Smart config prepared. mode=" + smartCoreMode
-                            + " coreHysteria=" + hysteriaUrls.Count
-                            + " xrayCandidates=" + xrayUrls.Count
-                            + " xrayEnabled=" + needXray
+                            "Smart config prepared. mode=xray-leastload"
+                            + " inputCandidates=" + smartUrls.Count
+                            + " poolMembers=" + poolMemberCount
+                            + " hysteriaMembers=" + hysteriaMemberCount
+                            + " droppedCandidates=" + (smartUrls.Count - poolMemberCount)
+                            + " xrayEnabled=True"
                             + " aiRoutingEnabled=" + aiRoutingEnabled);
                         _singboxLinkOverride = null;
                     }
