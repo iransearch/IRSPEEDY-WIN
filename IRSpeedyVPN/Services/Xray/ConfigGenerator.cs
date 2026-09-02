@@ -522,7 +522,10 @@ namespace IRSpeedyVPN.Services.Xray
                     var obfsType = string.IsNullOrWhiteSpace(node.obfs)
                         ? "salamander"
                         : node.obfs.Trim();
+                    var useGecko = string.Equals(
+                        obfsType, "gecko", StringComparison.OrdinalIgnoreCase);
                     if (!string.IsNullOrWhiteSpace(node.obfs_param)
+                        && !useGecko
                         && !string.Equals(obfsType, "salamander", StringComparison.OrdinalIgnoreCase))
                     {
                         LogHelper.WriteExLog(
@@ -551,9 +554,6 @@ namespace IRSpeedyVPN.Services.Xray
                         },
                         tlsSettings = new TlsSettings
                         {
-                            allowInsecure = string.IsNullOrWhiteSpace(node.allowInsecure)
-                                ? (bool?)null
-                                : Utils.ToBool(node.allowInsecure),
                             serverName = string.IsNullOrWhiteSpace(node.sni) ? null : node.sni,
                             alpn = node.GetAlpn(),
                             fingerprint = string.IsNullOrWhiteSpace(node.fingerPrint) ? null : node.fingerPrint,
@@ -577,7 +577,10 @@ namespace IRSpeedyVPN.Services.Xray
                                     type = "salamander",
                                     settings = new HysteriaFinalMaskLayerSettings
                                     {
-                                        password = node.obfs_param
+                                        password = node.obfs_param,
+                                        // Gecko is Salamander plus QUIC fragmentation and
+                                        // padding. These are the Core's own Gecko defaults.
+                                        packetSize = useGecko ? "512-1200" : null
                                     }
                                 }
                             }

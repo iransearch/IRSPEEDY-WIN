@@ -17,6 +17,7 @@ namespace IRSpeedyVPN.Services.Xray
     public class HysteriaFinalMaskLayerSettings
     {
         public string password { get; set; }
+        public string packetSize { get; set; }
     }
 
     public class HysteriaQuicParams
