@@ -59,7 +59,15 @@ namespace IRSpeedyVPN.Services.Xray
             "apple.com",
             "icloud.com",
             "showip.net",
-            "cdn-apple.com"
+            "cdn-apple.com",
+            "reddit.com",
+            "flow.google.com",
+            "accounts.google.com",
+            "fonts.googleapis.com",
+            "lh3.googleusercontent.com",
+            "www.googletagmanager.com",
+            "auditrecording-pa.googleapis.com",
+            "csp.withgoogle.com"
         };
 
         /// <summary>Reads the shared VOD/AI toggle. Both services follow it.</summary>
