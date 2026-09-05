@@ -272,7 +272,9 @@ namespace IRSpeedyVPN.Services
                         int poolMemberCount;
                         int hysteriaMemberCount;
                         bool aiFallbackTested;
-                        var aiLinks = SelectTestedAiFallback(GetAiLinks(), out aiFallbackTested);
+                        string smartFallback;
+                        var aiLinks = SelectTestedFallbacks(smartUrls, GetAiLinks(),
+                            out smartFallback, out aiFallbackTested);
                         xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
                             smartUrls,
                             _xraySocksPort,
@@ -282,7 +284,7 @@ namespace IRSpeedyVPN.Services
                             out aiRoutingEnabled,
                             out poolMemberCount,
                             out hysteriaMemberCount,
-                            aiFallbackTested);
+                            aiFallbackTested, smartFallback);
                         if (string.IsNullOrWhiteSpace(xrayConfig))
                         {
                             if (_xraySocksPort > 0)
@@ -957,12 +959,45 @@ namespace IRSpeedyVPN.Services
 
         /// <summary>Test AI links through Xray, then put the fastest healthy link
         /// first so BuildOutbounds maps it to the AI fallback tag.</summary>
-        private List<string> SelectTestedAiFallback(List<string> links, out bool fallbackTested)
-        {
-            fallbackTested = false;
-            if (!Xray.SmartIpRouting.IsEnabled() || links.Count == 0)
-                return links;
+        // Instance-local: never persist subscription links/credentials. Always re-test a
+        // cached winner, and only if it is still present in the current pool.
+        private string lastSmartFallback;
+        private string lastAiFallback;
+        private DateTime fallbackTestedUtc;
+        private int fallbackCandidateOffset;
 
+        private List<string> FallbackCandidates(List<string> links, string preferred)
+        {
+            var result = new List<string>();
+            if (links.Contains(preferred))
+                result.Add(preferred);
+            // Spread probes across the list rather than testing only the first
+            // protocol group. Rotate on reconnect so a dead subset is not sticky.
+            for (int i = 0; i < Math.Min(5, links.Count); i++)
+            {
+                int index = (int)(((long)i * links.Count / Math.Min(5, links.Count)
+                    + fallbackCandidateOffset) % links.Count);
+                if (!result.Contains(links[index]) && result.Count < 5)
+                    result.Add(links[index]);
+            }
+            return result;
+        }
+
+        private List<string> SelectTestedFallbacks(List<string> smartLinks,
+            List<string> aiLinks, out string smartFallback, out bool aiFallbackTested)
+        {
+            smartFallback = null;
+            aiFallbackTested = false;
+            var elapsed = Stopwatch.StartNew();
+            if (DateTime.UtcNow - fallbackTestedUtc > TimeSpan.FromMinutes(5))
+            {
+                lastSmartFallback = null;
+                lastAiFallback = null;
+            }
+            var smartCandidates = FallbackCandidates(smartLinks, lastSmartFallback);
+            var aiCandidates = Xray.SmartIpRouting.IsEnabled()
+                ? FallbackCandidates(aiLinks, lastAiFallback) : new List<string>();
+            fallbackCandidateOffset = (fallbackCandidateOffset + 1) % Math.Max(1, smartLinks.Count);
             var ports = new List<int>();
             try
             {
@@ -973,28 +1008,26 @@ namespace IRSpeedyVPN.Services
                 {
                     NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
                 };
-                foreach (var link in links)
+                foreach (var link in smartCandidates.Concat(aiCandidates).Distinct(StringComparer.Ordinal))
                 {
-                    // Use the same eligibility rules as the production AI pool.
                     string unusedTag;
                     if (Xray.SmartIpRouting.BuildOutbounds(new[] { link },
-                        Xray.SmartIpRouting.AiProxyPrefix, "AI", serializer, out unusedTag).Count == 0)
+                        Xray.SmartIpRouting.SmartProxyPrefix, "Fallback", serializer, out unusedTag).Count == 0)
                         continue;
-
                     int socksPort = FreePortManager.Dequeue();
                     ports.Add(socksPort);
                     string user = Guid.NewGuid().ToString("N");
                     string pass = Guid.NewGuid().ToString("N");
                     infos.Add(new Xray.ConfigGenerator.XraySocksInfo
                     {
-                        Link = link, Tag = "ai-test-" + infos.Count,
+                        Link = link, Tag = "fallback-test-" + infos.Count,
                         Port = socksPort, User = user, Pass = pass
                     });
                     candidates.Add(link, new string[0]);
                     overrides.Add(link, Tuple.Create(socksPort, user, pass));
                 }
                 if (candidates.Count == 0)
-                    return links;
+                    return aiLinks;
 
                 int port = FreePortManager.Dequeue();
                 ports.Add(port);
@@ -1002,55 +1035,80 @@ namespace IRSpeedyVPN.Services
                 var config = SingBox.ConfigGenerator.GetUrlTestConfig(
                     candidates, port, out var tagToUrl, null, overrides);
                 if (tagToUrl.Count == 0)
-                    return links;
+                    return aiLinks;
 
-                var response = ExecuteCoreCall(client => client.Test(new TestReq
+                LogHelper.WriteExLog("[FallbackTest] stage=start candidates=" + tagToUrl.Count
+                    + " testTimeoutMs=2000");
+                // One batch/one temporary Xray instance, no sequential AI wait and
+                // no RPC retry that would duplicate the startup probe budget.
+                var response = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs).Test(new TestReq
                 {
                     Config = config ?? "",
                     OutboundTags = tagToUrl.Keys.ToList(),
                     Url = "https://www.google.com/generate_204",
-                    MaxConcurrency = 5,
-                    TestTimeoutMs = 5000,
+                    MaxConcurrency = tagToUrl.Count,
+                    TestTimeoutMs = 2000,
                     NeedXray = true,
                     XrayConfig = Xray.ConfigGenerator.GetUrlTestXrayConfig(infos)
-                }));
+                });
 
-                string bestLink = null;
-                long bestLatency = long.MaxValue;
+                string bestAi = null;
+                long smartLatency = long.MaxValue, aiLatency = long.MaxValue;
                 if (response?.Results != null)
                 {
                     foreach (var result in response.Results)
                     {
                         if (result == null || !tagToUrl.TryGetValue(result.OutboundTag, out var link))
                             continue;
-                        LogHelper.WriteExLog("[AiFallbackTest] candidate=" + links.IndexOf(link)
-                            + " latencyMs=" + result.LatencyMs);
-                        if (result.LatencyMs > 0 && result.LatencyMs < bestLatency)
+                        bool healthy = result.LatencyMs > 0 && string.IsNullOrEmpty(result.Error);
+                        if (smartCandidates.Contains(link))
                         {
-                            bestLink = link;
-                            bestLatency = result.LatencyMs;
+                            LogHelper.WriteExLog("[SmartFallbackTest] candidate=" + smartLinks.IndexOf(link)
+                                + " latencyMs=" + result.LatencyMs + " healthy=" + healthy);
+                            if (healthy && result.LatencyMs < smartLatency)
+                            {
+                                smartFallback = link;
+                                smartLatency = result.LatencyMs;
+                            }
+                        }
+                        if (aiCandidates.Contains(link))
+                        {
+                            LogHelper.WriteExLog("[AiFallbackTest] candidate=" + aiLinks.IndexOf(link)
+                                + " latencyMs=" + result.LatencyMs + " healthy=" + healthy);
+                            if (healthy && result.LatencyMs < aiLatency)
+                            {
+                                bestAi = link;
+                                aiLatency = result.LatencyMs;
+                            }
                         }
                     }
                 }
-                if (bestLink != null)
-                {
-                    fallbackTested = true;
-                    LogHelper.WriteExLog("[AiFallbackTest] result=selected candidate=" + links.IndexOf(bestLink)
-                        + " fallbackTag=ai-proxy-1 latencyMs=" + bestLatency);
-                    return new[] { bestLink }.Concat(links.Where(link => link != bestLink)).ToList();
-                }
-                LogHelper.WriteExLog("[AiFallbackTest] result=no-healthy-candidate");
+                lastSmartFallback = smartFallback;
+                lastAiFallback = bestAi;
+                fallbackTestedUtc = DateTime.UtcNow;
+                LogHelper.WriteExLog("[SmartFallbackTest] result="
+                    + (smartFallback == null ? "no-healthy-candidate" : "selected")
+                    + " candidate=" + smartLinks.IndexOf(smartFallback));
+                aiFallbackTested = bestAi != null;
+                LogHelper.WriteExLog("[AiFallbackTest] result="
+                    + (aiFallbackTested ? "selected" : "no-healthy-candidate")
+                    + " candidate=" + aiLinks.IndexOf(bestAi));
+                if (aiFallbackTested)
+                    return new[] { bestAi }.Concat(aiLinks.Where(link => link != bestAi)).ToList();
             }
             catch (Exception ex)
             {
-                LogHelper.WriteExLog("[AiFallbackTest] result=failed exception=" + ex.GetType().FullName);
+                lastSmartFallback = null;
+                lastAiFallback = null;
+                LogHelper.WriteExLog("[FallbackTest] result=failed exception=" + ex.GetType().FullName);
             }
             finally
             {
                 foreach (int port in ports)
                     FreePortManager.Enqueue(port);
+                LogHelper.WriteExLog("[FallbackTest] stage=complete elapsedMs=" + elapsed.ElapsedMilliseconds);
             }
-            return links;
+            return aiLinks;
         }
 
         private void VodUrlTest()
@@ -1839,3 +1897,4 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
+

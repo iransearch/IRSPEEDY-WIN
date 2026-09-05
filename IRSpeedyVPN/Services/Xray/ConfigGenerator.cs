@@ -291,7 +291,8 @@ namespace IRSpeedyVPN.Services.Xray
             out bool aiRoutingEnabled,
             out int poolMemberCount,
             out int hysteriaMemberCount,
-            bool aiFallbackTested = false)
+            bool aiFallbackTested = false,
+            string testedSmartFallbackLink = null)
         {
             aiRoutingEnabled = false;
             poolMemberCount = 0;
@@ -341,6 +342,7 @@ namespace IRSpeedyVPN.Services.Xray
 
             var outbounds = new JArray();
             int idx = 0;
+            string testedSmartFallbackTag = null;
             foreach (var link in links)
             {
                 if (string.IsNullOrWhiteSpace(link))
@@ -363,6 +365,8 @@ namespace IRSpeedyVPN.Services.Xray
                     continue;
 
                 outbounds.Add(JObject.FromObject(proxy, serializer));
+                if (string.Equals(link, testedSmartFallbackLink, StringComparison.Ordinal))
+                    testedSmartFallbackTag = proxy.tag;
                 idx++;
                 if (item.configType == EConfigType.Hysteria2)
                     hysteriaMemberCount++;
@@ -371,6 +375,17 @@ namespace IRSpeedyVPN.Services.Xray
             if (idx == 0)
                 return null;
 
+            var smartBalancer = (root["routing"]?["balancers"] as JArray)?.OfType<JObject>()
+                .FirstOrDefault(b => (string)b["tag"] == SmartIpRouting.SmartBalancerTag);
+            if (smartBalancer != null)
+            {
+                // Never fall back to the sample's arbitrary, untested first member.
+                if (testedSmartFallbackTag == null)
+                    smartBalancer.Remove("fallbackTag");
+                else
+                    smartBalancer["fallbackTag"] = testedSmartFallbackTag;
+            }
+            LogHelper.WriteExLog("[SmartFallbackTest] fallbackTag=" + (testedSmartFallbackTag ?? "none"));
             poolMemberCount = idx;
             aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer, aiFallbackTested);
 
@@ -737,3 +752,4 @@ namespace IRSpeedyVPN.Services.Xray
         }
     }
 }
+
