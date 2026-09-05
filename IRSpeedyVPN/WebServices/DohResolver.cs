@@ -28,7 +28,7 @@ namespace IRSpeedyVPN.WebServices
         };
 
         private const int TtlSeconds = 300;
-        private const int TimeoutSeconds = 6;
+        private const int TimeoutSeconds = 2;
         private const int ProviderCooldownSeconds = 300;
 
         private sealed class Entry
@@ -100,6 +100,12 @@ namespace IRSpeedyVPN.WebServices
                     ip = result.Ip;
                     break;
                 }
+
+                // If a provider returns no answer and did not time out, its failure is
+                // likely definitive for the current environment. Avoid burning extra
+                // seconds on the next provider during login startup.
+                if (!result.TimedOut)
+                    break;
             }
 
             if (ip != null)

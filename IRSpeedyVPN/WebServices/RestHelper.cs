@@ -33,7 +33,8 @@ namespace IRSpeedyVPN.WebServices
             IEncryptor encryptor,
             IDecryptor decryptor,
             string token = null,
-            int? timeoutSeconds = null)
+            int? timeoutSeconds = null,
+            bool skipDoh = false)
         {
             string url = _baseAddress + relPath;
 
@@ -97,7 +98,7 @@ namespace IRSpeedyVPN.WebServices
             // with --resolve, so on those machines the lookup would cost a round trip
             // per request and then be thrown away.
             string resolveOverride = null;
-            if (!CurlHelper.IsUnavailable)
+            if (!skipDoh && !CurlHelper.IsUnavailable)
             {
                 try
                 {
