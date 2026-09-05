@@ -19,11 +19,10 @@ namespace IRSpeedyVPN.WebServices
     /// </summary>
     internal static class DohResolver
     {
-        // IP-literal DoH endpoints. Cloudflare and Google both serve valid certs
-        // for these addresses, so no hostname (and no system DNS) is involved.
+        // IP-literal DoH endpoint. Google serves a valid cert for this address,
+        // so no hostname (and no system DNS) is involved.
         private static readonly string[] Providers =
         {
-            "https://1.1.1.1/dns-query?type=A&name=",
             "https://8.8.8.8/resolve?type=A&name="
         };
 
