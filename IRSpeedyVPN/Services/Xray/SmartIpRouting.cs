@@ -67,7 +67,17 @@ namespace IRSpeedyVPN.Services.Xray
             "lh3.googleusercontent.com",
             "www.googletagmanager.com",
             "auditrecording-pa.googleapis.com",
-            "csp.withgoogle.com"
+            "csp.withgoogle.com",
+            "flow.google",
+            "flow-content.google",
+            "aisandbox-pa.googleapis.com",
+            "www.gstatic.com",
+            "fonts.gstatic.com",
+            "www.google.com",
+            "ogads-pa.clients6.google.com",
+            "ogs.google.com",
+            "mail.google.com",
+            "support.google.com"
         };
 
         /// <summary>Reads the shared VOD/AI toggle. Both services follow it.</summary>
