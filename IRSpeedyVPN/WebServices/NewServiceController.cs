@@ -24,6 +24,8 @@ namespace IRSpeedyVPN.WebServices
         // Network budget shared by the endpoints of each authentication flow.
         // A separate settings request may follow login when its response omits settings.
         private const int LoginRequestTimeoutSeconds = 10;
+        private const int SlowNetworkLoginBudgetSeconds = 30;
+        private const int LoginEndpointTimeoutSeconds = 8;
         // Secondary settings call is kept short so total login work stays fast.
         private const int GetSettingsTimeoutSeconds = 4;
 
@@ -144,7 +146,7 @@ namespace IRSpeedyVPN.WebServices
                 // Otherwise treat as retryable
                 return null;
             },
-                LoginRequestTimeoutSeconds);
+                SlowNetworkLoginBudgetSeconds);
         }
 
         internal BaseHttpResponse<DefaultPlainResponse<AccountInfoEx>> RemoveToken(
@@ -254,7 +256,11 @@ namespace IRSpeedyVPN.WebServices
                             lastException);
 
                     int remainingEndpoints = allowFailover ? _services.Count - attempts : 1;
-                    perAttemptTimeout = Math.Max(1, (int)(remainingMs / 1000 / remainingEndpoints));
+                    // Login must accommodate slow DNS/TLS and leave room for the
+                    // managed transport retry. Fast responses still return immediately.
+                    perAttemptTimeout = flowName == "Login"
+                        ? Math.Min(LoginEndpointTimeoutSeconds, (int)(remainingMs / 1000))
+                        : Math.Max(1, (int)(remainingMs / 1000 / remainingEndpoints));
                 }
 
                 var attemptSw = Stopwatch.StartNew();

@@ -94,6 +94,12 @@ namespace IRSpeedyVPN.WebServices
             var totalBudgetMs = timeoutSeconds.HasValue && timeoutSeconds.Value > 0
                 ? (long?)timeoutSeconds.Value * 1000L
                 : null;
+            // Reserve a real managed retry window on longer API attempts. Short
+            // DoH probes retain their existing no-fallback-on-timeout policy.
+            long fallbackReserveMs = !skipHttpFallbackOnTimeout
+                && totalBudgetMs.HasValue && totalBudgetMs.Value >= 6000
+                ? 3000L : 0L;
+            long? curlBudgetMs = totalBudgetMs - fallbackReserveMs;
             List<CurlCandidate> candidates = ResolveOrderedCandidates(diagnostic);
             Exception lastFailure = null;
             bool bundledCurlUnavailable = true;
@@ -152,7 +158,7 @@ namespace IRSpeedyVPN.WebServices
                     int? remainingTimeoutMs = null;
                     if (totalBudgetMs.HasValue)
                     {
-                        long remainingMs = totalBudgetMs.Value - totalStopwatch.ElapsedMilliseconds;
+                        long remainingMs = curlBudgetMs.Value - totalStopwatch.ElapsedMilliseconds;
                         if (remainingMs <= 0)
                             throw new TimeoutException("The API request budget was fully consumed before curl.");
                         remainingTimeoutMs = (int)Math.Min(int.MaxValue, remainingMs);
@@ -257,7 +263,10 @@ namespace IRSpeedyVPN.WebServices
             var fallbackRemainingBudgetMs = totalBudgetMs - totalStopwatch.ElapsedMilliseconds;
             if (fallbackRemainingBudgetMs.HasValue && fallbackRemainingBudgetMs.Value <= 0)
             {
-                throw new TimeoutException("The API request budget was fully consumed before HttpFallback.");
+                diagnostic.BundledCurlUnavailable = bundledCurlUnavailable;
+                diagnostic.HttpFallbackOutcome = "skipped-budget-exhausted";
+                WriteDiagnostics(diagnostic, "request budget exhausted before managed fallback", lastFailure);
+                throw new TimeoutException("The API request budget was fully consumed before HttpFallback.", lastFailure);
             }
 
             return SendViaHttpFallback(
