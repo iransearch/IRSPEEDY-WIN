@@ -69,6 +69,7 @@ namespace IRSpeedyVPN
         GeoIp IpInfo = null;
         readonly Dictionary<object, List<HeaderIconRegistration>> headerIconMap = new Dictionary<object, List<HeaderIconRegistration>>();
         object currentHeaderOwner;
+        private Stopwatch loginUiStopwatch;
         public MainWindow()
         {
 
@@ -508,7 +509,26 @@ namespace IRSpeedyVPN
                 lblCtrlTitle.Text = "";
                 ShowMessage("");
                 lastControl = TransitionBox.Content;
-                TransitionBox.Content = ctrl;
+                if (ReferenceEquals(ctrl, uCServerList))
+                {
+                    // The server list is the result of login: reveal it immediately
+                    // instead of adding a decorative transition to the user's wait.
+                    var transition = TransitionBox.Transition;
+                    try
+                    {
+                        TransitionBox.Transition = null;
+                        TransitionBox.Content = ctrl;
+                        lblCtrlTitle.Text = uCServerList.Title;
+                    }
+                    finally
+                    {
+                        TransitionBox.Transition = transition;
+                    }
+                }
+                else
+                {
+                    TransitionBox.Content = ctrl;
+                }
                 currentHeaderOwner = ctrl;
                 RefreshHeaderIcons();
             }
@@ -654,11 +674,15 @@ namespace IRSpeedyVPN
             }
             else
             {
+                loginUiStopwatch = Stopwatch.StartNew();
+                LogHelper.WriteExLog("[LoginPerformance] stage=credentials-submitted elapsedMs=0");
+                var uiStopwatch = loginUiStopwatch;
                 uCLogin.HideRenewMessage();
                 ShowMessage("");
                 RunAsync(() =>
                 {
-                    Login(username, password, Remember);                        
+                    LogHelper.WriteExLog("[LoginPerformance] stage=worker-start elapsedMs=" + uiStopwatch.ElapsedMilliseconds);
+                    Login(username, password, Remember);
                 });
             }
         }
@@ -818,9 +842,11 @@ namespace IRSpeedyVPN
         }
         private bool ProcessInfo(AccountInfoEx acc, string password, bool onlyRenew = false)
         {
+            var processStopwatch = Stopwatch.StartNew();
             // Prefer settings already returned by Login response to avoid an extra
             // network call during initial login latency.
             var setting = acc.Settings ?? GetSetting();
+            LogHelper.WriteExLog("[LoginPerformance] stage=settings-ready processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
             if (setting != null)
                 acc.Settings = setting;
 
@@ -845,10 +871,12 @@ namespace IRSpeedyVPN
                     IsUserLogin = true;
                     //serviceFactory.RenewServiceList(acc.Servers);
                     serviceFactory.RenewServiceList(acc.groups);
+                    LogHelper.WriteExLog("[LoginPerformance] stage=services-ready processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
                     if (!onlyRenew &&!isUpdateAvailable)
                     {
                         DisconnectAll();
                         proxifier.Detach();
+                        LogHelper.WriteExLog("[LoginPerformance] stage=cleanup-complete processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
                         mainTimer.Change(1000,1000);
                         Dispatcher.Invoke((Action)(() =>
                         {
@@ -856,7 +884,7 @@ namespace IRSpeedyVPN
                             txtUsername.Text = gInfo.Username;
                             ShowMessage("");                            
                             ShowControl(uCServerList);
-                            
+                            LogHelper.WriteExLog("[LoginPerformance] stage=list-content-set processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
                         }));
                         /*
                         var ip = GetIPInfo();
@@ -986,7 +1014,34 @@ namespace IRSpeedyVPN
         private void HideLoading()
         {
 
-           this.Dispatcher.Invoke((Action)(() => uCLoading.Visibility = Visibility.Hidden));
+            this.Dispatcher.Invoke((Action)(() =>
+            {
+                uCLoading.Visibility = Visibility.Hidden;
+                var uiStopwatch = loginUiStopwatch;
+                if (uiStopwatch == null)
+                    return;
+
+                // ContextIdle runs after the queued layout/render work. This measures
+                // UI readiness, not the physical display's presentation timestamp.
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle,
+                    (Action)(() =>
+                    {
+                        if (!ReferenceEquals(loginUiStopwatch, uiStopwatch))
+                            return;
+                        if (ReferenceEquals(TransitionBox.Content, uCServerList)
+                            && uCServerList.IsVisible && !uCLoading.IsVisible)
+                        {
+                            LogHelper.WriteExLog("[LoginPerformance] stage=list-ui-ready elapsedMs="
+                                + uiStopwatch.ElapsedMilliseconds);
+                        }
+                        else
+                        {
+                            LogHelper.WriteExLog("[LoginPerformance] stage=loading-hidden-without-list elapsedMs="
+                                + uiStopwatch.ElapsedMilliseconds);
+                        }
+                        loginUiStopwatch = null;
+                    }));
+            }));
         }
         private void Header_MouseDown(object sender, MouseButtonEventArgs e)
         {
