@@ -44,6 +44,17 @@ namespace IRSpeedyVPN.Services
         string _singboxLinkOverride;
         public static string selectedChain;
         public static object grpcLock=new object();
+        private static readonly object startupRouteLock = new object();
+        private static Xray.StartupRouting activeStartupRouting;
+
+        private static void StopStartupRouting()
+        {
+            lock (startupRouteLock)
+            {
+                activeStartupRouting?.Dispose();
+                activeStartupRouting = null;
+            }
+        }
         public string Name { get => name ?? (server.urls.FirstOrDefault().url.StartsWith("trojan:") ? "VPN+" : "V-Guard".ToUpper());
             set => name = value;
         } 
@@ -271,10 +282,16 @@ namespace IRSpeedyVPN.Services
                         bool aiRoutingEnabled = false;
                         int poolMemberCount;
                         int hysteriaMemberCount;
-                        bool aiFallbackTested;
-                        string smartFallback;
-                        var aiLinks = SelectTestedFallbacks(smartUrls, GetAiLinks(),
-                            out smartFallback, out aiFallbackTested);
+                        bool aiStartupTested;
+                        string smartStartup;
+                        var aiLinks = SelectStartupRoutes(smartUrls, GetAiLinks(),
+                            out smartStartup, out aiStartupTested);
+                        if (userCancelRequested)
+                        {
+                            FreePortManager.Enqueue(_xraySocksPort);
+                            _xraySocksPort = 0;
+                            return;
+                        }
                         xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
                             smartUrls,
                             _xraySocksPort,
@@ -284,7 +301,7 @@ namespace IRSpeedyVPN.Services
                             out aiRoutingEnabled,
                             out poolMemberCount,
                             out hysteriaMemberCount,
-                            aiFallbackTested, smartFallback);
+                            aiStartupTested, smartStartup);
                         if (string.IsNullOrWhiteSpace(xrayConfig))
                         {
                             if (_xraySocksPort > 0)
@@ -363,8 +380,18 @@ namespace IRSpeedyVPN.Services
                         );
                     }
 
-                    if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))
+                    Xray.StartupRouting startupRouting = null;
+                    if (isSmartFast && !string.IsNullOrWhiteSpace(xrayConfig))
+                        startupRouting = new Xray.StartupRouting(ref xrayConfig);
+                    var coreStart = Stopwatch.StartNew();
+                    LogHelper.WriteExLog("[ConnectionStartup] stage=core-start");
+                    bool started;
+                    string startError;
+                    try { started = TryStartCoreWithConfig(configData, out startError, needXray, xrayConfig); }
+                    catch { startupRouting?.Dispose(); throw; }
+                    if (!started)
                     {
+                        startupRouting?.Dispose();
                         LogHelper.WriteExLog(
                             "Core failed to start; connection dropped."
                             + " share=" + IsShareActive
@@ -379,6 +406,12 @@ namespace IRSpeedyVPN.Services
                         return;
                     }
 
+                    LogHelper.WriteExLog("[ConnectionStartup] stage=core-ready elapsedMs=" + coreStart.ElapsedMilliseconds);
+                    lock (startupRouteLock)
+                    {
+                        activeStartupRouting = startupRouting;
+                        activeStartupRouting?.Start();
+                    }
                     IsConnected = true;
                     if (vpnmode)
                     {                      
@@ -961,12 +994,12 @@ namespace IRSpeedyVPN.Services
         /// first so BuildOutbounds maps it to the AI fallback tag.</summary>
         // Instance-local: never persist subscription links/credentials. Always re-test a
         // cached winner, and only if it is still present in the current pool.
-        private string lastSmartFallback;
-        private string lastAiFallback;
-        private DateTime fallbackTestedUtc;
-        private int fallbackCandidateOffset;
+        private string lastSmartStartup;
+        private string lastAiStartup;
+        private DateTime startupTestedUtc;
+        private int startupCandidateOffset;
 
-        private List<string> FallbackCandidates(List<string> links, string preferred)
+        private List<string> StartupCandidates(List<string> links, string preferred)
         {
             var result = new List<string>();
             if (links.Contains(preferred))
@@ -976,28 +1009,28 @@ namespace IRSpeedyVPN.Services
             for (int i = 0; i < Math.Min(5, links.Count); i++)
             {
                 int index = (int)(((long)i * links.Count / Math.Min(5, links.Count)
-                    + fallbackCandidateOffset) % links.Count);
+                    + startupCandidateOffset) % links.Count);
                 if (!result.Contains(links[index]) && result.Count < 5)
                     result.Add(links[index]);
             }
             return result;
         }
 
-        private List<string> SelectTestedFallbacks(List<string> smartLinks,
-            List<string> aiLinks, out string smartFallback, out bool aiFallbackTested)
+        private List<string> SelectStartupRoutes(List<string> smartLinks,
+            List<string> aiLinks, out string smartStartup, out bool aiStartupTested)
         {
-            smartFallback = null;
-            aiFallbackTested = false;
+            smartStartup = null;
+            aiStartupTested = false;
             var elapsed = Stopwatch.StartNew();
-            if (DateTime.UtcNow - fallbackTestedUtc > TimeSpan.FromMinutes(5))
+            if (DateTime.UtcNow - startupTestedUtc > TimeSpan.FromMinutes(5))
             {
-                lastSmartFallback = null;
-                lastAiFallback = null;
+                lastSmartStartup = null;
+                lastAiStartup = null;
             }
-            var smartCandidates = FallbackCandidates(smartLinks, lastSmartFallback);
+            var smartCandidates = StartupCandidates(smartLinks, lastSmartStartup);
             var aiCandidates = Xray.SmartIpRouting.IsEnabled()
-                ? FallbackCandidates(aiLinks, lastAiFallback) : new List<string>();
-            fallbackCandidateOffset = (fallbackCandidateOffset + 1) % Math.Max(1, smartLinks.Count);
+                ? StartupCandidates(aiLinks, lastAiStartup) : new List<string>();
+            startupCandidateOffset = (startupCandidateOffset + 1) % Math.Max(1, smartLinks.Count);
             var ports = new List<int>();
             try
             {
@@ -1012,7 +1045,7 @@ namespace IRSpeedyVPN.Services
                 {
                     string unusedTag;
                     if (Xray.SmartIpRouting.BuildOutbounds(new[] { link },
-                        Xray.SmartIpRouting.SmartProxyPrefix, "Fallback", serializer, out unusedTag).Count == 0)
+                        Xray.SmartIpRouting.SmartProxyPrefix, "Startup", serializer, out unusedTag).Count == 0)
                         continue;
                     int socksPort = FreePortManager.Dequeue();
                     ports.Add(socksPort);
@@ -1020,7 +1053,7 @@ namespace IRSpeedyVPN.Services
                     string pass = Guid.NewGuid().ToString("N");
                     infos.Add(new Xray.ConfigGenerator.XraySocksInfo
                     {
-                        Link = link, Tag = "fallback-test-" + infos.Count,
+                        Link = link, Tag = "startup-test-" + infos.Count,
                         Port = socksPort, User = user, Pass = pass
                     });
                     candidates.Add(link, new string[0]);
@@ -1037,23 +1070,32 @@ namespace IRSpeedyVPN.Services
                 if (tagToUrl.Count == 0)
                     return aiLinks;
 
-                LogHelper.WriteExLog("[FallbackTest] stage=start candidates=" + tagToUrl.Count
-                    + " testTimeoutMs=2000");
-                // One batch/one temporary Xray instance, no sequential AI wait and
-                // no RPC retry that would duplicate the startup probe budget.
-                var response = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs).Test(new TestReq
+                var testRoot = JObject.Parse(config);
+                string runPrefix = "startup-" + Guid.NewGuid().ToString("N") + "-";
+                foreach (var token in testRoot.Descendants().OfType<JValue>())
+                    if (token.Type == JTokenType.String && tagToUrl.ContainsKey((string)token))
+                        token.Value = runPrefix + (string)token;
+                tagToUrl = tagToUrl.ToDictionary(kv => runPrefix + kv.Key, kv => kv.Value);
+                LogHelper.WriteExLog("[StartupTest] stage=start candidates=" + tagToUrl.Count
+                    + " budgetMs=2000");
+                var request = new TestReq
                 {
-                    Config = config ?? "",
+                    Config = testRoot.ToString(),
                     OutboundTags = tagToUrl.Keys.ToList(),
                     Url = "https://www.google.com/generate_204",
                     MaxConcurrency = tagToUrl.Count,
                     TestTimeoutMs = 2000,
                     NeedXray = true,
                     XrayConfig = Xray.ConfigGenerator.GetUrlTestXrayConfig(infos)
-                });
+                };
+                TestResp response;
+                lock (grpcLock)
+                {
+                    response = RunStartupProbe(request, tagToUrl,
+                        new HashSet<string>(smartCandidates), new HashSet<string>(aiCandidates));
+                }
 
                 string bestAi = null;
-                long smartLatency = long.MaxValue, aiLatency = long.MaxValue;
                 if (response?.Results != null)
                 {
                     foreach (var result in response.Results)
@@ -1063,52 +1105,107 @@ namespace IRSpeedyVPN.Services
                         bool healthy = result.LatencyMs > 0 && string.IsNullOrEmpty(result.Error);
                         if (smartCandidates.Contains(link))
                         {
-                            LogHelper.WriteExLog("[SmartFallbackTest] candidate=" + smartLinks.IndexOf(link)
+                            LogHelper.WriteExLog("[SmartStartupTest] candidate=" + smartLinks.IndexOf(link)
                                 + " latencyMs=" + result.LatencyMs + " healthy=" + healthy);
-                            if (healthy && result.LatencyMs < smartLatency)
+                            if (healthy && smartStartup == null)
                             {
-                                smartFallback = link;
-                                smartLatency = result.LatencyMs;
+                                smartStartup = link;
                             }
                         }
                         if (aiCandidates.Contains(link))
                         {
-                            LogHelper.WriteExLog("[AiFallbackTest] candidate=" + aiLinks.IndexOf(link)
+                            LogHelper.WriteExLog("[AiStartupTest] candidate=" + aiLinks.IndexOf(link)
                                 + " latencyMs=" + result.LatencyMs + " healthy=" + healthy);
-                            if (healthy && result.LatencyMs < aiLatency)
+                            if (healthy && bestAi == null)
                             {
                                 bestAi = link;
-                                aiLatency = result.LatencyMs;
                             }
                         }
                     }
                 }
-                lastSmartFallback = smartFallback;
-                lastAiFallback = bestAi;
-                fallbackTestedUtc = DateTime.UtcNow;
-                LogHelper.WriteExLog("[SmartFallbackTest] result="
-                    + (smartFallback == null ? "no-healthy-candidate" : "selected")
-                    + " candidate=" + smartLinks.IndexOf(smartFallback));
-                aiFallbackTested = bestAi != null;
-                LogHelper.WriteExLog("[AiFallbackTest] result="
-                    + (aiFallbackTested ? "selected" : "no-healthy-candidate")
+                lastSmartStartup = smartStartup;
+                lastAiStartup = bestAi;
+                startupTestedUtc = DateTime.UtcNow;
+                LogHelper.WriteExLog("[SmartStartupTest] result="
+                    + (smartStartup == null ? "no-healthy-candidate" : "selected")
+                    + " candidate=" + smartLinks.IndexOf(smartStartup));
+                aiStartupTested = bestAi != null;
+                LogHelper.WriteExLog("[AiStartupTest] result="
+                    + (aiStartupTested ? "selected" : "no-healthy-candidate")
                     + " candidate=" + aiLinks.IndexOf(bestAi));
-                if (aiFallbackTested)
+                if (aiStartupTested)
                     return new[] { bestAi }.Concat(aiLinks.Where(link => link != bestAi)).ToList();
             }
             catch (Exception ex)
             {
-                lastSmartFallback = null;
-                lastAiFallback = null;
-                LogHelper.WriteExLog("[FallbackTest] result=failed exception=" + ex.GetType().FullName);
+                lastSmartStartup = null;
+                lastAiStartup = null;
+                LogHelper.WriteExLog("[StartupTest] result=failed exception=" + ex.GetType().FullName);
             }
             finally
             {
                 foreach (int port in ports)
                     FreePortManager.Enqueue(port);
-                LogHelper.WriteExLog("[FallbackTest] stage=complete elapsedMs=" + elapsed.ElapsedMilliseconds);
+                LogHelper.WriteExLog("[StartupTest] stage=complete elapsedMs=" + elapsed.ElapsedMilliseconds);
             }
             return aiLinks;
+        }
+
+        private TestResp RunStartupProbe(TestReq request, Dictionary<string, string> tagToUrl,
+            HashSet<string> smart, HashSet<string> ai)
+        {
+            var collected = new Dictionary<string, URLTestResp>();
+            var clock = Stopwatch.StartNew();
+            var call = Task.Run(() => new LibcoreServiceClient("127.0.0.1", CorePort, 300, 4000).Test(request));
+            bool cancelled = false;
+            try
+            {
+                while (!call.Wait(100))
+                {
+                    try
+                    {
+                        var partial = new LibcoreServiceClient("127.0.0.1", CorePort, 200, 250).QueryURLTest();
+                        foreach (var result in partial.Results)
+                            if (result != null && tagToUrl.ContainsKey(result.OutboundTag))
+                                collected[result.OutboundTag] = result;
+                    }
+                    catch { /* Older cores can still return the bounded final batch. */ }
+                    var healthy = new HashSet<string>(collected.Values
+                        .Where(r => r.LatencyMs > 0 && string.IsNullOrEmpty(r.Error))
+                        .Select(r => tagToUrl[r.OutboundTag]));
+                    if ((smart.Count == 0 || smart.Overlaps(healthy))
+                        && (ai.Count == 0 || ai.Overlaps(healthy)))
+                        break;
+                    if (clock.ElapsedMilliseconds >= 2000 || userCancelRequested)
+                        break;
+                }
+                if (!call.IsCompleted)
+                {
+                    cancelled = true;
+                    try { new LibcoreServiceClient("127.0.0.1", CorePort, 200, 300).StopTest(); } catch { }
+                }
+                // Drain before releasing temporary ports or starting the production
+                // core. The absolute RPC deadline also bounds an unresponsive core.
+                var final = call.GetAwaiter().GetResult();
+                foreach (var result in final.Results)
+                    if (result != null && tagToUrl.ContainsKey(result.OutboundTag)
+                        && !collected.ContainsKey(result.OutboundTag))
+                        collected.Add(result.OutboundTag, result);
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteExLog("[StartupTest] stage=rpc-ended exception=" + ex.GetType().Name);
+            }
+            finally
+            {
+                if (!call.IsCompleted || call.IsFaulted)
+                {
+                    try { new LibcoreServiceClient("127.0.0.1", CorePort, 200, 300).StopTest(); } catch { }
+                }
+            }
+            LogHelper.WriteExLog("[StartupTest] stage=probe-complete earlyStop=" + cancelled
+                + " elapsedMs=" + clock.ElapsedMilliseconds);
+            return new TestResp { Results = collected.Values.ToList() };
         }
 
         private void VodUrlTest()
@@ -1384,6 +1481,7 @@ namespace IRSpeedyVPN.Services
 
         private void TryStopCore()
         {
+            StopStartupRouting();
             try
             {
                 if (!ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
@@ -1420,6 +1518,7 @@ namespace IRSpeedyVPN.Services
 
         private void SafeStopCore(LibcoreServiceClient client)
         {
+            StopStartupRouting();
             try
             {
                 client.Stop();
@@ -1897,4 +1996,3 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
-

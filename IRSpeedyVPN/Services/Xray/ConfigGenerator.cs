@@ -291,8 +291,8 @@ namespace IRSpeedyVPN.Services.Xray
             out bool aiRoutingEnabled,
             out int poolMemberCount,
             out int hysteriaMemberCount,
-            bool aiFallbackTested = false,
-            string testedSmartFallbackLink = null)
+            bool aiStartupTested = false,
+            string testedSmartStartupLink = null)
         {
             aiRoutingEnabled = false;
             poolMemberCount = 0;
@@ -342,7 +342,7 @@ namespace IRSpeedyVPN.Services.Xray
 
             var outbounds = new JArray();
             int idx = 0;
-            string testedSmartFallbackTag = null;
+            string testedSmartStartupTag = null;
             foreach (var link in links)
             {
                 if (string.IsNullOrWhiteSpace(link))
@@ -365,8 +365,8 @@ namespace IRSpeedyVPN.Services.Xray
                     continue;
 
                 outbounds.Add(JObject.FromObject(proxy, serializer));
-                if (string.Equals(link, testedSmartFallbackLink, StringComparison.Ordinal))
-                    testedSmartFallbackTag = proxy.tag;
+                if (string.Equals(link, testedSmartStartupLink, StringComparison.Ordinal))
+                    testedSmartStartupTag = proxy.tag;
                 idx++;
                 if (item.configType == EConfigType.Hysteria2)
                     hysteriaMemberCount++;
@@ -375,19 +375,14 @@ namespace IRSpeedyVPN.Services.Xray
             if (idx == 0)
                 return null;
 
-            var smartBalancer = (root["routing"]?["balancers"] as JArray)?.OfType<JObject>()
-                .FirstOrDefault(b => (string)b["tag"] == SmartIpRouting.SmartBalancerTag);
-            if (smartBalancer != null)
-            {
-                // Never fall back to the sample's arbitrary, untested first member.
-                if (testedSmartFallbackTag == null)
-                    smartBalancer.Remove("fallbackTag");
-                else
-                    smartBalancer["fallbackTag"] = testedSmartFallbackTag;
-            }
-            LogHelper.WriteExLog("[SmartFallbackTest] fallbackTag=" + (testedSmartFallbackTag ?? "none"));
             poolMemberCount = idx;
-            aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer, aiFallbackTested);
+            aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer);
+            // Keep permanent balancer rules in place. Each tested startup rule is
+            // a clone immediately before its automatic counterpart, preserving
+            // AI, private/IR bypass and UDP/443 policy priority.
+            StartupRouting.AddRules(root, SmartIpRouting.SmartBalancerTag, testedSmartStartupTag);
+            if (aiRoutingEnabled && aiStartupTested)
+                StartupRouting.AddRules(root, SmartIpRouting.AiBalancerTag, SmartIpRouting.AiProxyPrefix + "1");
 
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
             outbounds.Add(JObject.FromObject(new Outbound
@@ -415,16 +410,16 @@ namespace IRSpeedyVPN.Services.Xray
         /// public IP, which the core refuses to build as an Xray outbound, so VOD
         /// stays on its sing-box outbound instead.
         /// </summary>
-        private static bool ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer, bool aiFallbackTested)
+        private static bool ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer)
         {
             if (!SmartIpRouting.IsEnabled())
                 return false;
 
-            string aiFallbackTag;
+            string firstAiTag;
             var aiOutbounds = SmartIpRouting.BuildOutbounds(
-                aiLinks, SmartIpRouting.AiProxyPrefix, "AI", serializer, out aiFallbackTag);
+                aiLinks, SmartIpRouting.AiProxyPrefix, "AI", serializer, out firstAiTag);
 
-            if (aiOutbounds.Count == 0 || aiFallbackTag == null)
+            if (aiOutbounds.Count == 0 || firstAiTag == null)
                 return false;
 
             var balancers = root["routing"]?["balancers"] as JArray;
@@ -436,11 +431,8 @@ namespace IRSpeedyVPN.Services.Xray
 
             foreach (var outbound in aiOutbounds)
                 outbounds.Add(outbound);
-            var aiBalancer = SmartIpRouting.AiBalancer(aiFallbackTag);
-            // Never force an untested/dead first link when every probe failed.
-            // Keep the AI pool and let its observatory choose available members.
-            if (!aiFallbackTested)
-                aiBalancer.Remove("fallbackTag");
+            var aiBalancer = SmartIpRouting.AiBalancer(firstAiTag);
+            aiBalancer.Remove("fallbackTag");
             balancers.Add(aiBalancer);
 
             // The AI rule runs ahead of the geoip/geosite checks and the catch-all so
@@ -752,4 +744,3 @@ namespace IRSpeedyVPN.Services.Xray
         }
     }
 }
-

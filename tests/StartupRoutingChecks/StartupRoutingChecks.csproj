@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <LangVersion>latest</LangVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
+    <Compile Include="../../IRSpeedyVPN/Services/Xray/StartupRouting.cs" Link="StartupRouting.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Xray/Samples.cs" Link="Samples.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="LibcoreProto.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="LibcoreMessages.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs" />
+  </ItemGroup>
+</Project>

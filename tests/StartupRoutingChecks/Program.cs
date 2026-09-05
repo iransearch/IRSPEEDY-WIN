@@ -1,0 +1,100 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using IRSpeedyVPN.Services.Xray;
+using Newtonsoft.Json.Linq;
+
+internal static class Program
+{
+    private static void Check(bool condition, string message)
+    {
+        if (!condition) throw new Exception(message);
+    }
+
+    private static void Main()
+    {
+        var root = JObject.Parse(Samples.BalancerConfig);
+        var rules = (JArray)root["routing"]["rules"];
+        rules.Insert(1, new JObject { ["type"] = "field", ["balancerTag"] = "ai-balancer",
+            ["domain"] = new JArray("domain:google.com") });
+        ((JArray)root["routing"]["balancers"]).Add(new JObject {
+            ["tag"] = "ai-balancer", ["fallbackTag"] = "ai-proxy-1" });
+        var originals = rules.Select(r => r.DeepClone()).ToList();
+        StartupRouting.AddRules(root, "smart-balancer-1", "smart-proxy-23");
+        StartupRouting.AddRules(root, "ai-balancer", "ai-proxy-5");
+        Check(!((JArray)root["routing"]["balancers"]).Any(b => b["fallbackTag"] != null), "Fallback survived");
+        Check((string)rules[0]["outboundTag"] == "block", "UDP/443 policy changed");
+        Check((string)rules[1]["outboundTag"] == "ai-proxy-5", "AI pin lost its priority");
+        var automatic = rules.Where(r => r["ruleTag"] == null).ToList();
+        Check(automatic.Count == originals.Count && automatic.Zip(originals, JToken.DeepEquals).All(x => x),
+            "Automatic or bypass rules were modified");
+        var pinned = rules.OfType<JObject>().Where(r => r["ruleTag"] != null).ToList();
+        Check(pinned.Count == 3, "Both smart rules and the AI rule must be pinned");
+        foreach (var pin in pinned)
+        {
+            var next = (JObject)rules[rules.IndexOf(pin) + 1];
+            Check(next["balancerTag"] != null, "Pin is not immediately before its automatic rule");
+            Check(pin["balancerTag"] == null, "Startup pin still uses the balancer");
+        }
+        // AI can hand off independently; smart pins and bypass rules stay intact.
+        foreach (var pin in pinned.Where(p => ((string)p["ruleTag"]).StartsWith("startup-ai-balancer-"))) pin.Remove();
+        Check(rules.Count(r => r["ruleTag"] != null) == 2, "AI handoff removed smart pins");
+        foreach (var pin in rules.Where(r => r["ruleTag"] != null).ToList()) pin.Remove();
+        Check(rules.Zip(originals, JToken.DeepEquals).All(x => x), "Handoff did not restore original policy");
+
+        var untested = JObject.Parse(Samples.BalancerConfig);
+        StartupRouting.AddRules(untested, "smart-balancer-1", null);
+        Check(!((JArray)untested["routing"]["rules"]).Any(r => r["ruleTag"] != null), "Untested route was pinned");
+
+        // Golden wire fixture from Xray's command.proto: balancer(1),
+        // principle_target(6), repeated tag(1). Include an unknown varint field.
+        byte[] reply = { 10, 20, 48, 1, 50, 16, 10, 14, 115, 109, 97, 114, 116, 45, 112, 114, 111, 120, 121, 45, 50, 51 };
+        Check(XrayRoutingClient.DecodeTargets(reply).SequenceEqual(new[] { "smart-proxy-23" }), "Balancer decode failed");
+        Check(XrayRoutingClient.DecodeTargets(new byte[0]).Count == 0, "Empty result is not healthy");
+        bool rejected = false;
+        try { XrayRoutingClient.DecodeTargets(new byte[] { 10, 127, 1 }); } catch { rejected = true; }
+        Check(rejected, "Truncated response accepted");
+        // A core that accepts TCP but never answers must not hang startup.
+        var listener = new System.Net.Sockets.TcpListener(System.Net.IPAddress.Loopback, 0);
+        listener.Start();
+        var accept = listener.AcceptTcpClientAsync();
+        var clock = System.Diagnostics.Stopwatch.StartNew();
+        bool timedOut = false;
+        try
+        {
+            var port = ((System.Net.IPEndPoint)listener.LocalEndpoint).Port;
+            new IRSpeedyVPN.Services.Libcore.LibcoreServiceClient("127.0.0.1", port, 300, 150).QueryURLTest();
+        }
+        catch { timedOut = true; }
+        finally { accept.GetAwaiter().GetResult().Dispose(); listener.Stop(); }
+        Check(timedOut && clock.ElapsedMilliseconds < 1500, "Unresponsive core exceeded the RPC deadline");
+        Console.WriteLine("Startup routing policy and protobuf checks passed.");
+    }
+}
+
+// Test-only host adapters; the linked routing and protobuf code is production code.
+namespace IRSpeedyVPN
+{
+    internal static class AppServices
+    {
+        internal static readonly RuntimePaths ResourceManager = new RuntimePaths();
+        internal sealed class RuntimePaths { internal string TempPath => System.IO.Path.GetTempPath(); }
+    }
+}
+namespace IRSpeedyVPN.Common
+{
+    internal static class LogHelper { internal static void WriteExLog(string value) { } }
+    internal static class FreePortManager
+    {
+        internal static int Dequeue() => throw new NotSupportedException("No core in policy tests");
+        internal static void Enqueue(int port) { }
+    }
+}
+namespace IRSpeedyVPN.Services.Xray
+{
+    internal static class SmartIpRouting
+    {
+        internal const string SmartBalancerTag = "smart-balancer-1", AiBalancerTag = "ai-balancer";
+        internal const string SmartProxyPrefix = "smart-proxy-", AiProxyPrefix = "ai-proxy-";
+    }
+}

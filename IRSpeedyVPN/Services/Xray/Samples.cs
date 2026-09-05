@@ -31,7 +31,6 @@ namespace IRSpeedyVPN.Services.Xray
 			""routing"": {
 				""balancers"": [
 					{
-						""fallbackTag"": ""smart-proxy-0"",
 						""selector"": [
 							""smart-proxy-""
 						],
