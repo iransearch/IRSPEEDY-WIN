@@ -144,6 +144,65 @@ namespace IRSpeedyVPN.Common
             return delay;
         }
 
+        /// <summary>
+        /// Tests the active connection's HTTP/mixed listener. A null port is for
+        /// system-tunnel services, which have no local HTTP proxy.
+        /// </summary>
+        internal static long ConnectionUrlTest(string url, int timeoutMs, int? httpPort)
+        {
+            if (httpPort.HasValue && (httpPort.Value <= 0 || httpPort.Value > 65535))
+                throw new ArgumentOutOfRangeException(nameof(httpPort));
+
+            for (int attempt = 1; attempt <= 2; attempt++)
+            {
+                var stopwatch = Stopwatch.StartNew();
+                try
+                {
+                    ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12;
+                    var request = (HttpWebRequest)WebRequest.Create(url);
+                    // Some destinations reject HEAD. Only wait for GET headers; do
+                    // not download the page body just to measure reachability.
+                    request.Method = "GET";
+                    request.UserAgent = "Mozilla/5.0";
+                    request.Proxy = httpPort.HasValue
+                        ? new WebProxy("http://127.0.0.1:" + httpPort.Value)
+                        : null;
+                    request.Timeout = timeoutMs;
+                    request.ReadWriteTimeout = timeoutMs;
+                    request.AllowAutoRedirect = true;
+                    using (var response = (HttpWebResponse)request.GetResponse())
+                    {
+                        LogHelper.WriteExLog("[ConnectionTest] host=" + new Uri(url).Host
+                            + " route=" + (httpPort.HasValue ? "http-proxy:" + httpPort.Value : "system-tunnel")
+                            + " status=" + (int)response.StatusCode
+                            + " elapsedMs=" + stopwatch.ElapsedMilliseconds);
+                        return stopwatch.ElapsedMilliseconds;
+                    }
+                }
+                catch (WebException ex)
+                {
+                    using (var response = ex.Response as HttpWebResponse)
+                    {
+                        LogHelper.WriteExLog("[ConnectionTest] host=" + new Uri(url).Host
+                            + " route=" + (httpPort.HasValue ? "http-proxy:" + httpPort.Value : "system-tunnel")
+                            + " attempt=" + attempt + " error=" + ex.Status
+                            + " httpStatus=" + (response == null ? "" : ((int)response.StatusCode).ToString())
+                            + " elapsedMs=" + stopwatch.ElapsedMilliseconds);
+                        // An HTTP rejection is not a transient connection failure.
+                        if (response != null)
+                            return -1;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogHelper.WriteExLog("[ConnectionTest] host=" + new Uri(url).Host
+                        + " error=" + ex.GetType().FullName);
+                    return -1;
+                }
+            }
+            return -1;
+        }
+
         internal static long UrlTest(string url, int timeoutMs)
         {
             byte retCount = 2;

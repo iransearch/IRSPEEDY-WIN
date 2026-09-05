@@ -66,7 +66,7 @@ namespace IRSpeedyVPN.UserControls
                 OnDisconnectRequest.Invoke(sender, e);
         }
 
-        private long?[] CheckPing(string[] sites)
+        private long?[] CheckPing(string[] sites, int? httpPort)
         {
             long?[] result = new long?[sites.Length];
 
@@ -74,12 +74,13 @@ namespace IRSpeedyVPN.UserControls
             {
                 try
                 {
-                    long delay = ServiceHelper.UrlTest(sites[i], 4000);
+                    long delay = ServiceHelper.ConnectionUrlTest(sites[i], 4000, httpPort);
                     if (delay >= 0)
                         result[i] = delay;
                 }
-                catch
+                catch (Exception ex)
                 {
+                    LogHelper.WriteLog(ex);
                 }
             });
 
@@ -88,6 +89,11 @@ namespace IRSpeedyVPN.UserControls
 
         private void ConnectionTest_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
+            var service = globalInfo?.CurrentService;
+            if (service == null)
+                return;
+            // Snapshot the active port before the worker starts. Do not assume 1080.
+            int? httpPort = service.HttpPort;
             OnLoadingRequest?.Invoke(true, null);
             string[] sites = new[]
             {
@@ -98,7 +104,7 @@ namespace IRSpeedyVPN.UserControls
             };
             long?[] res = new long?[sites.Length];
 
-            Action action = () => res = CheckPing(sites);
+            Action action = () => res = CheckPing(sites, httpPort);
             action.BeginInvoke(ar =>
             {
                 OnLoadingRequest?.Invoke(false, null);
