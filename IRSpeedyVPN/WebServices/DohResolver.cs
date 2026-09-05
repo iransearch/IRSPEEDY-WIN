@@ -52,9 +52,9 @@ namespace IRSpeedyVPN.WebServices
         /// Returns an IPv4 address for <paramref name="host"/> resolved over DoH,
         /// or null when the caller should fall back to the system resolver.
         /// </summary>
-        public static string Resolve(string host)
+        public static string Resolve(string host, int timeoutSeconds = TimeoutSeconds)
         {
-            if (string.IsNullOrWhiteSpace(host))
+            if (timeoutSeconds <= 0 || string.IsNullOrWhiteSpace(host))
                 return null;
 
             // Already an IP literal: nothing to resolve.
@@ -82,7 +82,7 @@ namespace IRSpeedyVPN.WebServices
                     continue;
                 }
 
-                ProviderQueryResult result = QueryProvider(provider, host);
+                ProviderQueryResult result = QueryProvider(provider, host, Math.Min(TimeoutSeconds, timeoutSeconds));
                 if (result.TimedOut)
                 {
                     SetProviderCooldown(provider);
@@ -122,7 +122,7 @@ namespace IRSpeedyVPN.WebServices
             return ip;
         }
 
-        private static ProviderQueryResult QueryProvider(string providerUrl, string host)
+        private static ProviderQueryResult QueryProvider(string providerUrl, string host, int timeoutSeconds)
         {
             var result = new ProviderQueryResult();
 
@@ -135,16 +135,20 @@ namespace IRSpeedyVPN.WebServices
                     "Accept: application/dns-json\r\n",
                     null,
                     null,
-                    TimeoutSeconds,
+                    timeoutSeconds,
                     null,
                     true);
 
-                if (resp == null || string.IsNullOrWhiteSpace(resp.Body))
+                if (resp == null || resp.HttpCode != 200 || string.IsNullOrWhiteSpace(resp.Body))
                     return result;
 
                 var root = new JavaScriptSerializer()
                     .Deserialize<Dictionary<string, object>>(resp.Body);
                 if (root == null)
+                    return result;
+
+                object status;
+                if (!root.TryGetValue("Status", out status) || Convert.ToInt32(status) != 0)
                     return result;
 
                 object answerObj;
@@ -170,9 +174,8 @@ namespace IRSpeedyVPN.WebServices
                     if (string.IsNullOrWhiteSpace(text))
                         continue;
 
-                    // type 1 == A record. Some providers omit it; accept a valid
-                    // IPv4 either way.
-                    bool isARecord = typeObj == null || typeObj.ToString() == "1";
+                    // Only accept explicit A records from a successful DNS response.
+                    bool isARecord = typeObj != null && typeObj.ToString() == "1";
                     IPAddress parsed;
                     if (isARecord
                         && IPAddress.TryParse(text.Trim(), out parsed)

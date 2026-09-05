@@ -104,6 +104,7 @@ namespace IRSpeedyVPN.WebServices
             Exception lastFailure = null;
             bool bundledCurlUnavailable = true;
             bool curlRequestTimedOut = false;
+            bool curlDnsFailed = false;
             string fallbackStage = "managed-fallback: bundled curl unavailable";
             string args = BuildArgs(
                 url, method, headers, body, proxy, timeoutSeconds, resolveOverride);
@@ -174,6 +175,7 @@ namespace IRSpeedyVPN.WebServices
 
                     if (processResult.ExitCode != 0)
                     {
+                        curlDnsFailed = processResult.ExitCode == 6;
                         bool requestTimedOut = processResult.ExitCode == 28;
                         curlRequestTimedOut = requestTimedOut;
                         fallbackStage = requestTimedOut
@@ -245,6 +247,43 @@ namespace IRSpeedyVPN.WebServices
                         + " type="
                         + ex.GetType().FullName + " hresult=0x"
                         + ex.HResult.ToString("X8") + GetNativeErrorSuffix(ex));
+                }
+            }
+
+            // Recover only a failed system DNS lookup. Keep the URL/Host/SNI
+            // unchanged and let curl pin the DoH address via --resolve.
+            Uri target;
+            IPAddress literal;
+            if (curlDnsFailed && !bundledCurlUnavailable
+                && !skipHttpFallbackOnTimeout && string.IsNullOrEmpty(resolveOverride)
+                && Uri.TryCreate(url, UriKind.Absolute, out target)
+                && (target.Scheme == Uri.UriSchemeHttps || target.Scheme == Uri.UriSchemeHttp)
+                && !IPAddress.TryParse(target.Host, out literal))
+            {
+                long remainingMs = totalBudgetMs.HasValue
+                    ? totalBudgetMs.Value - totalStopwatch.ElapsedMilliseconds : 8000L;
+                // Reserve at least a second for the actual API retry. Whole-second
+                // timeouts round down so neither the lookup nor retry gets a new budget.
+                int lookupSeconds = (int)Math.Min(2L, (remainingMs - 1000L) / 1000L);
+                if (lookupSeconds > 0)
+                {
+                    LogHelper.WriteExLog("[DohRecovery] host=" + target.Host + " stage=lookup");
+                    string ip = DohResolver.Resolve(target.Host, lookupSeconds);
+                    remainingMs = totalBudgetMs.HasValue
+                        ? totalBudgetMs.Value - totalStopwatch.ElapsedMilliseconds : 8000L;
+                    if (!string.IsNullOrEmpty(ip) && remainingMs >= 1000L)
+                    {
+                        diagnostic.Attempts.Add("system-dns-failed recovery=doh address=" + ip);
+                        WriteDiagnostics(diagnostic, "retrying API with DoH address", lastFailure);
+                        int retrySeconds = (int)Math.Min(int.MaxValue, remainingMs / 1000L);
+                        var recovered = Send(url, method, headers, body, proxy, retrySeconds,
+                            target.Host + ":" + target.Port + ":" + ip, false);
+                        LogHelper.WriteExLog("[DohRecovery] host=" + target.Host
+                            + " stage=response httpStatus=" + recovered.HttpCode);
+                        return recovered;
+                    }
+                    LogHelper.WriteExLog("[DohRecovery] host=" + target.Host
+                        + " stage=no-retry reason=" + (string.IsNullOrEmpty(ip) ? "no-answer" : "budget-exhausted"));
                 }
             }
 
