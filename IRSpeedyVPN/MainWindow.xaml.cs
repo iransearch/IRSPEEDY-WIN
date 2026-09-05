@@ -664,12 +664,14 @@ namespace IRSpeedyVPN
         }
         bool Login(string username,string password,bool Remember,bool onlyRenew=false)
         {
+            var loginStopwatch = Stopwatch.StartNew();
             try
             {
                 IsRememberChecked = Remember;
                 lastLoginUsername = username;
                 lastLoginPassword = password;
                 var res = serviceController.Login2(username, password);
+                LogHelper.WriteExLog("[LoginPerformance] stage=auth-complete elapsedMs=" + loginStopwatch.ElapsedMilliseconds);
                 if (res.StatusCode == System.Net.HttpStatusCode.NotAcceptable)
                 {
                     var devices = TryParseDeviceList(res.ResponseData?.data);
@@ -709,6 +711,10 @@ namespace IRSpeedyVPN
                     ShowMessage("ارتباط با سرور برقرار نیست");
                     LogHelper.WriteLog(ex);
                 }
+            }
+            finally
+            {
+                LogHelper.WriteExLog("[LoginPerformance] stage=complete elapsedMs=" + loginStopwatch.ElapsedMilliseconds);
             }
             return false;
         }
@@ -887,13 +893,6 @@ namespace IRSpeedyVPN
             }
             else
             {
-                if (!uCLoading.IsVisible)
-                {
-
-                    Dispatcher.Invoke((Action)(() => { uCLoading.Visibility = Visibility.Visible; }));
-                    Thread.Sleep(3000);
-                    Dispatcher.Invoke((Action)(() => { uCLoading.Visibility = Visibility.Hidden; }));
-                }
                 DisconnectAll();
                 proxifier.Detach();
                 Dispatcher.Invoke((Action)(() =>

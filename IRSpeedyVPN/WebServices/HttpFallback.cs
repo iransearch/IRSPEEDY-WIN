@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Net;
 using System.Text;
+using System.Threading;
 
 namespace IRSpeedyVPN.WebServices
 {
@@ -26,8 +27,11 @@ namespace IRSpeedyVPN.WebServices
             string headers,
             string body,
             string proxy,
-            int? timeoutSeconds)
+            int? timeoutMilliseconds)
         {
+            if (timeoutMilliseconds.HasValue && timeoutMilliseconds.Value <= 0)
+                throw new TimeoutException("The HTTP request has no remaining budget.");
+
             EnsureModernTlsEnabled();
 
             var request = (HttpWebRequest)WebRequest.Create(url);
@@ -44,26 +48,50 @@ namespace IRSpeedyVPN.WebServices
             // to bring up, or into a stale proxy left behind by another app.
             request.Proxy = string.IsNullOrWhiteSpace(proxy) ? null : new WebProxy(proxy);
 
-            if (timeoutSeconds.HasValue && timeoutSeconds.Value > 0)
+            if (timeoutMilliseconds.HasValue && timeoutMilliseconds.Value > 0)
             {
-                int ms = timeoutSeconds.Value * 1000;
+                int ms = timeoutMilliseconds.Value;
                 request.Timeout = ms;
                 request.ReadWriteTimeout = ms;
             }
 
             ApplyHeaders(request, headers);
 
-            if (request.Method == "POST")
+            // Timeout/ReadWriteTimeout cover individual operations, not the full
+            // upload + headers + response body. Abort also bounds a slow/dripping body.
+            int deadlineExpired = 0;
+            int deadlineMs = timeoutMilliseconds.HasValue && timeoutMilliseconds.Value > 0
+                ? timeoutMilliseconds.Value
+                : Timeout.Infinite;
+            using (var deadline = new Timer(_ =>
             {
-                byte[] payload = body == null ? new byte[0] : Encoding.UTF8.GetBytes(body);
-                request.ContentLength = payload.Length;
-                using (var stream = request.GetRequestStream())
+                Interlocked.Exchange(ref deadlineExpired, 1);
+                try { request.Abort(); }
+                catch { }
+            }, null, deadlineMs, Timeout.Infinite))
+            {
+                try
                 {
-                    stream.Write(payload, 0, payload.Length);
+                    if (request.Method == "POST")
+                    {
+                        byte[] payload = body == null ? new byte[0] : Encoding.UTF8.GetBytes(body);
+                        request.ContentLength = payload.Length;
+                        using (var stream = request.GetRequestStream())
+                        {
+                            stream.Write(payload, 0, payload.Length);
+                        }
+                    }
+
+                    var response = ReadResponse(request);
+                    if (Volatile.Read(ref deadlineExpired) != 0)
+                        throw new TimeoutException("The HTTP request deadline expired.");
+                    return response;
+                }
+                catch (Exception ex) when (Volatile.Read(ref deadlineExpired) != 0)
+                {
+                    throw new TimeoutException("The HTTP request deadline expired.", ex);
                 }
             }
-
-            return ReadResponse(request);
         }
 
         /// <summary>

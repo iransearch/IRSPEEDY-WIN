@@ -127,13 +127,14 @@ namespace IRSpeedyVPN.WebServices
                     BuildAuthPayload(userName, password, deviceName, deviceToken, guid),
                     null, null, null, timeoutSeconds, skipDoh: true);
 
+                bool validResponse = IsValidEncryptedServerListResponse(res, guid);
                 LogHelper.WriteExLog("[StartupAuth] stage=validate-response requestId=" + requestId
-                    + " endpoint=" + GetBaseUrl(service) + " valid-guid=" + IsValidEncryptedServerListResponse(res, guid)
+                    + " endpoint=" + GetBaseUrl(service) + " valid-guid=" + validResponse
                     + " status=" + GetResponseStatus(res)
                     + " has-message=" + (res != null && res.ResponseData != null && !string.IsNullOrEmpty(res.ResponseData.message)));
 
                 // Keep your original validation:
-                if (IsValidEncryptedServerListResponse(res, guid))
+                if (validResponse)
                     return res;
 
                 // If server returned a meaningful message, return it (do not retry)
