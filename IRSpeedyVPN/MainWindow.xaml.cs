@@ -815,9 +815,6 @@ namespace IRSpeedyVPN
             // Prefer settings already returned by Login response to avoid an extra
             // network call during initial login latency.
             var setting = acc.Settings ?? GetSetting();
-            if (acc.Settings == null && setting != null)
-                acc.Settings = setting;
-
             if (setting != null)
                 acc.Settings = setting;
 

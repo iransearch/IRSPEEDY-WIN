@@ -21,8 +21,8 @@ namespace IRSpeedyVPN.WebServices
         // matching this value; an old server that does not read "kv" keeps using the
         // legacy key, and the client tries both keys on decrypt, so nothing breaks.
         private const int ServerListKeyVersion = 2;
-        // Per-flow budget for user-visible login attempt. Keep under 10s to keep
-        // login UX responsive.
+        // Network budget shared by the endpoints of each authentication flow.
+        // A separate settings request may follow login when its response omits settings.
         private const int LoginRequestTimeoutSeconds = 10;
         // Secondary settings call is kept short so total login work stays fast.
         private const int GetSettingsTimeoutSeconds = 4;
@@ -75,6 +75,7 @@ namespace IRSpeedyVPN.WebServices
                 $"&key={ChangePasswordKey}";
 
             return ExecuteWithFailover(
+                Guid.NewGuid().ToString("N"),
                 "ChangePassword",
                 (svc, timeoutSeconds) => svc.SendRequest<ChangePasswordResult>(
                     url, null, null, null, null, timeoutSeconds, skipDoh: true),
@@ -244,10 +245,15 @@ namespace IRSpeedyVPN.WebServices
                 if (flowBudgetMs > 0)
                 {
                     long remainingMs = flowBudgetMs - flowStopwatch.ElapsedMilliseconds;
-                    if (remainingMs <= 0)
-                        break;
+                    // The transport accepts whole seconds. Do not round up past
+                    // the remaining budget or let one endpoint consume every retry.
+                    if (remainingMs < 1000)
+                        throw new TimeoutException(
+                            "Authentication flow timeout budget exhausted: flow=" + flowName,
+                            lastException);
 
-                    perAttemptTimeout = (int)Math.Ceiling(Math.Max(1, remainingMs / 1000.0));
+                    int remainingEndpoints = allowFailover ? _services.Count - attempts : 1;
+                    perAttemptTimeout = Math.Max(1, (int)(remainingMs / 1000 / remainingEndpoints));
                 }
 
                 var attemptSw = Stopwatch.StartNew();
@@ -321,7 +327,9 @@ namespace IRSpeedyVPN.WebServices
 
             if (flowBudgetMs > 0 && flowStopwatch.ElapsedMilliseconds >= flowBudgetMs)
             {
-                throw new TimeoutException("Login flow timeout budget exhausted: flow=" + flowName);
+                throw new TimeoutException(
+                    "Authentication flow timeout budget exhausted: flow=" + flowName,
+                    lastException);
             }
 
             if (lastException != null)
