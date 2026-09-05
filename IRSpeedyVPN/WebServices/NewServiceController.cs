@@ -5,6 +5,7 @@ using IRSpeedyVPN.Models.Services;
 using IRSpeedyVPN.Security;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
@@ -20,6 +21,8 @@ namespace IRSpeedyVPN.WebServices
         // matching this value; an old server that does not read "kv" keeps using the
         // legacy key, and the client tries both keys on decrypt, so nothing breaks.
         private const int ServerListKeyVersion = 2;
+        private const int LoginRequestTimeoutSeconds = 12;
+        private const int GetSettingsTimeoutSeconds = 6;
 
         // ----------------------------
         // NEW API (failover endpoints)
@@ -68,7 +71,11 @@ namespace IRSpeedyVPN.WebServices
                 $"&new_password={Utils.UrlEncode(newPassword)}" +
                 $"&key={ChangePasswordKey}";
 
-            return ExecuteWithFailover(svc => svc.SendRequest<ChangePasswordResult>(url, null, null, null));
+            return ExecuteWithFailover(
+                "ChangePassword",
+                svc => svc.SendRequest<ChangePasswordResult>(
+                    url, null, null, null, null, LoginRequestTimeoutSeconds),
+                LoginRequestTimeoutSeconds);
         }
 
         internal BaseHttpResponse<GeoIp> GetIpInfo()
@@ -101,14 +108,25 @@ namespace IRSpeedyVPN.WebServices
             string deviceName,
             string deviceToken)
         {
-            return ExecuteWithFailover(service =>
+            string requestId = Guid.NewGuid().ToString("N");
+            LogHelper.WriteExLog("[StartupAuth] stage=start flow=Login requestId=" + requestId);
+
+            return ExecuteWithFailover(
+                requestId,
+                "Login",
+                service =>
             {
                 string guid = Guid.NewGuid().ToString();
 
                 var res = service.SendRequest<DefaultEncryptedResponse<AccountInfoEx>>(
                     "api/server/list/all",
                     BuildAuthPayload(userName, password, deviceName, deviceToken, guid),
-                    null, null, null, 20);
+                    null, null, null, LoginRequestTimeoutSeconds);
+
+                LogHelper.WriteExLog("[StartupAuth] stage=validate-response requestId=" + requestId
+                    + " endpoint=" + GetBaseUrl(service) + " valid-guid=" + IsValidEncryptedServerListResponse(res, guid)
+                    + " status=" + GetResponseStatus(res)
+                    + " has-message=" + (res != null && res.ResponseData != null && !string.IsNullOrEmpty(res.ResponseData.message)));
 
                 // Keep your original validation:
                 if (IsValidEncryptedServerListResponse(res, guid))
@@ -120,7 +138,8 @@ namespace IRSpeedyVPN.WebServices
 
                 // Otherwise treat as retryable
                 return null;
-            });
+            },
+                LoginRequestTimeoutSeconds);
         }
 
         internal BaseHttpResponse<DefaultPlainResponse<AccountInfoEx>> RemoveToken(
@@ -142,21 +161,40 @@ namespace IRSpeedyVPN.WebServices
 
         internal BaseHttpResponse<object> CheckToken(string deviceToken)
         {
-            return ExecuteWithFailover(service =>
+            return ExecuteWithFailover(
+                Guid.NewGuid().ToString("N"),
+                "CheckToken",
+                service =>
             {
                 string url = $"api/check/token?device_token={Utils.UrlEncode(deviceToken)}";
-                return service.SendRequest<object>(url, null, null, null, null);
-            });
+                return service.SendRequest<object>(url, null, null, null, null, LoginRequestTimeoutSeconds);
+            },
+                LoginRequestTimeoutSeconds);
         }
 
         internal BaseHttpResponse<DefaultPlainResponse<SettingInfo>> GetSettings()
         {
-            return ExecuteWithFailover(service =>
+            string requestId = Guid.NewGuid().ToString("N");
+            LogHelper.WriteExLog("[StartupAuth] stage=start flow=GetSettings requestId=" + requestId);
+
+            return ExecuteWithFailover(
+                requestId,
+                "GetSettings",
+                service =>
             {
                 string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
                 string url = $"api/version?type=windows&version_number={Utils.UrlEncode(version)}";
-                return service.SendRequest<DefaultPlainResponse<SettingInfo>>(url, null, null, null, null);
-            });
+                var result = service.SendRequest<DefaultPlainResponse<SettingInfo>>(
+                    url, null, null, null, null, GetSettingsTimeoutSeconds);
+                bool hasSettings = result != null && result.ResponseData != null && result.ResponseData.data != null;
+                LogHelper.WriteExLog("[StartupAuth] stage=validate-response requestId=" + requestId
+                    + " flow=GetSettings endpoint=" + GetBaseUrl(service)
+                    + " status=" + GetResponseStatus(result)
+                    + " has-settings=" + hasSettings);
+                return result;
+            },
+                GetSettingsTimeoutSeconds,
+                false);
         }
 
         // ==========================================================
@@ -164,33 +202,96 @@ namespace IRSpeedyVPN.WebServices
         // ==========================================================
 
         private BaseHttpResponse<TResponse> ExecuteWithFailover<TResponse>(
+            string requestId,
+            string flowName,
             Func<RestHelper, BaseHttpResponse<TResponse>> call)
         {
+            return ExecuteWithFailover(
+                requestId,
+                flowName,
+                call,
+                LoginRequestTimeoutSeconds,
+                true);
+        }
+
+        private BaseHttpResponse<TResponse> ExecuteWithFailover<TResponse>(
+            string requestId,
+            string flowName,
+            Func<RestHelper, BaseHttpResponse<TResponse>> call,
+            int timeoutSeconds,
+            bool allowFailover = true)
+        {
+            LogHelper.WriteExLog("[StartupAuth] stage=start requestId=" + requestId + " flow=" + flowName);
+
             int startIndex = _index;
             int attempts = 0;
             Exception lastException = null;
+            int attemptNumber = 1;
 
             while (attempts < _services.Count)
             {
                 var svc = _services[_index];
+                string endpoint = GetBaseUrl(svc);
+                var attemptSw = Stopwatch.StartNew();
+                LogHelper.WriteExLog("[StartupAuth] stage=endpoint-start requestId=" + requestId
+                    + " flow=" + flowName
+                    + " attempt=" + attemptNumber
+                    + " endpoint=" + endpoint
+                    + " timeoutSec=" + timeoutSeconds);
 
                 try
                 {
                     var result = call(svc);
+                    attemptSw.Stop();
 
-                    if (!IsRetriableFailure(result))
+                    bool retryable = IsRetriableFailure(result);
+                    LogHelper.WriteExLog("[StartupAuth] stage=endpoint-end requestId=" + requestId
+                        + " flow=" + flowName
+                        + " attempt=" + attemptNumber
+                        + " endpoint=" + endpoint
+                        + " status=" + GetResponseStatus(result)
+                        + " retryable=" + retryable
+                        + " elapsedMs=" + attemptSw.ElapsedMilliseconds);
+
+                    if (!retryable)
                     {
                         _lastGoodBaseUrl = GetBaseUrl(svc);
+                        LogHelper.WriteExLog("[StartupAuth] stage=flow-end requestId=" + requestId
+                            + " flow=" + flowName
+                            + " endpoint=" + endpoint
+                            + " result=success");
+                        return result;
+                    }
+
+                    if (!allowFailover)
+                    {
+                        LogHelper.WriteExLog("[StartupAuth] stage=flow-end requestId=" + requestId
+                            + " flow=" + flowName
+                            + " endpoint=" + endpoint
+                            + " result=single-endpoint-failed");
                         return result;
                     }
                 }
                 catch (Exception ex)
                 {
+                    attemptSw.Stop();
                     lastException = ex;
+                    LogHelper.WriteExLog("[StartupAuth] stage=endpoint-end requestId=" + requestId
+                        + " flow=" + flowName
+                        + " attempt=" + attemptNumber
+                        + " endpoint=" + endpoint
+                        + " status=exception"
+                        + " elapsedMs=" + attemptSw.ElapsedMilliseconds
+                        + " exception=" + ex.GetType().FullName
+                        + " hresult=0x" + ex.HResult.ToString("X8"));
+
+                    if (!allowFailover)
+                        throw;
                 }
 
                 _index = (_index + 1) % _services.Count;
                 attempts++;
+                attemptNumber++;
 
                 if (_index == startIndex)
                     break;
@@ -211,6 +312,14 @@ namespace IRSpeedyVPN.WebServices
         {
             if (result == null) return true;
             return result.StatusCode == HttpStatusCode.InternalServerError;
+        }
+
+        private static string GetResponseStatus<TResponse>(BaseHttpResponse<TResponse> response)
+        {
+            if (response == null)
+                return "null";
+
+            return response.StatusCode.ToString();
         }
 
         // ==========================================================
@@ -249,10 +358,7 @@ namespace IRSpeedyVPN.WebServices
         // if not, update this to match your RestHelper implementation.
         private static string GetBaseUrl(RestHelper helper)
         {
-            // Common patterns are BaseUrl / BaseAddress / Url / Host, etc.
-            // Replace with the real property name if available.
-            var prop = helper.GetType().GetProperty("BaseUrl") ?? helper.GetType().GetProperty("BaseAddress");
-            return prop?.GetValue(helper)?.ToString() ?? helper.ToString();
+            return helper == null ? "<null>" : helper.BaseAddress;
         }
     }
 }

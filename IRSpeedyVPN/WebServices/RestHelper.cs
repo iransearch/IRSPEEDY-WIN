@@ -22,6 +22,11 @@ namespace IRSpeedyVPN.WebServices
                 _curl.CurlExePath = curlExePath;
         }
 
+        internal string BaseAddress
+        {
+            get { return _baseAddress; }
+        }
+
         internal BaseHttpResponse<T> SendRequest<T>(
             string relPath,
             object data,

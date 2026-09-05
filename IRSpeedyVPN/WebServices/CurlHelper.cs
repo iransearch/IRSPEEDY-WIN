@@ -5,7 +5,11 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net;
+using System.Net.Security;
+using System.Net.Sockets;
 using System.Text;
+using System.Globalization;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 
 namespace IRSpeedyVPN.WebServices
@@ -14,6 +18,12 @@ namespace IRSpeedyVPN.WebServices
     {
         private const ushort PeMachineI386 = 0x014C;
         private const ushort PeMachineAmd64 = 0x8664;
+        private const string MarkerDns = "__TIME_DNS__:";
+        private const string MarkerConnect = "__TIME_CONNECT__:";
+        private const string MarkerTls = "__TIME_TLS__:";
+        private const string MarkerTotal = "__TIME_TOTAL__:";
+        private const string MarkerRemoteIp = "__REMOTE_IP__:";
+        private const string MarkerHttpCode = "__HTTP_CODE__:";
 
         // Reflects the most recent request. Send still resolves the bundled curl on every
         // call, because the versioned runtime may become ready after CurlHelper was
@@ -83,6 +93,9 @@ namespace IRSpeedyVPN.WebServices
             bool skipHttpFallbackOnTimeout)
         {
             var diagnostic = SafeCaptureDiagnostics(url, method);
+            var totalBudgetMs = timeoutSeconds.HasValue && timeoutSeconds.Value > 0
+                ? (long?)timeoutSeconds.Value * 1000L
+                : null;
             List<CurlCandidate> candidates = ResolveOrderedCandidates(diagnostic);
             Exception lastFailure = null;
             bool bundledCurlUnavailable = true;
@@ -90,6 +103,7 @@ namespace IRSpeedyVPN.WebServices
             string fallbackStage = "managed-fallback: bundled curl unavailable";
             string args = BuildArgs(
                 url, method, headers, body, proxy, timeoutSeconds, resolveOverride);
+            var totalStopwatch = Stopwatch.StartNew();
 
             foreach (CurlCandidate candidate in candidates)
             {
@@ -139,8 +153,13 @@ namespace IRSpeedyVPN.WebServices
                 bool processStarted = false;
                 try
                 {
+                    int? perMethodTimeout = null;
+                    if (totalBudgetMs.HasValue && totalBudgetMs.Value > 0)
+                        perMethodTimeout = GetBudgetedTimeoutSeconds(
+                            totalBudgetMs.Value - totalStopwatch.ElapsedMilliseconds);
+
                     CurlProcessResult processResult = ExecuteCurl(
-                        candidate.Path, args, timeoutSeconds, out processStarted);
+                        candidate.Path, args, perMethodTimeout, out processStarted);
                     // Process.Start succeeded. Any failure from this point describes
                     // this request or transport, not availability of the executable.
                     bundledCurlUnavailable = false;
@@ -157,15 +176,28 @@ namespace IRSpeedyVPN.WebServices
                         lastFailure = new InvalidOperationException(
                             "curl exited with code " + processResult.ExitCode
                             + " (stderrLength=" + processResult.StderrLength + ").");
-                        diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
-                            + " outcome=" + (requestTimedOut ? "timeout" : "exit-failure")
-                            + " exitCode=" + processResult.ExitCode
-                            + " stderrLength=" + processResult.StderrLength);
-                        continue;
+                    diagnostic.Attempts.Add(candidate.Role + " path=" + candidate.Path
+                        + " outcome=" + (requestTimedOut ? "timeout" : "exit-failure")
+                        + " exitCode=" + processResult.ExitCode
+                        + " stderrLength=" + processResult.StderrLength);
+                    continue;
                     }
 
-                    Parse(processResult.Output, out string responseBody, out int httpCode);
+                    Parse(
+                        processResult.Output,
+                        out string responseBody,
+                        out int httpCode,
+                        out long? dnsMs,
+                        out long? connectMs,
+                        out long? tlsMs,
+                        out long? totalMs,
+                        out string remoteIp);
                     diagnostic.HttpCode = httpCode;
+                    diagnostic.CurlDnsMs = dnsMs;
+                    diagnostic.CurlConnectMs = connectMs;
+                    diagnostic.CurlTlsMs = tlsMs;
+                    diagnostic.CurlTotalMs = totalMs;
+                    diagnostic.DestinationIp = remoteIp;
 
                     // All CurlHelper callers use HTTP(S). A zero status means curl did
                     // not produce a valid HTTP response even if the process itself
@@ -222,13 +254,21 @@ namespace IRSpeedyVPN.WebServices
                     lastFailure);
             }
 
+            if (totalBudgetMs.HasValue && totalBudgetMs.Value <= totalStopwatch.ElapsedMilliseconds)
+            {
+                throw new TimeoutException("The API request budget was fully consumed before HttpFallback.");
+            }
+
+            var fallbackRemainingBudgetMs = totalBudgetMs - totalStopwatch.ElapsedMilliseconds;
+
             return SendViaHttpFallback(
                 url,
                 method,
                 headers,
                 body,
                 proxy,
-                timeoutSeconds,
+                fallbackRemainingBudgetMs.HasValue ? GetTimeoutSecondsFromBudgetMs(fallbackRemainingBudgetMs.Value) : null,
+                totalStopwatch.ElapsedMilliseconds,
                 diagnostic,
                 fallbackStage,
                 bundledCurlUnavailable,
@@ -256,6 +296,14 @@ namespace IRSpeedyVPN.WebServices
             internal int StderrLength;
         }
 
+        private sealed class HttpFallbackNetworkTimings
+        {
+            internal long? DnsLookupMilliseconds;
+            internal long? ConnectMilliseconds;
+            internal long? TlsMilliseconds;
+            internal string DestinationIp;
+        }
+
         private sealed class CurlDiagnostics
         {
             internal string RequestId;
@@ -279,6 +327,17 @@ namespace IRSpeedyVPN.WebServices
             internal int StderrLength;
             internal readonly List<string> Candidates = new List<string>();
             internal readonly List<string> Attempts = new List<string>();
+            internal long? CurlDnsMs;
+            internal long? CurlConnectMs;
+            internal long? CurlTlsMs;
+            internal long? CurlTotalMs;
+            internal long? HttpFallbackTimedBudgetMs;
+            internal long? HttpFallbackDnsMs;
+            internal long? HttpFallbackConnectMs;
+            internal long? HttpFallbackTlsMs;
+            internal long? HttpFallbackTotalMs;
+            internal string DestinationIp;
+            internal string HttpFallbackDestinationIp;
         }
 
         private CurlDiagnostics SafeCaptureDiagnostics(string url, string method)
@@ -553,6 +612,195 @@ namespace IRSpeedyVPN.WebServices
             }
         }
 
+        private static HttpFallbackNetworkTimings MeasureHttpFallbackTransport(Uri requestUri, int? timeoutSeconds)
+        {
+            var result = new HttpFallbackNetworkTimings();
+            if (requestUri == null)
+                return result;
+
+            long budgetMs = timeoutSeconds.HasValue && timeoutSeconds.Value > 0
+                ? timeoutSeconds.Value * 1000L
+                : 0;
+            long remainingMs = budgetMs;
+            var totalStopwatch = Stopwatch.StartNew();
+            string host = requestUri.Host;
+            int port = requestUri.Port > 0 ? requestUri.Port : (string.Equals(requestUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase) ? 443 : 80);
+
+            IPAddress parsedIp = null;
+            if (IPAddress.TryParse(host, out parsedIp))
+            {
+                result.DestinationIp = parsedIp.ToString();
+            }
+            else
+            {
+                long dnsStart = 0;
+                long dnsStop = 0;
+                try
+                {
+                    dnsStart = totalStopwatch.ElapsedMilliseconds;
+                    var addresses = Dns.GetHostAddresses(host);
+                    dnsStop = totalStopwatch.ElapsedMilliseconds;
+                    result.DnsLookupMilliseconds = Math.Max(0, dnsStop - dnsStart);
+                    if (remainingMs > 0 && result.DnsLookupMilliseconds >= remainingMs)
+                    {
+                        result.DestinationIp = "<dns-timeout>";
+                        return result;
+                    }
+
+                    if (addresses != null)
+                    {
+                        foreach (var address in addresses)
+                        {
+                            if (address != null && address.AddressFamily == AddressFamily.InterNetwork)
+                            {
+                                parsedIp = address;
+                                break;
+                            }
+                        }
+
+                        if (parsedIp == null && addresses.Length > 0)
+                            parsedIp = addresses[0];
+                    }
+                }
+                catch
+                {
+                    dnsStop = totalStopwatch.ElapsedMilliseconds;
+                    result.DnsLookupMilliseconds = Math.Max(0, dnsStop - dnsStart);
+                }
+
+                result.DestinationIp = parsedIp == null ? null : parsedIp.ToString();
+            }
+
+            if (parsedIp == null || budgetMs <= 0 || remainingMs <= 0)
+            {
+                if (result.DnsLookupMilliseconds.HasValue == false)
+                    result.DnsLookupMilliseconds = 0;
+                return result;
+            }
+
+            remainingMs = budgetMs > 0
+                ? Math.Max(0, budgetMs - totalStopwatch.ElapsedMilliseconds)
+                : 0;
+
+            try
+            {
+                int connectTimeoutMs = GetTimeoutMillisecondsFromBudgetMs(remainingMs);
+                if (connectTimeoutMs <= 0)
+                {
+                    return result;
+                }
+
+                using (var tcpClient = new TcpClient())
+                {
+                    var connectWatch = Stopwatch.StartNew();
+                    var connectTask = tcpClient.ConnectAsync(parsedIp, port);
+                    bool connected = connectTask.Wait(Math.Max(1, connectTimeoutMs));
+                    connectWatch.Stop();
+                    if (!connected)
+                        throw new TimeoutException("HttpFallback connect timed out.");
+
+                    connectTask.Wait();
+                    result.ConnectMilliseconds = connectWatch.ElapsedMilliseconds;
+
+                    remainingMs = Math.Max(0, remainingMs - connectWatch.ElapsedMilliseconds);
+                    if (!string.Equals(requestUri.Scheme, Uri.UriSchemeHttps, StringComparison.OrdinalIgnoreCase))
+                        return result;
+
+                    int tlsTimeoutMs = GetTimeoutMillisecondsFromBudgetMs(remainingMs);
+                    if (tlsTimeoutMs <= 0)
+                        return result;
+
+                    var tlsWatch = Stopwatch.StartNew();
+                    using (var sslStream = new SslStream(
+                        tcpClient.GetStream(),
+                        false,
+                        new RemoteCertificateValidationCallback(
+                            (sender, certificate, chain, sslPolicyErrors) => true)))
+                    {
+                        var tlsTask = sslStream.AuthenticateAsClientAsync(host);
+                        bool tlsDone = tlsTask.Wait(Math.Max(1, tlsTimeoutMs));
+                        tlsWatch.Stop();
+                        if (!tlsDone)
+                            throw new TimeoutException("HttpFallback TLS handshake timed out.");
+
+                        tlsTask.Wait();
+                        result.TlsMilliseconds = tlsWatch.ElapsedMilliseconds;
+                    }
+                }
+            }
+            catch
+            {
+            }
+
+            return result;
+        }
+
+        private static int GetTimeoutMillisecondsFromBudgetMs(long? budgetMs)
+        {
+            if (!budgetMs.HasValue || budgetMs.Value <= 0)
+                return 0;
+
+            if (budgetMs.Value > int.MaxValue)
+                return int.MaxValue;
+
+            return (int)budgetMs.Value;
+        }
+
+        private static int? GetTimeoutSecondsFromBudgetMs(long? budgetMs)
+        {
+            if (!budgetMs.HasValue || budgetMs.Value <= 0)
+                return null;
+
+            long ceilMs = Math.Min(int.MaxValue, budgetMs.Value);
+            if (ceilMs <= 0)
+                return null;
+
+            return (int)Math.Ceiling(ceilMs / 1000.0);
+        }
+
+        private static int? GetBudgetedTimeoutSeconds(long remainingMs)
+        {
+            return GetTimeoutSecondsFromBudgetMs(remainingMs);
+        }
+
+        private static long? ParseLongTiming(string output, string marker)
+        {
+            string value = ParseTrailingValue(output, marker);
+            if (string.IsNullOrWhiteSpace(value))
+                return null;
+
+            double seconds;
+            if (!double.TryParse(
+                value,
+                NumberStyles.Float,
+                CultureInfo.InvariantCulture,
+                out seconds))
+            {
+                return null;
+            }
+
+            if (seconds < 0)
+                return null;
+
+            return (long)Math.Round(seconds * 1000d);
+        }
+
+        private static string ParseTrailingValue(string output, string marker)
+        {
+            int markerIndex = output.LastIndexOf(marker, StringComparison.Ordinal);
+            if (markerIndex < 0)
+                return null;
+
+            int start = markerIndex + marker.Length;
+            int end = output.IndexOf('\r', start);
+            if (end < 0)
+                end = output.IndexOf('\n', start);
+            if (end < 0)
+                end = output.Length;
+
+            return output.Substring(start, end - start).Trim();
+        }
+
         private CurlResponse SendViaHttpFallback(
             string url,
             string method,
@@ -560,6 +808,7 @@ namespace IRSpeedyVPN.WebServices
             string body,
             string proxy,
             int? timeoutSeconds,
+            long elapsedBeforeFallbackMs,
             CurlDiagnostics diagnostic,
             string fallbackStage,
             bool bundledCurlUnavailable,
@@ -567,6 +816,43 @@ namespace IRSpeedyVPN.WebServices
         {
             _curlUnavailable = bundledCurlUnavailable;
             diagnostic.BundledCurlUnavailable = bundledCurlUnavailable;
+            long? dnsMs = null;
+            long? connectMs = null;
+            long? tlsMs = null;
+            string destinationIp = null;
+            var preFlightSw = Stopwatch.StartNew();
+
+            try
+            {
+                Uri requestUri = new Uri(url);
+                var transportTiming = MeasureHttpFallbackTransport(requestUri, timeoutSeconds);
+                preFlightSw.Stop();
+                dnsMs = transportTiming.DnsLookupMilliseconds;
+                connectMs = transportTiming.ConnectMilliseconds;
+                tlsMs = transportTiming.TlsMilliseconds;
+                destinationIp = transportTiming.DestinationIp;
+            }
+            catch (Exception ex)
+            {
+                preFlightSw.Stop();
+                diagnostic.Attempts.Add("http-fallback transport-probe-exception type="
+                    + ex.GetType().FullName + " hresult=0x"
+                    + ex.HResult.ToString("X8"));
+            }
+
+            long fallbackBudgetMs = 0;
+            if (timeoutSeconds.HasValue && timeoutSeconds.Value > 0)
+                fallbackBudgetMs = timeoutSeconds.Value * 1000L;
+
+            if (fallbackBudgetMs > 0)
+            {
+                var preConsumedMs = preFlightSw.ElapsedMilliseconds;
+                if (preConsumedMs >= fallbackBudgetMs)
+                    throw new TimeoutException("The API request budget was fully consumed by HttpFallback transport pre-check.");
+
+                timeoutSeconds = GetTimeoutSecondsFromBudgetMs(fallbackBudgetMs - preConsumedMs);
+                diagnostic.HttpFallbackTimedBudgetMs = fallbackBudgetMs;
+            }
 
             var stopwatch = Stopwatch.StartNew();
             try
@@ -576,6 +862,13 @@ namespace IRSpeedyVPN.WebServices
                 stopwatch.Stop();
 
                 diagnostic.HttpFallbackOutcome = "success";
+                diagnostic.HttpFallbackDestinationIp = destinationIp;
+                diagnostic.HttpFallbackDnsMs = dnsMs;
+                diagnostic.HttpFallbackConnectMs = connectMs;
+                diagnostic.HttpFallbackTlsMs = tlsMs;
+                diagnostic.HttpFallbackTotalMs = elapsedBeforeFallbackMs > 0
+                    ? (long?)(elapsedBeforeFallbackMs + stopwatch.ElapsedMilliseconds)
+                    : stopwatch.ElapsedMilliseconds;
                 diagnostic.HttpFallbackHttpCode = response.HttpCode;
                 diagnostic.HttpFallbackElapsedMilliseconds = stopwatch.ElapsedMilliseconds;
                 diagnostic.Attempts.Add("http-fallback outcome=success httpCode="
@@ -750,6 +1043,16 @@ namespace IRSpeedyVPN.WebServices
                 if (diagnostic.ExitCode.HasValue)
                     message.Append(" curlExitCode=").Append(diagnostic.ExitCode.Value)
                         .Append(" stderrLength=").Append(diagnostic.StderrLength);
+                if (diagnostic.CurlDnsMs.HasValue)
+                    message.Append(" curlDnsMs=").Append(diagnostic.CurlDnsMs.Value);
+                if (diagnostic.CurlConnectMs.HasValue)
+                    message.Append(" curlConnectMs=").Append(diagnostic.CurlConnectMs.Value);
+                if (diagnostic.CurlTlsMs.HasValue)
+                    message.Append(" curlTlsMs=").Append(diagnostic.CurlTlsMs.Value);
+                if (diagnostic.CurlTotalMs.HasValue)
+                    message.Append(" curlTotalMs=").Append(diagnostic.CurlTotalMs.Value);
+                if (!string.IsNullOrWhiteSpace(diagnostic.DestinationIp))
+                    message.Append(" curlDestinationIp=").Append(diagnostic.DestinationIp);
                 if (!string.IsNullOrWhiteSpace(diagnostic.HttpFallbackOutcome))
                 {
                     message.Append(" httpFallbackOutcome=")
@@ -760,6 +1063,24 @@ namespace IRSpeedyVPN.WebServices
                     if (diagnostic.HttpFallbackHttpCode.HasValue)
                         message.Append(" httpFallbackHttpCode=")
                             .Append(diagnostic.HttpFallbackHttpCode.Value);
+                    if (diagnostic.HttpFallbackTimedBudgetMs.HasValue)
+                        message.Append(" httpFallbackTimedBudgetMs=")
+                            .Append(diagnostic.HttpFallbackTimedBudgetMs.Value);
+                    if (diagnostic.HttpFallbackDnsMs.HasValue)
+                        message.Append(" httpFallbackDnsMs=")
+                            .Append(diagnostic.HttpFallbackDnsMs.Value);
+                    if (diagnostic.HttpFallbackConnectMs.HasValue)
+                        message.Append(" httpFallbackConnectMs=")
+                            .Append(diagnostic.HttpFallbackConnectMs.Value);
+                    if (diagnostic.HttpFallbackTlsMs.HasValue)
+                        message.Append(" httpFallbackTlsMs=")
+                            .Append(diagnostic.HttpFallbackTlsMs.Value);
+                    if (diagnostic.HttpFallbackTotalMs.HasValue)
+                        message.Append(" httpFallbackTotalMs=")
+                            .Append(diagnostic.HttpFallbackTotalMs.Value);
+                    if (!string.IsNullOrWhiteSpace(diagnostic.HttpFallbackDestinationIp))
+                        message.Append(" httpFallbackDestinationIp=")
+                            .Append(diagnostic.HttpFallbackDestinationIp);
                 }
 
                 message.Append("\r\nCandidates:");
@@ -869,7 +1190,13 @@ namespace IRSpeedyVPN.WebServices
                 args.Append(EscapeArg(body));
             }
 
-            string writeOut = "\r\n__HTTP_CODE__:%{http_code}";
+            string writeOut = "\r\n"
+                + MarkerHttpCode + "%{http_code}\r\n"
+                + MarkerRemoteIp + "%{remote_ip}\r\n"
+                + MarkerDns + "%{time_namelookup}\r\n"
+                + MarkerConnect + "%{time_connect}\r\n"
+                + MarkerTls + "%{time_appconnect}\r\n"
+                + MarkerTotal + "%{time_total}";
 
             args.Append(" -w ");
             args.Append(EscapeArg(writeOut));
@@ -881,19 +1208,36 @@ namespace IRSpeedyVPN.WebServices
             return args.ToString();
         }
 
-        private static void Parse(string output, out string body, out int code)
+        private static void Parse(
+            string output,
+            out string body,
+            out int code,
+            out long? dnsMs,
+            out long? connectMs,
+            out long? tlsMs,
+            out long? totalMs,
+            out string remoteIp)
         {
-            const string marker = "__HTTP_CODE__:";
+            const string marker = MarkerHttpCode;
             int idx = output.LastIndexOf(marker, StringComparison.Ordinal);
 
             body = output;
             code = 0;
+            dnsMs = null;
+            connectMs = null;
+            tlsMs = null;
+            totalMs = null;
+            remoteIp = null;
 
             if (idx >= 0)
             {
-
+                dnsMs = ParseLongTiming(output, MarkerDns);
+                connectMs = ParseLongTiming(output, MarkerConnect);
+                tlsMs = ParseLongTiming(output, MarkerTls);
+                totalMs = ParseLongTiming(output, MarkerTotal);
+                remoteIp = ParseTrailingValue(output, MarkerRemoteIp);
+                int.TryParse(ParseTrailingValue(output, marker), out code);
                 body = output.Substring(0, idx).TrimEnd('\r', '\n');
-                int.TryParse(output.Substring(idx + marker.Length).Trim(), out code);
             }
         }
 
