@@ -271,15 +271,18 @@ namespace IRSpeedyVPN.Services
                         bool aiRoutingEnabled = false;
                         int poolMemberCount;
                         int hysteriaMemberCount;
+                        bool aiFallbackTested;
+                        var aiLinks = SelectTestedAiFallback(GetAiLinks(), out aiFallbackTested);
                         xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
                             smartUrls,
                             _xraySocksPort,
                             authUser,
                             authPass,
-                            GetAiLinks(),
+                            aiLinks,
                             out aiRoutingEnabled,
                             out poolMemberCount,
-                            out hysteriaMemberCount);
+                            out hysteriaMemberCount,
+                            aiFallbackTested);
                         if (string.IsNullOrWhiteSpace(xrayConfig))
                         {
                             if (_xraySocksPort > 0)
@@ -950,6 +953,104 @@ namespace IRSpeedyVPN.Services
                 LogHelper.WriteLog(ex);
                 return new List<string>();
             }
+        }
+
+        /// <summary>Test AI links through Xray, then put the fastest healthy link
+        /// first so BuildOutbounds maps it to the AI fallback tag.</summary>
+        private List<string> SelectTestedAiFallback(List<string> links, out bool fallbackTested)
+        {
+            fallbackTested = false;
+            if (!Xray.SmartIpRouting.IsEnabled() || links.Count == 0)
+                return links;
+
+            var ports = new List<int>();
+            try
+            {
+                var candidates = new Dictionary<string, string[]>();
+                var infos = new List<Xray.ConfigGenerator.XraySocksInfo>();
+                var overrides = new Dictionary<string, Tuple<int, string, string>>();
+                var serializer = new Newtonsoft.Json.JsonSerializer
+                {
+                    NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore
+                };
+                foreach (var link in links)
+                {
+                    // Use the same eligibility rules as the production AI pool.
+                    string unusedTag;
+                    if (Xray.SmartIpRouting.BuildOutbounds(new[] { link },
+                        Xray.SmartIpRouting.AiProxyPrefix, "AI", serializer, out unusedTag).Count == 0)
+                        continue;
+
+                    int socksPort = FreePortManager.Dequeue();
+                    ports.Add(socksPort);
+                    string user = Guid.NewGuid().ToString("N");
+                    string pass = Guid.NewGuid().ToString("N");
+                    infos.Add(new Xray.ConfigGenerator.XraySocksInfo
+                    {
+                        Link = link, Tag = "ai-test-" + infos.Count,
+                        Port = socksPort, User = user, Pass = pass
+                    });
+                    candidates.Add(link, new string[0]);
+                    overrides.Add(link, Tuple.Create(socksPort, user, pass));
+                }
+                if (candidates.Count == 0)
+                    return links;
+
+                int port = FreePortManager.Dequeue();
+                ports.Add(port);
+                EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
+                var config = SingBox.ConfigGenerator.GetUrlTestConfig(
+                    candidates, port, out var tagToUrl, null, overrides);
+                if (tagToUrl.Count == 0)
+                    return links;
+
+                var response = ExecuteCoreCall(client => client.Test(new TestReq
+                {
+                    Config = config ?? "",
+                    OutboundTags = tagToUrl.Keys.ToList(),
+                    Url = "https://www.google.com/generate_204",
+                    MaxConcurrency = 5,
+                    TestTimeoutMs = 5000,
+                    NeedXray = true,
+                    XrayConfig = Xray.ConfigGenerator.GetUrlTestXrayConfig(infos)
+                }));
+
+                string bestLink = null;
+                long bestLatency = long.MaxValue;
+                if (response?.Results != null)
+                {
+                    foreach (var result in response.Results)
+                    {
+                        if (result == null || !tagToUrl.TryGetValue(result.OutboundTag, out var link))
+                            continue;
+                        LogHelper.WriteExLog("[AiFallbackTest] candidate=" + links.IndexOf(link)
+                            + " latencyMs=" + result.LatencyMs);
+                        if (result.LatencyMs > 0 && result.LatencyMs < bestLatency)
+                        {
+                            bestLink = link;
+                            bestLatency = result.LatencyMs;
+                        }
+                    }
+                }
+                if (bestLink != null)
+                {
+                    fallbackTested = true;
+                    LogHelper.WriteExLog("[AiFallbackTest] result=selected candidate=" + links.IndexOf(bestLink)
+                        + " fallbackTag=ai-proxy-1 latencyMs=" + bestLatency);
+                    return new[] { bestLink }.Concat(links.Where(link => link != bestLink)).ToList();
+                }
+                LogHelper.WriteExLog("[AiFallbackTest] result=no-healthy-candidate");
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteExLog("[AiFallbackTest] result=failed exception=" + ex.GetType().FullName);
+            }
+            finally
+            {
+                foreach (int port in ports)
+                    FreePortManager.Enqueue(port);
+            }
+            return links;
         }
 
         private void VodUrlTest()

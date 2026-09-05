@@ -290,7 +290,8 @@ namespace IRSpeedyVPN.Services.Xray
             IEnumerable<string> aiLinks,
             out bool aiRoutingEnabled,
             out int poolMemberCount,
-            out int hysteriaMemberCount)
+            out int hysteriaMemberCount,
+            bool aiFallbackTested = false)
         {
             aiRoutingEnabled = false;
             poolMemberCount = 0;
@@ -371,7 +372,7 @@ namespace IRSpeedyVPN.Services.Xray
                 return null;
 
             poolMemberCount = idx;
-            aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer);
+            aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer, aiFallbackTested);
 
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
             outbounds.Add(JObject.FromObject(new Outbound
@@ -399,7 +400,7 @@ namespace IRSpeedyVPN.Services.Xray
         /// public IP, which the core refuses to build as an Xray outbound, so VOD
         /// stays on its sing-box outbound instead.
         /// </summary>
-        private static bool ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer)
+        private static bool ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer, bool aiFallbackTested)
         {
             if (!SmartIpRouting.IsEnabled())
                 return false;
@@ -420,7 +421,12 @@ namespace IRSpeedyVPN.Services.Xray
 
             foreach (var outbound in aiOutbounds)
                 outbounds.Add(outbound);
-            balancers.Add(SmartIpRouting.AiBalancer(aiFallbackTag));
+            var aiBalancer = SmartIpRouting.AiBalancer(aiFallbackTag);
+            // Never force an untested/dead first link when every probe failed.
+            // Keep the AI pool and let its observatory choose available members.
+            if (!aiFallbackTested)
+                aiBalancer.Remove("fallbackTag");
+            balancers.Add(aiBalancer);
 
             // The AI rule runs ahead of the geoip/geosite checks and the catch-all so
             // its traffic never reaches the main balancer. The first rule is the
