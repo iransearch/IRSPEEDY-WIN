@@ -21,8 +21,11 @@ namespace IRSpeedyVPN.WebServices
         // matching this value; an old server that does not read "kv" keeps using the
         // legacy key, and the client tries both keys on decrypt, so nothing breaks.
         private const int ServerListKeyVersion = 2;
-        private const int LoginRequestTimeoutSeconds = 12;
-        private const int GetSettingsTimeoutSeconds = 6;
+        // Per-flow budget for user-visible login attempt. Keep under 10s to keep
+        // login UX responsive.
+        private const int LoginRequestTimeoutSeconds = 10;
+        // Secondary settings call is kept short so total login work stays fast.
+        private const int GetSettingsTimeoutSeconds = 4;
 
         // ----------------------------
         // NEW API (failover endpoints)
@@ -73,8 +76,8 @@ namespace IRSpeedyVPN.WebServices
 
             return ExecuteWithFailover(
                 "ChangePassword",
-                svc => svc.SendRequest<ChangePasswordResult>(
-                    url, null, null, null, null, LoginRequestTimeoutSeconds, skipDoh: true),
+                (svc, timeoutSeconds) => svc.SendRequest<ChangePasswordResult>(
+                    url, null, null, null, null, timeoutSeconds, skipDoh: true),
                 LoginRequestTimeoutSeconds);
         }
 
@@ -114,14 +117,14 @@ namespace IRSpeedyVPN.WebServices
             return ExecuteWithFailover(
                 requestId,
                 "Login",
-                service =>
+                (service, timeoutSeconds) =>
             {
                 string guid = Guid.NewGuid().ToString();
 
                 var res = service.SendRequest<DefaultEncryptedResponse<AccountInfoEx>>(
                     "api/server/list/all",
                     BuildAuthPayload(userName, password, deviceName, deviceToken, guid),
-                    null, null, null, LoginRequestTimeoutSeconds, skipDoh: true);
+                    null, null, null, timeoutSeconds, skipDoh: true);
 
                 LogHelper.WriteExLog("[StartupAuth] stage=validate-response requestId=" + requestId
                     + " endpoint=" + GetBaseUrl(service) + " valid-guid=" + IsValidEncryptedServerListResponse(res, guid)
@@ -148,15 +151,18 @@ namespace IRSpeedyVPN.WebServices
             string deviceName,
             string deviceToken)
         {
-            return ExecuteWithFailover(service =>
-            {
-                string guid = Guid.NewGuid().ToString();
+            return ExecuteWithFailover(
+                Guid.NewGuid().ToString("N"),
+                "RemoveToken",
+                (service, timeoutSeconds) =>
+                {
+                    string guid = Guid.NewGuid().ToString();
 
-                return service.SendRequest<DefaultPlainResponse<AccountInfoEx>>(
-                    "api/remove/token",
-                    BuildAuthPayload(userName, password, deviceName, deviceToken, guid),
-                    null, null);
-            });
+                    return service.SendRequest<DefaultPlainResponse<AccountInfoEx>>(
+                        "api/remove/token",
+                        BuildAuthPayload(userName, password, deviceName, deviceToken, guid),
+                        null, null, null, timeoutSeconds, skipDoh: true);
+                });
         }
 
         internal BaseHttpResponse<object> CheckToken(string deviceToken)
@@ -164,10 +170,10 @@ namespace IRSpeedyVPN.WebServices
             return ExecuteWithFailover(
                 Guid.NewGuid().ToString("N"),
                 "CheckToken",
-                service =>
+                (service, timeoutSeconds) =>
             {
                 string url = $"api/check/token?device_token={Utils.UrlEncode(deviceToken)}";
-                return service.SendRequest<object>(url, null, null, null, null, LoginRequestTimeoutSeconds, skipDoh: true);
+                return service.SendRequest<object>(url, null, null, null, null, timeoutSeconds, skipDoh: true);
             },
                 LoginRequestTimeoutSeconds);
         }
@@ -180,12 +186,12 @@ namespace IRSpeedyVPN.WebServices
             return ExecuteWithFailover(
                 requestId,
                 "GetSettings",
-                service =>
+                (service, timeoutSeconds) =>
             {
                 string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
                 string url = $"api/version?type=windows&version_number={Utils.UrlEncode(version)}";
                 var result = service.SendRequest<DefaultPlainResponse<SettingInfo>>(
-                    url, null, null, null, null, GetSettingsTimeoutSeconds, skipDoh: true);
+                    url, null, null, null, null, timeoutSeconds, skipDoh: true);
                 bool hasSettings = result != null && result.ResponseData != null && result.ResponseData.data != null;
                 LogHelper.WriteExLog("[StartupAuth] stage=validate-response requestId=" + requestId
                     + " flow=GetSettings endpoint=" + GetBaseUrl(service)
@@ -204,7 +210,7 @@ namespace IRSpeedyVPN.WebServices
         private BaseHttpResponse<TResponse> ExecuteWithFailover<TResponse>(
             string requestId,
             string flowName,
-            Func<RestHelper, BaseHttpResponse<TResponse>> call)
+            Func<RestHelper, int?, BaseHttpResponse<TResponse>> call)
         {
             return ExecuteWithFailover(
                 requestId,
@@ -217,7 +223,7 @@ namespace IRSpeedyVPN.WebServices
         private BaseHttpResponse<TResponse> ExecuteWithFailover<TResponse>(
             string requestId,
             string flowName,
-            Func<RestHelper, BaseHttpResponse<TResponse>> call,
+            Func<RestHelper, int?, BaseHttpResponse<TResponse>> call,
             int timeoutSeconds,
             bool allowFailover = true)
         {
@@ -227,21 +233,37 @@ namespace IRSpeedyVPN.WebServices
             int attempts = 0;
             Exception lastException = null;
             int attemptNumber = 1;
+            var flowStopwatch = Stopwatch.StartNew();
+            long flowBudgetMs = timeoutSeconds > 0 ? timeoutSeconds * 1000L : -1;
 
             while (attempts < _services.Count)
             {
                 var svc = _services[_index];
                 string endpoint = GetBaseUrl(svc);
+                int? perAttemptTimeout = null;
+                if (flowBudgetMs > 0)
+                {
+                    long remainingMs = flowBudgetMs - flowStopwatch.ElapsedMilliseconds;
+                    if (remainingMs <= 0)
+                        break;
+
+                    perAttemptTimeout = (int)Math.Ceiling(Math.Max(1, remainingMs / 1000.0));
+                }
+
                 var attemptSw = Stopwatch.StartNew();
                 LogHelper.WriteExLog("[StartupAuth] stage=endpoint-start requestId=" + requestId
                     + " flow=" + flowName
                     + " attempt=" + attemptNumber
                     + " endpoint=" + endpoint
-                    + " timeoutSec=" + timeoutSeconds);
+                    + " timeoutSec=" + (perAttemptTimeout.HasValue ? perAttemptTimeout.Value.ToString() : "")
+                    + " flowRemainingMs="
+                    + (flowBudgetMs > 0
+                        ? Math.Max(0L, flowBudgetMs - flowStopwatch.ElapsedMilliseconds).ToString()
+                        : ""));
 
                 try
                 {
-                    var result = call(svc);
+                    var result = call(svc, perAttemptTimeout);
                     attemptSw.Stop();
 
                     bool retryable = IsRetriableFailure(result);
@@ -295,6 +317,11 @@ namespace IRSpeedyVPN.WebServices
 
                 if (_index == startIndex)
                     break;
+            }
+
+            if (flowBudgetMs > 0 && flowStopwatch.ElapsedMilliseconds >= flowBudgetMs)
+            {
+                throw new TimeoutException("Login flow timeout budget exhausted: flow=" + flowName);
             }
 
             if (lastException != null)
