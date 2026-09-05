@@ -519,90 +519,31 @@ namespace IRSpeedyVPN.Services.Xray
                 }
                 else if (node.configType == EConfigType.Hysteria2)
                 {
-                    var obfsType = string.IsNullOrWhiteSpace(node.obfs)
-                        ? "salamander"
-                        : node.obfs.Trim();
-                    var useGecko = string.Equals(
-                        obfsType, "gecko", StringComparison.OrdinalIgnoreCase);
-                    if (!string.IsNullOrWhiteSpace(node.obfs_param)
-                        && !useGecko
-                        && !string.Equals(obfsType, "salamander", StringComparison.OrdinalIgnoreCase))
+                    // The rolled-back Throne core uses its legacy Hysteria2 adapter.
+                    // Keep obfs and TLS in settings; do not translate to hysteria/finalmask.
+                    outbound.protocol = "hysteria2";
+                    var settings = new OutboundSettings
                     {
-                        LogHelper.WriteExLog(
-                            "Xray Hysteria2 outbound skipped: unsupported obfs type.");
-                        return;
-                    }
-
-                    var serverPort = node.port > 0 ? node.port : 443;
-                    outbound.protocol = "hysteria";
-                    outbound.settings = new OutboundSettings
-                    {
-                        version = 2,
-                        address = node.address,
-                        port = serverPort
+                        server = node.address,
+                        server_port = node.port > 0 ? node.port : 443,
+                        password = node.password
                     };
-
-                    var stream = new StreamSettings
-                    {
-                        method = "hysteria",
-                        security = "tls",
-                        hysteriaSettings = new HysteriaSettings
-                        {
-                            version = 2,
-                            auth = node.password,
-                            udpIdleTimeout = 60
-                        },
-                        tlsSettings = new TlsSettings
-                        {
-                            serverName = string.IsNullOrWhiteSpace(node.sni) ? null : node.sni,
-                            alpn = node.GetAlpn(),
-                            fingerprint = string.IsNullOrWhiteSpace(node.fingerPrint) ? null : node.fingerPrint,
-                            pinnedPeerCertSha256 = string.IsNullOrWhiteSpace(node.certSha256) ? null : node.certSha256
-                        },
-                        sockopt = new Sockopt
-                        {
-                            domainStrategy = "UseIP"
-                        }
-                    };
-
-                    HysteriaFinalMask finalMask = null;
                     if (!string.IsNullOrWhiteSpace(node.obfs_param))
                     {
-                        finalMask = new HysteriaFinalMask
+                        settings.obfs = new HysteriaObfs
                         {
-                            udp = new List<HysteriaFinalMaskLayer>
-                            {
-                                new HysteriaFinalMaskLayer
-                                {
-                                    type = "salamander",
-                                    settings = new HysteriaFinalMaskLayerSettings
-                                    {
-                                        password = node.obfs_param,
-                                        // Gecko is Salamander plus QUIC fragmentation and
-                                        // padding. These are the Core's own Gecko defaults.
-                                        packetSize = useGecko ? "512-1200" : null
-                                    }
-                                }
-                            }
+                            type = string.IsNullOrWhiteSpace(node.obfs) ? "salamander" : node.obfs,
+                            password = node.obfs_param
                         };
                     }
-
-                    if (node.portEnd > serverPort)
+                    settings.tls = new HysteriaTls
                     {
-                        if (finalMask == null)
-                            finalMask = new HysteriaFinalMask();
-                        finalMask.quicParams = new HysteriaQuicParams
-                        {
-                            udpHop = new HysteriaUdpHop
-                            {
-                                ports = serverPort + "-" + node.portEnd,
-                                interval = 30
-                            }
-                        };
-                    }
-
-                    stream.finalmask = finalMask;
-                    outbound.streamSettings = stream;
+                        enabled = true,
+                        server_name = string.IsNullOrWhiteSpace(node.sni) ? null : node.sni,
+                        insecure = string.IsNullOrWhiteSpace(node.allowInsecure) ? (bool?)null : Utils.ToBool(node.allowInsecure)
+                    };
+                    outbound.settings = settings;
+                    outbound.streamSettings = null;
                 }
             }
             catch (Exception ex)
