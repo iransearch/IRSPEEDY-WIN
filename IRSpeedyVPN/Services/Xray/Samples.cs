@@ -17,8 +17,8 @@ namespace IRSpeedyVPN.Services.Xray
 					""connectivity"": """",
 					""destination"": ""https://connectivitycheck.gstatic.com/generate_204"",
 					""httpMethod"": ""HEAD"",
-					""interval"": ""60m"",
-					""sampling"": 3,
+					""interval"": ""30m"",
+					""sampling"": 2,
 					""timeout"": ""5s""
 				},
 				""subjectSelector"": [
@@ -31,7 +31,6 @@ namespace IRSpeedyVPN.Services.Xray
 			""routing"": {
 				""balancers"": [
 					{
-						""fallbackTag"": ""smart-proxy-0"",
 						""selector"": [
 							""smart-proxy-""
 						],

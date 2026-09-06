@@ -253,7 +253,6 @@ namespace IRSpeedyVPN.Services.Xray
         {
             return new JObject
             {
-                ["fallbackTag"] = fallbackTag,
                 ["selector"] = new JArray { selectorPrefix },
                 ["strategy"] = new JObject
                 {
