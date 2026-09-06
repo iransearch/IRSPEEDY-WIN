@@ -65,6 +65,7 @@
     <PackageReference Include="DotNetZip" Version="1.13.8" />
     <PackageReference Include="DotRas.for.Win8" Version="1.3.0" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
+    <PackageReference Include="Grpc.Core" Version="2.46.6" />
     <PackageReference Include="System.Buffers" Version="4.5.1" />
     <PackageReference Include="System.Memory" Version="4.5.5" />
 
@@ -150,5 +151,20 @@
     </Exec>
     <Warning Condition="'$(DotfuscatorExitCode)' != '0'" Text="Dotfuscator exited with code $(DotfuscatorExitCode); obfuscated output may be missing. Check the Dotfuscator installation, license, and config (IRSpeedyVPN.Dotfuscator.xml)." />
     <Copy SourceFiles="$(TargetDir)$(TargetName).exe.config" DestinationFolder="$(TargetDir)Obfuscated" Condition="'$(DotfuscatorExitCode)' == '0' And Exists('$(TargetDir)$(TargetName).exe.config')" />
+  </Target>
+  <!-- Grpc.Core's net45 targets copy both process architectures to normal
+       output. Preserve them when users take the protected executable instead. -->
+  <Target Name="ValidateRoutingGrpcRuntime" AfterTargets="Build">
+    <Error Condition="!Exists('$(TargetDir)grpc_csharp_ext.x64.dll') Or !Exists('$(TargetDir)grpc_csharp_ext.x86.dll')"
+           Text="Routing gRPC native libraries are missing from the build output. Restore Grpc.Core and keep native library copying enabled." />
+  </Target>
+  <Target Name="CopyRoutingGrpcToProtectedOutput" AfterTargets="RunDotfuscator"
+          Condition="Exists('$(TargetDir)Obfuscated\$(TargetFileName)')">
+    <ItemGroup>
+      <_RoutingGrpcFiles Include="$(TargetDir)grpc_csharp_ext.x64.dll;$(TargetDir)grpc_csharp_ext.x86.dll" />
+      <_RoutingGrpcFiles Include="$(TargetDir)Grpc.Core.dll" Condition="Exists('$(TargetDir)Grpc.Core.dll')" />
+      <_RoutingGrpcFiles Include="$(TargetDir)Grpc.Core.Api.dll" Condition="Exists('$(TargetDir)Grpc.Core.Api.dll')" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_RoutingGrpcFiles)" DestinationFolder="$(TargetDir)Obfuscated" SkipUnchangedFiles="true" />
   </Target>
 </Project>

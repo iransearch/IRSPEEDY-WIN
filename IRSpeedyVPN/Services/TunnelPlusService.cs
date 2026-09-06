@@ -410,7 +410,7 @@ namespace IRSpeedyVPN.Services
                     lock (startupRouteLock)
                     {
                         activeStartupRouting = startupRouting;
-                        activeStartupRouting?.Start();
+                        activeStartupRouting?.Start(port);
                     }
                     IsConnected = true;
                     if (vpnmode)
@@ -1106,7 +1106,8 @@ namespace IRSpeedyVPN.Services
                         if (smartCandidates.Contains(link))
                         {
                             LogHelper.WriteExLog("[SmartStartupTest] candidate=" + smartLinks.IndexOf(link)
-                                + " latencyMs=" + result.LatencyMs + " healthy=" + healthy);
+                                + " latencyMs=" + result.LatencyMs + " healthy=" + healthy
+                                + " reason=" + ClassifyStartupProbe(result));
                             if (healthy && smartStartup == null)
                             {
                                 smartStartup = link;
@@ -1115,7 +1116,8 @@ namespace IRSpeedyVPN.Services
                         if (aiCandidates.Contains(link))
                         {
                             LogHelper.WriteExLog("[AiStartupTest] candidate=" + aiLinks.IndexOf(link)
-                                + " latencyMs=" + result.LatencyMs + " healthy=" + healthy);
+                                + " latencyMs=" + result.LatencyMs + " healthy=" + healthy
+                                + " reason=" + ClassifyStartupProbe(result));
                             if (healthy && bestAi == null)
                             {
                                 bestAi = link;
@@ -1158,6 +1160,7 @@ namespace IRSpeedyVPN.Services
             var clock = Stopwatch.StartNew();
             var call = Task.Run(() => new LibcoreServiceClient("127.0.0.1", CorePort, 300, 4000).Test(request));
             bool cancelled = false;
+            string stopReason = "batch-complete";
             try
             {
                 while (!call.Wait(100))
@@ -1175,9 +1178,15 @@ namespace IRSpeedyVPN.Services
                         .Select(r => tagToUrl[r.OutboundTag]));
                     if ((smart.Count == 0 || smart.Overlaps(healthy))
                         && (ai.Count == 0 || ai.Overlaps(healthy)))
+                    {
+                        stopReason = "healthy-routes-found";
                         break;
+                    }
                     if (clock.ElapsedMilliseconds >= 2000 || userCancelRequested)
+                    {
+                        stopReason = userCancelRequested ? "user-cancelled" : "budget-exhausted";
                         break;
+                    }
                 }
                 if (!call.IsCompleted)
                 {
@@ -1188,9 +1197,12 @@ namespace IRSpeedyVPN.Services
                 // core. The absolute RPC deadline also bounds an unresponsive core.
                 var final = call.GetAwaiter().GetResult();
                 foreach (var result in final.Results)
-                    if (result != null && tagToUrl.ContainsKey(result.OutboundTag)
-                        && !collected.ContainsKey(result.OutboundTag))
-                        collected.Add(result.OutboundTag, result);
+                    if (result != null && tagToUrl.ContainsKey(result.OutboundTag))
+                    {
+                        bool success = result.LatencyMs > 0 && string.IsNullOrEmpty(result.Error);
+                        if (!collected.ContainsKey(result.OutboundTag) || success)
+                            collected[result.OutboundTag] = result;
+                    }
             }
             catch (Exception ex)
             {
@@ -1204,8 +1216,20 @@ namespace IRSpeedyVPN.Services
                 }
             }
             LogHelper.WriteExLog("[StartupTest] stage=probe-complete earlyStop=" + cancelled
-                + " elapsedMs=" + clock.ElapsedMilliseconds);
+                + " stopReason=" + stopReason + " elapsedMs=" + clock.ElapsedMilliseconds);
             return new TestResp { Results = collected.Values.ToList() };
+        }
+
+        private static string ClassifyStartupProbe(URLTestResp result)
+        {
+            if (result.LatencyMs > 0 && string.IsNullOrEmpty(result.Error)) return "success";
+            // Do not write raw errors containing subscription URLs/credentials.
+            string error = (result.Error ?? "").ToLowerInvariant();
+            if (error.Contains("cancel")) return "cancelled";
+            if (error.Contains("timeout") || error.Contains("deadline")) return "timeout";
+            if (error.Contains("lookup") || error.Contains("resolve") || error.Contains("dns")) return "dns";
+            if (error.Contains("tls") || error.Contains("certificate")) return "tls";
+            return "network-or-no-result";
         }
 
         private void VodUrlTest()

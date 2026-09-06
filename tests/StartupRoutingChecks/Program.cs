@@ -1,4 +1,7 @@
 using System;
+using Grpc.Core;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using IRSpeedyVPN.Services.Xray;
@@ -68,8 +71,70 @@ internal static class Program
         catch { timedOut = true; }
         finally { accept.GetAwaiter().GetResult().Dispose(); listener.Stop(); }
         Check(timedOut && clock.ElapsedMilliseconds < 1500, "Unresponsive core exceeded the RPC deadline");
-        Console.WriteLine("Startup routing policy and protobuf checks passed.");
+        RunGrpcChecks().GetAwaiter().GetResult();
+        Console.WriteLine("Startup routing policy, protobuf, deadline and native gRPC checks passed.");
     }
+    private static async Task RunGrpcChecks()
+    {
+        const string service = "xray.app.router.command.RoutingService";
+        var bytes = Marshallers.Create<byte[]>(b => b, b => b);
+        var info = new Method<byte[], byte[]>(MethodType.Unary, service, "GetBalancerInfo", bytes, bytes);
+        var remove = new Method<byte[], byte[]>(MethodType.Unary, service, "RemoveRule", bytes, bytes);
+        bool slow = false, rejectRemove = false;
+        int infoCalls = 0, removeCalls = 0;
+        var server = new Server();
+        server.Ports.Add(new ServerPort("127.0.0.1", 0, ServerCredentials.Insecure));
+        server.Services.Add(ServerServiceDefinition.CreateBuilder()
+            .AddMethod(info, async (request, context) =>
+            {
+                Interlocked.Increment(ref infoCalls);
+                if (slow) await Task.Delay(5000, context.CancellationToken);
+                var reader = new IRSpeedyVPN.Services.Libcore.LibcoreProto.ProtoReader(request);
+                Check(reader.TryReadField(out int field, out int wire) && field == 1 && wire == 2,
+                    "Incorrect GetBalancerInfo request");
+                if (reader.ReadString() == "ai-balancer") return new byte[0];
+                return new byte[] { 10, 18, 50, 16, 10, 14, 115, 109, 97, 114, 116, 45, 112, 114, 111, 120, 121, 45, 50, 51 };
+            })
+            .AddMethod(remove, (request, context) =>
+            {
+                Interlocked.Increment(ref removeCalls);
+                if (rejectRemove) throw new RpcException(new Status(StatusCode.PermissionDenied, "test refusal"));
+                return Task.FromResult(new byte[0]);
+            }).Build());
+        server.Start();
+        var client = new XrayRoutingClient(server.Ports.Single().BoundPort);
+        try
+        {
+            Check((await client.GetTargetsAsync("smart-balancer-1", CancellationToken.None))
+                .SequenceEqual(new[] { "smart-proxy-23" }), "Native gRPC healthy target missing");
+            Check((await client.GetTargetsAsync("ai-balancer", CancellationToken.None)).Count == 0,
+                "AI was marked healthy without a result");
+            await client.RemoveRuleAsync("startup-test", CancellationToken.None);
+            Check(infoCalls == 2 && removeCalls == 1, "Persistent channel did not carry both methods");
+            rejectRemove = true;
+            bool rejected = false;
+            try { await client.RemoveRuleAsync("startup-test", CancellationToken.None); }
+            catch (RpcException ex) { rejected = ex.StatusCode == StatusCode.PermissionDenied
+                && XrayRoutingClient.DescribeError(ex).Contains("test refusal"); }
+            Check(rejected, "Failed gRPC removal was accepted or lost its error detail");
+            slow = true;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            bool deadline = false;
+            try { await client.GetTargetsAsync("smart-balancer-1", CancellationToken.None); }
+            catch (RpcException ex) { deadline = ex.StatusCode == StatusCode.DeadlineExceeded; }
+            Check(deadline && clock.ElapsedMilliseconds < 2000, "gRPC health query deadline failed");
+            using (var stop = new CancellationTokenSource())
+            {
+                stop.Cancel();
+                bool cancelled = false;
+                try { await client.GetTargetsAsync("smart-balancer-1", stop.Token); }
+                catch (OperationCanceledException) { cancelled = true; }
+                Check(cancelled, "A cancelled session issued a health query");
+            }
+        }
+        finally { await client.CloseAsync(); await server.KillAsync(); }
+    }
+
 }
 
 // Test-only host adapters; the linked routing and protobuf code is production code.

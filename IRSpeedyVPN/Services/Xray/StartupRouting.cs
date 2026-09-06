@@ -1,12 +1,11 @@
+using Grpc.Core;
 using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Services.Libcore;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -49,8 +48,13 @@ namespace IRSpeedyVPN.Services.Xray
                 var rules = ((JArray)root["routing"]["rules"]).OfType<JObject>()
                     .Select(r => (string)r["ruleTag"])
                     .Where(r => r != null && r.StartsWith("startup-" + tag + "-", StringComparison.Ordinal)).ToList();
-                if (rules.Count > 0)
+                if (((JArray)root["routing"]["balancers"]).Any(b => (string)b["tag"] == tag))
+                {
                     pending.Add(tag, rules);
+                    if (rules.Count == 0)
+                        LogHelper.WriteExLog("[StartupRoute] stage=waiting-for-health balancer=" + tag
+                            + " reason=no-tested-startup-route");
+                }
             }
             if (pending.Count == 0)
                 return;
@@ -63,7 +67,7 @@ namespace IRSpeedyVPN.Services.Xray
             config = root.ToString();
         }
 
-        public void Start()
+        public void Start(int httpPort)
         {
             lock (stop)
             {
@@ -71,9 +75,16 @@ namespace IRSpeedyVPN.Services.Xray
                 worker = Task.Run(async () =>
                 {
                     var elapsed = Stopwatch.StartNew();
-                    bool reportedError = false;
+                    // These two header-only checks run off the connection/UI path.
+                    // They measure the production route, not just core construction.
+                    var readiness = pending.Keys.Select(group => ProbeFirstResponseAsync(httpPort, group)).ToArray();
+                    var reportedErrors = new Dictionary<string, string>();
+                    XrayRoutingClient client = null;
                     try
                     {
+                        client = new XrayRoutingClient(port);
+                        LogHelper.WriteExLog("[StartupRoute] stage=control-ready transport=grpc-core elapsedMs="
+                            + elapsed.ElapsedMilliseconds);
                         while (!stop.IsCancellationRequested && pending.Count > 0)
                         {
                             foreach (string balancer in pending.Keys.ToList())
@@ -82,14 +93,14 @@ namespace IRSpeedyVPN.Services.Xray
                                 {
                                     // This asks the strategy itself, including its RTT and
                                     // failure thresholds, rather than guessing with a timer.
-                                    var targets = XrayRoutingClient.GetTargets(port, balancer, stop.Token);
+                                    var targets = await client.GetTargetsAsync(balancer, stop.Token);
                                     string prefix = balancer == SmartIpRouting.AiBalancerTag
                                         ? SmartIpRouting.AiProxyPrefix : SmartIpRouting.SmartProxyPrefix;
                                     if (!targets.Any(t => t.StartsWith(prefix, StringComparison.Ordinal))) continue;
                                     foreach (string rule in pending[balancer].ToList())
                                     {
                                         stop.Token.ThrowIfCancellationRequested();
-                                        XrayRoutingClient.RemoveRule(port, rule, stop.Token);
+                                        await client.RemoveRuleAsync(rule, stop.Token);
                                         pending[balancer].Remove(rule);
                                     }
                                     pending.Remove(balancer);
@@ -101,11 +112,13 @@ namespace IRSpeedyVPN.Services.Xray
                                 {
                                     // Keep the tested rule on API failure; never silently
                                     // switch to an unready pool or restart the user's tunnel.
-                                    if (!reportedError)
+                                    if (stop.IsCancellationRequested) break;
+                                    string detail = XrayRoutingClient.DescribeError(ex);
+                                    if (!reportedErrors.TryGetValue(balancer, out var previous) || previous != detail)
                                     {
-                                        reportedError = true;
-                                        LogHelper.WriteExLog("[StartupRoute] stage=handoff-pending exception="
-                                            + ex.GetType().Name + " detail=" + ex.Message);
+                                        reportedErrors[balancer] = detail;
+                                        LogHelper.WriteExLog("[StartupRoute] stage=handoff-pending balancer="
+                                            + balancer + " " + detail);
                                     }
                                 }
                             }
@@ -114,8 +127,61 @@ namespace IRSpeedyVPN.Services.Xray
                         }
                     }
                     catch (OperationCanceledException) { }
+                    catch (Exception ex)
+                    {
+                        LogHelper.WriteExLog("[StartupRoute] stage=control-unavailable "
+                            + XrayRoutingClient.DescribeError(ex));
+                    }
+                    finally
+                    {
+                        if (client != null) await client.CloseAsync();
+                        await Task.WhenAll(readiness);
+                    }
 
                 });
+            }
+        }
+
+        private async Task ProbeFirstResponseAsync(int httpPort, string group)
+        {
+            var watch = Stopwatch.StartNew();
+            string url = group == SmartIpRouting.AiBalancerTag
+                ? "https://www.google.com/generate_204" : "https://www.youtube.com/generate_204";
+            using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(stop.Token))
+            {
+                deadline.CancelAfter(2000);
+                var request = (System.Net.HttpWebRequest)System.Net.WebRequest.Create(url);
+                request.Proxy = new System.Net.WebProxy("127.0.0.1", httpPort);
+                request.AllowAutoRedirect = false;
+                System.Net.ServicePointManager.SecurityProtocol |= System.Net.SecurityProtocolType.Tls12;
+                using (deadline.Token.Register(request.Abort))
+                {
+                    try
+                    {
+                        using (var response = (System.Net.HttpWebResponse)await request.GetResponseAsync())
+                        {
+                            LogHelper.WriteExLog("[ConnectionStartup] stage=route-response balancer=" + group
+                                + " httpStatus=" + (int)response.StatusCode + " elapsedMs=" + watch.ElapsedMilliseconds);
+                        }
+                    }
+                    catch (System.Net.WebException ex)
+                    {
+                        using (var response = ex.Response as System.Net.HttpWebResponse)
+                        {
+                            if (!stop.IsCancellationRequested)
+                                LogHelper.WriteExLog("[ConnectionStartup] stage=route-probe-failed balancer=" + group
+                                    + " reason=" + (deadline.IsCancellationRequested ? "timeout" : ex.Status.ToString())
+                                    + " httpStatus=" + (response == null ? "none" : ((int)response.StatusCode).ToString())
+                                    + " elapsedMs=" + watch.ElapsedMilliseconds);
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        if (!stop.IsCancellationRequested)
+                            LogHelper.WriteExLog("[ConnectionStartup] stage=route-probe-failed balancer=" + group
+                                + " reason=" + ex.GetType().Name + " elapsedMs=" + watch.ElapsedMilliseconds);
+                    }
+                }
             }
         }
 
@@ -135,13 +201,61 @@ namespace IRSpeedyVPN.Services.Xray
         }
     }
 
-    // .NET Framework's HttpWebRequest has no h2c support. Use the architecture-
-    // matched bundled curl for these small loopback gRPC calls, no extra DLLs.
-    internal static class XrayRoutingClient
+    // Persistent native HTTP/2 channel supports net48 without relying on curl's
+    // optional HTTP/2 build features or the OS HTTP stack. No subprocesses/files.
+    internal sealed class XrayRoutingClient
     {
-        internal static List<string> GetTargets(int port, string balancer, CancellationToken stop)
+        private const string ServiceName = "xray.app.router.command.RoutingService";
+        private static readonly Marshaller<byte[]> Bytes = Marshallers.Create<byte[]>(x => x, x => x);
+        private static readonly Method<byte[], byte[]> GetInfo = new Method<byte[], byte[]>(
+            MethodType.Unary, ServiceName, "GetBalancerInfo", Bytes, Bytes);
+        private static readonly Method<byte[], byte[]> Remove = new Method<byte[], byte[]>(
+            MethodType.Unary, ServiceName, "RemoveRule", Bytes, Bytes);
+        private readonly Channel channel;
+        private readonly CallInvoker invoker;
+
+        internal XrayRoutingClient(int port)
         {
-            return DecodeTargets(Call(port, "GetBalancerInfo", balancer, stop));
+            channel = new Channel("127.0.0.1", port, ChannelCredentials.Insecure, new[]
+            {
+                new ChannelOption("grpc.enable_http_proxy", 0),
+                new ChannelOption(ChannelOptions.MaxReceiveMessageLength, 256 * 1024)
+            });
+            invoker = channel.CreateCallInvoker();
+        }
+
+        internal async Task<List<string>> GetTargetsAsync(string balancer, CancellationToken stop)
+        {
+            return DecodeTargets(await CallAsync(GetInfo, balancer, stop).ConfigureAwait(false));
+        }
+
+        internal async Task RemoveRuleAsync(string rule, CancellationToken stop)
+        {
+            await CallAsync(Remove, rule, stop).ConfigureAwait(false);
+        }
+
+        internal Task CloseAsync() => channel.ShutdownAsync();
+
+        private async Task<byte[]> CallAsync(Method<byte[], byte[]> method, string value, CancellationToken stop)
+        {
+            stop.ThrowIfCancellationRequested();
+            var writer = new LibcoreProto.ProtoWriter();
+            writer.WriteStringField(1, value);
+            var options = new CallOptions(deadline: DateTime.UtcNow.AddMilliseconds(900), cancellationToken: stop);
+            using (var call = invoker.AsyncUnaryCall(method, null, options, writer.ToArray()))
+                return await call.ResponseAsync.ConfigureAwait(false);
+        }
+
+        internal static string DescribeError(Exception error)
+        {
+            // Report actual gRPC status/detail, not a discarded subprocess stderr.
+            var rpc = error as RpcException;
+            var detail = rpc == null ? error.GetBaseException().Message : rpc.Status.Detail;
+            detail = (detail ?? "").Replace('\r', ' ').Replace('\n', ' ');
+            if (detail.Length > 300) detail = detail.Substring(0, 300);
+            return "exception=" + error.GetType().Name
+                + (rpc == null ? "" : " grpcStatus=" + rpc.StatusCode)
+                + " detail=" + detail;
         }
 
         internal static List<string> DecodeTargets(byte[] payload)
@@ -154,11 +268,6 @@ namespace IRSpeedyVPN.Services.Xray
             return result;
         }
 
-        internal static void RemoveRule(int port, string rule, CancellationToken stop)
-        {
-            Call(port, "RemoveRule", rule, stop);
-        }
-
         private static IEnumerable<byte[]> Fields(byte[] data, int wanted)
         {
             var reader = new LibcoreProto.ProtoReader(data);
@@ -167,69 +276,6 @@ namespace IRSpeedyVPN.Services.Xray
                 if (field == wanted && wire == 2) yield return reader.ReadBytes();
                 else reader.SkipField(wire);
             }
-        }
-
-        private static byte[] Call(int port, string method, string value, CancellationToken stop)
-        {
-            stop.ThrowIfCancellationRequested();
-            var writer = new LibcoreProto.ProtoWriter();
-            writer.WriteStringField(1, value);
-            byte[] body = writer.ToArray();
-            byte[] frame = new byte[5 + body.Length];
-            for (int i = 0; i < 4; i++) frame[4 - i] = (byte)(body.Length >> (8 * i));
-            Buffer.BlockCopy(body, 0, frame, 5, body.Length);
-            string headers = Path.GetTempFileName();
-            try
-            {
-                string curl = Path.Combine(AppServices.ResourceManager.TempPath, "curl",
-                    Environment.Is64BitOperatingSystem ? "curl64.exe" : "curl32.exe");
-                using (var process = new Process())
-                using (var output = new MemoryStream())
-                {
-                    process.StartInfo = new ProcessStartInfo(curl)
-                    {
-                        UseShellExecute = false, CreateNoWindow = true,
-                        RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
-                        Arguments = "--disable --silent --show-error --noproxy \"*\" --http2-prior-knowledge"
-                            + " --connect-timeout 0.3 --max-time 1.2 -H \"Content-Type: application/grpc\""
-                            + " -H \"TE: trailers\" -H \"grpc-timeout: 900m\" --data-binary @-"
-                            + " --dump-header \"" + headers + "\" http://127.0.0.1:" + port
-                            + "/xray.app.router.command.RoutingService/" + method
-                    };
-                    process.Start();
-                    using (stop.Register(() => { try { process.Kill(); } catch { } }))
-                    {
-                        var read = process.StandardOutput.BaseStream.CopyToAsync(output);
-                        var errors = process.StandardError.ReadToEndAsync();
-                        process.StandardInput.BaseStream.Write(frame, 0, frame.Length);
-                        process.StandardInput.Close();
-                        if (!process.WaitForExit(1700))
-                        {
-                            try { process.Kill(); } catch { }
-                            throw new TimeoutException("Xray routing API deadline exceeded.");
-                        }
-                        read.GetAwaiter().GetResult();
-                        errors.GetAwaiter().GetResult();
-                        stop.ThrowIfCancellationRequested();
-                        if (process.ExitCode != 0)
-                            throw new IOException("Routing curl exit=" + process.ExitCode);
-                        string responseHeaders = File.ReadAllText(headers);
-                        var status = Regex.Matches(responseHeaders, @"(?im)^grpc-status:\s*(\d+)\s*$");
-                        if (!Regex.IsMatch(responseHeaders, @"(?m)^HTTP/2 200\b")
-                            || status.Count == 0 || status[status.Count - 1].Groups[1].Value != "0")
-                            throw new IOException("Xray routing API did not acknowledge success.");
-                        var response = output.ToArray();
-                        if (response.Length < 5 || response[0] != 0)
-                            throw new InvalidDataException("Invalid gRPC response frame.");
-                        long length = ((long)response[1] << 24) | ((long)response[2] << 16)
-                            | ((long)response[3] << 8) | response[4];
-                        if (length != response.Length - 5)
-                            throw new InvalidDataException("Invalid gRPC response length.");
-                        return response.Skip(5).ToArray();
-                    }
-                }
-            }
-            finally { try { File.Delete(headers); } catch { } }
         }
     }
 }
