@@ -271,9 +271,7 @@ namespace IRSpeedyVPN.Services.Xray
 
         public static JObject AiBalancer(string fallbackTag)
         {
-            var balancer = LeastLoadBalancer(AiBalancerTag, AiProxyPrefix, null, ServiceMaxRtt);
-            balancer.Remove("fallbackTag");
-            return balancer;
+            return LeastLoadBalancer(AiBalancerTag, AiProxyPrefix, fallbackTag, ServiceMaxRtt);
         }
 
         /// <summary>Routing rule sending the given domains to a balancer.</summary>

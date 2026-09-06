@@ -8,14 +8,12 @@ namespace IRSpeedyVPN.Services.Libcore
         private readonly string _host;
         private readonly int _port;
         private readonly int _timeoutMs;
-        private readonly int _callDeadlineMs;
 
-        public LibcoreServiceClient(string host, int port, int timeoutMs = 2000, int callDeadlineMs = 0)
+        public LibcoreServiceClient(string host, int port, int timeoutMs = 2000)
         {
             _host = host;
             _port = port;
             _timeoutMs = timeoutMs;
-            _callDeadlineMs = callDeadlineMs;
         }
 
         public ErrorResp Start(LoadConfigReq req)
@@ -57,7 +55,7 @@ namespace IRSpeedyVPN.Services.Libcore
         {
             using (var client = ProtorpcClient.Connect(_host, _port, _timeoutMs))
             {
-                return client.Call(method, reqBody, decoder, _callDeadlineMs);
+                return client.Call(method, reqBody, decoder);
             }
         }
 

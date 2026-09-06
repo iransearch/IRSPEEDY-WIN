@@ -174,7 +174,7 @@ namespace IRSpeedyVPN.Services.Libcore
             return resp;
         }
 
-        internal sealed class ProtoWriter
+        private sealed class ProtoWriter
         {
             private readonly MemoryStream _ms = new MemoryStream();
 
@@ -223,7 +223,7 @@ namespace IRSpeedyVPN.Services.Libcore
             public byte[] ToArray() => _ms.ToArray();
         }
 
-        internal sealed class ProtoReader
+        private sealed class ProtoReader
         {
             private readonly byte[] _data;
             private int _pos;
@@ -276,7 +276,7 @@ namespace IRSpeedyVPN.Services.Libcore
             {
                 var len = (int)ReadVarint();
                 if (len == 0) return Array.Empty<byte>();
-                if (len < 0 || len > _data.Length - _pos) throw new EndOfStreamException();
+                if (_pos + len > _data.Length) throw new EndOfStreamException();
                 var bytes = new byte[len];
                 Buffer.BlockCopy(_data, _pos, bytes, 0, len);
                 _pos += len;

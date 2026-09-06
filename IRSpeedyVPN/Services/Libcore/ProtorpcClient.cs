@@ -51,39 +51,34 @@ namespace IRSpeedyVPN.Services.Libcore
             }
         }
 
-        public TResp Call<TResp>(string method, byte[] requestBody, Func<byte[], TResp> decode, int deadlineMs = 0)
+        public TResp Call<TResp>(string method, byte[] requestBody, Func<byte[], TResp> decode)
         {
-            using (var deadline = deadlineMs > 0
-                ? new Timer(_ => { try { _client.Close(); } catch { } }, null, deadlineMs, Timeout.Infinite)
-                : null)
+            if (string.IsNullOrWhiteSpace(method))
             {
-                if (string.IsNullOrWhiteSpace(method))
-                {
-                    throw new ArgumentException("RPC method is required.", nameof(method));
-                }
-
-                var headerBytes = LibcoreProto.EncodeRequestHeader(
-                    (ulong)Interlocked.Increment(ref _nextId),
-                    method,
-                    (uint)(requestBody?.Length ?? 0));
-
-                WriteFrame(headerBytes);
-                WriteFrame(requestBody ?? Array.Empty<byte>());
-
-                var responseHeaderBytes = ReadFrame(0);
-                var responseHeader = LibcoreProto.DecodeResponseHeader(responseHeaderBytes);
-                if (!string.IsNullOrEmpty(responseHeader.Error))
-                {
-                    throw new InvalidOperationException(responseHeader.Error);
-                }
-
-                var responseBody = ReadFrame(0);
-                if (responseHeader.RawResponseLen != (uint)responseBody.Length)
-                {
-                    throw new InvalidOperationException("protorpc: unexpected response length.");
-                }
-                return decode != null ? decode(responseBody) : default;
+                throw new ArgumentException("RPC method is required.", nameof(method));
             }
+
+            var headerBytes = LibcoreProto.EncodeRequestHeader(
+                (ulong)Interlocked.Increment(ref _nextId),
+                method,
+                (uint)(requestBody?.Length ?? 0));
+
+            WriteFrame(headerBytes);
+            WriteFrame(requestBody ?? Array.Empty<byte>());
+
+            var responseHeaderBytes = ReadFrame(0);
+            var responseHeader = LibcoreProto.DecodeResponseHeader(responseHeaderBytes);
+            if (!string.IsNullOrEmpty(responseHeader.Error))
+            {
+                throw new InvalidOperationException(responseHeader.Error);
+            }
+
+            var responseBody = ReadFrame(0);
+            if (responseHeader.RawResponseLen != (uint)responseBody.Length)
+            {
+                throw new InvalidOperationException("protorpc: unexpected response length.");
+            }
+            return decode != null ? decode(responseBody) : default;
         }
 
         private void WriteFrame(byte[] data)
