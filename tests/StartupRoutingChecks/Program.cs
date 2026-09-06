@@ -89,6 +89,7 @@ internal static class Program
         catch { timedOut = true; }
         finally { accept.GetAwaiter().GetResult().Dispose(); listener.Stop(); }
         Check(timedOut && clock.ElapsedMilliseconds < 1500, "Unresponsive core exceeded the RPC deadline");
+        RunObservationChecks();
         RunNativePackagingChecks();
         // Native initialization must happen before either the test Server or client.
         string nativePath = NativeGrpcRuntime.Prepare();
@@ -97,6 +98,33 @@ internal static class Program
         RunGrpcChecks().GetAwaiter().GetResult();
         Console.WriteLine("Startup routing policy, protobuf, deadline and native gRPC checks passed.");
     }
+    // Wire fixture follows app/observatory/{config,command/command}.proto.
+    private static readonly byte[] ObservationFixture = { 10, 30, 10, 28, 8, 1, 16, 123, 34, 14, 115, 109, 97, 114, 116, 45, 112, 114, 111, 120, 121, 45, 50, 51, 58, 4, 8, 2, 16, 1, 80, 1 };
+
+    private static void RunObservationChecks()
+    {
+        var statuses = XrayRoutingClient.DecodeObservation(ObservationFixture);
+        Check(statuses.Count == 1 && statuses[0].Tag == "smart-proxy-23"
+            && statuses[0].Alive && statuses[0].Delay == 123
+            && statuses[0].Samples == 2 && statuses[0].Failed == 1, "Observation protobuf decode failed");
+        var summary = XrayRoutingClient.SummarizeObservation(statuses,
+            new HashSet<string> { "smart-proxy-23", "smart-proxy-24" });
+        Check(summary.Contains("configured=2 observed=1 missing=1 alive=1")
+            && summary.Contains("minAliveDelayMs=123") && summary.Contains("failedSamples=1"),
+            "Observation membership/count summary failed");
+        Check(XrayRoutingClient.SummarizeObservation(statuses, new HashSet<string> { "ai-proxy-1" })
+            .Contains("observed=0 missing=1 alive=0"), "Smart observation leaked into AI counts");
+        const string sensitive = "lookup https://secret-user:secret-password@example.invalid failed";
+        Check(XrayRoutingClient.ClassifyObservationError(sensitive) == "dns", "DNS classification failed");
+        statuses[0].Reason = XrayRoutingClient.ClassifyObservationError(sensitive);
+        Check(!XrayRoutingClient.SummarizeObservation(statuses, new HashSet<string> { "smart-proxy-23" })
+            .Contains("secret"), "Raw observation error leaked");
+        bool truncated = false;
+        try { XrayRoutingClient.DecodeObservation(new byte[] { 10, 100, 1 }); }
+        catch { truncated = true; }
+        Check(truncated, "Truncated observation accepted");
+    }
+
     private static void RunNativePackagingChecks()
     {
         string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "IRSpeedy-native-check-" + Guid.NewGuid().ToString("N"));
@@ -142,6 +170,8 @@ internal static class Program
         var bytes = Marshallers.Create<byte[]>(b => b, b => b);
         var info = new Method<byte[], byte[]>(MethodType.Unary, service, "GetBalancerInfo", bytes, bytes);
         var remove = new Method<byte[], byte[]>(MethodType.Unary, service, "RemoveRule", bytes, bytes);
+        var observe = new Method<byte[], byte[]>(MethodType.Unary,
+            "xray.core.app.observatory.command.ObservatoryService", "GetOutboundStatus", bytes, bytes);
         bool slow = false, rejectRemove = false;
         int infoCalls = 0, removeCalls = 0;
         var server = new Server();
@@ -163,6 +193,12 @@ internal static class Program
                 if (rejectRemove) throw new RpcException(new Status(StatusCode.PermissionDenied, "test refusal"));
                 return Task.FromResult(new byte[0]);
             }).Build());
+        server.Services.Add(ServerServiceDefinition.CreateBuilder()
+            .AddMethod(observe, (request, context) =>
+            {
+                Check(request.Length == 0, "Observatory request must be empty");
+                return Task.FromResult(ObservationFixture);
+            }).Build());
         server.Start();
         var client = new XrayRoutingClient(server.Ports.Single().BoundPort);
         try
@@ -173,6 +209,8 @@ internal static class Program
                 "AI was marked healthy without a result");
             await client.RemoveRuleAsync("startup-test", CancellationToken.None);
             Check(infoCalls == 2 && removeCalls == 1, "Persistent channel did not carry both methods");
+            var observed = await client.GetObservationAsync(CancellationToken.None);
+            Check(observed.Count == 1 && observed[0].Alive, "Observatory RPC integration failed");
             rejectRemove = true;
             bool rejected = false;
             try { await client.RemoveRuleAsync("startup-test", CancellationToken.None); }

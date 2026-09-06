@@ -16,6 +16,7 @@ namespace IRSpeedyVPN.Services.Xray
     {
         private readonly CancellationTokenSource stop = new CancellationTokenSource();
         private readonly Dictionary<string, List<string>> pending = new Dictionary<string, List<string>>();
+        private readonly Dictionary<string, HashSet<string>> observedGroups = new Dictionary<string, HashSet<string>>();
         private readonly int port;
         private Task worker;
         private bool disposed;
@@ -51,6 +52,15 @@ namespace IRSpeedyVPN.Services.Xray
                 if (((JArray)root["routing"]["balancers"]).Any(b => (string)b["tag"] == tag))
                 {
                     pending.Add(tag, rules);
+                    string prefix = tag == SmartIpRouting.AiBalancerTag
+                        ? SmartIpRouting.AiProxyPrefix : SmartIpRouting.SmartProxyPrefix;
+                    observedGroups[tag] = new HashSet<string>(((JArray)root["outbounds"] ?? new JArray())
+                        .Select(o => (string)o["tag"]).Where(t => t != null && t.StartsWith(prefix, StringComparison.Ordinal)));
+                    var strategy = ((JArray)root["routing"]["balancers"])
+                        .First(b => (string)b["tag"] == tag)["strategy"]?["settings"];
+                    LogHelper.WriteExLog("[StartupHealth] stage=pool-policy balancer=" + tag
+                        + " configured=" + observedGroups[tag].Count + " maxRTT=" + (string)strategy?["maxRTT"]
+                        + " tolerance=" + (string)strategy?["tolerance"]);
                     if (rules.Count == 0)
                         LogHelper.WriteExLog("[StartupRoute] stage=waiting-for-health balancer=" + tag
                             + " reason=no-tested-startup-route");
@@ -65,7 +75,7 @@ namespace IRSpeedyVPN.Services.Xray
             root["api"] = new JObject
             {
                 ["tag"] = "startup-api", ["listen"] = "127.0.0.1:" + port,
-                ["services"] = new JArray("RoutingService")
+                ["services"] = new JArray("RoutingService", "ObservatoryService")
             };
             config = root.ToString();
         }
@@ -83,6 +93,8 @@ namespace IRSpeedyVPN.Services.Xray
                     var readiness = pending.Keys.Select(group => ProbeFirstResponseAsync(httpPort, group)).ToArray();
                     var reportedErrors = new Dictionary<string, string>();
                     var nextHealthReport = new Dictionary<string, long>();
+                    long nextObservation = 0;
+                    bool observationSupported = true;
                     XrayRoutingClient client = null;
                     try
                     {
@@ -146,6 +158,27 @@ namespace IRSpeedyVPN.Services.Xray
                                 }
                             }
                             if (pending.Count == 0) break;
+                            if (observationSupported && elapsed.ElapsedMilliseconds >= nextObservation)
+                            {
+                                nextObservation = elapsed.ElapsedMilliseconds + 30000;
+                                try
+                                {
+                                    var statuses = await client.GetObservationAsync(stop.Token);
+                                    foreach (string group in pending.Keys)
+                                        LogHelper.WriteExLog("[StartupHealth] balancer=" + group + " "
+                                            + XrayRoutingClient.SummarizeObservation(statuses, observedGroups[group])
+                                            + " elapsedMs=" + elapsed.ElapsedMilliseconds);
+                                }
+                                catch (OperationCanceledException) { throw; }
+                                catch (Exception ex)
+                                {
+                                    var rpc = ex as RpcException;
+                                    if (rpc != null && rpc.StatusCode == StatusCode.Unimplemented)
+                                        observationSupported = false;
+                                    LogHelper.WriteExLog("[StartupHealth] stage=observation-unavailable exception="
+                                        + ex.GetType().Name + (rpc == null ? "" : " grpcStatus=" + rpc.StatusCode));
+                                }
+                            }
                             await Task.Delay(elapsed.Elapsed < TimeSpan.FromSeconds(30) ? 1000 : 10000, stop.Token);
                         }
                     }
@@ -234,6 +267,8 @@ namespace IRSpeedyVPN.Services.Xray
             MethodType.Unary, ServiceName, "GetBalancerInfo", Bytes, Bytes);
         private static readonly Method<byte[], byte[]> Remove = new Method<byte[], byte[]>(
             MethodType.Unary, ServiceName, "RemoveRule", Bytes, Bytes);
+        private static readonly Method<byte[], byte[]> Observe = new Method<byte[], byte[]>(MethodType.Unary,
+            "xray.core.app.observatory.command.ObservatoryService", "GetOutboundStatus", Bytes, Bytes);
         private readonly Channel channel;
         private readonly CallInvoker invoker;
 
@@ -258,6 +293,79 @@ namespace IRSpeedyVPN.Services.Xray
         }
 
         internal Task CloseAsync() => channel.ShutdownAsync();
+
+        internal async Task<List<ObservedOutbound>> GetObservationAsync(CancellationToken stop)
+        {
+            stop.ThrowIfCancellationRequested();
+            var options = new CallOptions(deadline: DateTime.UtcNow.AddMilliseconds(900), cancellationToken: stop);
+            using (var call = invoker.AsyncUnaryCall(Observe, null, options, new byte[0]))
+                return DecodeObservation(await call.ResponseAsync.ConfigureAwait(false));
+        }
+
+        internal sealed class ObservedOutbound
+        {
+            internal string Tag = "", Reason = "none";
+            internal bool Alive;
+            internal long Delay, Samples, Failed;
+        }
+
+        internal static List<ObservedOutbound> DecodeObservation(byte[] payload)
+        {
+            var result = new List<ObservedOutbound>();
+            foreach (var report in Fields(payload, 1))
+                foreach (var bytes in Fields(report, 1))
+                {
+                    var status = new ObservedOutbound();
+                    var reader = new LibcoreProto.ProtoReader(bytes);
+                    while (reader.TryReadField(out int field, out int wire))
+                    {
+                        if (field == 1 && wire == 0) status.Alive = reader.ReadVarint() != 0;
+                        else if (field == 2 && wire == 0) status.Delay = unchecked((long)reader.ReadVarint());
+                        else if (field == 3 && wire == 2) status.Reason = ClassifyObservationError(reader.ReadString());
+                        else if (field == 4 && wire == 2) status.Tag = reader.ReadString();
+                        else if (field == 7 && wire == 2)
+                        {
+                            var measurement = new LibcoreProto.ProtoReader(reader.ReadBytes());
+                            while (measurement.TryReadField(out int metric, out int metricWire))
+                            {
+                                if (metric == 1 && metricWire == 0) status.Samples = unchecked((long)measurement.ReadVarint());
+                                else if (metric == 2 && metricWire == 0) status.Failed = unchecked((long)measurement.ReadVarint());
+                                else measurement.SkipField(metricWire);
+                            }
+                        }
+                        else reader.SkipField(wire);
+                    }
+                    result.Add(status);
+                }
+            return result;
+        }
+
+        internal static string ClassifyObservationError(string error)
+        {
+            if (string.IsNullOrWhiteSpace(error)) return "none";
+            error = error.ToLowerInvariant();
+            if (error.Contains("lookup") || error.Contains("resolve") || error.Contains("dns")) return "dns";
+            if (error.Contains("certificate") || error.Contains("tls") || error.Contains("x509")) return "tls";
+            if (error.Contains("timeout") || error.Contains("deadline")) return "timeout";
+            if (error.Contains("refused")) return "refused";
+            if (error.Contains("status") || error.Contains("204")) return "http-status";
+            return "network-or-other";
+        }
+
+        internal static string SummarizeObservation(List<ObservedOutbound> statuses, HashSet<string> configured)
+        {
+            var members = statuses.Where(s => configured.Contains(s.Tag))
+                .GroupBy(s => s.Tag).Select(g => g.Last()).ToList();
+            var alive = members.Where(s => s.Alive).ToList();
+            // Emit aggregate counts and fixed categories only: never raw errors,
+            // subscription URLs, hostnames, or untrusted outbound tags.
+            return "configured=" + configured.Count + " observed=" + members.Count
+                + " missing=" + (configured.Count - members.Count) + " alive=" + alive.Count
+                + " minAliveDelayMs=" + (alive.Count == 0 ? "none" : alive.Min(s => s.Delay).ToString())
+                + " samples=" + members.Sum(s => s.Samples) + " failedSamples=" + members.Sum(s => s.Failed)
+                + " errors=" + string.Join(",", members.GroupBy(s => s.Reason)
+                    .OrderBy(g => g.Key).Select(g => g.Key + ":" + g.Count()));
+        }
 
         private async Task<byte[]> CallAsync(Method<byte[], byte[]> method, string value, CancellationToken stop)
         {

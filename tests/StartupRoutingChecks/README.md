@@ -54,6 +54,25 @@ responses, rejected rule removal, a deadline and cancellation. They also cover
 retaining errors instead of accepting HTTP 200 as gRPC success.
 
 Runtime integration still needs to be checked on Windows with the actual core.
+While handoff is pending, the application now queries the loopback
+`ObservatoryService.GetOutboundStatus` at most once every 30s with a 900ms
+deadline, using the same native channel. `[StartupHealth]` in the normal app log
+shows configured/observed/missing/alive counts, minimum alive delay, sample and
+failure counts, and fixed error categories separately for Smart and AI. The
+`pool-policy` line records each strategy's RTT and tolerance limits. These are
+observations, not a claim that the selected route can reach every destination.
+Burst cores may not populate error text; `errors=none` does not prove success.
+No raw URLs, remote addresses, credentials or error messages are logged by this
+diagnostic. Unsupported ObservatoryService produces an explicit diagnostic and
+disables only this optional query; routing health and handoff continue.
+
+Windows acceptance: force initial failures, then check the same app log for
+`StartupHealth`. Distinguish absent observations from failed probes and from
+alive nodes excluded by strategy limits. Verify handoff remains independent for
+each group, and compare the observed failures with the initial Google test
+(the burst destination is connectivitycheck.gstatic.com). A protobuf fixture
+and a local gRPC server check cover decoding, the empty request, group isolation
+and omission of sensitive raw error text. These checks need Windows execution.
 The shared burst observer now uses a 10s interval and one sample (previously
 60m and three). Burst scheduling multiplies interval by sample count; the old
 policy could leave failed initial observations stale for hours. This changes
