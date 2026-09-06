@@ -58,6 +58,9 @@ namespace IRSpeedyVPN.Services.Xray
             }
             if (pending.Count == 0)
                 return;
+            var ping = root["burstObservatory"]?["pingConfig"];
+            LogHelper.WriteExLog("[StartupRoute] stage=health-policy interval=" + (string)ping?["interval"]
+                + " sampling=" + (string)ping?["sampling"] + " timeout=" + (string)ping?["timeout"]);
             port = FreePortManager.Dequeue();
             root["api"] = new JObject
             {
@@ -79,6 +82,7 @@ namespace IRSpeedyVPN.Services.Xray
                     // They measure the production route, not just core construction.
                     var readiness = pending.Keys.Select(group => ProbeFirstResponseAsync(httpPort, group)).ToArray();
                     var reportedErrors = new Dictionary<string, string>();
+                    var nextHealthReport = new Dictionary<string, long>();
                     XrayRoutingClient client = null;
                     try
                     {
@@ -99,7 +103,23 @@ namespace IRSpeedyVPN.Services.Xray
                                     var targets = await client.GetTargetsAsync(balancer, stop.Token);
                                     string prefix = balancer == SmartIpRouting.AiBalancerTag
                                         ? SmartIpRouting.AiProxyPrefix : SmartIpRouting.SmartProxyPrefix;
-                                    if (!targets.Any(t => t.StartsWith(prefix, StringComparison.Ordinal))) continue;
+                                    if (!targets.Any(t => t.StartsWith(prefix, StringComparison.Ordinal)))
+                                    {
+                                        // A successful RPC with no eligible target is not an
+                                        // API failure. Report it periodically instead of waiting silently.
+                                        if (!nextHealthReport.TryGetValue(balancer, out var next)
+                                            || elapsed.ElapsedMilliseconds >= next)
+                                        {
+                                            nextHealthReport[balancer] = elapsed.ElapsedMilliseconds + 30000;
+                                            LogHelper.WriteExLog("[StartupRoute] stage=waiting-for-health balancer="
+                                                + balancer + " reason=" + (targets.Count == 0
+                                                    ? "no-eligible-target" : "unexpected-target-prefix")
+                                                + " reportedTargets=" + targets.Count
+                                                + " startupRules=" + pending[balancer].Count
+                                                + " elapsedMs=" + elapsed.ElapsedMilliseconds);
+                                        }
+                                        continue;
+                                    }
                                     foreach (string rule in pending[balancer].ToList())
                                     {
                                         stop.Token.ThrowIfCancellationRequested();
@@ -264,10 +284,19 @@ namespace IRSpeedyVPN.Services.Xray
         internal static List<string> DecodeTargets(byte[] payload)
         {
             var result = new List<string>();
+            bool hasPrincipleTarget = false;
             foreach (byte[] message in Fields(payload, 1))
                 foreach (byte[] principle in Fields(message, 6))
+                {
+                    hasPrincipleTarget = true;
                     foreach (byte[] tag in Fields(principle, 1))
                         result.Add(System.Text.Encoding.UTF8.GetString(tag));
+                }
+            // Xray can return gRPC OK while swallowing GetPrincipleTarget errors.
+            // A present, empty message means no healthy candidates; an absent
+            // message means the core did not supply strategy health at all.
+            if (!hasPrincipleTarget)
+                throw new InvalidOperationException("GetBalancerInfo omitted principle_target; core strategy health is unavailable. Check the core routing log and API compatibility.");
             return result;
         }
 

@@ -17,6 +17,16 @@ internal static class Program
     private static void Main()
     {
         var root = JObject.Parse(Samples.BalancerConfig);
+        // Regression: the old 60m * 3 policy left initial failures stale for hours.
+        // Recovery must be scheduled in seconds without extending the startup probe.
+        var ping = root["burstObservatory"]["pingConfig"];
+        string interval = (string)ping["interval"];
+        Check(interval.EndsWith("s", StringComparison.Ordinal)
+            && double.TryParse(interval.Substring(0, interval.Length - 1),
+                System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture,
+                out double seconds)
+            && seconds >= 10 && seconds * (int)ping["sampling"] <= 30
+            && (int)ping["sampling"] > 0, "Health recovery is scheduled too slowly");
         var rules = (JArray)root["routing"]["rules"];
         rules.Insert(1, new JObject { ["type"] = "field", ["balancerTag"] = "ai-balancer",
             ["domain"] = new JArray("domain:google.com") });
@@ -53,7 +63,15 @@ internal static class Program
         // principle_target(6), repeated tag(1). Include an unknown varint field.
         byte[] reply = { 10, 20, 48, 1, 50, 16, 10, 14, 115, 109, 97, 114, 116, 45, 112, 114, 111, 120, 121, 45, 50, 51 };
         Check(XrayRoutingClient.DecodeTargets(reply).SequenceEqual(new[] { "smart-proxy-23" }), "Balancer decode failed");
-        Check(XrayRoutingClient.DecodeTargets(new byte[0]).Count == 0, "Empty result is not healthy");
+        Check(XrayRoutingClient.DecodeTargets(new byte[] { 10, 2, 50, 0 }).Count == 0,
+            "Explicit empty principle target is not healthy");
+        foreach (var missing in new[] { new byte[0], new byte[] { 10, 2, 42, 0 } })
+        {
+            bool missingRejected = false;
+            try { XrayRoutingClient.DecodeTargets(missing); }
+            catch (InvalidOperationException) { missingRejected = true; }
+            Check(missingRejected, "Missing strategy health was treated as a healthy API response");
+        }
         bool rejected = false;
         try { XrayRoutingClient.DecodeTargets(new byte[] { 10, 127, 1 }); } catch { rejected = true; }
         Check(rejected, "Truncated response accepted");
@@ -136,7 +154,7 @@ internal static class Program
                 var reader = new IRSpeedyVPN.Services.Libcore.LibcoreProto.ProtoReader(request);
                 Check(reader.TryReadField(out int field, out int wire) && field == 1 && wire == 2,
                     "Incorrect GetBalancerInfo request");
-                if (reader.ReadString() == "ai-balancer") return new byte[0];
+                if (reader.ReadString() == "ai-balancer") return new byte[] { 10, 2, 50, 0 };
                 return new byte[] { 10, 18, 50, 16, 10, 14, 115, 109, 97, 114, 116, 45, 112, 114, 111, 120, 121, 45, 50, 51 };
             })
             .AddMethod(remove, (request, context) =>

@@ -54,6 +54,22 @@ responses, rejected rule removal, a deadline and cancellation. They also cover
 retaining errors instead of accepting HTTP 200 as gRPC success.
 
 Runtime integration still needs to be checked on Windows with the actual core.
+The shared burst observer now uses a 10s interval and one sample (previously
+60m and three). Burst scheduling multiplies interval by sample count; the old
+policy could leave failed initial observations stale for hours. This changes
+background refresh only, not the two-second startup selection budget. A single
+sample favors recovery speed over averaging; one failed sample can temporarily
+exclude a node until a later successful check. With 118 pool members this also
+increases background probe traffic, so measure CPU/network use on Windows.
+
+After a deliberately failed initial observation, restore network access without
+reconnecting. Confirm `health-policy interval=10s sampling=1`, recurring health
+probes, and separate `automatic` events only after each group's eligible targets
+appear. An empty strategy result emits `waiting-for-health` at most every 30s per
+group. A missing `principle_target` is an API compatibility/core health error,
+not a successful empty health result; check for `handoff-pending` and the core log.
+The protobuf checks distinguish these cases. Retain the tested startup route
+when the API supplies no valid health result; never switch on a blind timer.
 No change is claimed to repair an unreachable remote AI server; its failed
 probes are classified as timeout, cancelled, DNS, TLS or other network failure.
 Wire definitions: https://github.com/XTLS/Xray-core/blob/main/app/router/command/command.proto

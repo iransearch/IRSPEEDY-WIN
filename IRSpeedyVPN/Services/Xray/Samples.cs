@@ -11,14 +11,17 @@ namespace IRSpeedyVPN.Services.Xray
         // SmartIpRouting appends the vod-proxy-/ai-proxy- prefixes to the
         // burstObservatory selector when those services are active. The Throne
         // core accepts only this one observatory, so the probe is shared.
+        // Burst scheduling uses interval * sampling. Keep one sample per 10s
+        // so a failed initial check cannot strand both pools for hours.
+        // This is background health work; it does not extend startup testing.
         public static string BalancerConfig= @"{
 			""burstObservatory"": {
 				""pingConfig"": {
 					""connectivity"": """",
 					""destination"": ""https://connectivitycheck.gstatic.com/generate_204"",
 					""httpMethod"": ""HEAD"",
-					""interval"": ""60m"",
-					""sampling"": 3,
+					""interval"": ""10s"",
+					""sampling"": 1,
 					""timeout"": ""5s""
 				},
 				""subjectSelector"": [
@@ -105,3 +108,4 @@ namespace IRSpeedyVPN.Services.Xray
 		}";
     }
 }
+
