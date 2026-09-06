@@ -71,9 +71,53 @@ internal static class Program
         catch { timedOut = true; }
         finally { accept.GetAwaiter().GetResult().Dispose(); listener.Stop(); }
         Check(timedOut && clock.ElapsedMilliseconds < 1500, "Unresponsive core exceeded the RPC deadline");
+        RunNativePackagingChecks();
+        // Native initialization must happen before either the test Server or client.
+        string nativePath = NativeGrpcRuntime.Prepare();
+        Check(Environment.GetEnvironmentVariable("GRPC_CSHARP_EXT_OVERRIDE_LOCATION") == nativePath,
+            "Grpc.Core native path override was not set");
         RunGrpcChecks().GetAwaiter().GetResult();
         Console.WriteLine("Startup routing policy, protobuf, deadline and native gRPC checks passed.");
     }
+    private static void RunNativePackagingChecks()
+    {
+        string root = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "IRSpeedy-native-check-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            foreach (bool is64 in new[] { false, true })
+            {
+                string architecture = is64 ? "x64" : "x86";
+                Func<System.IO.Stream> source = () => typeof(NativeGrpcRuntime).Assembly
+                    .GetManifestResourceStream("IRSpeedy.NativeGrpc." + architecture);
+                using (var stream = source())
+                using (var reader = new System.IO.BinaryReader(stream))
+                {
+                    Check(reader.ReadUInt16() == 0x5a4d, "Native resource is not PE");
+                    stream.Position = 0x3c;
+                    int offset = reader.ReadInt32();
+                    stream.Position = offset;
+                    Check(reader.ReadUInt32() == 0x4550, "Missing PE signature");
+                    Check(reader.ReadUInt16() == (is64 ? 0x8664 : 0x14c), "Incorrect embedded architecture");
+                }
+                string path = NativeGrpcRuntime.Extract(source, root, is64);
+                Check(System.IO.File.Exists(path), "Native extraction failed");
+                var written = System.IO.File.GetLastWriteTimeUtc(path);
+                Check(NativeGrpcRuntime.Extract(source, root, is64) == path, "Cache path changed");
+                Check(System.IO.File.GetLastWriteTimeUtc(path) == written, "Valid cache was rewritten");
+                System.IO.File.WriteAllText(path, "incomplete/corrupt cache");
+                NativeGrpcRuntime.Extract(source, root, is64);
+                Check(System.IO.File.ReadAllBytes(path).Take(2).SequenceEqual(new byte[] { 77, 90 }),
+                    "Corrupted native cache was not repaired");
+                System.IO.File.Delete(path);
+                Task.WaitAll(Enumerable.Range(0, 4).Select(_ => Task.Run(() =>
+                    Check(NativeGrpcRuntime.Extract(source, root, is64) == path, "Concurrent extraction failed"))).ToArray());
+                Check(!System.IO.Directory.GetFiles(root, "*.tmp", System.IO.SearchOption.AllDirectories).Any(),
+                    "Temporary native files were left behind");
+            }
+        }
+        finally { if (System.IO.Directory.Exists(root)) System.IO.Directory.Delete(root, true); }
+    }
+
     private static async Task RunGrpcChecks()
     {
         const string service = "xray.app.router.command.RoutingService";

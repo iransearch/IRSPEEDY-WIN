@@ -82,6 +82,9 @@ namespace IRSpeedyVPN.Services.Xray
                     XrayRoutingClient client = null;
                     try
                     {
+                        // Keep extraction off the login/UI path and ahead of JIT
+                        // execution of Grpc.Core's native Channel initialization.
+                        NativeGrpcRuntime.Prepare();
                         client = new XrayRoutingClient(port);
                         LogHelper.WriteExLog("[StartupRoute] stage=control-ready transport=grpc-core elapsedMs="
                             + elapsed.ElapsedMilliseconds);

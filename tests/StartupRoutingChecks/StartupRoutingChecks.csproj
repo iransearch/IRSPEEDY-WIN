@@ -6,7 +6,8 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
-    <PackageReference Include="Grpc.Core" Version="2.46.6" />
+    <PackageReference Include="Grpc.Core" Version="2.46.6" GeneratePathProperty="true" />
+    <Compile Include="../../IRSpeedyVPN/Services/Xray/NativeGrpcRuntime.cs" Link="NativeGrpcRuntime.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Xray/StartupRouting.cs" Link="StartupRouting.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Xray/Samples.cs" Link="Samples.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="LibcoreProto.cs" />
@@ -14,4 +15,5 @@
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs" />
   </ItemGroup>
+  <Import Project="../../build/NativeGrpc.targets" />
 </Project>
