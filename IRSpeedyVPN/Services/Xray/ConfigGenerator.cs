@@ -40,6 +40,24 @@ namespace IRSpeedyVPN.Services.Xray
             return NeedsXray(item);
         }
 
+        // Preflight uses the same outbound conversion and refusal rules as Smart.
+        // Return fixed reasons only; parser exception text may contain credentials.
+        public static string UrlTestRefusalReason(string link)
+        {
+            try
+            {
+                string message;
+                var item = ShareHandler.ImportFromConfigLink(link, out message);
+                if (item == null) return "invalid-link";
+                if (!NeedsXray(item)) return null;
+                var outbound = new Outbound { tag = "test-preflight" };
+                FillOutboundForItem(outbound, item);
+                if (outbound.protocol == null) return "unsupported-protocol";
+                return SmartIpRouting.CoreRefusalReason(outbound);
+            }
+            catch (Exception) { return "invalid-outbound-config"; }
+        }
+
         /// <summary>
         /// Generate a complete Xray config for a single xhttp link (used with Start/LoadConfigReq)
         /// </summary>

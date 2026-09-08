@@ -731,6 +731,19 @@ namespace IRSpeedyVPN.Services
                     {
                         if (!allUrls.ContainsKey(u))
                         {
+                            string refusal = Xray.ConfigGenerator.UrlTestRefusalReason(u);
+                            if (refusal != null)
+                            {
+                                foreach (var rejected in sourceUrls.Where(item => item.url == u))
+                                {
+                                    rejected.latency = -1;
+                                    rejected.latencychkTime = DateTime.Now;
+                                }
+                                LogHelper.WriteExLog("[UrlTest] stage=candidate-rejected candidate="
+                                    + sourceUrls.FindIndex(item => item.url == u)
+                                    + " reason=" + refusal);
+                                return;
+                            }
                             var sniRuntime = GetSniRuntime(u, urlTestSniServers, false);
                             allUrls.Add(u, BuildChainLinks(GetChainLink(u), new string[] { defaultChainLink, selectedChain }));
                             if (sniRuntime != null)
@@ -817,28 +830,53 @@ namespace IRSpeedyVPN.Services
 
                         EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
 
-                        var configData = SingBox.ConfigGenerator.GetUrlTestConfig(allUrls, port, out tagToUrl, urlTestOverrides, socksOverrides);
-
-                        if (tagToUrl.Count == 0)
+                        while (true)
                         {
-                            return;
+                            if (cancelUrlTest || (!force && UrlTestCoordinator.AbortRequested)) return;
+                            if (allUrls.Count == 0) return;
+                            var activeXray = xrayInfos.Where(info => allUrls.ContainsKey(info.Link)).ToList();
+                            try
+                            {
+                                var configData = SingBox.ConfigGenerator.GetUrlTestConfig(allUrls, port,
+                                    out tagToUrl, urlTestOverrides, socksOverrides);
+                                if (tagToUrl.Count == 0) return;
+                                bool needXray = activeXray.Count > 0;
+                                string xrayConfig = needXray
+                                    ? Xray.ConfigGenerator.GetUrlTestXrayConfig(activeXray) : "";
+                                resp = ExecuteCoreCall(client => client.Test(new TestReq
+                                {
+                                    Config = configData ?? "",
+                                    OutboundTags = tagToUrl.Keys.ToList(),
+                                    Url = gInfo?.settings?.setting?.url_test ?? "https://www.google.com/generate_204",
+                                    MaxConcurrency = 15,
+                                    TestTimeoutMs = 5000,
+                                    NeedXray = needXray,
+                                    XrayConfig = xrayConfig
+                                }));
+                                break;
+                            }
+                            catch (InvalidOperationException ex)
+                            {
+                                // Only a core CONFIG rejection naming an exact member can
+                                // prune this batch. Network/RPC/global errors still propagate.
+                                var match = System.Text.RegularExpressions.Regex.Match(ex.Message ?? "",
+                                    @"failed to build outbound config with tag (xray-\d+)(?=\s|>|$)");
+                                var rejectedInfo = match.Success
+                                    ? activeXray.FirstOrDefault(info => info.Tag == match.Groups[1].Value) : null;
+                                if (rejectedInfo == null || !allUrls.Remove(rejectedInfo.Link)) throw;
+                                socksOverrides.Remove(rejectedInfo.Link);
+                                foreach (var rejected in sourceUrls.Where(item => item.url == rejectedInfo.Link))
+                                {
+                                    rejected.latency = -1;
+                                    rejected.latencychkTime = DateTime.Now;
+                                }
+                                LogHelper.WriteExLog("[UrlTest] stage=candidate-rejected candidate="
+                                    + sourceUrls.FindIndex(item => item.url == rejectedInfo.Link)
+                                    + " reason=core-config-rejected remaining=" + allUrls.Count);
+                                // Every retry removes one member. Keep the original infos
+                                // for finally's port cleanup; use activeXray for config only.
+                            }
                         }
-
-                        bool needXray = xrayInfos.Count > 0;
-                        string xrayConfig = needXray ? Xray.ConfigGenerator.GetUrlTestXrayConfig(xrayInfos) : "";
-
-                        resp = ExecuteCoreCall(client => client.Test(new TestReq
-                        {
-                            Config = configData ?? "",
-                            OutboundTags = tagToUrl.Keys.ToList(),
-                            //UseDefaultOutbound = false,
-                            Url = gInfo?.settings?.setting?.url_test ?? "https://www.google.com/generate_204",
-                            //TestCurrent = false,
-                            MaxConcurrency = 15,
-                            TestTimeoutMs = 5000,
-                            NeedXray = needXray,
-                            XrayConfig = xrayConfig
-                        }));
                     }
                     if (resp?.Results != null && !(cancelUrlTest || (!force && UrlTestCoordinator.AbortRequested)))
                     {
