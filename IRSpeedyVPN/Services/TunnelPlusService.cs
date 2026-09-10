@@ -843,7 +843,7 @@ namespace IRSpeedyVPN.Services
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
                                     ? Xray.ConfigGenerator.GetUrlTestXrayConfig(activeXray) : "";
-                                resp = ExecuteCoreCall(client => client.Test(new TestReq
+                                resp = UrlTestRetryPolicy.Run(new TestReq
                                 {
                                     Config = configData ?? "",
                                     OutboundTags = tagToUrl.Keys.ToList(),
@@ -852,7 +852,9 @@ namespace IRSpeedyVPN.Services
                                     TestTimeoutMs = 5000,
                                     NeedXray = needXray,
                                     XrayConfig = xrayConfig
-                                }));
+                                }, request => ExecuteCoreCall(client => client.Test(request)),
+                                    () => cancelUrlTest || (!force && UrlTestCoordinator.AbortRequested),
+                                    message => LogHelper.WriteExLog(message));
                                 break;
                             }
                             catch (InvalidOperationException ex)
@@ -883,7 +885,7 @@ namespace IRSpeedyVPN.Services
                         var testedUrls = new HashSet<string>(StringComparer.Ordinal);
                         foreach (var result in resp.Results)
                         {
-                            if (result == null || result.LatencyMs <= 0)
+                            if (!UrlTestRetryPolicy.IsSuccess(result))
                                 continue;
                             if (!tagToUrl.TryGetValue(result.OutboundTag, out var url))
                                 continue;
