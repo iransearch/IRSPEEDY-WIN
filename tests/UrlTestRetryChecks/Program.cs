@@ -103,7 +103,63 @@ internal static class Program
         catch (OperationCanceledException) { rejected = true; }
         Check(rejected && cancelledCalls == 1, "Cancelled batch issued retry or published results");
         CheckProgress();
-        Console.WriteLine("URL test retry and progress checks passed.");
+        CheckCountryRounds();
+        Console.WriteLine("URL test retry, progress and country scheduling checks passed.");
+    }
+
+    private static void CheckCountryRounds()
+    {
+        var order = new List<string>();
+        var updates = new List<long>();
+        Func<string, int[], InitialCountryTest> country = (name, latencies) =>
+            new InitialCountryTest(latencies.Select((latency, index) =>
+                new Action<Action<long>>(report =>
+                {
+                    order.Add(name + (index + 1));
+                    report(latency);
+                })), latency => { if (name == "A") updates.Add(latency); },
+                () => order.Add(name + "-done"));
+        InitialUrlTestSchedule.Run(new[] {
+            country("A", new[] { 600, 700, 400 }),
+            country("B", new[] { 300 }),
+            country("C", new[] { -1, 500 })
+        }, () => false, ex => { throw ex; });
+        Check(order.SequenceEqual(new[] {
+            "A1", "B1", "B-done", "C1", "A2", "C2", "C-done", "A3", "A-done"
+        }), "Countries did not follow stable rounds or completed before their last member");
+        Check(updates.SequenceEqual(new long[] { 600, 400 }), "Country minimum was reset between rounds");
+
+        order.Clear();
+        int pass = 0;
+        var withRetry = new InitialCountryTest(new Action<Action<long>>[] {
+            report => UrlTestRetryPolicy.Run(Request(), (req, partial) =>
+            {
+                order.Add(++pass == 1 ? "A-primary" : "A-retry");
+                return Response(pass == 1 ? 600 : 400);
+            }, () => false, _ => { }, report)
+        }, _ => { }, () => order.Add("A-done"));
+        InitialUrlTestSchedule.Run(new[] { withRetry, country("B", new[] { 200 }) },
+            () => false, ex => { throw ex; });
+        Check(order.SequenceEqual(new[] { "A-primary", "A-retry", "A-done", "B1", "B-done" }),
+            "Next country started before the current server retry finished");
+
+        order.Clear();
+        int failures = 0;
+        var invalid = new InitialCountryTest(new Action<Action<long>>[] {
+            _ => { order.Add("invalid"); throw new InvalidOperationException(); }
+        }, _ => { }, () => order.Add("invalid-done"));
+        InitialUrlTestSchedule.Run(new[] { invalid, country("B", new[] { 200 }) },
+            () => false, _ => failures++);
+        Check(failures == 1 && order.Contains("B-done"), "One invalid member stopped the schedule");
+
+        bool cancelled = false;
+        order.Clear();
+        var stopping = new InitialCountryTest(new Action<Action<long>>[] {
+            report => { cancelled = true; report(100); }
+        }, _ => order.Add("late-progress"), () => order.Add("late-completion"));
+        InitialUrlTestSchedule.Run(new[] { stopping, country("B", new[] { 200 }) },
+            () => cancelled, ex => { throw ex; });
+        Check(order.Count == 0, "Cancellation allowed progress, completion or another country");
     }
 
     private static void CheckProgress()

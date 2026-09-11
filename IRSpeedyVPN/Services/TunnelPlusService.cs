@@ -682,6 +682,46 @@ namespace IRSpeedyVPN.Services
             return RunUrlTest(null, false, progress, cancelled);
         }
 
+        // One scheduled member, including its retry. Run synchronously so a cancelled
+        // wrapper cannot advance the schedule while the core still owns its resources.
+        public void TestInitialUrl(Url url, Action<long> progress, Func<bool> cancelled)
+        {
+            if (url == null || cancelled() || UrlTestCoordinator.AbortRequested) return;
+            url.latency = 0;
+            url.latencychkTime = default(DateTime);
+            try
+            {
+                UrlTestFull(new[] { url }, false, progress, cancelled);
+            }
+            finally
+            {
+                if (!cancelled() && !UrlTestCoordinator.AbortRequested)
+                {
+                    // A refused config or a transport exception is this member's
+                    // failure, not permission to reuse its previous cached success.
+                    if (url.latencychkTime == default(DateTime))
+                    {
+                        url.latency = -1;
+                        url.latencychkTime = DateTime.Now;
+                    }
+                    foreach (var duplicate in server.urls.Where(u => u != null && u.url == url.url))
+                    {
+                        duplicate.latency = url.latency;
+                        duplicate.latencychkTime = url.latencychkTime;
+                    }
+                }
+            }
+        }
+
+        public void CompleteInitialUrlTests()
+        {
+            var best = server.urls.Where(u => u != null && u.latency > 0)
+                .OrderBy(u => u.latency).FirstOrDefault();
+            urlTestSpeed = best?.latency ?? -1;
+            selectedUrl = best?.url;
+            lastUrlTest = DateTime.Now;
+        }
+
         private long RunUrlTest(Url[] urls, bool force, Action<long> progress, Func<bool> cancelled)
         {
             if (cancelled?.Invoke() == true) return urlTestSpeed;
