@@ -117,15 +117,15 @@ namespace IRSpeedyVPN.Services
         const int CoreExitWindowSeconds = 30;
         const int ImmediateExitSeconds = 2;
         static readonly object coreLock = new object();
-        static readonly object sniLock = new object();
+        readonly object sniLock = new object();
         readonly Dictionary<string, SniRuntime> serviceSniServers = new Dictionary<string, SniRuntime>(StringComparer.OrdinalIgnoreCase);
-        static readonly HashSet<int> activeSniPorts = new HashSet<int>();
+        readonly HashSet<int> activeSniPorts = new HashSet<int>();
         const int CorePort = 19810;
         const int VpnCorePort = 19811;
         const int CoreConnectTimeoutMs = 8000;
         const int CoreConnectRetryDelayMs = 200;        
         const string SniScheme = "sni://";
-        static int nextSniListenPort = 40443;
+        int nextSniListenPort = 40443;
         public TunnelPlusService(IServer server, GlobalInfo globalInfo)
         {
             gInfo = globalInfo;
@@ -162,11 +162,7 @@ namespace IRSpeedyVPN.Services
                 if (serviceController.CheckUserPermission(gInfo.Username, gInfo.Password))
                 // if (ServiceHelper.CheckAvailabilty(gInfo.Username,gInfo.Password))
                 {
-                    LogHelper.WriteExLog("[ConnectionTrace] stage=drain-start countryId=" + ID);
                     StopAndDrainUrlTests();
-                    LogHelper.WriteExLog("[ConnectionTrace] stage=drain-complete countryId=" + ID
-                        + " bestMs=" + urlTestSpeed + " poolMembers=" + (_smartFastUrls?.Length ?? 0)
-                        + " selectedMember=" + (server.urls.FindIndex(u => u.url == SelectedUrl) + 1));
                     if (goUrl == null)
                     {
                         KillAll();
@@ -362,9 +358,6 @@ namespace IRSpeedyVPN.Services
                         );
                     }
 
-                    LogHelper.WriteExLog("[ConnectionTrace] stage=core-start countryId=" + ID
-                        + " category=" + InitialTestCategory(lastLink) + " needXray=" + needXray
-                        + " smart=" + isSmartFast + " port=" + port);
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))
                     {
                         LogHelper.WriteExLog(
@@ -381,7 +374,6 @@ namespace IRSpeedyVPN.Services
                         return;
                     }
 
-                    LogHelper.WriteExLog("[ConnectionTrace] stage=core-started countryId=" + ID);
                     IsConnected = true;
                     if (vpnmode)
                     {                      
@@ -685,265 +677,6 @@ namespace IRSpeedyVPN.Services
             return RunUrlTest(urls, force, null, null);
         }
 
-
-
-        private static string RedactProbeError(string error)
-        {
-            if (string.IsNullOrWhiteSpace(error)) return "<none>";
-            var text = error.Length > 4096 ? error.Substring(0, 4096) : error;
-            int json = text.IndexOfAny(new[] { '{', '[' });
-            if (json >= 0) text = text.Substring(0, json) + "<payload>";
-            text = System.Text.RegularExpressions.Regex.Replace(text, "\"[^\"]*(?:\"|$)|'[^']*(?:'|$)", "<value>");
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"\S+://\S*|\S+@\S+", "<endpoint>");
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"(?i)\b(password|passwd|token|secret|uuid|authorization|auth|key)\b\s*[:=]\s*\S+", "$1=<value>");
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"(?i)\b[0-9a-f]{8}-[0-9a-f-]{27,}\b|\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?|\b[0-9a-f]{32,}\b", "<address-or-id>");
-            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
-            return text.Length > 600 ? text.Substring(0, 600) : text;
-        }
-
-    internal sealed class StableInitialCore : IDisposable
-    {
-        internal readonly object SyncRoot = new object();
-        private readonly object lifecycle = new object();
-        private readonly string executable;
-        private readonly int port;
-        private Process process;
-        private bool disposed;
-        private string activeConfig;
-        private string activeXray;
-
-        internal StableInitialCore(string executable)
-        {
-            if (string.IsNullOrEmpty(executable) || !File.Exists(executable))
-                throw new FileNotFoundException("URL test core executable is unavailable.");
-            this.executable = executable;
-            port = FreePortManager.Dequeue();
-        }
-
-        internal TestResp Test(TestReq request, Action<TestResp> report, Func<bool> cancelled)
-        {
-            lock (SyncRoot)
-            {
-                if (cancelled()) throw new OperationCanceledException();
-                EnsureStarted(cancelled);
-                var running = process;
-                var deadline = Stopwatch.StartNew();
-                // Killing only this owned process also unblocks an RPC waiting on
-                // an unresponsive core when the user switches lists or connects.
-                using (var cancellation = new Timer(_ =>
-                {
-                    if (cancelled() || deadline.ElapsedMilliseconds > 15000) StopProcess(running);
-                }, null, 0, 100))
-                {
-                    try
-                    {
-                        var client = new LibcoreServiceClient("127.0.0.1", port, 1000);
-                        // TestCurrent selects the conventional proxy outbound; without it
-                        // the core may silently probe the direct default outbound instead.
-                        if (request.OutboundTags == null || request.OutboundTags.Count != 1
-                            || request.OutboundTags[0] != "proxy"
-                            || !JObject.Parse(request.Config)["outbounds"].Children()
-                                .Any(o => (string)o["tag"] == "proxy" && (string)o["type"] != "direct"))
-                            throw new InvalidOperationException("Stable probe requires a proxy outbound.");
-                        if (activeConfig != request.Config || activeXray != request.XrayConfig)
-                        {
-                            var started = client.Start(new LoadConfigReq
-                            {
-                                CoreConfig = request.Config, NeedXray = request.NeedXray,
-                                XrayConfig = request.XrayConfig ?? "", DisableStats = true
-                            });
-                            if (!string.IsNullOrEmpty(started?.Error))
-                                throw new InvalidOperationException(started.Error);
-                            activeConfig = request.Config;
-                            activeXray = request.XrayConfig;
-                            LogHelper.WriteExLog("[StableProbe] stage=config-loaded port=" + port);
-                        }
-                        var current = new TestReq
-                        {
-                            TestCurrent = true, OutboundTags = request.OutboundTags,
-                            Url = request.Url, TestTimeoutMs = request.TestTimeoutMs,
-                            MaxConcurrency = request.MaxConcurrency,
-                            UseDefaultOutbound = request.UseDefaultOutbound
-                        };
-                        LogHelper.WriteExLog("[StableProbe] stage=test-current port=" + port);
-                        var result = client.TestWithProgress(current, report, cancelled,
-                            message => LogHelper.WriteExLog(message));
-                        if (cancelled()) throw new OperationCanceledException();
-                        if (result?.Results == null || result.Results.Count != 1
-                            || result.Results[0].OutboundTag != "proxy")
-                            throw new InvalidOperationException("Stable probe response did not match proxy.");
-                        return result;
-                    }
-                    catch
-                    {
-                        StopProcess(running);
-                        if (cancelled()) throw new OperationCanceledException();
-                        throw;
-                    }
-                }
-            }
-        }
-
-        private void EnsureStarted(Func<bool> cancelled)
-        {
-            lock (lifecycle)
-            {
-                if (disposed) throw new ObjectDisposedException(nameof(StableInitialCore));
-                if (process != null && !process.HasExited) return;
-                process?.Dispose();
-                process = new Process
-                {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = executable,
-                        Arguments = "-port " + port,
-                        WorkingDirectory = Path.GetDirectoryName(executable),
-                        UseShellExecute = false,
-                        CreateNoWindow = true,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true
-                    }
-                };
-                // Drain output; never log raw configurations, URLs or credentials.
-                process.OutputDataReceived += (sender, args) => { };
-                process.ErrorDataReceived += (sender, args) => { };
-                try
-                {
-                    if (!process.Start()) throw new InvalidOperationException("URL test core did not start.");
-                    process.BeginOutputReadLine();
-                    process.BeginErrorReadLine();
-                }
-                catch
-                {
-                    StopProcess(process);
-                    throw;
-                }
-            }
-            var startup = Stopwatch.StartNew();
-            while (startup.ElapsedMilliseconds < 8000)
-            {
-                if (cancelled())
-                {
-                    StopProcess(process);
-                    throw new OperationCanceledException();
-                }
-                if (process == null || process.HasExited)
-                    throw new InvalidOperationException("URL test core exited during startup.");
-                if (ProtorpcClient.CanConnect("127.0.0.1", port, 100))
-                {
-                    LogHelper.WriteExLog("[UrlTest] stage=worker-core-ready port=" + port);
-                    return;
-                }
-                Thread.Sleep(50);
-            }
-            StopProcess(process);
-            throw new TimeoutException("URL test core startup timed out.");
-        }
-
-        private void StopProcess(Process expected)
-        {
-            lock (lifecycle)
-            {
-                if (expected == null || !ReferenceEquals(process, expected)) return;
-                try
-                {
-                    if (!expected.HasExited) expected.Kill();
-                    if (!expected.WaitForExit(1000)) return;
-                }
-                catch (InvalidOperationException) { }
-                catch { return; }
-                expected.Dispose();
-                process = null;
-                activeConfig = null;
-                activeXray = null;
-            }
-        }
-
-        public void Dispose()
-        {
-            lock (SyncRoot)
-            {
-                if (disposed) return;
-                disposed = true;
-                StopProcess(process);
-                // Do not recycle a port if an owned process failed to terminate.
-                if (process == null) FreePortManager.Enqueue(port);
-            }
-        }
-    }
-
-        internal static readonly object InitialTestBatchGate = new object();
-
-        internal static int InitialTestCategory(string link)
-        {
-            var value = (link ?? "").Trim();
-            if (value.StartsWith("hy2://", StringComparison.OrdinalIgnoreCase)
-                || value.StartsWith("hysteria2://", StringComparison.OrdinalIgnoreCase)
-                || value.StartsWith("hysteria://", StringComparison.OrdinalIgnoreCase))
-                return 0;
-            if (!value.StartsWith("vless://", StringComparison.OrdinalIgnoreCase))
-                return 3;
-            try
-            {
-                string message;
-                var item = ShareHandler.ImportFromConfigLink(value, out message);
-                if (item != null && string.Equals(item.streamSecurity, "reality", StringComparison.OrdinalIgnoreCase))
-                    return 1;
-            }
-            catch { }
-            return 2;
-        }
-
-        private readonly object initialResultLock = new object();
-
-        internal void TestInitialMember(Url url, Action<long> progress, Func<bool> cancelled)
-        {
-            if (cancelled()) return;
-            var elapsed = Stopwatch.StartNew();
-            LogHelper.WriteExLog("[InitialMember] stage=start countryId=" + ID
-                + " member=" + (server.urls.IndexOf(url) + 1) + " category=" + InitialTestCategory(url.url));
-            url.latency = -1;
-            url.latencychkTime = default(DateTime);
-            try
-            {
-                // Run synchronously: finish both attempts and cleanup before the next member.
-                UrlTestFull(new[] { url }, false, progress, cancelled, true);
-            }
-            finally
-            {
-                if (!cancelled())
-                {
-                    url.latencychkTime = DateTime.Now;
-                    foreach (var duplicate in server.urls.Where(u => u != null && u.url == url.url))
-                    {
-                        duplicate.latency = url.latency;
-                        duplicate.latencychkTime = url.latencychkTime;
-                    }
-                }
-                lock (initialResultLock)
-                {
-                    if (!cancelled() && url.latency > 0 && (urlTestSpeed <= 0 || url.latency < urlTestSpeed))
-                    {
-                        urlTestSpeed = url.latency;
-                        selectedUrl = url.url;
-                    }
-                }
-                LogHelper.WriteExLog("[InitialMember] stage=end countryId=" + ID
-                    + " member=" + (server.urls.IndexOf(url) + 1) + " latencyMs=" + url.latency
-                    + " cancelled=" + cancelled() + " elapsedMs=" + elapsed.ElapsedMilliseconds
-                    + " countryBestMs=" + urlTestSpeed);
-            }
-        }
-
-        internal void CompleteInitialTests()
-        {
-            var best = server.urls.Where(u => u != null && u.latency > 0)
-                .OrderBy(u => u.latency).FirstOrDefault();
-            urlTestSpeed = best == null ? -1 : best.latency;
-            selectedUrl = best == null ? null : best.url;
-            lastUrlTest = DateTime.Now;
-        }
-
         public long UrlTestWithProgress(Action<long> progress, Func<bool> cancelled)
         {
             return RunUrlTest(null, false, progress, cancelled);
@@ -980,18 +713,15 @@ namespace IRSpeedyVPN.Services
             return urlTestSpeed;
         }
         public void UrlTestFull(Url[] urls = null, bool force = false,
-            Action<long> progress = null, Func<bool> cancelled = null, bool stableInitial = false)
+            Action<long> progress = null, Func<bool> cancelled = null)
         {
-            if (!stableInitial) cancelUrlTest = false;
-            Func<bool> isCancelled = () => (!stableInitial && cancelUrlTest) || cancelled?.Invoke() == true
+            cancelUrlTest = false;
+            Func<bool> isCancelled = () => cancelUrlTest || cancelled?.Invoke() == true
                 || (!force && UrlTestCoordinator.AbortRequested);
             if (isCancelled())
                 return;
-            if (!stableInitial)
-            {
-                urlTestSpeed = -1;
-                selectedUrl = null;
-            }
+            urlTestSpeed = -1;
+            selectedUrl = null;
             try
             {
                 var sourceUrls = (urls != null ? (IEnumerable<Url>)urls : server.urls)
@@ -1053,7 +783,6 @@ namespace IRSpeedyVPN.Services
                 var urlTestConfigPaths = new List<string>();
                 var urlTestHysteriaPorts = new List<int>();
                 int port = -1;
-                StableInitialCore stableCore = null;
                 try
                 {
                     foreach (var kvp in allUrls)
@@ -1108,13 +837,12 @@ namespace IRSpeedyVPN.Services
 
                     TestResp resp;
                     Dictionary<string, string> tagToUrl;
-                    lock (stableInitial ? new object() : grpcLock)
+                    lock (grpcLock)
                     {
                         if (isCancelled())
                             return;
 
-                        if (stableInitial) stableCore = new StableInitialCore(ResolveCorePath());
-                        else EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
+                        EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
 
                         while (true)
                         {
@@ -1127,7 +855,7 @@ namespace IRSpeedyVPN.Services
                                 // countries. Only this test's unique tags may update its row.
                                 var configData = SingBox.ConfigGenerator.GetUrlTestConfig(allUrls, port,
                                     out tagToUrl, urlTestOverrides, socksOverrides,
-                                    stableInitial ? "" : "urltest-" + Guid.NewGuid().ToString("N") + "-");
+                                    "urltest-" + Guid.NewGuid().ToString("N") + "-");
                                 if (tagToUrl.Count == 0) return;
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
@@ -1141,27 +869,10 @@ namespace IRSpeedyVPN.Services
                                     TestTimeoutMs = 5000,
                                     NeedXray = needXray,
                                     XrayConfig = xrayConfig
-                                }, (request, report) =>
-                                {
-                                    var watch = Stopwatch.StartNew();
-                                    var response = stableCore != null
-                                        ? stableCore.Test(request, report, isCancelled)
-                                        : ExecuteCoreCall(client => progress == null
+                                }, (request, report) => ExecuteCoreCall(client => progress == null
                                         ? client.Test(request)
                                         : client.TestWithProgress(request, report, isCancelled,
-                                            message => LogHelper.WriteExLog(message)));
-                                    foreach (var result in response?.Results ?? new List<URLTestResp>())
-                                    {
-                                        string link;
-                                        tagToUrl.TryGetValue(result.OutboundTag ?? "", out link);
-                                        LogHelper.WriteExLog("[ProbeTrace] countryId=" + ID
-                                            + " member=" + (server.urls.FindIndex(u => u.url == link) + 1)
-                                            + " phase=" + (UrlTestRetryPolicy.SameEndpoint(request.Url, UrlTestRetryPolicy.RetryUrl) ? "alternate-url" : "primary")
-                                            + " timeoutMs=" + request.TestTimeoutMs + " elapsedMs=" + watch.ElapsedMilliseconds
-                                            + " latencyMs=" + result.LatencyMs + " error=" + RedactProbeError(result.Error));
-                                    }
-                                    return response;
-                                },
+                                            message => LogHelper.WriteExLog(message))),
                                     isCancelled, message => LogHelper.WriteExLog(message), progress);
                                 break;
                             }
@@ -1197,7 +908,7 @@ namespace IRSpeedyVPN.Services
                                 continue;
                             if (!tagToUrl.TryGetValue(result.OutboundTag, out var url))
                                 continue;
-                            if (!stableInitial && (urlTestSpeed < 0 || result.LatencyMs < urlTestSpeed))
+                            if (urlTestSpeed < 0 || result.LatencyMs < urlTestSpeed)
                             {
                                 urlTestSpeed = result.LatencyMs;
                                 selectedUrl = url;
@@ -1223,7 +934,6 @@ namespace IRSpeedyVPN.Services
                 }
                 finally
                 {
-                    stableCore?.Dispose();
                     foreach (var p in urlTestHysteriaProcs)
                         TryKillProcess(p);
                     foreach (var cfg in urlTestConfigPaths)
@@ -1241,7 +951,7 @@ namespace IRSpeedyVPN.Services
             {
                 if (isCancelled())
                     return;
-                if (!stableInitial && onConnectDisconnect != null)
+                if (onConnectDisconnect != null)
                     onConnectDisconnect.Invoke(this, false, 0, "1 خطا در بررسی سرورها");
                 return;
             }
@@ -1250,7 +960,7 @@ namespace IRSpeedyVPN.Services
                 if (isCancelled())
                     return;
                 LogHelper.WriteLog(ex);
-                if (!stableInitial && onConnectDisconnect != null)
+                if (onConnectDisconnect != null)
                     onConnectDisconnect.Invoke(this, false, 0, "خطا در بررسی سرورها");
             }/*
             if (!IsConnected)
@@ -1602,10 +1312,6 @@ namespace IRSpeedyVPN.Services
                 // The barrier below still waits for the in-flight call to unwind.
             }
 
-            lock (InitialTestBatchGate)
-            {
-                // Include member cleanup before connection starts using ports and SNI processes.
-            }
             lock (grpcLock)
             {
                 // Wait until any in-flight URL Test RPC has released the shared Core.
@@ -1702,7 +1408,7 @@ namespace IRSpeedyVPN.Services
 
             var listenPort = AllocateSniListenPort();            
 
-            var configPath = Path.Combine(Path.GetDirectoryName(sniPath), "sni-" + Guid.NewGuid().ToString("N") + ".json");
+            var configPath = Path.Combine(Path.GetDirectoryName(sniPath), "config.json");
             var serializer = new JavaScriptSerializer();
             var configJson = serializer.Serialize(new Dictionary<string, object>
             {
@@ -1758,7 +1464,7 @@ namespace IRSpeedyVPN.Services
             TryKillProcess(runtime.Process);
             if (releasePort && runtime.ListenPort > 0)
                 ReleaseSniListenPort(runtime.ListenPort);
-            try { if (File.Exists(runtime.ConfigPath)) File.Delete(runtime.ConfigPath); } catch { }
+            ShellExecute.KillProccess("sni");
         }
 
         private int AllocateSniListenPort()

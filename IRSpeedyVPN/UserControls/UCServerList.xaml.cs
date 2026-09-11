@@ -219,124 +219,46 @@ namespace IRSpeedyVPN.UserControls
         /// Tests every URL of every visible numbered country row. The picker displays
         /// only the minimum positive latency for that row.
         /// </summary>
-
-
-
         private void RunBackgroundUrlTests(IVPNService[] services)
         {
             _urlTestCts?.Cancel();
             _urlTestCts = new CancellationTokenSource();
             var token = _urlTestCts.Token;
+
             UrlTestCoordinator.BeginBatch();
 
             Task.Run(() =>
             {
-                // An older cancelled batch must finish core cleanup before a new one starts.
-                lock (TunnelPlusService.InitialTestBatchGate)
+                foreach (var service in services)
                 {
-                    Func<bool> cancelled = () => token.IsCancellationRequested || UrlTestCoordinator.AbortRequested;
-                    if (cancelled()) return;
-                    var countries = services.Select(service => new
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
+                        break;
+
+                    if (!HasFreshResultsForAllUrls(service))
                     {
-                        Service = service,
-                        Fresh = HasFreshResultsForAllUrls(service),
-                        Members = (service.GetServerUrls() ?? new List<Url>())
-                            .Where(u => u != null && !string.IsNullOrWhiteSpace(u.url))
-                            .GroupBy(u => u.url, StringComparer.Ordinal).Select(g => g.First())
-                            .Select(u => new { Url = u, Category = TunnelPlusService.InitialTestCategory(u.url) })
-                            .ToList()
-                    }).ToList();
-                    int configuredLimit;
-                    if (!int.TryParse(IRSpeedyVPN.Resource.RegHelper.GetSettingValue("InitialTestConcurrency"), out configuredLimit))
-                        configuredLimit = 5;
-                    int limit = Math.Max(1, Math.Min(5, configuredLimit));
-                    var resultGate = new object();
-                    LogHelper.WriteExLog("[InitialBatch] stage=start concurrency=" + limit);
-                    var remaining = countries.ToDictionary(c => c.Service,
-                        c => c.Service is TunnelPlusService ? c.Members.Count : 1);
-                    var best = countries.ToDictionary(c => c.Service, c => long.MaxValue);
-                    Action<IVPNService> complete = service =>
-                    {
-                        if (cancelled()) return;
-                        Dispatcher.BeginInvoke(new Action(() =>
+                        try
                         {
-                            if (!cancelled()) countryPicker.RefreshGroup(service);
-                        }));
-                    };
-                    foreach (var country in countries)
-                    {
-                        if (country.Fresh || remaining[country.Service] == 0)
-                        {
-                            remaining[country.Service] = 0;
-                            complete(country.Service);
-                        }
-                    }
-                    for (int category = 0; category < 4; category++)
-                    {
-                        if (cancelled()) return;
-                        var jobs = new List<Action>();
-                        // Enqueue first member of every country before second members.
-                        int rounds = countries.Select(c => c.Members.Count(m => m.Category == category))
-                            .DefaultIfEmpty(0).Max();
-                        for (int round = 0; round < rounds; round++)
-                        {
-                            foreach (var country in countries)
-                            {
-                                var service = country.Service;
-                                if (country.Fresh || !(service is TunnelPlusService)) continue;
-                                var member = country.Members.Where(m => m.Category == category).Skip(round).FirstOrDefault();
-                                if (member == null) continue;
-                                jobs.Add(() =>
+                            if (service is TunnelPlusService tunnel)
+                                tunnel.UrlTestWithProgress(latency =>
                                 {
-                                    var tunnel = (TunnelPlusService)service;
-                                    try
+                                    Dispatcher.BeginInvoke(new Action(() =>
                                     {
-                                        tunnel.TestInitialMember(member.Url, latency =>
-                                        {
-                                            lock (resultGate)
-                                            {
-                                                if (cancelled() || latency <= 0 || latency >= best[service]) return;
-                                                best[service] = latency;
-                                                Dispatcher.BeginInvoke(new Action(() =>
-                                                {
-                                                    if (!cancelled()) countryPicker.ShowGroupProgress(service, latency);
-                                                }));
-                                            }
-                                        }, cancelled);
-                                    }
-                                    finally
-                                    {
-                                        lock (resultGate)
-                                        {
-                                            if (!cancelled() && --remaining[service] == 0)
-                                            {
-                                                tunnel.CompleteInitialTests();
-                                                complete(service);
-                                            }
-                                        }
-                                    }
-                                });
-                            }
+                                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
+                                            countryPicker.ShowGroupProgress(service, latency);
+                                    }));
+                                }, () => token.IsCancellationRequested);
+                            else
+                                service.UrlTest();
                         }
-                        if (category == 3)
-                        {
-                            foreach (var country in countries.Where(c => !c.Fresh && !(c.Service is TunnelPlusService)))
-                            {
-                                var service = country.Service;
-                                jobs.Add(() =>
-                                {
-                                    try { if (!cancelled()) service.UrlTest(); }
-                                    finally { complete(service); }
-                                });
-                            }
-                        }
-                        var elapsed = System.Diagnostics.Stopwatch.StartNew();
-                        LogHelper.WriteExLog("[InitialBatch] stage=category-start category=" + category
-                            + " jobs=" + jobs.Count + " concurrency=" + limit);
-                        InitialProbeScheduler.Run(jobs, limit, cancelled, ex => LogHelper.WriteLog(ex));
-                        LogHelper.WriteExLog("[InitialBatch] stage=category-end category=" + category
-                            + " elapsedMs=" + elapsed.ElapsedMilliseconds + " cancelled=" + cancelled());
+                        catch { }
                     }
+
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
+                            countryPicker.RefreshGroup(service);
+                    }));
                 }
             });
         }
