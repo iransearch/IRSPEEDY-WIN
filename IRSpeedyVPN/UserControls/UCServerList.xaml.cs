@@ -248,8 +248,8 @@ namespace IRSpeedyVPN.UserControls
                     }).ToList();
                     int configuredLimit;
                     if (!int.TryParse(IRSpeedyVPN.Resource.RegHelper.GetSettingValue("InitialTestConcurrency"), out configuredLimit))
-                        configuredLimit = 10;
-                    int limit = Math.Max(1, Math.Min(10, configuredLimit));
+                        configuredLimit = 5;
+                    int limit = Math.Max(1, Math.Min(5, configuredLimit));
                     var resultGate = new object();
                     LogHelper.WriteExLog("[InitialBatch] stage=start concurrency=" + limit);
                     var remaining = countries.ToDictionary(c => c.Service,
