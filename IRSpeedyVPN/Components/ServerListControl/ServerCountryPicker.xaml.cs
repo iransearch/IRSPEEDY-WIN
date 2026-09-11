@@ -178,6 +178,17 @@ namespace IRSpeedyVPN.Components.ServerListControl
         // fastest to slowest. Rows with no positive result sink to the bottom.
         public long SortKey { get; private set; } = long.MaxValue;
 
+        public void ShowProgress(long latency)
+        {
+            if (latency <= 0) return;
+            IsSelectable = true;
+            Sig.FromLatency(latency, out var bars, out var color, out var text);
+            SignalBars = bars;
+            SignalColor = color;
+            SignalText = text;
+            // SortKey remains the last completed result until RefreshSignals().
+        }
+
         public List<Url> GetUrls()
         {
             return (Service?.GetServerUrls() ?? new List<Url>())
@@ -365,6 +376,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
             }
             else
                 Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
+        }
+
+        /// <summary>Display progress in place without changing ordering or selection.</summary>
+        public void ShowGroupProgress(IVPNService service, long latency)
+        {
+            var group = _groups.FirstOrDefault(g => ReferenceEquals(g.Service, service));
+            group?.ShowProgress(latency);
         }
 
         /// <summary>Refresh the numbered row that owns this service after URL testing.</summary>

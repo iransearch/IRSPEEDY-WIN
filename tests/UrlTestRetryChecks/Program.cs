@@ -102,7 +102,56 @@ internal static class Program
         }
         catch (OperationCanceledException) { rejected = true; }
         Check(rejected && cancelledCalls == 1, "Cancelled batch issued retry or published results");
-        Console.WriteLine("URL test retry checks passed.");
+        CheckProgress();
+        Console.WriteLine("URL test retry and progress checks passed.");
+    }
+
+    private static void CheckProgress()
+    {
+        var updates = new List<long>();
+        bool complete = false;
+        int pass = 0;
+        var request = Request();
+        request.OutboundTags = new List<string> { "0", "1" };
+        var result = UrlTestRetryPolicy.Run(request, (req, report) =>
+        {
+            Check(!complete, "Country completed before test returned");
+            if (++pass == 1)
+            {
+                report(Response(800, -1));
+                Check(updates.SequenceEqual(new long[] { 800 }), "First success was not published immediately");
+                report(Response(800, 600));
+                report(Response(900, 650));
+                Check(updates.SequenceEqual(new long[] { 800, 600 }), "Slower/duplicate progress replaced the best");
+                // A query snapshot from a previous country must never change this row.
+                report(new TestResp { Results = new List<URLTestResp> {
+                    new URLTestResp { OutboundTag = "previous-country", LatencyMs = 1 } } });
+                return Response(800, 600);
+            }
+            report(Response(700, 400));
+            Check(updates.SequenceEqual(new long[] { 800, 600, 400 }), "Retry improvement was not published");
+            throw new TimeoutException();
+        }, () => false, line => { if (line.Contains("stage=final")) complete = true; }, updates.Add);
+        Check(complete && result.Results.Select(x => x.LatencyMs).SequenceEqual(new[] { 700, 400 }),
+            "Successful progress was lost after final RPC failure");
+
+        bool cancelled = false, rejected = false;
+        int calls = 0;
+        updates.Clear();
+        try
+        {
+            UrlTestRetryPolicy.Run(Request(), (req, report) =>
+            {
+                calls++;
+                report(Response(600));
+                cancelled = true;
+                report(Response(400));
+                return Response(400);
+            }, () => cancelled, _ => { }, updates.Add);
+        }
+        catch (OperationCanceledException) { rejected = true; }
+        Check(rejected && calls == 1 && updates.SequenceEqual(new long[] { 600 }),
+            "Cancelled country published progress or retried");
     }
 
     private static TestReq Request() => new TestReq

@@ -20,14 +20,22 @@ namespace IRSpeedyVPN.Services.Libcore
         public static ProtorpcClient Connect(string host, int port, int timeoutMs)
         {
             var client = new TcpClient();
-            var ar = client.BeginConnect(host, port, null, null);
-            if (!ar.AsyncWaitHandle.WaitOne(timeoutMs))
+            try
+            {
+                var ar = client.BeginConnect(host, port, null, null);
+                using (var connected = ar.AsyncWaitHandle)
+                {
+                    if (!connected.WaitOne(timeoutMs))
+                        throw new TimeoutException($"Timeout connecting to {host}:{port}.");
+                    client.EndConnect(ar);
+                }
+                return new ProtorpcClient(client);
+            }
+            catch
             {
                 client.Close();
-                throw new TimeoutException($"Timeout connecting to {host}:{port}.");
+                throw;
             }
-            client.EndConnect(ar);
-            return new ProtorpcClient(client);
         }
 
         public static bool CanConnect(string host, int port, int timeoutMs)
@@ -79,6 +87,15 @@ namespace IRSpeedyVPN.Services.Libcore
                 throw new InvalidOperationException("protorpc: unexpected response length.");
             }
             return decode != null ? decode(responseBody) : default;
+        }
+
+        // Queries are optional UI updates: close their dedicated connection at the
+        // deadline, even if a core accepts it but never sends a complete response.
+        public TResp CallWithDeadline<TResp>(string method, byte[] requestBody,
+            Func<byte[], TResp> decode, int timeoutMs)
+        {
+            using (var deadline = new Timer(_ => Dispose(), null, timeoutMs, Timeout.Infinite))
+                return Call(method, requestBody, decode);
         }
 
         private void WriteFrame(byte[] data)

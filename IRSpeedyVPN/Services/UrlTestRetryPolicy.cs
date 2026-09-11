@@ -23,10 +23,16 @@ namespace IRSpeedyVPN.Services
                 && a.UserInfo == b.UserInfo && a.PathAndQuery == b.PathAndQuery;
         }
 
-        // Both passes complete before the caller publishes latency or reorders countries.
+        // Both passes complete before the caller commits results or reorders countries.
         // Only the slow/failed subset is probed a second time; config and routing stay identical.
         internal static TestResp Run(TestReq primary, Func<TestReq, TestResp> send,
             Func<bool> cancelled, Action<string> log)
+        {
+            return Run(primary, (request, report) => send(request), cancelled, log, null);
+        }
+
+        internal static TestResp Run(TestReq primary, Func<TestReq, Action<TestResp>, TestResp> send,
+            Func<bool> cancelled, Action<string> log, Action<long> progress)
         {
             Action checkCancellation = () =>
             {
@@ -38,10 +44,24 @@ namespace IRSpeedyVPN.Services
             {
                 OutboundTag = tag, LatencyMs = -1, Error = "no-successful-result"
             }, StringComparer.Ordinal);
+            long displayedBest = long.MaxValue;
+            Action<TestResp, HashSet<string>> accept = (response, allowed) =>
+            {
+                checkCancellation();
+                Merge(best, response, allowed);
+                var minimum = best.Values.Where(IsSuccess).Select(r => (long)r.LatencyMs)
+                    .DefaultIfEmpty(long.MaxValue).Min();
+                if (minimum < displayedBest)
+                {
+                    displayedBest = minimum;
+                    progress?.Invoke(minimum);
+                }
+            };
+            var primaryTags = new HashSet<string>(tags, StringComparer.Ordinal);
             log("[UrlTest] stage=primary-start candidates=" + tags.Count);
             try
             {
-                Merge(best, send(primary), new HashSet<string>(tags, StringComparer.Ordinal));
+                accept(send(primary, partial => accept(partial, primaryTags)), primaryTags);
             }
             catch (TimeoutException)
             {
@@ -60,9 +80,10 @@ namespace IRSpeedyVPN.Services
                 };
                 checkCancellation();
                 log("[UrlTest] stage=retry-start candidates=" + retryTags.Count);
+                var allowedRetryTags = new HashSet<string>(retryTags, StringComparer.Ordinal);
                 try
                 {
-                    Merge(best, send(retry), new HashSet<string>(retryTags, StringComparer.Ordinal));
+                    accept(send(retry, partial => accept(partial, allowedRetryTags)), allowedRetryTags);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)

@@ -206,7 +206,7 @@ namespace IRSpeedyVPN.Services.SingBox
             return res;
         }
 
-        public static string GetUrlTestConfig(Dictionary<string, string[]> links, int port, out Dictionary<string, string> tagToUrl, Dictionary<string, EndpointOverride> endpointOverrides = null, Dictionary<string, Tuple<int, string, string>> socksOverrides = null)
+        public static string GetUrlTestConfig(Dictionary<string, string[]> links, int port, out Dictionary<string, string> tagToUrl, Dictionary<string, EndpointOverride> endpointOverrides = null, Dictionary<string, Tuple<int, string, string>> socksOverrides = null, string tagPrefix = "")
         {
             if (links == null)
             {
@@ -231,7 +231,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 Tuple<int, string, string> socks = null;
                 bool isSocks = socksOverrides != null && socksOverrides.TryGetValue(link.Key, out socks);
 
-                var tag = idx == 0 ? "proxy" : $"proxy-{idx}";
+                var tag = tagPrefix + (idx == 0 ? "proxy" : $"proxy-{idx}");
 
                 if (!isSocks)
                 {

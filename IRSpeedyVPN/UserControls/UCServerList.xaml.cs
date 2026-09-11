@@ -236,10 +236,29 @@ namespace IRSpeedyVPN.UserControls
 
                     if (!HasFreshResultsForAllUrls(service))
                     {
-                        try { service.UrlTest(); } catch { }
+                        try
+                        {
+                            if (service is TunnelPlusService tunnel)
+                                tunnel.UrlTestWithProgress(latency =>
+                                {
+                                    Dispatcher.BeginInvoke(new Action(() =>
+                                    {
+                                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
+                                            countryPicker.ShowGroupProgress(service, latency);
+                                    }));
+                                }, () => token.IsCancellationRequested);
+                            else
+                                service.UrlTest();
+                        }
+                        catch { }
                     }
 
-                    Dispatcher.BeginInvoke(new Action(() => countryPicker.RefreshGroup(service)));
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
+                            countryPicker.RefreshGroup(service);
+                    }));
                 }
             });
         }

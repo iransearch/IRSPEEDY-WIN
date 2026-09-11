@@ -674,6 +674,17 @@ namespace IRSpeedyVPN.Services
 
         public long UrlTest(Url[] urls, bool force)
         {
+            return RunUrlTest(urls, force, null, null);
+        }
+
+        public long UrlTestWithProgress(Action<long> progress, Func<bool> cancelled)
+        {
+            return RunUrlTest(null, false, progress, cancelled);
+        }
+
+        private long RunUrlTest(Url[] urls, bool force, Action<long> progress, Func<bool> cancelled)
+        {
+            if (cancelled?.Invoke() == true) return urlTestSpeed;
             if (!force && UrlTestCoordinator.AbortRequested && urls == null)
                 return urlTestSpeed;
 
@@ -687,10 +698,10 @@ namespace IRSpeedyVPN.Services
 
             if (shouldRun)
             {
-                var task = Task.Factory.StartNew(() => UrlTestFull(urls, force));
+                var task = Task.Factory.StartNew(() => UrlTestFull(urls, force, progress, cancelled));
                 while (!task.Wait(200))
                 {
-                    if (!force && UrlTestCoordinator.AbortRequested)
+                    if ((!force && UrlTestCoordinator.AbortRequested) || cancelled?.Invoke() == true)
                     {
                         cancelUrlTest = true;
                         break;
@@ -701,10 +712,13 @@ namespace IRSpeedyVPN.Services
             }
             return urlTestSpeed;
         }
-        public void UrlTestFull(Url[] urls = null, bool force = false)
+        public void UrlTestFull(Url[] urls = null, bool force = false,
+            Action<long> progress = null, Func<bool> cancelled = null)
         {
             cancelUrlTest = false;
-            if (!force && UrlTestCoordinator.AbortRequested)
+            Func<bool> isCancelled = () => cancelUrlTest || cancelled?.Invoke() == true
+                || (!force && UrlTestCoordinator.AbortRequested);
+            if (isCancelled())
                 return;
             urlTestSpeed = -1;
             selectedUrl = null;
@@ -818,27 +832,30 @@ namespace IRSpeedyVPN.Services
 
                     port = FreePortManager.Dequeue();
 
-                    if (!force && (cancelUrlTest || UrlTestCoordinator.AbortRequested))
+                    if (isCancelled())
                         return;
 
                     TestResp resp;
                     Dictionary<string, string> tagToUrl;
                     lock (grpcLock)
                     {
-                        if (!force && (cancelUrlTest || UrlTestCoordinator.AbortRequested))
+                        if (isCancelled())
                             return;
 
                         EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
 
                         while (true)
                         {
-                            if (cancelUrlTest || (!force && UrlTestCoordinator.AbortRequested)) return;
+                            if (isCancelled()) return;
                             if (allUrls.Count == 0) return;
                             var activeXray = xrayInfos.Where(info => allUrls.ContainsKey(info.Link)).ToList();
                             try
                             {
+                                // QueryURLTest can contain cached results from earlier
+                                // countries. Only this test's unique tags may update its row.
                                 var configData = SingBox.ConfigGenerator.GetUrlTestConfig(allUrls, port,
-                                    out tagToUrl, urlTestOverrides, socksOverrides);
+                                    out tagToUrl, urlTestOverrides, socksOverrides,
+                                    "urltest-" + Guid.NewGuid().ToString("N") + "-");
                                 if (tagToUrl.Count == 0) return;
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
@@ -852,9 +869,11 @@ namespace IRSpeedyVPN.Services
                                     TestTimeoutMs = 5000,
                                     NeedXray = needXray,
                                     XrayConfig = xrayConfig
-                                }, request => ExecuteCoreCall(client => client.Test(request)),
-                                    () => cancelUrlTest || (!force && UrlTestCoordinator.AbortRequested),
-                                    message => LogHelper.WriteExLog(message));
+                                }, (request, report) => ExecuteCoreCall(client => progress == null
+                                        ? client.Test(request)
+                                        : client.TestWithProgress(request, report, isCancelled,
+                                            message => LogHelper.WriteExLog(message))),
+                                    isCancelled, message => LogHelper.WriteExLog(message), progress);
                                 break;
                             }
                             catch (InvalidOperationException ex)
@@ -880,7 +899,7 @@ namespace IRSpeedyVPN.Services
                             }
                         }
                     }
-                    if (resp?.Results != null && !(cancelUrlTest || (!force && UrlTestCoordinator.AbortRequested)))
+                    if (resp?.Results != null && !isCancelled())
                     {
                         var testedUrls = new HashSet<string>(StringComparer.Ordinal);
                         foreach (var result in resp.Results)
@@ -930,7 +949,7 @@ namespace IRSpeedyVPN.Services
             }
             catch (FileNotFoundException ex)
             {
-                if (!force && UrlTestCoordinator.AbortRequested)
+                if (isCancelled())
                     return;
                 if (onConnectDisconnect != null)
                     onConnectDisconnect.Invoke(this, false, 0, "1 خطا در بررسی سرورها");
@@ -938,7 +957,7 @@ namespace IRSpeedyVPN.Services
             }
             catch(Exception ex)
             {               
-                if (!force && (cancelUrlTest || UrlTestCoordinator.AbortRequested))
+                if (isCancelled())
                     return;
                 LogHelper.WriteLog(ex);
                 if (onConnectDisconnect != null)

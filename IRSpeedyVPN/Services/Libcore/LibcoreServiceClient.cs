@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading.Tasks;
 
 namespace IRSpeedyVPN.Services.Libcore
 {
@@ -34,6 +35,44 @@ namespace IRSpeedyVPN.Services.Libcore
         public TestResp Test(TestReq req)
         {
             return Call("LibcoreService.Test", LibcoreProto.EncodeTestReq(req), LibcoreProto.DecodeTestResp);
+        }
+
+        public TestResp TestWithProgress(TestReq req, Action<TestResp> report,
+            Func<bool> cancelled, Action<string> log)
+        {
+            var test = Task.Run(() => Test(req));
+            var pending = new Task[] { test };
+            try
+            {
+                while (Task.WaitAny(pending, 150) < 0)
+                {
+                    if (cancelled()) break;
+                    QueryURLTestResponse partial;
+                    try
+                    {
+                        using (var client = ProtorpcClient.Connect(_host, _port, 250))
+                            partial = client.CallWithDeadline("LibcoreService.QueryURLTest",
+                                LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeQueryURLTestResponse, 250);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Older cores may not support querying. Keep the authoritative
+                        // test running; do not restart it or turn this into a test failure.
+                        log("[UrlTest] stage=progress-unavailable exception=" + ex.GetType().Name);
+                        break;
+                    }
+                    if (!cancelled() && partial?.Results != null)
+                        report(new TestResp { Results = partial.Results });
+                }
+            }
+            finally
+            {
+                // A cancelled progress callback must not release test resources early.
+                try { test.GetAwaiter().GetResult(); } catch { }
+            }
+            // Always drain Test before its caller releases ports/config resources.
+            // Awaiter preserves the original config rejection for candidate isolation.
+            return test.GetAwaiter().GetResult();
         }
 
         public EmptyResp StopTest()
