@@ -6,7 +6,6 @@ using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Models.Services;
 using IRSpeedyVPN.Services;
-using IRSpeedyVPN.Services.Libcore;
 using IRSpeedyVPN.Windows;
 using System;
 using System.Collections.Generic;
@@ -230,67 +229,37 @@ namespace IRSpeedyVPN.UserControls
 
             Task.Run(() =>
             {
-                Func<bool> cancelled = () => token.IsCancellationRequested || UrlTestCoordinator.AbortRequested;
-                var schedule = new List<InitialCountryTest>();
-                var cores = new UrlTestCoreSession[InitialUrlTestSchedule.MaxConcurrentCountries];
                 foreach (var service in services)
                 {
-                    if (cancelled()) return;
-                    bool needsTest = !HasFreshResultsForAllUrls(service);
-                    var tunnel = service as TunnelPlusService;
-                    var tests = new List<Action<int, Action<long>>>();
-                    if (needsTest)
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
+                        break;
+
+                    if (!HasFreshResultsForAllUrls(service))
                     {
-                        if (tunnel != null)
+                        try
                         {
-                            // Preserve web-service URL order. Row sorting during the
-                            // run must never change the round-robin schedule.
-                            var urls = (service.GetServerUrls() ?? new List<Url>())
-                                .Where(u => u != null)
-                                .GroupBy(u => u.url, StringComparer.Ordinal)
-                                .Select(group => group.First()).ToArray();
-                            foreach (var url in urls)
-                                tests.Add((slot, report) =>
+                            if (service is TunnelPlusService tunnel)
+                                tunnel.UrlTestWithProgress(latency =>
                                 {
-                                    LogHelper.WriteExLog("[UrlTest] stage=member-start countryId=" + service.ID + " slot=" + slot);
-                                    try
+                                    Dispatcher.BeginInvoke(new Action(() =>
                                     {
-                                        tunnel.TestInitialUrl(url, report, cancelled, () =>
-                                        {
-                                            if (cores[slot] == null) cores[slot] = tunnel.CreateInitialTestCore();
-                                            return cores[slot];
-                                        });
-                                    }
-                                    finally
-                                    {
-                                        LogHelper.WriteExLog("[UrlTest] stage=member-end countryId=" + service.ID + " slot=" + slot);
-                                    }
-                                });
+                                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
+                                            countryPicker.ShowGroupProgress(service, latency);
+                                    }));
+                                }, () => token.IsCancellationRequested);
+                            else
+                                service.UrlTest();
                         }
-                        else
-                            tests.Add((slot, report) => report(service.UrlTest()));
+                        catch { }
                     }
-                    schedule.Add(new InitialCountryTest(tests,
-                        latency => Dispatcher.BeginInvoke(new Action(() =>
-                        {
-                            if (!cancelled()) countryPicker.ShowGroupProgress(service, latency);
-                        })),
-                        () =>
-                        {
-                            if (cancelled()) return;
-                            if (needsTest && tunnel != null) tunnel.CompleteInitialUrlTests();
-                            Dispatcher.BeginInvoke(new Action(() =>
-                            {
-                                if (!cancelled()) countryPicker.RefreshGroup(service);
-                            }));
-                        }));
-                }
-                InitialUrlTestSchedule.Run(schedule, cancelled,
-                    ex => LogHelper.WriteExLog("[UrlTest] stage=member-failed exception=" + ex.GetType().Name),
-                    cleanup: () =>
+
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
+                    Dispatcher.BeginInvoke(new Action(() =>
                     {
-                        foreach (var core in cores) core?.Dispose();
-                    });
+                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
+                            countryPicker.RefreshGroup(service);
+                    }));
+                }
             });
         }
 
@@ -449,4 +418,3 @@ namespace IRSpeedyVPN.UserControls
         #endregion
     }
 }
-
