@@ -246,6 +246,12 @@ namespace IRSpeedyVPN.UserControls
                             .Select(u => new { Url = u, Category = TunnelPlusService.InitialTestCategory(u.url) })
                             .ToList()
                     }).ToList();
+                    int configuredLimit;
+                    if (!int.TryParse(IRSpeedyVPN.Resource.RegHelper.GetSettingValue("InitialTestConcurrency"), out configuredLimit))
+                        configuredLimit = 10;
+                    int limit = Math.Max(1, Math.Min(10, configuredLimit));
+                    var resultGate = new object();
+                    LogHelper.WriteExLog("[InitialBatch] stage=start concurrency=" + limit);
                     var remaining = countries.ToDictionary(c => c.Service,
                         c => c.Service is TunnelPlusService ? c.Members.Count : 1);
                     var best = countries.ToDictionary(c => c.Service, c => long.MaxValue);
@@ -267,45 +273,69 @@ namespace IRSpeedyVPN.UserControls
                     }
                     for (int category = 0; category < 4; category++)
                     {
-                        foreach (var country in countries)
+                        if (cancelled()) return;
+                        var jobs = new List<Action>();
+                        // Enqueue first member of every country before second members.
+                        int rounds = countries.Select(c => c.Members.Count(m => m.Category == category))
+                            .DefaultIfEmpty(0).Max();
+                        for (int round = 0; round < rounds; round++)
                         {
-                            if (cancelled()) return;
-                            var service = country.Service;
-                            if (remaining[service] == 0) continue;
-                            if (service is TunnelPlusService tunnel)
+                            foreach (var country in countries)
                             {
-                                foreach (var member in country.Members.Where(m => m.Category == category))
+                                var service = country.Service;
+                                if (country.Fresh || !(service is TunnelPlusService)) continue;
+                                var member = country.Members.Where(m => m.Category == category).Skip(round).FirstOrDefault();
+                                if (member == null) continue;
+                                jobs.Add(() =>
                                 {
-                                    if (cancelled()) return;
+                                    var tunnel = (TunnelPlusService)service;
                                     try
                                     {
                                         tunnel.TestInitialMember(member.Url, latency =>
                                         {
-                                            if (cancelled() || latency <= 0 || latency >= best[service]) return;
-                                            best[service] = latency;
-                                            Dispatcher.BeginInvoke(new Action(() =>
+                                            lock (resultGate)
                                             {
-                                                if (!cancelled()) countryPicker.ShowGroupProgress(service, latency);
-                                            }));
+                                                if (cancelled() || latency <= 0 || latency >= best[service]) return;
+                                                best[service] = latency;
+                                                Dispatcher.BeginInvoke(new Action(() =>
+                                                {
+                                                    if (!cancelled()) countryPicker.ShowGroupProgress(service, latency);
+                                                }));
+                                            }
                                         }, cancelled);
                                     }
-                                    catch (Exception ex) { LogHelper.WriteLog(ex); }
-                                    if (cancelled()) return;
-                                    if (--remaining[service] == 0)
+                                    finally
                                     {
-                                        tunnel.CompleteInitialTests();
-                                        complete(service);
+                                        lock (resultGate)
+                                        {
+                                            if (!cancelled() && --remaining[service] == 0)
+                                            {
+                                                tunnel.CompleteInitialTests();
+                                                complete(service);
+                                            }
+                                        }
                                     }
-                                }
-                            }
-                            else if (category == 3)
-                            {
-                                try { service.UrlTest(); }
-                                catch (Exception ex) { LogHelper.WriteLog(ex); }
-                                remaining[service] = 0;
-                                complete(service);
+                                });
                             }
                         }
+                        if (category == 3)
+                        {
+                            foreach (var country in countries.Where(c => !c.Fresh && !(c.Service is TunnelPlusService)))
+                            {
+                                var service = country.Service;
+                                jobs.Add(() =>
+                                {
+                                    try { if (!cancelled()) service.UrlTest(); }
+                                    finally { complete(service); }
+                                });
+                            }
+                        }
+                        var elapsed = System.Diagnostics.Stopwatch.StartNew();
+                        LogHelper.WriteExLog("[InitialBatch] stage=category-start category=" + category
+                            + " jobs=" + jobs.Count + " concurrency=" + limit);
+                        InitialProbeScheduler.Run(jobs, limit, cancelled, ex => LogHelper.WriteLog(ex));
+                        LogHelper.WriteExLog("[InitialBatch] stage=category-end category=" + category
+                            + " elapsedMs=" + elapsed.ElapsedMilliseconds + " cancelled=" + cancelled());
                     }
                 }
             });

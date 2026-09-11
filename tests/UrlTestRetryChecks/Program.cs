@@ -1,4 +1,6 @@
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 using System.Collections.Generic;
 using System.Linq;
 using IRSpeedyVPN.Services;
@@ -17,8 +19,65 @@ internal static class Program
             { OutboundTag = index.ToString(), LatencyMs = latency }).ToList() };
     }
 
+
+    private static void CheckParallelSlots()
+    {
+        using (var entered = new CountdownEvent(10))
+        using (var releaseFirst = new ManualResetEventSlim())
+        using (var releaseRest = new ManualResetEventSlim())
+        using (var eleventh = new ManualResetEventSlim())
+        {
+            int active = 0, peak = 0;
+            var gate = new object();
+            var jobs = Enumerable.Range(0, 11).Select(index => new Action(() =>
+            {
+                lock (gate) { active++; peak = Math.Max(peak, active); }
+                try
+                {
+                    if (index < 10)
+                    {
+                        entered.Signal();
+                        if (index == 0) releaseFirst.Wait();
+                        else releaseRest.Wait();
+                    }
+                    else eleventh.Set();
+                }
+                finally { lock (gate) active--; }
+            })).ToList();
+            var run = Task.Run(() => InitialProbeScheduler.Run(jobs, 10, () => false, ex => { throw ex; }));
+            try
+            {
+                Check(entered.Wait(5000), "Ten probes did not start concurrently");
+                Check(!eleventh.IsSet, "Concurrency cap exceeded");
+                releaseFirst.Set();
+                Check(eleventh.Wait(5000), "Vacant slot did not refill while slow probes remained");
+            }
+            finally { releaseFirst.Set(); releaseRest.Set(); run.GetAwaiter().GetResult(); }
+            Check(peak == 10 && active == 0, "Worker limit or draining failed");
+        }
+        using (var entered = new CountdownEvent(2))
+        using (var release = new ManualResetEventSlim())
+        {
+            int cancel = 0, completed = 0, queued = 0;
+            var jobs = new List<Action>();
+            for (int i = 0; i < 2; i++)
+                jobs.Add(() => { entered.Signal(); release.Wait(); Interlocked.Increment(ref completed); });
+            jobs.Add(() => Interlocked.Increment(ref queued));
+            var run = Task.Run(() => InitialProbeScheduler.Run(jobs, 2,
+                () => Volatile.Read(ref cancel) != 0, ex => { throw ex; }));
+            try
+            {
+                Check(entered.Wait(5000), "Cancellation probes did not start");
+                Interlocked.Exchange(ref cancel, 1);
+            }
+            finally { Interlocked.Exchange(ref cancel, 1); release.Set(); run.GetAwaiter().GetResult(); }
+            Check(completed == 2 && queued == 0, "Cancellation did not drain active probes or skip queued work");
+        }
+    }
+
     private static void Main()
     {
+        CheckParallelSlots();
         // The five requested outcomes plus both threshold boundaries.
         foreach (var row in new[] {
             new[] { 600, 630, 600, 2 }, new[] { 600, 400, 400, 2 },

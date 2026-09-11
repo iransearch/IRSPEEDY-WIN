@@ -117,15 +117,15 @@ namespace IRSpeedyVPN.Services
         const int CoreExitWindowSeconds = 30;
         const int ImmediateExitSeconds = 2;
         static readonly object coreLock = new object();
-        readonly object sniLock = new object();
+        static readonly object sniLock = new object();
         readonly Dictionary<string, SniRuntime> serviceSniServers = new Dictionary<string, SniRuntime>(StringComparer.OrdinalIgnoreCase);
-        readonly HashSet<int> activeSniPorts = new HashSet<int>();
+        static readonly HashSet<int> activeSniPorts = new HashSet<int>();
         const int CorePort = 19810;
         const int VpnCorePort = 19811;
         const int CoreConnectTimeoutMs = 8000;
         const int CoreConnectRetryDelayMs = 200;        
         const string SniScheme = "sni://";
-        int nextSniListenPort = 40443;
+        static int nextSniListenPort = 40443;
         public TunnelPlusService(IServer server, GlobalInfo globalInfo)
         {
             gInfo = globalInfo;
@@ -894,11 +894,11 @@ namespace IRSpeedyVPN.Services
             return 2;
         }
 
+        private readonly object initialResultLock = new object();
+
         internal void TestInitialMember(Url url, Action<long> progress, Func<bool> cancelled)
         {
             if (cancelled()) return;
-            long previousSpeed = urlTestSpeed;
-            string previousUrl = selectedUrl;
             var elapsed = Stopwatch.StartNew();
             LogHelper.WriteExLog("[InitialMember] stage=start countryId=" + ID
                 + " member=" + (server.urls.IndexOf(url) + 1) + " category=" + InitialTestCategory(url.url));
@@ -920,11 +920,13 @@ namespace IRSpeedyVPN.Services
                         duplicate.latencychkTime = url.latencychkTime;
                     }
                 }
-                // Singleton tests must preserve the country's earlier successful selection.
-                if (cancelled() || url.latency <= 0 || (previousSpeed > 0 && previousSpeed <= url.latency))
+                lock (initialResultLock)
                 {
-                    urlTestSpeed = previousSpeed;
-                    selectedUrl = previousUrl;
+                    if (!cancelled() && url.latency > 0 && (urlTestSpeed <= 0 || url.latency < urlTestSpeed))
+                    {
+                        urlTestSpeed = url.latency;
+                        selectedUrl = url.url;
+                    }
                 }
                 LogHelper.WriteExLog("[InitialMember] stage=end countryId=" + ID
                     + " member=" + (server.urls.IndexOf(url) + 1) + " latencyMs=" + url.latency
@@ -980,13 +982,16 @@ namespace IRSpeedyVPN.Services
         public void UrlTestFull(Url[] urls = null, bool force = false,
             Action<long> progress = null, Func<bool> cancelled = null, bool stableInitial = false)
         {
-            cancelUrlTest = false;
-            Func<bool> isCancelled = () => cancelUrlTest || cancelled?.Invoke() == true
+            if (!stableInitial) cancelUrlTest = false;
+            Func<bool> isCancelled = () => (!stableInitial && cancelUrlTest) || cancelled?.Invoke() == true
                 || (!force && UrlTestCoordinator.AbortRequested);
             if (isCancelled())
                 return;
-            urlTestSpeed = -1;
-            selectedUrl = null;
+            if (!stableInitial)
+            {
+                urlTestSpeed = -1;
+                selectedUrl = null;
+            }
             try
             {
                 var sourceUrls = (urls != null ? (IEnumerable<Url>)urls : server.urls)
@@ -1103,7 +1108,7 @@ namespace IRSpeedyVPN.Services
 
                     TestResp resp;
                     Dictionary<string, string> tagToUrl;
-                    lock (grpcLock)
+                    lock (stableInitial ? new object() : grpcLock)
                     {
                         if (isCancelled())
                             return;
@@ -1192,7 +1197,7 @@ namespace IRSpeedyVPN.Services
                                 continue;
                             if (!tagToUrl.TryGetValue(result.OutboundTag, out var url))
                                 continue;
-                            if (urlTestSpeed < 0 || result.LatencyMs < urlTestSpeed)
+                            if (!stableInitial && (urlTestSpeed < 0 || result.LatencyMs < urlTestSpeed))
                             {
                                 urlTestSpeed = result.LatencyMs;
                                 selectedUrl = url;
@@ -1236,7 +1241,7 @@ namespace IRSpeedyVPN.Services
             {
                 if (isCancelled())
                     return;
-                if (onConnectDisconnect != null)
+                if (!stableInitial && onConnectDisconnect != null)
                     onConnectDisconnect.Invoke(this, false, 0, "1 خطا در بررسی سرورها");
                 return;
             }
@@ -1245,7 +1250,7 @@ namespace IRSpeedyVPN.Services
                 if (isCancelled())
                     return;
                 LogHelper.WriteLog(ex);
-                if (onConnectDisconnect != null)
+                if (!stableInitial && onConnectDisconnect != null)
                     onConnectDisconnect.Invoke(this, false, 0, "خطا در بررسی سرورها");
             }/*
             if (!IsConnected)
@@ -1697,7 +1702,7 @@ namespace IRSpeedyVPN.Services
 
             var listenPort = AllocateSniListenPort();            
 
-            var configPath = Path.Combine(Path.GetDirectoryName(sniPath), "config.json");
+            var configPath = Path.Combine(Path.GetDirectoryName(sniPath), "sni-" + Guid.NewGuid().ToString("N") + ".json");
             var serializer = new JavaScriptSerializer();
             var configJson = serializer.Serialize(new Dictionary<string, object>
             {
@@ -1753,7 +1758,7 @@ namespace IRSpeedyVPN.Services
             TryKillProcess(runtime.Process);
             if (releasePort && runtime.ListenPort > 0)
                 ReleaseSniListenPort(runtime.ListenPort);
-            ShellExecute.KillProccess("sni");
+            try { if (File.Exists(runtime.ConfigPath)) File.Delete(runtime.ConfigPath); } catch { }
         }
 
         private int AllocateSniListenPort()
