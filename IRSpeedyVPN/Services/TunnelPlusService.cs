@@ -738,6 +738,13 @@ namespace IRSpeedyVPN.Services
                     try
                     {
                         var client = new LibcoreServiceClient("127.0.0.1", port, 1000);
+                        // TestCurrent selects the conventional proxy outbound; without it
+                        // the core may silently probe the direct default outbound instead.
+                        if (request.OutboundTags == null || request.OutboundTags.Count != 1
+                            || request.OutboundTags[0] != "proxy"
+                            || !JObject.Parse(request.Config)["outbounds"].Children()
+                                .Any(o => (string)o["tag"] == "proxy" && (string)o["type"] != "direct"))
+                            throw new InvalidOperationException("Stable probe requires a proxy outbound.");
                         if (activeConfig != request.Config || activeXray != request.XrayConfig)
                         {
                             var started = client.Start(new LoadConfigReq
@@ -762,6 +769,9 @@ namespace IRSpeedyVPN.Services
                         var result = client.TestWithProgress(current, report, cancelled,
                             message => LogHelper.WriteExLog(message));
                         if (cancelled()) throw new OperationCanceledException();
+                        if (result?.Results == null || result.Results.Count != 1
+                            || result.Results[0].OutboundTag != "proxy")
+                            throw new InvalidOperationException("Stable probe response did not match proxy.");
                         return result;
                     }
                     catch
@@ -1112,7 +1122,7 @@ namespace IRSpeedyVPN.Services
                                 // countries. Only this test's unique tags may update its row.
                                 var configData = SingBox.ConfigGenerator.GetUrlTestConfig(allUrls, port,
                                     out tagToUrl, urlTestOverrides, socksOverrides,
-                                    "urltest-" + Guid.NewGuid().ToString("N") + "-");
+                                    stableInitial ? "" : "urltest-" + Guid.NewGuid().ToString("N") + "-");
                                 if (tagToUrl.Count == 0) return;
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
