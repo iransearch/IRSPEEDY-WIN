@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
 using IRSpeedyVPN.Services;
 using IRSpeedyVPN.Services.Libcore;
 
@@ -77,6 +79,17 @@ internal static class Program
             return Response(630);
         }, () => false, _ => { }).Results[0].LatencyMs == 630, "Primary timeout was not retried");
         bool configRejected = false;
+        foreach (var failure in new Exception[] { new System.IO.IOException(), new System.Net.Sockets.SocketException() })
+        {
+            int transportPass = 0;
+            var recovered = UrlTestRetryPolicy.Run(Request(), _ =>
+            {
+                if (++transportPass == 1) throw failure;
+                return Response(350);
+            }, () => false, _ => { });
+            Check(transportPass == 2 && recovered.Results[0].LatencyMs == 350,
+                "Transport failure skipped the alternate URL");
+        }
         int configCalls = 0;
         try
         {
@@ -104,6 +117,7 @@ internal static class Program
         Check(rejected && cancelledCalls == 1, "Cancelled batch issued retry or published results");
         CheckProgress();
         CheckCountryRounds();
+        CheckParallelCountries();
         Console.WriteLine("URL test retry, progress and country scheduling checks passed.");
     }
 
@@ -113,7 +127,7 @@ internal static class Program
         var updates = new List<long>();
         Func<string, int[], InitialCountryTest> country = (name, latencies) =>
             new InitialCountryTest(latencies.Select((latency, index) =>
-                new Action<Action<long>>(report =>
+                new Action<int, Action<long>>((slot, report) =>
                 {
                     order.Add(name + (index + 1));
                     report(latency);
@@ -123,7 +137,7 @@ internal static class Program
             country("A", new[] { 600, 700, 400 }),
             country("B", new[] { 300 }),
             country("C", new[] { -1, 500 })
-        }, () => false, ex => { throw ex; });
+        }, () => false, ex => { throw ex; }, maxConcurrency: 1);
         Check(order.SequenceEqual(new[] {
             "A1", "B1", "B-done", "C1", "A2", "C2", "C-done", "A3", "A-done"
         }), "Countries did not follow stable rounds or completed before their last member");
@@ -131,35 +145,119 @@ internal static class Program
 
         order.Clear();
         int pass = 0;
-        var withRetry = new InitialCountryTest(new Action<Action<long>>[] {
-            report => UrlTestRetryPolicy.Run(Request(), (req, partial) =>
+        var withRetry = new InitialCountryTest(new Action<int, Action<long>>[] {
+            (slot, report) => UrlTestRetryPolicy.Run(Request(), (req, partial) =>
             {
                 order.Add(++pass == 1 ? "A-primary" : "A-retry");
                 return Response(pass == 1 ? 600 : 400);
             }, () => false, _ => { }, report)
         }, _ => { }, () => order.Add("A-done"));
         InitialUrlTestSchedule.Run(new[] { withRetry, country("B", new[] { 200 }) },
-            () => false, ex => { throw ex; });
+            () => false, ex => { throw ex; }, maxConcurrency: 1);
         Check(order.SequenceEqual(new[] { "A-primary", "A-retry", "A-done", "B1", "B-done" }),
             "Next country started before the current server retry finished");
 
         order.Clear();
         int failures = 0;
-        var invalid = new InitialCountryTest(new Action<Action<long>>[] {
-            _ => { order.Add("invalid"); throw new InvalidOperationException(); }
+        var invalid = new InitialCountryTest(new Action<int, Action<long>>[] {
+            (slot, report) => { order.Add("invalid"); throw new InvalidOperationException(); }
         }, _ => { }, () => order.Add("invalid-done"));
         InitialUrlTestSchedule.Run(new[] { invalid, country("B", new[] { 200 }) },
-            () => false, _ => failures++);
+            () => false, _ => failures++, maxConcurrency: 1);
         Check(failures == 1 && order.Contains("B-done"), "One invalid member stopped the schedule");
 
         bool cancelled = false;
         order.Clear();
-        var stopping = new InitialCountryTest(new Action<Action<long>>[] {
-            report => { cancelled = true; report(100); }
+        var stopping = new InitialCountryTest(new Action<int, Action<long>>[] {
+            (slot, report) => { cancelled = true; report(100); }
         }, _ => order.Add("late-progress"), () => order.Add("late-completion"));
         InitialUrlTestSchedule.Run(new[] { stopping, country("B", new[] { 200 }) },
-            () => cancelled, ex => { throw ex; });
+            () => cancelled, ex => { throw ex; }, maxConcurrency: 1);
         Check(order.Count == 0, "Cancellation allowed progress, completion or another country");
+    }
+
+    private static void CheckParallelCountries()
+    {
+        var entered = Enumerable.Range(0, 6).Select(_ => new ManualResetEventSlim()).ToArray();
+        var release = Enumerable.Range(0, 6).Select(_ => new ManualResetEventSlim()).ToArray();
+        int active = 0, peak = 0, secondRound = 0, completed = 0, cleanup = 0;
+        var perCountry = new int[6];
+        var slotBusy = new int[5];
+        var countries = Enumerable.Range(0, 6).Select(country => new InitialCountryTest(
+            Enumerable.Range(0, 2).Select(round => new Action<int, Action<long>>((slot, report) =>
+            {
+                Check(Interlocked.Increment(ref perCountry[country]) == 1, "Same country overlapped");
+                Check(Interlocked.Increment(ref slotBusy[slot]) == 1, "Core slot overlapped");
+                int now = Interlocked.Increment(ref active);
+                int previous;
+                do { previous = Volatile.Read(ref peak); }
+                while (now > previous && Interlocked.CompareExchange(ref peak, now, previous) != previous);
+                try
+                {
+                    if (round == 0)
+                    {
+                        entered[country].Set();
+                        Check(release[country].Wait(5000), "First-round gate timed out");
+                        report(600);
+                    }
+                    else
+                    {
+                        Check(release.All(gate => gate.IsSet), "Next round started before all first members finished");
+                        Interlocked.Increment(ref secondRound);
+                        report(400);
+                    }
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref active);
+                    Interlocked.Decrement(ref perCountry[country]);
+                    Interlocked.Decrement(ref slotBusy[slot]);
+                }
+            })), _ => { }, () => Interlocked.Increment(ref completed))).ToArray();
+        var job = Task.Run(() => InitialUrlTestSchedule.Run(countries, () => false,
+            ex => { throw ex; }, () => Interlocked.Increment(ref cleanup)));
+        try
+        {
+            Check(entered.Take(5).All(gate => gate.Wait(5000)), "Five countries did not start concurrently");
+            Check(!entered[5].IsSet && Volatile.Read(ref active) == 5, "Concurrency limit was not five");
+            release[0].Set();
+            Check(entered[5].Wait(5000), "Freed slot did not refill with the sixth country");
+            Check(Volatile.Read(ref secondRound) == 0, "Round barrier was skipped");
+        }
+        finally
+        {
+            foreach (var gate in release) gate.Set();
+            Check(job.Wait(5000), "Parallel test did not drain");
+            foreach (var gate in entered.Concat(release)) gate.Dispose();
+        }
+        Check(peak == 5 && active == 0 && secondRound == 6 && completed == 6 && cleanup == 1,
+            "Parallel scheduling/completion/cleanup regression");
+
+        using (var fiveStarted = new CountdownEvent(5))
+        using (var unblock = new ManualResetEventSlim())
+        {
+            int cancelled = 0, started = 0, late = 0, cleaned = 0;
+            var stopping = Enumerable.Range(0, 8).Select(_ => new InitialCountryTest(
+                new Action<int, Action<long>>[] { (slot, report) =>
+                {
+                    Interlocked.Increment(ref started);
+                    fiveStarted.Signal();
+                    Check(unblock.Wait(5000), "Cancellation gate timed out");
+                    report(100);
+                } }, _latency => Interlocked.Increment(ref late),
+                () => Interlocked.Increment(ref late))).ToArray();
+            var stopJob = Task.Run(() => InitialUrlTestSchedule.Run(stopping,
+                () => Volatile.Read(ref cancelled) != 0, ex => { throw ex; },
+                () => Interlocked.Increment(ref cleaned)));
+            try { Check(fiveStarted.Wait(5000), "Cancellation test did not start five workers"); }
+            finally
+            {
+                Interlocked.Exchange(ref cancelled, 1);
+                unblock.Set();
+                Check(stopJob.Wait(5000), "Cancelled workers did not drain");
+            }
+            Check(started == 5 && late == 0 && cleaned == 1, "Cancellation started queued work or published results");
+        }
     }
 
     private static void CheckProgress()

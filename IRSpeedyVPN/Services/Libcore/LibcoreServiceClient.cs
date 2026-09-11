@@ -9,12 +9,14 @@ namespace IRSpeedyVPN.Services.Libcore
         private readonly string _host;
         private readonly int _port;
         private readonly int _timeoutMs;
+        private readonly int _requestTimeoutMs;
 
-        public LibcoreServiceClient(string host, int port, int timeoutMs = 2000)
+        public LibcoreServiceClient(string host, int port, int timeoutMs = 2000, int requestTimeoutMs = 0)
         {
             _host = host;
             _port = port;
             _timeoutMs = timeoutMs;
+            _requestTimeoutMs = requestTimeoutMs;
         }
 
         public ErrorResp Start(LoadConfigReq req)
@@ -47,11 +49,11 @@ namespace IRSpeedyVPN.Services.Libcore
                 while (Task.WaitAny(pending, 150) < 0)
                 {
                     if (cancelled()) break;
-                    QueryURLTestResponse partial;
+                    QueryURLTestResponse snapshot;
                     try
                     {
                         using (var client = ProtorpcClient.Connect(_host, _port, 250))
-                            partial = client.CallWithDeadline("LibcoreService.QueryURLTest",
+                            snapshot = client.CallWithDeadline("LibcoreService.QueryURLTest",
                                 LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeQueryURLTestResponse, 250);
                     }
                     catch (Exception ex)
@@ -61,8 +63,8 @@ namespace IRSpeedyVPN.Services.Libcore
                         log("[UrlTest] stage=progress-unavailable exception=" + ex.GetType().Name);
                         break;
                     }
-                    if (!cancelled() && partial?.Results != null)
-                        report(new TestResp { Results = partial.Results });
+                    if (!cancelled() && snapshot?.Results != null)
+                        report(new TestResp { Results = snapshot.Results });
                 }
             }
             finally
@@ -94,6 +96,8 @@ namespace IRSpeedyVPN.Services.Libcore
         {
             using (var client = ProtorpcClient.Connect(_host, _port, _timeoutMs))
             {
+                if (_requestTimeoutMs > 0)
+                    return client.CallWithDeadline(method, reqBody, decoder, _requestTimeoutMs);
                 return client.Call(method, reqBody, decoder);
             }
         }

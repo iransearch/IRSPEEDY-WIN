@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.IO;
+using System.Net.Sockets;
 using IRSpeedyVPN.Services.Libcore;
 
 namespace IRSpeedyVPN.Services
@@ -63,9 +65,9 @@ namespace IRSpeedyVPN.Services
             {
                 accept(send(primary, partial => accept(partial, primaryTags)), primaryTags);
             }
-            catch (TimeoutException)
+            catch (Exception ex) when (ex is TimeoutException || ex is IOException || ex is SocketException)
             {
-                log("[UrlTest] stage=primary-failed reason=timeout");
+                log("[UrlTest] stage=primary-failed exception=" + ex.GetType().Name);
             }
             checkCancellation();
             var retryTags = tags.Where(tag => !IsSuccess(best[tag]) || best[tag].LatencyMs > 500).ToList();

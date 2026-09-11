@@ -119,13 +119,14 @@ namespace IRSpeedyVPN.Services
         static readonly object coreLock = new object();
         readonly object sniLock = new object();
         readonly Dictionary<string, SniRuntime> serviceSniServers = new Dictionary<string, SniRuntime>(StringComparer.OrdinalIgnoreCase);
-        readonly HashSet<int> activeSniPorts = new HashSet<int>();
+        static readonly object sniPortLock = new object();
+        static readonly HashSet<int> activeSniPorts = new HashSet<int>();
         const int CorePort = 19810;
         const int VpnCorePort = 19811;
         const int CoreConnectTimeoutMs = 8000;
         const int CoreConnectRetryDelayMs = 200;        
         const string SniScheme = "sni://";
-        int nextSniListenPort = 40443;
+        static int nextSniListenPort = 40443;
         public TunnelPlusService(IServer server, GlobalInfo globalInfo)
         {
             gInfo = globalInfo;
@@ -639,6 +640,8 @@ namespace IRSpeedyVPN.Services
         }
         void KillAll()
         {
+            UrlTestCoordinator.CancelAll();
+            InitialUrlTestSchedule.Drain();
             if (IsConnected)
             {
 
@@ -684,14 +687,20 @@ namespace IRSpeedyVPN.Services
 
         // One scheduled member, including its retry. Run synchronously so a cancelled
         // wrapper cannot advance the schedule while the core still owns its resources.
-        public void TestInitialUrl(Url url, Action<long> progress, Func<bool> cancelled)
+        internal UrlTestCoreSession CreateInitialTestCore()
+        {
+            return new UrlTestCoreSession(ResolveCorePath());
+        }
+
+        public void TestInitialUrl(Url url, Action<long> progress, Func<bool> cancelled,
+            Func<UrlTestCoreSession> getTestCore)
         {
             if (url == null || cancelled() || UrlTestCoordinator.AbortRequested) return;
             url.latency = 0;
             url.latencychkTime = default(DateTime);
             try
             {
-                UrlTestFull(new[] { url }, false, progress, cancelled);
+                UrlTestFull(new[] { url }, false, progress, cancelled, getTestCore());
             }
             finally
             {
@@ -753,7 +762,7 @@ namespace IRSpeedyVPN.Services
             return urlTestSpeed;
         }
         public void UrlTestFull(Url[] urls = null, bool force = false,
-            Action<long> progress = null, Func<bool> cancelled = null)
+            Action<long> progress = null, Func<bool> cancelled = null, UrlTestCoreSession testCore = null)
         {
             cancelUrlTest = false;
             Func<bool> isCancelled = () => cancelUrlTest || cancelled?.Invoke() == true
@@ -877,12 +886,13 @@ namespace IRSpeedyVPN.Services
 
                     TestResp resp;
                     Dictionary<string, string> tagToUrl;
-                    lock (grpcLock)
+                    lock (testCore?.SyncRoot ?? grpcLock)
                     {
                         if (isCancelled())
                             return;
 
-                        EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
+                        if (testCore == null)
+                            EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
 
                         while (true)
                         {
@@ -905,11 +915,13 @@ namespace IRSpeedyVPN.Services
                                     Config = configData ?? "",
                                     OutboundTags = tagToUrl.Keys.ToList(),
                                     Url = gInfo?.settings?.setting?.url_test ?? "https://www.google.com/generate_204",
-                                    MaxConcurrency = 15,
+                                    MaxConcurrency = testCore == null ? 15 : 1,
                                     TestTimeoutMs = 5000,
                                     NeedXray = needXray,
                                     XrayConfig = xrayConfig
-                                }, (request, report) => ExecuteCoreCall(client => progress == null
+                                }, (request, report) => testCore != null
+                                    ? testCore.Test(request, report, isCancelled)
+                                    : ExecuteCoreCall(client => progress == null
                                         ? client.Test(request)
                                         : client.TestWithProgress(request, report, isCancelled,
                                             message => LogHelper.WriteExLog(message))),
@@ -991,6 +1003,11 @@ namespace IRSpeedyVPN.Services
             {
                 if (isCancelled())
                     return;
+                if (testCore != null)
+                {
+                    LogHelper.WriteExLog("[UrlTest] stage=member-failed exception=" + ex.GetType().Name);
+                    return;
+                }
                 if (onConnectDisconnect != null)
                     onConnectDisconnect.Invoke(this, false, 0, "1 خطا در بررسی سرورها");
                 return;
@@ -999,6 +1016,11 @@ namespace IRSpeedyVPN.Services
             {               
                 if (isCancelled())
                     return;
+                if (testCore != null)
+                {
+                    LogHelper.WriteExLog("[UrlTest] stage=member-failed exception=" + ex.GetType().Name);
+                    return;
+                }
                 LogHelper.WriteLog(ex);
                 if (onConnectDisconnect != null)
                     onConnectDisconnect.Invoke(this, false, 0, "خطا در بررسی سرورها");
@@ -1339,6 +1361,7 @@ namespace IRSpeedyVPN.Services
         private void StopAndDrainUrlTests()
         {
             UrlTestCoordinator.CancelAll();
+            InitialUrlTestSchedule.Drain();
             try
             {
                 if (ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
@@ -1448,7 +1471,7 @@ namespace IRSpeedyVPN.Services
 
             var listenPort = AllocateSniListenPort();            
 
-            var configPath = Path.Combine(Path.GetDirectoryName(sniPath), "config.json");
+            var configPath = Path.Combine(Path.GetDirectoryName(sniPath), "sni-" + Guid.NewGuid().ToString("N") + ".json");
             var serializer = new JavaScriptSerializer();
             var configJson = serializer.Serialize(new Dictionary<string, object>
             {
@@ -1460,25 +1483,31 @@ namespace IRSpeedyVPN.Services
                 { "QUEUE_NUM", config.QueueNum },
                 { "HANDSHAKE_TIMEOUT_MS", config.HandshakeTimeoutMs },
             });
-            File.WriteAllText(configPath, configJson, Encoding.ASCII);
-
-            var process = ShellExecute.ShellexecAndReturnProcess(sniPath, configPath);
-            if (!WaitForSniPort("127.0.0.1", listenPort, TimeSpan.FromSeconds(10)))
+            Process process = null;
+            try
+            {
+                File.WriteAllText(configPath, configJson, Encoding.ASCII);
+                process = ShellExecute.ShellexecAndReturnProcess(sniPath, configPath);
+                if (process == null || !WaitForSniPort("127.0.0.1", listenPort, TimeSpan.FromSeconds(10)))
+                    throw new TimeoutException($"sni.exe did not start listening on port {listenPort} within 10 seconds.");
+                return new SniRuntime
+                {
+                    RawLink = config.RawLink,
+                    ListenHost = "127.0.0.1",
+                    ListenPort = listenPort,
+                    WorkingDirectory = Path.GetDirectoryName(sniPath),
+                    ConfigPath = configPath,
+                    Process = process,
+                    Persistent = persistent,
+                };
+            }
+            catch
             {
                 TryKillProcess(process);
                 ReleaseSniListenPort(listenPort);
-                throw new TimeoutException($"sni.exe did not start listening on port {listenPort} within 10 seconds.");
+                try { File.Delete(configPath); } catch { }
+                throw;
             }
-            return new SniRuntime
-            {
-                RawLink = config.RawLink,
-                ListenHost = "127.0.0.1",
-                ListenPort = listenPort,
-                WorkingDirectory = Path.GetDirectoryName(sniPath),
-                ConfigPath = configPath,
-                Process = process,
-                Persistent = persistent,
-            };
         }
 
         private void StopSniServers(Dictionary<string, SniRuntime> runtimes)
@@ -1504,12 +1533,12 @@ namespace IRSpeedyVPN.Services
             TryKillProcess(runtime.Process);
             if (releasePort && runtime.ListenPort > 0)
                 ReleaseSniListenPort(runtime.ListenPort);
-            ShellExecute.KillProccess("sni");
+            try { File.Delete(runtime.ConfigPath); } catch { }
         }
 
         private int AllocateSniListenPort()
         {
-            lock (sniLock)
+            lock (sniPortLock)
             {
                 var candidate = Math.Max(nextSniListenPort, 50443);
                 while (candidate < 65535)
@@ -1529,7 +1558,7 @@ namespace IRSpeedyVPN.Services
 
         private void ReleaseSniListenPort(int port)
         {
-            lock (sniLock)
+            lock (sniPortLock)
             {
                 activeSniPorts.Remove(port);
                 if (port < nextSniListenPort)
