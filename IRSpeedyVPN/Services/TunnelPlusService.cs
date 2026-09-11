@@ -162,7 +162,11 @@ namespace IRSpeedyVPN.Services
                 if (serviceController.CheckUserPermission(gInfo.Username, gInfo.Password))
                 // if (ServiceHelper.CheckAvailabilty(gInfo.Username,gInfo.Password))
                 {
+                    LogHelper.WriteExLog("[ConnectionTrace] stage=drain-start countryId=" + ID);
                     StopAndDrainUrlTests();
+                    LogHelper.WriteExLog("[ConnectionTrace] stage=drain-complete countryId=" + ID
+                        + " bestMs=" + urlTestSpeed + " poolMembers=" + (_smartFastUrls?.Length ?? 0)
+                        + " selectedMember=" + (server.urls.FindIndex(u => u.url == SelectedUrl) + 1));
                     if (goUrl == null)
                     {
                         KillAll();
@@ -358,6 +362,9 @@ namespace IRSpeedyVPN.Services
                         );
                     }
 
+                    LogHelper.WriteExLog("[ConnectionTrace] stage=core-start countryId=" + ID
+                        + " category=" + InitialTestCategory(lastLink) + " needXray=" + needXray
+                        + " smart=" + isSmartFast + " port=" + port);
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))
                     {
                         LogHelper.WriteExLog(
@@ -374,6 +381,7 @@ namespace IRSpeedyVPN.Services
                         return;
                     }
 
+                    LogHelper.WriteExLog("[ConnectionTrace] stage=core-started countryId=" + ID);
                     IsConnected = true;
                     if (vpnmode)
                     {                      
@@ -678,6 +686,23 @@ namespace IRSpeedyVPN.Services
         }
 
 
+
+        private static string RedactProbeError(string error)
+        {
+            if (string.IsNullOrWhiteSpace(error)) return "<none>";
+            var text = error.Length > 4096 ? error.Substring(0, 4096) : error;
+            int json = text.IndexOfAny(new[] { '{', '[' });
+            if (json >= 0) text = text.Substring(0, json) + "<payload>";
+            text = System.Text.RegularExpressions.Regex.Replace(text, "\"[^\"]*(?:\"|$)|'[^']*(?:'|$)", "<value>");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\S+://\S*|\S+@\S+", "<endpoint>");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"(?i)\b(password|passwd|token|secret|uuid|authorization|auth|key)\b\s*[:=]\s*\S+", "$1=<value>");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"(?i)\b[0-9a-f]{8}-[0-9a-f-]{27,}\b|\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?|\b[0-9a-f]{32,}\b", "<address-or-id>");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\s+", " ");
+            return text.Length > 600 ? text.Substring(0, 600) : text;
+        }
+
+        internal static readonly object InitialTestBatchGate = new object();
+
         internal static int InitialTestCategory(string link)
         {
             var value = (link ?? "").Trim();
@@ -701,6 +726,11 @@ namespace IRSpeedyVPN.Services
         internal void TestInitialMember(Url url, Action<long> progress, Func<bool> cancelled)
         {
             if (cancelled()) return;
+            long previousSpeed = urlTestSpeed;
+            string previousUrl = selectedUrl;
+            var elapsed = Stopwatch.StartNew();
+            LogHelper.WriteExLog("[InitialMember] stage=start countryId=" + ID
+                + " member=" + (server.urls.IndexOf(url) + 1) + " category=" + InitialTestCategory(url.url));
             url.latency = -1;
             url.latencychkTime = default(DateTime);
             try
@@ -719,6 +749,16 @@ namespace IRSpeedyVPN.Services
                         duplicate.latencychkTime = url.latencychkTime;
                     }
                 }
+                // Singleton tests must preserve the country's earlier successful selection.
+                if (cancelled() || url.latency <= 0 || (previousSpeed > 0 && previousSpeed <= url.latency))
+                {
+                    urlTestSpeed = previousSpeed;
+                    selectedUrl = previousUrl;
+                }
+                LogHelper.WriteExLog("[InitialMember] stage=end countryId=" + ID
+                    + " member=" + (server.urls.IndexOf(url) + 1) + " latencyMs=" + url.latency
+                    + " cancelled=" + cancelled() + " elapsedMs=" + elapsed.ElapsedMilliseconds
+                    + " countryBestMs=" + urlTestSpeed);
             }
         }
 
@@ -923,10 +963,25 @@ namespace IRSpeedyVPN.Services
                                     TestTimeoutMs = 5000,
                                     NeedXray = needXray,
                                     XrayConfig = xrayConfig
-                                }, (request, report) => ExecuteCoreCall(client => progress == null
+                                }, (request, report) =>
+                                {
+                                    var watch = Stopwatch.StartNew();
+                                    var response = ExecuteCoreCall(client => progress == null
                                         ? client.Test(request)
                                         : client.TestWithProgress(request, report, isCancelled,
-                                            message => LogHelper.WriteExLog(message))),
+                                            message => LogHelper.WriteExLog(message)));
+                                    foreach (var result in response?.Results ?? new List<URLTestResp>())
+                                    {
+                                        string link;
+                                        tagToUrl.TryGetValue(result.OutboundTag ?? "", out link);
+                                        LogHelper.WriteExLog("[ProbeTrace] countryId=" + ID
+                                            + " member=" + (server.urls.FindIndex(u => u.url == link) + 1)
+                                            + " phase=" + (UrlTestRetryPolicy.SameEndpoint(request.Url, UrlTestRetryPolicy.RetryUrl) ? "alternate-url" : "primary")
+                                            + " timeoutMs=" + request.TestTimeoutMs + " elapsedMs=" + watch.ElapsedMilliseconds
+                                            + " latencyMs=" + result.LatencyMs + " error=" + RedactProbeError(result.Error));
+                                    }
+                                    return response;
+                                },
                                     isCancelled, message => LogHelper.WriteExLog(message), progress);
                                 break;
                             }
@@ -1366,6 +1421,10 @@ namespace IRSpeedyVPN.Services
                 // The barrier below still waits for the in-flight call to unwind.
             }
 
+            lock (InitialTestBatchGate)
+            {
+                // Include member cleanup before connection starts using ports and SNI processes.
+            }
             lock (grpcLock)
             {
                 // Wait until any in-flight URL Test RPC has released the shared Core.

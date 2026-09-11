@@ -220,7 +220,7 @@ namespace IRSpeedyVPN.UserControls
         /// only the minimum positive latency for that row.
         /// </summary>
 
-        private static readonly object InitialTestBatchGate = new object();
+
 
         private void RunBackgroundUrlTests(IVPNService[] services)
         {
@@ -232,7 +232,7 @@ namespace IRSpeedyVPN.UserControls
             Task.Run(() =>
             {
                 // An older cancelled batch must finish core cleanup before a new one starts.
-                lock (InitialTestBatchGate)
+                lock (TunnelPlusService.InitialTestBatchGate)
                 {
                     Func<bool> cancelled = () => token.IsCancellationRequested || UrlTestCoordinator.AbortRequested;
                     if (cancelled()) return;
