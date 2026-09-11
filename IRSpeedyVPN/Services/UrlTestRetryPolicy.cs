@@ -60,10 +60,40 @@ namespace IRSpeedyVPN.Services
                 }
             };
             var primaryTags = new HashSet<string>(tags, StringComparer.Ordinal);
+            Func<TestReq, HashSet<string>, string, TestResp> probe = (request, allowed, phase) =>
+            {
+                var reported = new Dictionary<string, string>(StringComparer.Ordinal);
+                Action<TestResp> observe = response =>
+                {
+                    foreach (var result in response?.Results ?? new List<URLTestResp>())
+                    {
+                        if (result?.OutboundTag == null || !allowed.Contains(result.OutboundTag)) continue;
+                        string description = UrlTestDiagnostics.Describe(result);
+                        string previous;
+                        if (!reported.TryGetValue(result.OutboundTag, out previous) || previous != description)
+                        {
+                            reported[result.OutboundTag] = description;
+                            log("[UrlTest] stage=probe-result phase=" + phase + " " + description);
+                        }
+                    }
+                };
+                var finalResponse = send(request, partial =>
+                {
+                    checkCancellation();
+                    observe(partial);
+                    accept(partial, allowed);
+                });
+                checkCancellation();
+                observe(finalResponse);
+                log("[UrlTest] stage=probe-response phase=" + phase
+                    + " received=" + (finalResponse?.Results?.Count ?? 0)
+                    + " matched=" + (finalResponse?.Results?.Count(r => r?.OutboundTag != null && allowed.Contains(r.OutboundTag)) ?? 0));
+                return finalResponse;
+            };
             log("[UrlTest] stage=primary-start candidates=" + tags.Count);
             try
             {
-                accept(send(primary, partial => accept(partial, primaryTags)), primaryTags);
+                accept(probe(primary, primaryTags, "primary"), primaryTags);
             }
             catch (Exception ex) when (ex is TimeoutException || ex is IOException || ex is SocketException)
             {
@@ -85,7 +115,7 @@ namespace IRSpeedyVPN.Services
                 var allowedRetryTags = new HashSet<string>(retryTags, StringComparer.Ordinal);
                 try
                 {
-                    accept(send(retry, partial => accept(partial, allowedRetryTags)), allowedRetryTags);
+                    accept(probe(retry, allowedRetryTags, "alternate"), allowedRetryTags);
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)

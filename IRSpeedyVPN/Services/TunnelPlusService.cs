@@ -777,6 +777,9 @@ namespace IRSpeedyVPN.Services
                     .Where(u => u != null && !string.IsNullOrWhiteSpace(u.url))
                     .ToList();
 
+                string diagnosticContext = " testId=" + Guid.NewGuid().ToString("N")
+                    + " countryId=" + ID + " member="
+                    + (sourceUrls.Count == 1 ? server.urls.FindIndex(u => u != null && u.url == sourceUrls[0].url) + 1 : 0);
                 var urlObjects = new Dictionary<string, Url>(StringComparer.Ordinal);
                 foreach (var u in sourceUrls)
                     if (!urlObjects.ContainsKey(u.url))
@@ -910,6 +913,7 @@ namespace IRSpeedyVPN.Services
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
                                     ? Xray.ConfigGenerator.GetUrlTestXrayConfig(activeXray) : "";
+                                LogUrlTestConfig(configData, xrayConfig, tagToUrl.Keys.First(), diagnosticContext);
                                 resp = UrlTestRetryPolicy.Run(new TestReq
                                 {
                                     Config = configData ?? "",
@@ -925,7 +929,7 @@ namespace IRSpeedyVPN.Services
                                         ? client.Test(request)
                                         : client.TestWithProgress(request, report, isCancelled,
                                             message => LogHelper.WriteExLog(message))),
-                                    isCancelled, message => LogHelper.WriteExLog(message), progress);
+                                    isCancelled, message => LogHelper.WriteExLog(message + diagnosticContext), progress);
                                 break;
                             }
                             catch (InvalidOperationException ex)
@@ -1033,6 +1037,40 @@ namespace IRSpeedyVPN.Services
                     TryKillProcess(coreProcess);
                 }
             }*/
+        }
+
+        private static void LogUrlTestConfig(string config, string xrayConfig, string tag, string context)
+        {
+            try
+            {
+                var root = JObject.Parse(config);
+                var outbound = (root["outbounds"] as JArray)?.OfType<JObject>()
+                    .FirstOrDefault(o => (string)o["tag"] == tag);
+                bool xray = !string.IsNullOrWhiteSpace(xrayConfig);
+                var effective = xray
+                    ? (JObject.Parse(xrayConfig)["outbounds"] as JArray)?.OfType<JObject>().FirstOrDefault()
+                    : outbound;
+                string protocol = (string)effective?[xray ? "protocol" : "type"] ?? "unknown";
+                // Only fixed schema tokens and presence flags; no endpoint/auth values.
+                protocol = System.Text.RegularExpressions.Regex.Replace(protocol, "[^a-zA-Z0-9_-]", "");
+                var tls = outbound?["tls"] as JObject;
+                string security = xray ? (string)effective?["streamSettings"]?["security"] : null;
+                string detectedSecurity = xray
+                    ? (security == "reality" ? "Reality" : security == "tls" ? "TLS" : "None")
+                    : ((bool?)tls?["enabled"] == true ? "TLS" : "None");
+                LogHelper.WriteExLog("[UrlTest] stage=config-summary" + context
+                    + " engine=" + (xray ? "xray" : "sing-box") + " protocol=" + protocol
+                    + " security=" + detectedSecurity
+                    + " sniPresent=" + !string.IsNullOrWhiteSpace((string)tls?["server_name"])
+                    + " insecure=" + ((bool?)tls?["insecure"] == true)
+                    + " passwordPresent=" + !string.IsNullOrEmpty((string)outbound?["password"])
+                    + " obfsPresent=" + (outbound?["obfs"] is JObject));
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteExLog("[UrlTest] stage=config-summary-unavailable" + context
+                    + " exception=" + ex.GetType().Name);
+            }
         }
 
         private static bool IsHysteria2Link(string link)

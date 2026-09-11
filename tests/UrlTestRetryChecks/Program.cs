@@ -116,9 +116,30 @@ internal static class Program
         catch (OperationCanceledException) { rejected = true; }
         Check(rejected && cancelledCalls == 1, "Cancelled batch issued retry or published results");
         CheckProgress();
+        CheckDiagnostics();
         CheckCountryRounds();
         CheckParallelCountries();
         Console.WriteLine("URL test retry, progress and country scheduling checks passed.");
+    }
+
+    private static void CheckDiagnostics()
+    {
+        Check(UrlTestDiagnostics.Classify("QUIC handshake failed") == "quic-handshake", "QUIC diagnosis lost");
+        Check(UrlTestDiagnostics.Classify("TLS required") == "tls-configuration", "Missing TLS diagnosis lost");
+        Check(UrlTestDiagnostics.Classify("x509: certificate expired") == "tls-certificate", "Certificate diagnosis lost");
+        var secretError = "authentication failed password=secret123 uuid=abcf2902-89e7-43ec-a548-69b3be8cc838";
+        string safe = UrlTestDiagnostics.Describe(new URLTestResp { LatencyMs = -1, Error = secretError });
+        Check(safe.Contains("reason=authentication") && !safe.Contains("secret123") && !safe.Contains("abcf2902"),
+            "Diagnostic exposed credentials");
+        var logs = new List<string>();
+        int pass = 0;
+        var result = UrlTestRetryPolicy.Run(Request(), _ => ++pass == 1
+            ? new TestResp { Results = new List<URLTestResp> {
+                new URLTestResp { OutboundTag = "0", LatencyMs = -1, Error = "QUIC handshake failed" } } }
+            : Response(400), () => false, logs.Add);
+        Check(result.Results[0].LatencyMs == 400 && logs.Any(l => l.Contains("phase=primary") && l.Contains("quic-handshake"))
+            && logs.Any(l => l.Contains("phase=alternate") && l.Contains("latencyMs=400")),
+            "Per-attempt diagnostics or retry result missing");
     }
 
     private static void CheckCountryRounds()

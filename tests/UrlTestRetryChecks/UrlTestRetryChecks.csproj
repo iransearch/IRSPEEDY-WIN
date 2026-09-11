@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../IRSpeedyVPN/Services/UrlTestRetryPolicy.cs" Link="UrlTestRetryPolicy.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/UrlTestDiagnostics.cs" Link="UrlTestDiagnostics.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/InitialUrlTestSchedule.cs" Link="InitialUrlTestSchedule.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="LibcoreMessages.cs" />
   </ItemGroup>
