@@ -920,7 +920,7 @@ namespace IRSpeedyVPN.Services
                                     OutboundTags = tagToUrl.Keys.ToList(),
                                     Url = gInfo?.settings?.setting?.url_test ?? "https://www.google.com/generate_204",
                                     MaxConcurrency = testCore == null ? 15 : 1,
-                                    TestTimeoutMs = 5000,
+                                    TestTimeoutMs = 8000,
                                     NeedXray = needXray,
                                     XrayConfig = xrayConfig
                                 }, (request, report) => testCore != null

@@ -41,7 +41,8 @@ namespace IRSpeedyVPN.Services.Libcore
                 {
                     try
                     {
-                        var client = new LibcoreServiceClient("127.0.0.1", port, 1000, 10000);
+                        // Leave room for core setup and response delivery beyond the 8s probe.
+                        var client = new LibcoreServiceClient("127.0.0.1", port, 1000, 15000);
                         var result = client.TestWithProgress(request, report, cancelled,
                             message => LogHelper.WriteExLog(message));
                         if (cancelled()) throw new OperationCanceledException();
