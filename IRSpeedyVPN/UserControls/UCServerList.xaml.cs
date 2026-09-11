@@ -219,46 +219,94 @@ namespace IRSpeedyVPN.UserControls
         /// Tests every URL of every visible numbered country row. The picker displays
         /// only the minimum positive latency for that row.
         /// </summary>
+
+        private static readonly object InitialTestBatchGate = new object();
+
         private void RunBackgroundUrlTests(IVPNService[] services)
         {
             _urlTestCts?.Cancel();
             _urlTestCts = new CancellationTokenSource();
             var token = _urlTestCts.Token;
-
             UrlTestCoordinator.BeginBatch();
 
             Task.Run(() =>
             {
-                foreach (var service in services)
+                // An older cancelled batch must finish core cleanup before a new one starts.
+                lock (InitialTestBatchGate)
                 {
-                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
-                        break;
-
-                    if (!HasFreshResultsForAllUrls(service))
+                    Func<bool> cancelled = () => token.IsCancellationRequested || UrlTestCoordinator.AbortRequested;
+                    if (cancelled()) return;
+                    var countries = services.Select(service => new
                     {
-                        try
+                        Service = service,
+                        Fresh = HasFreshResultsForAllUrls(service),
+                        Members = (service.GetServerUrls() ?? new List<Url>())
+                            .Where(u => u != null && !string.IsNullOrWhiteSpace(u.url))
+                            .GroupBy(u => u.url, StringComparer.Ordinal).Select(g => g.First())
+                            .Select(u => new { Url = u, Category = TunnelPlusService.InitialTestCategory(u.url) })
+                            .ToList()
+                    }).ToList();
+                    var remaining = countries.ToDictionary(c => c.Service,
+                        c => c.Service is TunnelPlusService ? c.Members.Count : 1);
+                    var best = countries.ToDictionary(c => c.Service, c => long.MaxValue);
+                    Action<IVPNService> complete = service =>
+                    {
+                        if (cancelled()) return;
+                        Dispatcher.BeginInvoke(new Action(() =>
                         {
-                            if (service is TunnelPlusService tunnel)
-                                tunnel.UrlTestWithProgress(latency =>
-                                {
-                                    Dispatcher.BeginInvoke(new Action(() =>
-                                    {
-                                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
-                                            countryPicker.ShowGroupProgress(service, latency);
-                                    }));
-                                }, () => token.IsCancellationRequested);
-                            else
-                                service.UrlTest();
-                        }
-                        catch { }
-                    }
-
-                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
-                    Dispatcher.BeginInvoke(new Action(() =>
+                            if (!cancelled()) countryPicker.RefreshGroup(service);
+                        }));
+                    };
+                    foreach (var country in countries)
                     {
-                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
-                            countryPicker.RefreshGroup(service);
-                    }));
+                        if (country.Fresh || remaining[country.Service] == 0)
+                        {
+                            remaining[country.Service] = 0;
+                            complete(country.Service);
+                        }
+                    }
+                    for (int category = 0; category < 4; category++)
+                    {
+                        foreach (var country in countries)
+                        {
+                            if (cancelled()) return;
+                            var service = country.Service;
+                            if (remaining[service] == 0) continue;
+                            if (service is TunnelPlusService tunnel)
+                            {
+                                foreach (var member in country.Members.Where(m => m.Category == category))
+                                {
+                                    if (cancelled()) return;
+                                    try
+                                    {
+                                        tunnel.TestInitialMember(member.Url, latency =>
+                                        {
+                                            if (cancelled() || latency <= 0 || latency >= best[service]) return;
+                                            best[service] = latency;
+                                            Dispatcher.BeginInvoke(new Action(() =>
+                                            {
+                                                if (!cancelled()) countryPicker.ShowGroupProgress(service, latency);
+                                            }));
+                                        }, cancelled);
+                                    }
+                                    catch (Exception ex) { LogHelper.WriteLog(ex); }
+                                    if (cancelled()) return;
+                                    if (--remaining[service] == 0)
+                                    {
+                                        tunnel.CompleteInitialTests();
+                                        complete(service);
+                                    }
+                                }
+                            }
+                            else if (category == 3)
+                            {
+                                try { service.UrlTest(); }
+                                catch (Exception ex) { LogHelper.WriteLog(ex); }
+                                remaining[service] = 0;
+                                complete(service);
+                            }
+                        }
+                    }
                 }
             });
         }

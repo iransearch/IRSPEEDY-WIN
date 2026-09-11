@@ -677,6 +677,60 @@ namespace IRSpeedyVPN.Services
             return RunUrlTest(urls, force, null, null);
         }
 
+
+        internal static int InitialTestCategory(string link)
+        {
+            var value = (link ?? "").Trim();
+            if (value.StartsWith("hy2://", StringComparison.OrdinalIgnoreCase)
+                || value.StartsWith("hysteria2://", StringComparison.OrdinalIgnoreCase)
+                || value.StartsWith("hysteria://", StringComparison.OrdinalIgnoreCase))
+                return 0;
+            if (!value.StartsWith("vless://", StringComparison.OrdinalIgnoreCase))
+                return 3;
+            try
+            {
+                string message;
+                var item = ShareHandler.ImportFromConfigLink(value, out message);
+                if (item != null && string.Equals(item.streamSecurity, "reality", StringComparison.OrdinalIgnoreCase))
+                    return 1;
+            }
+            catch { }
+            return 2;
+        }
+
+        internal void TestInitialMember(Url url, Action<long> progress, Func<bool> cancelled)
+        {
+            if (cancelled()) return;
+            url.latency = -1;
+            url.latencychkTime = default(DateTime);
+            try
+            {
+                // Run synchronously: finish both attempts and cleanup before the next member.
+                UrlTestFull(new[] { url }, false, progress, cancelled);
+            }
+            finally
+            {
+                if (!cancelled())
+                {
+                    url.latencychkTime = DateTime.Now;
+                    foreach (var duplicate in server.urls.Where(u => u != null && u.url == url.url))
+                    {
+                        duplicate.latency = url.latency;
+                        duplicate.latencychkTime = url.latencychkTime;
+                    }
+                }
+            }
+        }
+
+        internal void CompleteInitialTests()
+        {
+            var best = server.urls.Where(u => u != null && u.latency > 0)
+                .OrderBy(u => u.latency).FirstOrDefault();
+            urlTestSpeed = best == null ? -1 : best.latency;
+            selectedUrl = best == null ? null : best.url;
+            lastUrlTest = DateTime.Now;
+        }
+
         public long UrlTestWithProgress(Action<long> progress, Func<bool> cancelled)
         {
             return RunUrlTest(null, false, progress, cancelled);
