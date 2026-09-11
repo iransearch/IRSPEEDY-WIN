@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Text.RegularExpressions;
 using System.Security.Cryptography;
 using System.Text;
 using IRSpeedyVPN.Services.Libcore;
@@ -12,10 +14,60 @@ namespace IRSpeedyVPN.Services
             if (result == null) return "result=missing";
             if (UrlTestRetryPolicy.IsSuccess(result))
                 return "result=success latencyMs=" + result.LatencyMs;
-            // Core errors may contain credentials or full outbound JSON. Log fixed
-            // categories and a fingerprint, never the original error or config.
+            // Preserve useful diagnostic words, but never emit arbitrary core data.
             return "result=failure latencyMs=" + result.LatencyMs
-                + " reason=" + Classify(result.Error) + " errorId=" + Fingerprint(result.Error);
+                + " reason=" + Classify(result.Error) + " errorId=" + Fingerprint(result.Error)
+                + " errorDetail=\"" + SafeDetail(result.Error) + "\"";
+        }
+
+
+        // Use an allowlist rather than relying on secret-key names: core errors can
+        // contain arbitrary passwords, URLs, JSON or server-provided response text.
+        private static readonly HashSet<string> DiagnosticWords = new HashSet<string>(
+            ("get head post http https request response status code unexpected invalid failed failure error " +
+             "connect connection connecting dial tcp udp quic tls handshake certificate x509 expired " +
+             "timeout timed out deadline exceeded context canceled cancelled operation aborted " +
+             "no recent network activity received packets packet idle keepalive closed reset refused " +
+             "unreachable route host remote local peer server client transport stream eof broken pipe " +
+             "read write send receive resolve resolver dns lookup name resolution such address " +
+             "authentication authenticated unauthorized forbidden password required missing unsupported " +
+             "protocol version configuration config outbound inbound proxy socks hysteria hysteria2 " +
+             "obfs salamander mismatch malformed bad unknown internal application crypto buffer " +
+             "resource temporarily unavailable permission denied access not allowed cannot unable " +
+             "to from by for with without is was has been the a an of on in during after before " +
+             "establish open close socket networkidle readfrom writeto use io end file " +
+             "too many requests service unavailable successful success empty returned expected " +
+             "headers header body length short overflow underflow limit reached refused_stream " +
+             "connection_error protocol_error internal_error handshake_failure " +
+             "network_unreachable connection_refused").Split(' '),
+            StringComparer.OrdinalIgnoreCase);
+
+        internal static string SafeDetail(string error)
+        {
+            if (string.IsNullOrWhiteSpace(error)) return "no error text";
+            // Bound work independently of the size of a malformed core response.
+            var text = error.Length > 4096 ? error.Substring(0, 4096) : error;
+            // Discard structured payloads and quoted values before token filtering.
+            int payload = text.IndexOfAny(new[] { '{', '[' });
+            if (payload >= 0) text = text.Substring(0, payload) + " REDACTED";
+            text = Regex.Replace(text, "\\\"[^\\\"]*(?:\\\"|$)|'[^']*(?:'|$)", " REDACTED ");
+            text = Regex.Replace(text, @"\S*(?:://|@|=)\S*", " REDACTED ");
+            var status = Regex.Match(text, @"\bstatus(?: code)?\s*:?\s+([1-5][0-9]{2})\b", RegexOptions.IgnoreCase);
+            var output = new StringBuilder();
+            bool redacted = false;
+            foreach (Match token in Regex.Matches(text, @"[^\s:;,()<>]+"))
+            {
+                string word = token.Value.TrimEnd('.');
+                bool known = DiagnosticWords.Contains(word);
+                if (!known && redacted) continue;
+                string value = known ? word.ToLowerInvariant() : "<redacted>";
+                if (output.Length + value.Length + 1 > 384) break;
+                if (output.Length > 0) output.Append(' ');
+                output.Append(value);
+                redacted = !known;
+            }
+            if (status.Success) output.Append(" httpStatus=").Append(status.Groups[1].Value);
+            return output.Length == 0 ? "<redacted>" : output.ToString();
         }
 
         internal static string Classify(string error)

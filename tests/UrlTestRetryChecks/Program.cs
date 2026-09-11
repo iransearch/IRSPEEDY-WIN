@@ -131,6 +131,19 @@ internal static class Program
         string safe = UrlTestDiagnostics.Describe(new URLTestResp { LatencyMs = -1, Error = secretError });
         Check(safe.Contains("reason=authentication") && !safe.Contains("secret123") && !safe.Contains("abcf2902"),
             "Diagnostic exposed credentials");
+        Check(UrlTestDiagnostics.SafeDetail("Get \"https://user:secret123@example.com/private?token=abc\": no recent network activity")
+            == "get <redacted> no recent network activity", "Useful core error detail lost");
+        Check(UrlTestDiagnostics.SafeDetail("unexpected HTTP status code: 403").Contains("httpStatus=403"),
+            "HTTP failure status lost");
+        string detail = UrlTestDiagnostics.SafeDetail("failed password=secret123 192.0.2.1 abcf2902-89e7-43ec-a548-69b3be8cc838 customSecret\r\nforbidden");
+        Check(!detail.Contains("secret123") && !detail.Contains("192.0.2.1")
+            && !detail.Contains("abcf2902") && !detail.Contains("customSecret")
+            && !detail.Contains("\r") && !detail.Contains("\n") && detail.Contains("forbidden"),
+            "Error detail leaked data or allowed multiline log injection");
+        Check(!UrlTestDiagnostics.SafeDetail("failed {\"password\":\"secret123\"}").Contains("secret123"),
+            "Structured payload leaked");
+        Check(UrlTestDiagnostics.SafeDetail(new string('x', 20000)).Length <= 400,
+            "Error detail was not bounded");
         var logs = new List<string>();
         int pass = 0;
         var result = UrlTestRetryPolicy.Run(Request(), _ => ++pass == 1
