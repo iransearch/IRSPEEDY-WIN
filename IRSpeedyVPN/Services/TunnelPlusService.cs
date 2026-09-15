@@ -722,6 +722,7 @@ namespace IRSpeedyVPN.Services
                 return;
             urlTestSpeed = -1;
             selectedUrl = null;
+            string testId = Guid.NewGuid().ToString("N");
             try
             {
                 var sourceUrls = (urls != null ? (IEnumerable<Url>)urls : server.urls)
@@ -755,7 +756,7 @@ namespace IRSpeedyVPN.Services
                                 }
                                 LogHelper.WriteExLog("[UrlTest] stage=candidate-rejected candidate="
                                     + sourceUrls.FindIndex(item => item.url == u)
-                                    + " reason=" + refusal);
+                                    + " reason=" + refusal + ProbeContext(testId, u));
                                 return;
                             }
                             var sniRuntime = GetSniRuntime(u, urlTestSniServers, false);
@@ -860,6 +861,7 @@ namespace IRSpeedyVPN.Services
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
                                     ? Xray.ConfigGenerator.GetUrlTestXrayConfig(activeXray) : "";
+                                int diagnosticAttempt = 0;
                                 resp = UrlTestRetryPolicy.Run(new TestReq
                                 {
                                     Config = configData ?? "",
@@ -869,11 +871,30 @@ namespace IRSpeedyVPN.Services
                                     TestTimeoutMs = 5000,
                                     NeedXray = needXray,
                                     XrayConfig = xrayConfig
-                                }, (request, report) => ExecuteCoreCall(client => progress == null
-                                        ? client.Test(request)
-                                        : client.TestWithProgress(request, report, isCancelled,
-                                            message => LogHelper.WriteExLog(message))),
-                                    isCancelled, message => LogHelper.WriteExLog(message), progress);
+                                }, (request, report) =>
+                                {
+                                    string phase = ++diagnosticAttempt == 1 ? "primary" : "alternate";
+                                    var elapsed = Stopwatch.StartNew();
+                                    try
+                                    {
+                                        var response = ExecuteCoreCall(client => progress == null
+                                            ? client.Test(request)
+                                            : client.TestWithProgress(request, report, isCancelled,
+                                                message => LogHelper.WriteExLog(message)));
+                                        LogProbeAttempt(testId, phase, request, response, tagToUrl,
+                                            elapsed.ElapsedMilliseconds, null);
+                                        return response;
+                                    }
+                                    catch (Exception ex)
+                                    {
+                                        LogProbeAttempt(testId, phase, request, null, tagToUrl,
+                                            elapsed.ElapsedMilliseconds, ex);
+                                        throw;
+                                    }
+                                },
+                                    isCancelled, message => LogHelper.WriteExLog(message
+                                        + " testId=" + testId + " countryId=" + ID
+                                        + " countryIndex=" + CountryIndex), progress);
                                 break;
                             }
                             catch (InvalidOperationException ex)
@@ -893,7 +914,8 @@ namespace IRSpeedyVPN.Services
                                 }
                                 LogHelper.WriteExLog("[UrlTest] stage=candidate-rejected candidate="
                                     + sourceUrls.FindIndex(item => item.url == rejectedInfo.Link)
-                                    + " reason=core-config-rejected remaining=" + allUrls.Count);
+                                    + " reason=core-config-rejected remaining=" + allUrls.Count
+                                    + ProbeContext(testId, rejectedInfo.Link));
                                 // Every retry removes one member. Keep the original infos
                                 // for finally's port cleanup; use activeXray for config only.
                             }
@@ -971,6 +993,68 @@ namespace IRSpeedyVPN.Services
                     TryKillProcess(coreProcess);
                 }
             }*/
+        }
+
+
+        private string ProbeContext(string testId, string link)
+        {
+            string protocol = "unknown", security = "unknown";
+            try
+            {
+                string message;
+                var item = ShareHandler.ImportFromConfigLink(link ?? "", out message);
+                if (item != null)
+                {
+                    protocol = item.configType.ToString();
+                    security = string.IsNullOrEmpty(item.streamSecurity) ? "none" : item.streamSecurity;
+                }
+            }
+            catch { }
+            return " testId=" + testId + " countryId=" + ID + " countryIndex=" + CountryIndex
+                + " country=\"" + SafeProbeText(Country) + "\""
+                + " member=" + (server.urls.FindIndex(u => u != null && u.url == link) + 1)
+                + " protocol=" + SafeProbeText(protocol) + " security=" + SafeProbeText(security);
+        }
+
+        private void LogProbeAttempt(string testId, string phase, TestReq request, TestResp response,
+            Dictionary<string, string> tagToUrl, long elapsedMs, Exception exception)
+        {
+            // Diagnostics must never affect success, retry selection or exception handling.
+            try
+            {
+                foreach (string tag in request.OutboundTags)
+                {
+                    string link;
+                    if (!tagToUrl.TryGetValue(tag, out link)) continue;
+                    var result = response?.Results?.FirstOrDefault(r => r != null && r.OutboundTag == tag);
+                    string outcome = exception != null ? "exception" : result == null ? "missing"
+                        : UrlTestRetryPolicy.IsSuccess(result) ? "success" : "failure";
+                    LogHelper.WriteExLog("[ProbeDetail] phase=" + phase + ProbeContext(testId, link)
+                        + " result=" + outcome + " latencyMs=" + (result?.LatencyMs ?? -1)
+                        + " requestElapsedMs=" + elapsedMs + " timeoutMs=" + request.TestTimeoutMs
+                        + " exception=" + (exception?.GetType().Name ?? "none")
+                        + " error=\"" + SafeProbeText(exception?.Message ?? result?.Error) + "\"");
+                }
+            }
+            catch { }
+        }
+
+        private static string SafeProbeText(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return "<none>";
+            if (text.Length > 4096) text = text.Substring(0, 4096);
+            // Preserve diagnostic phrases (including 'network changed'), not connection data.
+            int payload = text.IndexOfAny(new[] { '{', '[' });
+            if (payload >= 0) text = text.Substring(0, payload) + "<payload>";
+            text = System.Text.RegularExpressions.Regex.Replace(text, "\"[^\"]*(?:\"|$)|'[^']*(?:'|$)", "<value>");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"\S+://\S*|\S+@\S+", "<endpoint>");
+            text = System.Text.RegularExpressions.Regex.Replace(text,
+                @"(?i)\b(password|passwd|token|secret|uuid|authorization|auth|key)\b\s*[:=]\s*\S+", "$1=<value>");
+            text = System.Text.RegularExpressions.Regex.Replace(text,
+                @"(?i)\b[0-9a-f]{8}-[0-9a-f-]{27,}\b|\b(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?|\b[0-9a-f]{32,}\b",
+                "<address-or-id>");
+            text = System.Text.RegularExpressions.Regex.Replace(text, @"[\s\p{Cc}\p{Cf}]+", " ");
+            return text.Length > 600 ? text.Substring(0, 600) : text;
         }
 
         private static bool IsHysteria2Link(string link)
