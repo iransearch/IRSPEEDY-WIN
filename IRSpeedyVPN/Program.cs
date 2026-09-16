@@ -34,6 +34,14 @@ namespace IRSpeedyVPN
 
             try
             {
+                // Also guard assembly/JIT loading failures before Initialize can catch them.
+                try
+                {
+                    ErrorReporting.Initialize();
+                    if (Environment.GetCommandLineArgs().Contains("--sentry-test"))
+                        ErrorReporting.Verify();
+                }
+                catch { LogHelper.WriteLog("[ErrorReporting] SDK could not be loaded"); }
                 var app = new App();
                 app.InitializeComponent();
 
@@ -66,6 +74,10 @@ namespace IRSpeedyVPN
             catch (Exception ex)
             {
                 LogHelper.WriteLog(ex, true);
+            }
+            finally
+            {
+                ErrorReporting.Shutdown();
             }
         }
 

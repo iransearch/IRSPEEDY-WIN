@@ -58,6 +58,7 @@ namespace IRSpeedyVPN.Common
 
         public static void WriteExLog(string Message)
         {
+            try { ErrorReporting.ObserveDiagnostic(Message); } catch { }
             // Kept as a separate entry point, but writes to the single log.txt so
             // there is only one log file to collect.
             Append(string.Format("{0:s} : {1}\n", DateTime.Now, Scrub(Message)));
@@ -73,6 +74,7 @@ namespace IRSpeedyVPN.Common
             if (ex == null)
                 return;
 
+            try { ErrorReporting.Capture(ex, isAppCrash); } catch { }
             Append(string.Format(
                 "{0:s} :{3} {1}\n{2}\n",
                 DateTime.Now,
