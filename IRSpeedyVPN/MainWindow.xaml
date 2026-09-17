@@ -35,7 +35,7 @@
      <TextBlock x:Name="lblCtrlTitle" Visibility="Collapsed"/><TextBlock x:Name="lblPremium" Visibility="Collapsed" Text="PREMIUM"/>
     </StackPanel>
     <Grid Grid.Row="3">
-     <transc:TransitionElement x:Name="TransitionBox" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch"/>
+     <transc:TransitionElement x:Name="TransitionBox" HorizontalAlignment="Stretch" VerticalAlignment="Stretch"/>
      <uc:UCLoading x:Name="uCLoading" Visibility="Hidden" Panel.ZIndex="10"/>
     </Grid>
     <Grid Grid.Row="4" Margin="2,6,2,0"><TextBlock Text="Windows App 1.4.5.8" FontFamily="Segoe UI" FontSize="11" Foreground="{StaticResource MutedBrush}"/><TextBlock x:Name="txtUsername" HorizontalAlignment="Right" FontSize="11" Foreground="{StaticResource MutedBrush}"/></Grid>
