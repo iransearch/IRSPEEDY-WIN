@@ -32,7 +32,6 @@ namespace IRSpeedyVPN.UserControls
         internal IVPNService selectedService;
         private string selectedProtocol;
         private bool _isLoading = true;
-        private CancellationTokenSource addressRequest;
         private bool _isUrlTestSupported;
         private CancellationTokenSource _urlTestCts;
         private IVPNService[] _currentServices;
@@ -66,25 +65,12 @@ namespace IRSpeedyVPN.UserControls
             }
 
             UpdateHeaderIcons();
-            ReadBeforeConnectionAddress();
-        }
-
-        private async void ReadBeforeConnectionAddress()
-        {
-            if (globalInfo?.CurrentService != null || ConnectionAddressReader.BeforeConnection != null) return;
-            addressRequest?.Cancel();
-            addressRequest = new CancellationTokenSource();
-            var request = addressRequest;
-            var value = await Task.Run(() => ConnectionAddressReader.ReadAsync(null, request.Token));
-            if (!request.IsCancellationRequested && IsVisible) ConnectionAddressReader.BeforeConnection = value;
-            if (ReferenceEquals(addressRequest, request)) addressRequest = null;
-            request.Dispose();
         }
 
         private void UserControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (IsVisible) UpdateHeaderIcons();
-            else { addressRequest?.Cancel(); ClearHeaderIcons(); }
+            else ClearHeaderIcons();
         }
 
         #endregion
@@ -284,7 +270,6 @@ namespace IRSpeedyVPN.UserControls
         private void btnConnect_Click(object sender, RoutedEventArgs e)
         {
             if (OnConnectRequest == null) return;
-            addressRequest?.Cancel();
 
             if (selectedService != null)
             {
@@ -433,4 +418,3 @@ namespace IRSpeedyVPN.UserControls
         #endregion
     }
 }
-

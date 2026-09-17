@@ -1,4 +1,4 @@
-using IRSpeedyVPN.WebServices;
+﻿using IRSpeedyVPN.WebServices;
 using IRSpeedyVPN.UserControls;
 using IRSpeedyVPN.Windows;
 using System;
@@ -19,7 +19,6 @@ using IRSpeedyVPN.Services;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Common;
-using IRSpeedyVPN.Authentication;
 using IRSpeedyVPN.Models.Services;
 using IRSpeedyVPN.Resource;
 using System.Reflection;
@@ -96,11 +95,6 @@ namespace IRSpeedyVPN
          */ 
           //  var isobf=ObfuscateManager.IsObfucated();
         }
-        private void Minimize_Click(object sender, RoutedEventArgs e)
-        {
-            WindowState = WindowState.Minimized;
-        }
-
         void SetupNotify()
         {
             notify = new System.Windows.Forms.NotifyIcon();
@@ -184,7 +178,7 @@ namespace IRSpeedyVPN
                 //                Initialized = 1;
                 uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
                 uCServerList.OnLoadingRequest += OnLoadingRequest;
-                ConfigureLoginView();
+                uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
                 uCUserInfo.OnChangeServerRequest += UCUserInfo_OnChangeServerRequest;
                 uCUserInfo.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;
                 uCUserInfo.OnLoadingRequest += OnLoadingRequest;
@@ -192,7 +186,7 @@ namespace IRSpeedyVPN
                 uCChangePassword.OnResult += UCChangePassword_OnResult;                
                 ShowControl(uCLogin);
                 proxifier.onResult += Proxifier_onResult;
-                TransitionBox.Transition = null;
+                TransitionBox.Transition = new Transitionals.Transitions.RotateTransition() { Direction=Transitionals.Transitions.RotateDirection.Right};
                 TransitionBox.TransitionEnded += TransitionBox_TransitionEnded;
 
 #if _PREMIUM
@@ -429,7 +423,7 @@ namespace IRSpeedyVPN
 
         private void UCUserInfo_OnChangeServerRequest(object sender, EventArgs e)
         {
-            UCUserInfo_OnDisconnectRequest(sender, e);
+            throw new NotImplementedException();
         }
 
         private void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service, string protocol)
@@ -541,17 +535,7 @@ namespace IRSpeedyVPN
                 {
                     TransitionBox.Content = ctrl;
                 }
-                if (SystemParameters.ClientAreaAnimation && ctrl is FrameworkElement page)
-                {
-                    page.BeginAnimation(UIElement.OpacityProperty,
-                        new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
-                    var slide = new TranslateTransform();
-                    page.RenderTransform = slide;
-                    slide.BeginAnimation(TranslateTransform.YProperty,
-                        new System.Windows.Media.Animation.DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(160)));
-                }
                 currentHeaderOwner = ctrl;
-                sessionHeader.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
                 RefreshHeaderIcons();
             }
         }
@@ -600,7 +584,7 @@ namespace IRSpeedyVPN
                     Style = (Style)FindResource("LabelButton"),
                     Content = icon.Icon,
                     Background = null,
-                    Foreground = (Brush)FindResource("InkBrush"),
+                    Foreground = Brushes.White,
                     FontFamily = (FontFamily)FindResource("fa_ProLight"),
                     FontSize = 20,
                     ToolTip = icon.ToolTip,
@@ -642,17 +626,11 @@ namespace IRSpeedyVPN
                         lblErrorMessage.Text = "برقراری ارتباط با خطا مواجه شد";
                         LogHelper.WriteLog(Message);
                     }
-                    if (ReferenceEquals(TransitionBox.Content, uCLogin) && !success)
-                    {
-                        uCLogin.ViewModel.ErrorMessage = lblErrorMessage.Text;
-                        lblErrorMessage.Visibility = Visibility.Collapsed;
-                    }
-                    else lblErrorMessage.Visibility = Visibility.Visible;
+                    lblErrorMessage.Visibility = Visibility.Visible;
                 }
                 else
                 {
-                    lblErrorMessage.Visibility = Visibility.Collapsed;
-                    if (ReferenceEquals(TransitionBox.Content, uCLogin)) uCLogin.ViewModel.ErrorMessage = string.Empty;
+                    lblErrorMessage.Visibility = Visibility.Hidden;
 
                 }
             }));
@@ -689,34 +667,30 @@ namespace IRSpeedyVPN
         }
 
 
-        private void ConfigureLoginView()
-        {
-            uCLogin.ConfigureAuthentication(new DelegateAuthService(LoginFromFormAsync), () =>
-            {
-                // ProcessInfo also handles mandatory updates; do not bypass that screen.
-                if (IsUserLogin && !isUpdateAvailable) ShowControl(uCServerList);
-            });
-        }
-
-        private async Task<AuthResult> LoginFromFormAsync(string username, string password)
+        private void UCLogin_OnCredentialEntered(UCLogin sender, string username, string password,bool Remember)
         {
             gInfo.CurrentService = null;
-            var remember = uCLogin.ViewModel.RememberMe;
-            loginUiStopwatch = Stopwatch.StartNew();
-            var uiStopwatch = loginUiStopwatch;
-            LogHelper.WriteExLog("[LoginPerformance] stage=credentials-submitted elapsedMs=0");
-            uCLogin.HideRenewMessage();
-            ShowMessage("");
-            try
+            if (string.IsNullOrEmpty(username))
             {
-                bool success = await Task.Run(() =>
+                ShowMessage("نام کاربری را وارد کنید");
+            }
+            else if (password.Length < 3)
+            {
+                ShowMessage("طول رمز عبور کوتاه است ");
+            }
+            else
+            {
+                loginUiStopwatch = Stopwatch.StartNew();
+                LogHelper.WriteExLog("[LoginPerformance] stage=credentials-submitted elapsedMs=0");
+                var uiStopwatch = loginUiStopwatch;
+                uCLogin.HideRenewMessage();
+                ShowMessage("");
+                RunAsync(() =>
                 {
                     LogHelper.WriteExLog("[LoginPerformance] stage=worker-start elapsedMs=" + uiStopwatch.ElapsedMilliseconds);
-                    return Login(username, password, remember);
+                    Login(username, password, Remember);
                 });
-                return success ? AuthResult.Succeeded() : AuthResult.Failed(uCLogin.ViewModel.ErrorMessage);
             }
-            finally { HideLoading(); }
         }
         bool Login(string username,string password,bool Remember,bool onlyRenew=false)
         {
@@ -732,7 +706,6 @@ namespace IRSpeedyVPN
                 {
                     var devices = TryParseDeviceList(res.ResponseData?.data);
                     ShowDeviceLimitPopup(devices, res.ResponseData?.message);
-                    ShowMessage(res.ResponseData?.message ?? "تعداد دستگاه‌های مجاز تکمیل شده است.");
                     localResource.RemoveConfig();
                 }
                 else if (res.StatusCode == System.Net.HttpStatusCode.OK)
@@ -1078,28 +1051,10 @@ namespace IRSpeedyVPN
         }
         private void Header_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton != MouseButton.Left || e.ButtonState != MouseButtonState.Pressed) return;
-            var source = e.OriginalSource as DependencyObject;
-            while (source != null && !ReferenceEquals(source, sender))
-            {
-                if (source is System.Windows.Controls.Primitives.ButtonBase) return;
-                source = source is System.Windows.Media.Visual ? VisualTreeHelper.GetParent(source) : LogicalTreeHelper.GetParent(source);
-            }
-            DragMove();
+            this.DragMove();
         }
 
-        private void Brand_Click(object sender, RoutedEventArgs e)
-        {
-            ShowHintPopup("IRSPEEDY · Windows App 1.4.5.8", sender as UIElement);
-        }
-
-        private void ResizeThumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
-        {
-            Width = Math.Max(MinWidth, ActualWidth + e.HorizontalChange);
-            Height = Math.Max(MinHeight, ActualHeight + e.VerticalChange);
-        }
-
-        private void Close_Click(object sender, RoutedEventArgs e)
+        private void Exit_PreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
             if (isUpdateAvailable)
                 Notify_Exit(sender, e);
@@ -1181,4 +1136,3 @@ namespace IRSpeedyVPN
         }
     }
 }
-

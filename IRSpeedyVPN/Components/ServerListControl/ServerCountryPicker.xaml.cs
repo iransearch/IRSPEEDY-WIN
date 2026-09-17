@@ -137,7 +137,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
     internal class SmartItem : PickerItem
     {
-        public string Display => "اتصال هوشمند";
+        public string Display => "انتخاب هوشمند سریعترین سرور";
     }
 
     /// <summary>
@@ -297,23 +297,28 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             InitializeComponent();
 
+            EventManager.RegisterClassHandler(typeof(Window), UIElement.PreviewMouseDownEvent,
+                new MouseButtonEventHandler(OnWindowPreviewMouseDown), true);
         }
 
-        private void Search_TextChanged(object sender, TextChangedEventArgs e) => UpdateVisibleItems();
-
-        private void UpdateVisibleItems()
+        private void OnWindowPreviewMouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (icCountries == null) return;
-            var query = (searchBox?.Text ?? "").Trim();
-            var items = new List<object>();
-            if (_smart != null && (query.Length == 0 || _smart.Display.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0))
-                items.Add(_smart);
-            items.AddRange(_groups.Where(g => query.Length == 0
-                || (g.CountryName ?? "").IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0
-                || (g.CountryCode ?? "").IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
-                || (g.Service?.Name ?? "").IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0));
-            icCountries.ItemsSource = items;
-            if (emptyMessage != null) emptyMessage.Visibility = items.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            if (!popup.IsOpen) return;
+
+            var source = e.OriginalSource as DependencyObject;
+            if (source == null) return;
+
+            if (IsSelfOrDescendant(source, root) || IsSelfOrDescendant(source, popup.Child))
+                return;
+
+            ClosePopup();
+        }
+
+        private static bool IsSelfOrDescendant(DependencyObject child, DependencyObject ancestor)
+        {
+            for (var d = child; d != null; d = VisualTreeHelper.GetParent(d))
+                if (ReferenceEquals(d, ancestor)) return true;
+            return false;
         }
 
         public void Load(IEnumerable<IVPNService> services, bool urlTestSupported)
@@ -342,7 +347,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
             _smart = _urlTest ? new SmartItem() : null;
 
-            UpdateVisibleItems();
+            var items = new List<object>();
+            if (_smart != null) items.Add(_smart);
+            items.AddRange(_groups);
+            icCountries.ItemsSource = items;
 
             // Order by any results already cached from a previous session.
             ResortGroups();
@@ -407,7 +415,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
             _groups = ordered;
 
-            UpdateVisibleItems();
+            var items = new List<object>();
+            if (_smart != null) items.Add(_smart);
+            items.AddRange(_groups);
+            icCountries.ItemsSource = items;
         }
 
         private bool PrepareCountryPool(GroupItem group, IVPNService preferredService = null)
@@ -457,18 +468,55 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 _selectedGroup.IsSelectedCountry = true;
             }
 
-
+            UpdateFace();
         }
+
+        private void UpdateFace()
+        {
+            if (_kind == SelectionKind.Smart || (_selectedService == null && _urlTest))
+            {
+                faceBolt.Visibility = Visibility.Visible;
+                faceText.Text = _smart?.Display ?? "";
+                return;
+            }
+
+            faceBolt.Visibility = Visibility.Collapsed;
+            faceText.Text = _selectedGroup?.CountryName ?? _selectedService?.Country ?? "";
+        }
+
+        #region Popup open / close
+
+        private void BtnToggle_Checked(object sender, RoutedEventArgs e) => popup.IsOpen = true;
+        private void BtnToggle_Unchecked(object sender, RoutedEventArgs e) => popup.IsOpen = false;
+        private void Popup_Closed(object sender, EventArgs e) => btnToggle.IsChecked = false;
+
+        private void ClosePopup()
+        {
+            popup.IsOpen = false;
+            btnToggle.IsChecked = false;
+        }
+
+        #endregion
 
         #region Click routing
 
-        private void OnItemClick(object sender, RoutedEventArgs e)
+        private void OnListClick(object sender, MouseButtonEventArgs e)
         {
-            var item = (e.OriginalSource as FrameworkElement)?.DataContext as PickerItem;
+            PickerItem item = null;
+            for (var dep = e.OriginalSource as DependencyObject; dep != null; dep = VisualTreeHelper.GetParent(dep))
+            {
+                if (dep is FrameworkElement element && element.DataContext is PickerItem pickerItem)
+                {
+                    item = pickerItem;
+                    break;
+                }
+            }
+
             if (item is SmartItem)
             {
                 Apply(null, null, SelectionKind.Smart);
                 ServerSelected?.Invoke(null);
+                ClosePopup();
                 e.Handled = true;
                 return;
             }
@@ -490,6 +538,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
                 Apply(connectionService, group, SelectionKind.Country);
                 ServerSelected?.Invoke(connectionService);
+                ClosePopup();
                 e.Handled = true;
             }
         }
@@ -497,4 +546,3 @@ namespace IRSpeedyVPN.Components.ServerListControl
         #endregion
     }
 }
-

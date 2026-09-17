@@ -41,7 +41,7 @@ namespace IRSpeedyVPN
             uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
             uCServerList.OnLoadingRequest += OnLoadingRequest;
             uCServerList.Loaded += FastStartup_ServerListLoaded;
-            ConfigureLoginView();
+            uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
             uCLogin.Loaded += FastStartup_LoginLoaded;
             uCUserInfo.OnChangeServerRequest += UCUserInfo_OnChangeServerRequest;
             uCUserInfo.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;
@@ -52,7 +52,10 @@ namespace IRSpeedyVPN
             Closing += FastStartup_Closing;
 
             ShowControl(uCLogin);
-            TransitionBox.Transition = null;
+            TransitionBox.Transition = new Transitionals.Transitions.RotateTransition
+            {
+                Direction = Transitionals.Transitions.RotateDirection.Right
+            };
             TransitionBox.TransitionEnded += TransitionBox_TransitionEnded;
 
 #if _PREMIUM
@@ -499,4 +502,3 @@ namespace IRSpeedyVPN
         }
     }
 }
-
