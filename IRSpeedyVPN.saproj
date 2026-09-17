@@ -1,5 +1,5 @@
 <SmartAssemblyProject ProjectId="{4270db2e-1d96-4def-9d45-f1461227c163}" Version="2.0">
-    <MainAssemblyFileName>.\IRSpeedyVPN\bin\Debug\net48\IRSpeedyVPN.exe</MainAssemblyFileName>
+    <MainAssemblyFileName>.\IRSpeedyVPN\bin\Release\net48\IRSpeedyVPN.exe</MainAssemblyFileName>
     <Configuration Name="Release">
         <Options>
             <ExceptionReporting Template="res:{SmartExceptions}.1033.dll" />
@@ -462,6 +462,6 @@
                 <Merging />
             </Assembly>
         </Assemblies>
-        <Destination DestinationFileName=".\IRSpeedyVPN\bin\Debug\net48\Obfuscated\IRSpeedyVPN.exe" />
+        <Destination DestinationFileName=".\IRSpeedyVPN\bin\Release\net48\Obfuscated\IRSpeedyVPN.exe" />
     </Configuration>
 </SmartAssemblyProject>

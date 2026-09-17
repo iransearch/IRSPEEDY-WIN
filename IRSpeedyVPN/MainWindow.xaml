@@ -14,7 +14,7 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
      TextElement.FontWeight="Regular"
      TextElement.FontSize="13"
       TextOptions.TextFormattingMode="Display"
-      WindowStyle="None" WindowStartupLocation="CenterScreen" Width="391.408" Height="359.311" Background="Transparent" AllowsTransparency="True" Title="IRSpeedy VPN" Icon="pack://application:,,,/Logo.ico" ResizeMode="NoResize">
+      WindowStyle="None" WindowStartupLocation="CenterScreen" Width="391.408" Height="359.311" Background="Transparent" AllowsTransparency="True" Title="IRSpeedy VPN" Icon="pack://application:,,,/Logo-v2.ico" ResizeMode="NoResize">
     <Window.Resources>
         <ResourceDictionary>
 

@@ -5,7 +5,7 @@
     <UseWPF>true</UseWPF>
     <RootNamespace>IRSpeedyVPN</RootNamespace>
     <AssemblyName>IRSpeedyVPN</AssemblyName>
-    <ApplicationIcon>Logo.ico</ApplicationIcon>
+    <ApplicationIcon>Logo-v2.ico</ApplicationIcon>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <StartupObject>IRSpeedyVPN.Program</StartupObject>
     <FileAlignment>512</FileAlignment>
@@ -110,12 +110,12 @@
 		<Resource Include="Resources\Font Awesome 5 Brands-Regular-400.otf" />
 		<Resource Include="Resources\Font Awesome 5 Pro-Light-300.otf" />
 		<Resource Include="Resources\BKoodak.ttf" />
-		<Resource Include="Resources\Logo.png" />
+		<Resource Include="Resources\Logo-v2.png" />
 		<Resource Include="Resources\IRCurve.png" />
 		<Resource Include="Resources\Files.zip" />
 		<Resource Include="Resources\eye.png" />
 		<Resource Include="Resources\eyeSlash.png" />
-		<Resource Include="Logo.ico" />
+		<Resource Include="Logo-v2.ico" />
 	</ItemGroup>
 
   <ItemGroup>

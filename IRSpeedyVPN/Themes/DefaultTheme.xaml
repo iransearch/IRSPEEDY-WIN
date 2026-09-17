@@ -6,7 +6,7 @@
     <FontFamily x:Key="fa_Brands">pack://application:,,,/resources/#Font Awesome 5 Brands</FontFamily>
     <FontFamily x:Key="fa_ProLight">pack://application:,,,/resources/#Font Awesome 5 Pro Light</FontFamily>
     
-    <BitmapImage x:Key="Logo" UriSource="pack://application:,,,/resources/Logo.png"/>
+    <BitmapImage x:Key="Logo" UriSource="pack://application:,,,/resources/Logo-v2.png"/>
     <BitmapImage x:Key="eye" UriSource="pack://application:,,,/resources/eye.png"/>
     <BitmapImage x:Key="eyeSlash" UriSource="pack://application:,,,/resources/eyeSlash.png"/>
     <BitmapImage x:Key="headerCurve" UriSource="pack://application:,,,/resources/IRCurve.png"/>

@@ -98,7 +98,13 @@ namespace IRSpeedyVPN
         void SetupNotify()
         {
             notify = new System.Windows.Forms.NotifyIcon();
-            notify.Icon = System.Drawing.Icon.ExtractAssociatedIcon(Assembly.GetExecutingAssembly().Location);
+            // Read the embedded branding resource, not Windows' executable icon cache.
+            using (var stream = Application.GetResourceStream(
+                new Uri("pack://application:,,,/Logo-v2.ico", UriKind.Absolute)).Stream)
+            using (var icon = new System.Drawing.Icon(stream))
+            {
+                notify.Icon = (System.Drawing.Icon)icon.Clone();
+            }
             notify.Visible = false;
             notify.DoubleClick += Notify_DoubleClick;
             notify.BalloonTipClosed += Notify_BalloonTipClosed;
