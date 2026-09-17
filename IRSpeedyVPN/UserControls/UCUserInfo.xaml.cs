@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Services;
@@ -35,6 +35,7 @@ namespace IRSpeedyVPN.UserControls
         public event EventHandler OnChangeServerRequest;
         Timer uiTimer;
         int timerTick;
+        private CancellationTokenSource addressRequest;
         
         GlobalInfo globalInfo;
 
@@ -50,7 +51,10 @@ namespace IRSpeedyVPN.UserControls
         {
             Dispatcher.Invoke((Action)(() =>
             {
-                txtConnectionTime.Text = (globalInfo.ConnectionTime - DateTime.Now).ToString(@"hh\:mm\:ss");
+                if (!IsVisible || globalInfo == null) return;
+                var elapsed = DateTime.Now - globalInfo.ConnectionTime;
+                if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
+                txtConnectionTime.Text = ((int)elapsed.TotalHours).ToString("00") + elapsed.ToString(@"\:mm\:ss");
             }));
         }
         private void btn_ChangeServer_Click(object sender, RoutedEventArgs e)
@@ -61,7 +65,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void btnDisConnect_Click(object sender, RoutedEventArgs e)
         {
-            uiTimer.Change(int.MaxValue, int.MaxValue);
+            uiTimer?.Change(int.MaxValue, int.MaxValue);
             if (OnDisconnectRequest != null)
                 OnDisconnectRequest.Invoke(sender, e);
         }
@@ -138,7 +142,7 @@ namespace IRSpeedyVPN.UserControls
 
             globalInfo = AppServices.GlobalInfo;
             timerTick = 0;
-            uiTimer.Change(1000, 1000);
+            uiTimer?.Change(1000, 1000);
 
             // Global Fast has no country scope marker (SelectedServerUrl == null).
             // A country-scoped Smart connection deliberately keeps one URL as a marker,
@@ -151,8 +155,12 @@ namespace IRSpeedyVPN.UserControls
                 ? "سرور هوشمند"
                 : globalInfo.CurrentService.Country;
 
+            var latency = globalInfo.CurrentService.UrlTestSpeed;
+            txtLatency.Text = latency > 0 ? latency + " ms" : "—";
+            activeFlag.Source = IRSpeedyVPN.Components.ServerListControl.CountryFlagConverter.GetFlag(globalInfo.CurrentService.CountryCode);
             txtServiceName.Text = globalInfo.CurrentService.Name + (proxifier.IsAttached() && proxifier.ProxyType.GetDescription().Length > 0 ? " / " + proxifier.ProxyType.GetDescription() : "");
             txtConnectionTime.Text = "00:00:00";
+            ReadConnectionAddress();
 
             txtExpireDate.Text = (globalInfo.ExpiryDate != null) ? globalInfo.ExpiryDate.Value.ToPresianDate() : "اولین اتصال";
             txtRemainedTime.Text = (globalInfo.ExpiryDate != null) ? globalInfo.ExpiryDate.Value.TotalDays() : "اولین اتصال";
@@ -160,14 +168,33 @@ namespace IRSpeedyVPN.UserControls
             
         }
 
+        private async void ReadConnectionAddress()
+        {
+            addressRequest?.Cancel();
+            addressRequest = new CancellationTokenSource();
+            var request = addressRequest;
+            var service = globalInfo?.CurrentService;
+            txtRealIp.Text = ConnectionAddressReader.BeforeConnection ?? "اندازه‌گیری نشده";
+            txtActiveIp.Text = "در حال بررسی…";
+            var port = service?.HttpPort;
+            var value = await System.Threading.Tasks.Task.Run(() => ConnectionAddressReader.ReadAsync(port, request.Token));
+            if (!request.IsCancellationRequested && IsVisible && ReferenceEquals(service, globalInfo?.CurrentService))
+                txtActiveIp.Text = value ?? "در دسترس نیست";
+            if (ReferenceEquals(addressRequest, request)) addressRequest = null;
+            request.Dispose();
+        }
+
         private void UserControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (!IsVisible)
             {
+                uiTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                addressRequest?.Cancel();
                 ClearHeaderIcons();
             }
             else
             {
+                uiTimer?.Change(1000, 1000);
                 RegisterHeaderIcons();
             }
         }
@@ -211,3 +238,4 @@ namespace IRSpeedyVPN.UserControls
         }
     }
 }
+

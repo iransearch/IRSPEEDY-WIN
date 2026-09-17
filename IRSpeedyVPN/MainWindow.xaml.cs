@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.WebServices;
+using IRSpeedyVPN.WebServices;
 using IRSpeedyVPN.UserControls;
 using IRSpeedyVPN.Windows;
 using System;
@@ -95,6 +95,11 @@ namespace IRSpeedyVPN
          */ 
           //  var isobf=ObfuscateManager.IsObfucated();
         }
+        private void Minimize_Click(object sender, RoutedEventArgs e)
+        {
+            WindowState = WindowState.Minimized;
+        }
+
         void SetupNotify()
         {
             notify = new System.Windows.Forms.NotifyIcon();
@@ -186,7 +191,7 @@ namespace IRSpeedyVPN
                 uCChangePassword.OnResult += UCChangePassword_OnResult;                
                 ShowControl(uCLogin);
                 proxifier.onResult += Proxifier_onResult;
-                TransitionBox.Transition = new Transitionals.Transitions.RotateTransition() { Direction=Transitionals.Transitions.RotateDirection.Right};
+                TransitionBox.Transition = null;
                 TransitionBox.TransitionEnded += TransitionBox_TransitionEnded;
 
 #if _PREMIUM
@@ -423,7 +428,7 @@ namespace IRSpeedyVPN
 
         private void UCUserInfo_OnChangeServerRequest(object sender, EventArgs e)
         {
-            throw new NotImplementedException();
+            UCUserInfo_OnDisconnectRequest(sender, e);
         }
 
         private void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service, string protocol)
@@ -535,6 +540,15 @@ namespace IRSpeedyVPN
                 {
                     TransitionBox.Content = ctrl;
                 }
+                if (SystemParameters.ClientAreaAnimation && ctrl is FrameworkElement page)
+                {
+                    page.BeginAnimation(UIElement.OpacityProperty,
+                        new System.Windows.Media.Animation.DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(160)));
+                    var slide = new TranslateTransform();
+                    page.RenderTransform = slide;
+                    slide.BeginAnimation(TranslateTransform.YProperty,
+                        new System.Windows.Media.Animation.DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(160)));
+                }
                 currentHeaderOwner = ctrl;
                 RefreshHeaderIcons();
             }
@@ -584,7 +598,7 @@ namespace IRSpeedyVPN
                     Style = (Style)FindResource("LabelButton"),
                     Content = icon.Icon,
                     Background = null,
-                    Foreground = Brushes.White,
+                    Foreground = (Brush)FindResource("InkBrush"),
                     FontFamily = (FontFamily)FindResource("fa_ProLight"),
                     FontSize = 20,
                     ToolTip = icon.ToolTip,
@@ -1051,7 +1065,7 @@ namespace IRSpeedyVPN
         }
         private void Header_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            this.DragMove();
+            if (e.ChangedButton == MouseButton.Left && e.ButtonState == MouseButtonState.Pressed) this.DragMove();
         }
 
         private void Exit_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -1136,3 +1150,4 @@ namespace IRSpeedyVPN
         }
     }
 }
+

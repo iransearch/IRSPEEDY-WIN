@@ -52,10 +52,7 @@ namespace IRSpeedyVPN
             Closing += FastStartup_Closing;
 
             ShowControl(uCLogin);
-            TransitionBox.Transition = new Transitionals.Transitions.RotateTransition
-            {
-                Direction = Transitionals.Transitions.RotateDirection.Right
-            };
+            TransitionBox.Transition = null;
             TransitionBox.TransitionEnded += TransitionBox_TransitionEnded;
 
 #if _PREMIUM
@@ -502,3 +499,4 @@ namespace IRSpeedyVPN
         }
     }
 }
+

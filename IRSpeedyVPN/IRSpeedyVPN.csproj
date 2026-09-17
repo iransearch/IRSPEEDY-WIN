@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
+<Project Sdk="Microsoft.NET.Sdk.WindowsDesktop">
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net48</TargetFramework>
@@ -110,6 +110,8 @@
 		<Resource Include="Resources\Font Awesome 5 Brands-Regular-400.otf" />
 		<Resource Include="Resources\Font Awesome 5 Pro-Light-300.otf" />
 		<Resource Include="Resources\BKoodak.ttf" />
+        <Resource Include="Resources\Fonts\*.ttf" />
+        <Resource Include="Resources\Flags.png" />
 		<Resource Include="Resources\Logo-v2.png" />
 		<Resource Include="Resources\IRCurve.png" />
 		<Resource Include="Resources\Files.zip" />
@@ -153,3 +155,4 @@
     <Copy SourceFiles="$(TargetDir)$(TargetName).exe.config" DestinationFolder="$(TargetDir)Obfuscated" Condition="'$(DotfuscatorExitCode)' == '0' And Exists('$(TargetDir)$(TargetName).exe.config')" />
   </Target>
 </Project>
+

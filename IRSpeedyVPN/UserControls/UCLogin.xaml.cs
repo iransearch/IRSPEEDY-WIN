@@ -39,7 +39,7 @@ namespace IRSpeedyVPN.UserControls
         }
         public void HideRenewMessage()
         {            
-            boxRenew.Visibility = Visibility.Hidden;
+            boxRenew.Visibility = Visibility.Collapsed;
         }
         public void SetUserPassword(string username,string password)
         {
@@ -62,16 +62,31 @@ namespace IRSpeedyVPN.UserControls
         {
             ShowPassword(false);
         }
-        void ShowPassword(Boolean show)
+        private bool passwordVisible;
+        private void TogglePassword_Click(object sender, RoutedEventArgs e)
         {
-            txtPasswordShow.Text = txtPassword.Password;
-            txtPassword.Visibility = show ? Visibility.Hidden : Visibility.Visible;
-            txtPasswordShow.Visibility = !show ? Visibility.Hidden : Visibility.Visible;
-            imgEye.Source = show ? (ImageSource)TryFindResource("eyeSlash") : (ImageSource)TryFindResource("eye");
-            if (show)
-                txtPasswordShow.Focus();
-            else
-                txtPassword.Focus();
+            ShowPassword(!passwordVisible);
+        }
+        void ShowPassword(bool show)
+        {
+            if (passwordVisible) txtPassword.Password = txtPasswordShow.Text;
+            else txtPasswordShow.Text = txtPassword.Password;
+            passwordVisible = show;
+            txtPassword.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+            txtPasswordShow.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            imgEye.Source = (ImageSource)TryFindResource(show ? "eyeSlash" : "eye");
+            if (show) txtPasswordShow.Focus(); else txtPassword.Focus();
+        }
+        private void RecoverPassword_Click(object sender, RoutedEventArgs e)
+        {
+            var link = AppServices.GlobalInfo?.settings?.setting?.support_url;
+            if (Uri.TryCreate(link, UriKind.Absolute, out var uri)
+                && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp))
+            {
+                try { Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true }); }
+                catch { MessageBox.Show("باز کردن صفحه پشتیبانی ممکن نشد.", "IRSPEEDY"); }
+            }
+            else MessageBox.Show("برای بازیابی رمز عبور با پشتیبانی فروشنده حساب تماس بگیرید.", "بازیابی رمز عبور");
         }
 
         private void btnLogin_Click(object sender, RoutedEventArgs e)
@@ -81,7 +96,7 @@ namespace IRSpeedyVPN.UserControls
             if (OnCredentialEntered != null)
             {
                
-               OnCredentialEntered.Invoke(this, txtUsername.Text, txtPassword.Password,chkRemember.IsChecked.Value);
+               OnCredentialEntered.Invoke(this, txtUsername.Text, passwordVisible ? txtPasswordShow.Text : txtPassword.Password, chkRemember.IsChecked == true);
             }
         }
 
@@ -104,3 +119,4 @@ namespace IRSpeedyVPN.UserControls
 
     }
 }
+

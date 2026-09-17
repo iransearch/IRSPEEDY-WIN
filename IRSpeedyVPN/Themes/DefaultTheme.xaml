@@ -1,8 +1,8 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:local="clr-namespace:IRSpeedyVPN.Themes">
     
-    <FontFamily x:Key="BKoodak">pack://application:,,,/resources/#B Koodak</FontFamily>
+    <FontFamily x:Key="BKoodak">pack://application:,,,/IRSpeedyVPN;component/Resources/Fonts/#Vazir</FontFamily>
     <FontFamily x:Key="fa_Brands">pack://application:,,,/resources/#Font Awesome 5 Brands</FontFamily>
     <FontFamily x:Key="fa_ProLight">pack://application:,,,/resources/#Font Awesome 5 Pro Light</FontFamily>
     
