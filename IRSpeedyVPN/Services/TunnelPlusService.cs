@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Events;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
@@ -32,7 +32,7 @@ using v2rayN.Mode;
 
 namespace IRSpeedyVPN.Services
 {
-    class TunnelPlusService : IVPNService, ISmartFastConnection
+    partial class TunnelPlusService : IVPNService, ISmartFastConnection
     {
         NewServiceController serviceController { get; set; }
         GlobalInfo gInfo;
@@ -136,6 +136,8 @@ namespace IRSpeedyVPN.Services
 
         public void Connect(string protocol)
         {
+            diagnosticConnectionId = Guid.NewGuid().ToString("N");
+            Diagnostic("connect-request");
             userCancelRequested = false;
             useSystemProxy = (ProxifierRuleType == ProxifierType.None);
             IsConnected = false;
@@ -234,6 +236,7 @@ namespace IRSpeedyVPN.Services
                     port = ResolveListenPort(port);
                     lastListenPort = port;
                     lastVpnMode = vpnmode;
+                    Diagnostic("config-mode", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy") + " gameForcesTun=" + gameMode);
                     var shieldFiles = GetShieldFiles();
                     var isSmartFast = _smartFastUrls != null && _smartFastUrls.Length > 0;
                     var sniRuntime = isSmartFast ? null : GetSniRuntime(lastLink, serviceSniServers, true);
@@ -375,6 +378,8 @@ namespace IRSpeedyVPN.Services
                     }
 
                     IsConnected = true;
+                    Diagnostic("connection-established", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy"));
+                    ConnectionDiagnostics.RequestSnapshot();
                     if (vpnmode)
                     {                      
                         useSystemProxy = false;
@@ -432,6 +437,7 @@ namespace IRSpeedyVPN.Services
         private bool TryStartCoreWithConfig(string configData, out string error, bool needXray = false, string xrayConfig = null)
         {
             error = null;
+            Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData) + " needXray=" + needXray);
             EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
             ErrorResp startResp;
             try
@@ -461,6 +467,7 @@ namespace IRSpeedyVPN.Services
                 TryStopCore();
                 return false;
             }
+            Diagnostic("config-apply-result", "success=" + string.IsNullOrEmpty(startResp.Error));
             if (!string.IsNullOrEmpty(startResp.Error))
             {
                 error = startResp.Error;
@@ -601,6 +608,7 @@ namespace IRSpeedyVPN.Services
         }
         private void DisconnectInternal(bool chkprocess, bool silent, bool userCanceled)
         {
+            Diagnostic("disconnect-request", "userCanceled=" + userCanceled + " checkProcess=" + chkprocess + " silent=" + silent);
             if (userCanceled)
                 userCancelRequested = true;
             if (useSystemProxy)
@@ -631,6 +639,8 @@ namespace IRSpeedyVPN.Services
                 _singboxLinkOverride = null;
                 suppressCoreExit = false;                
                 IsConnected = false;
+                Diagnostic("disconnect-complete");
+                ConnectionDiagnostics.RequestSnapshot();
 
                 if (onConnectDisconnect != null && !silent)
                     onConnectDisconnect.Invoke(this, false, 0, "");
@@ -715,6 +725,7 @@ namespace IRSpeedyVPN.Services
         public void UrlTestFull(Url[] urls = null, bool force = false,
             Action<long> progress = null, Func<bool> cancelled = null)
         {
+            Diagnostic("test-group-enter", "forced=" + force);
             cancelUrlTest = false;
             Func<bool> isCancelled = () => cancelUrlTest || cancelled?.Invoke() == true
                 || (!force && UrlTestCoordinator.AbortRequested);
@@ -875,21 +886,36 @@ namespace IRSpeedyVPN.Services
                                 {
                                     string phase = ++diagnosticAttempt == 1 ? "primary" : "alternate";
                                     var elapsed = Stopwatch.StartNew();
+                                    string diagnosticRequest = Guid.NewGuid().ToString("N");
+                                    long networkAtStart = ConnectionDiagnostics.EventSequence;
+                                    Diagnostic("probe-rpc-begin", "testId=" + testId + " requestId=" + diagnosticRequest
+                                        + " phase=" + phase + " probeRoute=core-rpc candidates=" + request.OutboundTags.Count
+                                        + " maxConcurrency=" + request.MaxConcurrency + " timeoutMs=" + request.TestTimeoutMs
+                                        + " needXray=" + request.NeedXray
+                                        + " configId=" + ConnectionDiagnostics.Fingerprint(request.Config)
+                                        + " urlId=" + ConnectionDiagnostics.Fingerprint(request.Url));
                                     try
                                     {
                                         var response = ExecuteCoreCall(client => progress == null
                                             ? client.Test(request)
                                             : client.TestWithProgress(request, report, isCancelled,
                                                 message => LogHelper.WriteExLog(message)));
-                                        LogProbeAttempt(testId, phase, request, response, tagToUrl,
+                                        LogProbeAttempt(testId, diagnosticRequest, phase, request, response, tagToUrl,
                                             elapsed.ElapsedMilliseconds, null);
                                         return response;
                                     }
                                     catch (Exception ex)
                                     {
-                                        LogProbeAttempt(testId, phase, request, null, tagToUrl,
+                                        LogProbeAttempt(testId, diagnosticRequest, phase, request, null, tagToUrl,
                                             elapsed.ElapsedMilliseconds, ex);
                                         throw;
+                                    }
+                                    finally
+                                    {
+                                        Diagnostic("probe-rpc-end", "testId=" + testId + " requestId=" + diagnosticRequest
+                                            + " phase=" + phase + " batchElapsedMs=" + elapsed.ElapsedMilliseconds
+                                            + " netEventsAtStart=" + networkAtStart + " netEventsAtEnd=" + ConnectionDiagnostics.EventSequence
+                                            + " cancelFlag=" + cancelUrlTest + " abortRequested=" + UrlTestCoordinator.AbortRequested);
                                     }
                                 },
                                     isCancelled, message => LogHelper.WriteExLog(message
@@ -1016,7 +1042,7 @@ namespace IRSpeedyVPN.Services
                 + " protocol=" + SafeProbeText(protocol) + " security=" + SafeProbeText(security);
         }
 
-        private void LogProbeAttempt(string testId, string phase, TestReq request, TestResp response,
+        private void LogProbeAttempt(string testId, string requestId, string phase, TestReq request, TestResp response,
             Dictionary<string, string> tagToUrl, long elapsedMs, Exception exception)
         {
             // Diagnostics must never affect success, retry selection or exception handling.
@@ -1027,9 +1053,14 @@ namespace IRSpeedyVPN.Services
                     string link;
                     if (!tagToUrl.TryGetValue(tag, out link)) continue;
                     var result = response?.Results?.FirstOrDefault(r => r != null && r.OutboundTag == tag);
+                    if ((result?.Error ?? exception?.Message ?? "").IndexOf("network changed", StringComparison.OrdinalIgnoreCase) >= 0)
+                        ConnectionDiagnostics.RequestSnapshot();
                     string outcome = exception != null ? "exception" : result == null ? "missing"
                         : UrlTestRetryPolicy.IsSuccess(result) ? "success" : "failure";
                     LogHelper.WriteExLog("[ProbeDetail] phase=" + phase + ProbeContext(testId, link)
+                        + " requestId=" + requestId + " outboundTag=" + SafeProbeText(tag)
+                        + " memberId=" + ConnectionDiagnostics.Fingerprint(link)
+                        + ConnectionDiagnostics.Context
                         + " result=" + outcome + " latencyMs=" + (result?.LatencyMs ?? -1)
                         + " requestElapsedMs=" + elapsedMs + " timeoutMs=" + request.TestTimeoutMs
                         + " exception=" + (exception?.GetType().Name ?? "none")
@@ -1205,6 +1236,7 @@ namespace IRSpeedyVPN.Services
             {
                 if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
                 {
+                    Diagnostic("core-reuse", "port=" + port + " referencedPid=" + DiagnosticPid(process) + " owned=" + owned);
                     return;
                 }
 
@@ -1276,15 +1308,23 @@ namespace IRSpeedyVPN.Services
                     EnableRaisingEvents = true
                 };
                 startedProcess.OutputDataReceived += (sender, args) =>
+                {
                     AppendCoreDiagnostic(diagnostics, diagnosticsLock, "stdout", args.Data);
+                    ObserveCoreOutput(startedProcess, "stdout", args.Data);
+                };
                 startedProcess.ErrorDataReceived += (sender, args) =>
+                {
                     AppendCoreDiagnostic(diagnostics, diagnosticsLock, "stderr", args.Data);
+                    ObserveCoreOutput(startedProcess, "stderr", args.Data);
+                };
                 startedProcess.Exited += CoreProcess_Exited;
 
                 try
                 {
                     if (!startedProcess.Start())
                         throw new InvalidOperationException("Core process could not be started.");
+                    Diagnostic("core-spawn", "pid=" + DiagnosticPid(startedProcess) + " port=" + port
+                        + " runtimeId=" + ConnectionDiagnostics.Fingerprint(corePath));
                     startedProcess.BeginOutputReadLine();
                     startedProcess.BeginErrorReadLine();
                 }
@@ -1303,7 +1343,10 @@ namespace IRSpeedyVPN.Services
                 while (sw.ElapsedMilliseconds < CoreConnectTimeoutMs)
                 {
                     if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
+                    {
+                        Diagnostic("core-ready", "pid=" + DiagnosticPid(startedProcess) + " startupMs=" + sw.ElapsedMilliseconds);
                         return;
+                    }
 
                     if (startedProcess.HasExited)
                     {
@@ -1382,6 +1425,7 @@ namespace IRSpeedyVPN.Services
 
         private void StopAndDrainUrlTests()
         {
+            Diagnostic("tests-cancel-request");
             UrlTestCoordinator.CancelAll();
             try
             {
@@ -1389,6 +1433,7 @@ namespace IRSpeedyVPN.Services
                 {
                     var client = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs);
                     client.StopTest();
+                    Diagnostic("tests-stop-rpc-complete");
                 }
             }
             catch
@@ -1400,13 +1445,17 @@ namespace IRSpeedyVPN.Services
             {
                 // Wait until any in-flight URL Test RPC has released the shared Core.
             }
+            Diagnostic("tests-drain-complete");
         }
 
         private void SafeStopCore(LibcoreServiceClient client)
         {
             try
             {
+                Diagnostic("core-stop-rpc-begin");
                 client.Stop();
+                Diagnostic("core-stop-rpc-complete");
+                ConnectionDiagnostics.RequestSnapshot();
             }
             catch { }
         }
@@ -1420,6 +1469,7 @@ namespace IRSpeedyVPN.Services
             catch (TimeoutException ex)
             {
                 LogHelper.WriteLog(ex);
+                Diagnostic("core-rpc-timeout-retry", "delayMs=" + CoreConnectRetryDelayMs);
                 EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
                 Thread.Sleep(CoreConnectRetryDelayMs);
                 return call(new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs));
@@ -1432,6 +1482,7 @@ namespace IRSpeedyVPN.Services
             {
                 if (!process.HasExited)
                 {
+                    Diagnostic("process-kill-request", "pid=" + DiagnosticPid(process));
                     process.Kill();
                     process.WaitForExit();
                 }
@@ -1735,6 +1786,7 @@ namespace IRSpeedyVPN.Services
 
         private void CoreProcess_Exited(object sender, EventArgs e)
         {
+            DiagnosticExit(sender as Process);
             if (suppressCoreExit)
                 return;
             if (!IsConnected)
@@ -1780,6 +1832,7 @@ namespace IRSpeedyVPN.Services
         }
         private void TryReconnect()
         {
+            Diagnostic("reconnect-request");
             if (Interlocked.CompareExchange(ref reconnecting, 1, 0) != 0)
                 return;
             Task.Run(() =>
@@ -1881,3 +1934,4 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
+
