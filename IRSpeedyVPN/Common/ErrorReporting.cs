@@ -55,8 +55,8 @@ namespace IRSpeedyVPN.Common
                     // Existing Program handlers already log WPF, AppDomain and Task errors.
                     o.DisableAppDomainUnhandledExceptionCapture();
                     o.DisableUnobservedTaskExceptionCapture();
-                    o.DisableDiagnosticSourceIntegration();
-                    o.DisableSystemDiagnosticsMetricsIntegration();
+                    // DiagnosticSource and System.Diagnostics.Metrics integrations are
+                    // not included in Sentry's .NET Framework target; no disable calls needed.
                     o.DisableNetFxInstallationsIntegration();
                     o.SetBeforeSend(KeepSafeFields);
                 });
