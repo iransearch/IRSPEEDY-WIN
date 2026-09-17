@@ -41,7 +41,7 @@ namespace IRSpeedyVPN
             uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
             uCServerList.OnLoadingRequest += OnLoadingRequest;
             uCServerList.Loaded += FastStartup_ServerListLoaded;
-            uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
+            ConfigureLoginView();
             uCLogin.Loaded += FastStartup_LoginLoaded;
             uCUserInfo.OnChangeServerRequest += UCUserInfo_OnChangeServerRequest;
             uCUserInfo.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;

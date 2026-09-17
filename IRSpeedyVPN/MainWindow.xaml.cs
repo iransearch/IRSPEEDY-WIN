@@ -19,6 +19,7 @@ using IRSpeedyVPN.Services;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Authentication;
 using IRSpeedyVPN.Models.Services;
 using IRSpeedyVPN.Resource;
 using System.Reflection;
@@ -183,7 +184,7 @@ namespace IRSpeedyVPN
                 //                Initialized = 1;
                 uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
                 uCServerList.OnLoadingRequest += OnLoadingRequest;
-                uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
+                ConfigureLoginView();
                 uCUserInfo.OnChangeServerRequest += UCUserInfo_OnChangeServerRequest;
                 uCUserInfo.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;
                 uCUserInfo.OnLoadingRequest += OnLoadingRequest;
@@ -550,6 +551,7 @@ namespace IRSpeedyVPN
                         new System.Windows.Media.Animation.DoubleAnimation(8, 0, TimeSpan.FromMilliseconds(160)));
                 }
                 currentHeaderOwner = ctrl;
+                sessionHeader.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
                 RefreshHeaderIcons();
             }
         }
@@ -640,11 +642,17 @@ namespace IRSpeedyVPN
                         lblErrorMessage.Text = "برقراری ارتباط با خطا مواجه شد";
                         LogHelper.WriteLog(Message);
                     }
-                    lblErrorMessage.Visibility = Visibility.Visible;
+                    if (ReferenceEquals(TransitionBox.Content, uCLogin) && !success)
+                    {
+                        uCLogin.ViewModel.ErrorMessage = lblErrorMessage.Text;
+                        lblErrorMessage.Visibility = Visibility.Collapsed;
+                    }
+                    else lblErrorMessage.Visibility = Visibility.Visible;
                 }
                 else
                 {
-                    lblErrorMessage.Visibility = Visibility.Hidden;
+                    lblErrorMessage.Visibility = Visibility.Collapsed;
+                    if (ReferenceEquals(TransitionBox.Content, uCLogin)) uCLogin.ViewModel.ErrorMessage = string.Empty;
 
                 }
             }));
@@ -681,30 +689,34 @@ namespace IRSpeedyVPN
         }
 
 
-        private void UCLogin_OnCredentialEntered(UCLogin sender, string username, string password,bool Remember)
+        private void ConfigureLoginView()
+        {
+            uCLogin.ConfigureAuthentication(new DelegateAuthService(LoginFromFormAsync), () =>
+            {
+                // ProcessInfo also handles mandatory updates; do not bypass that screen.
+                if (IsUserLogin && !isUpdateAvailable) ShowControl(uCServerList);
+            });
+        }
+
+        private async Task<AuthResult> LoginFromFormAsync(string username, string password)
         {
             gInfo.CurrentService = null;
-            if (string.IsNullOrEmpty(username))
+            var remember = uCLogin.ViewModel.RememberMe;
+            loginUiStopwatch = Stopwatch.StartNew();
+            var uiStopwatch = loginUiStopwatch;
+            LogHelper.WriteExLog("[LoginPerformance] stage=credentials-submitted elapsedMs=0");
+            uCLogin.HideRenewMessage();
+            ShowMessage("");
+            try
             {
-                ShowMessage("نام کاربری را وارد کنید");
-            }
-            else if (password.Length < 3)
-            {
-                ShowMessage("طول رمز عبور کوتاه است ");
-            }
-            else
-            {
-                loginUiStopwatch = Stopwatch.StartNew();
-                LogHelper.WriteExLog("[LoginPerformance] stage=credentials-submitted elapsedMs=0");
-                var uiStopwatch = loginUiStopwatch;
-                uCLogin.HideRenewMessage();
-                ShowMessage("");
-                RunAsync(() =>
+                bool success = await Task.Run(() =>
                 {
                     LogHelper.WriteExLog("[LoginPerformance] stage=worker-start elapsedMs=" + uiStopwatch.ElapsedMilliseconds);
-                    Login(username, password, Remember);
+                    return Login(username, password, remember);
                 });
+                return success ? AuthResult.Succeeded() : AuthResult.Failed(uCLogin.ViewModel.ErrorMessage);
             }
+            finally { HideLoading(); }
         }
         bool Login(string username,string password,bool Remember,bool onlyRenew=false)
         {
@@ -720,6 +732,7 @@ namespace IRSpeedyVPN
                 {
                     var devices = TryParseDeviceList(res.ResponseData?.data);
                     ShowDeviceLimitPopup(devices, res.ResponseData?.message);
+                    ShowMessage(res.ResponseData?.message ?? "تعداد دستگاه‌های مجاز تکمیل شده است.");
                     localResource.RemoveConfig();
                 }
                 else if (res.StatusCode == System.Net.HttpStatusCode.OK)
@@ -1065,10 +1078,28 @@ namespace IRSpeedyVPN
         }
         private void Header_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            if (e.ChangedButton == MouseButton.Left && e.ButtonState == MouseButtonState.Pressed) this.DragMove();
+            if (e.ChangedButton != MouseButton.Left || e.ButtonState != MouseButtonState.Pressed) return;
+            var source = e.OriginalSource as DependencyObject;
+            while (source != null && !ReferenceEquals(source, sender))
+            {
+                if (source is System.Windows.Controls.Primitives.ButtonBase) return;
+                source = source is System.Windows.Media.Visual ? VisualTreeHelper.GetParent(source) : LogicalTreeHelper.GetParent(source);
+            }
+            DragMove();
         }
 
-        private void Exit_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        private void Brand_Click(object sender, RoutedEventArgs e)
+        {
+            ShowHintPopup("IRSPEEDY · Windows App 1.4.5.8", sender as UIElement);
+        }
+
+        private void ResizeThumb_DragDelta(object sender, System.Windows.Controls.Primitives.DragDeltaEventArgs e)
+        {
+            Width = Math.Max(MinWidth, ActualWidth + e.HorizontalChange);
+            Height = Math.Max(MinHeight, ActualHeight + e.VerticalChange);
+        }
+
+        private void Close_Click(object sender, RoutedEventArgs e)
         {
             if (isUpdateAvailable)
                 Notify_Exit(sender, e);

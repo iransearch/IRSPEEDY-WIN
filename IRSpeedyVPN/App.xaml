@@ -12,6 +12,7 @@
                 <ResourceDictionary Source="Themes/Theme.TextBoxButton.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.ComboBox.xaml"/>
                 <ResourceDictionary Source="Themes/FluentTheme.xaml"/>
+                <ResourceDictionary Source="Themes/LoginTheme.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.CountryPicker.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.TextBlock.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.LabelButton.xaml"/>

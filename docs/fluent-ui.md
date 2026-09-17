@@ -7,14 +7,15 @@ account before showing real servers.
 
 ## Visual contract
 
-- Default window: 500 x 840 DIPs, minimum 420 x 700. Flexible content columns, scrolling
-  lists/forms, WindowChrome resize borders and text wrapping support smaller windows and DPI scaling.
-- Accent #0066FF, success #00C853, disconnect #E53935; soft blue waves and translucent cards.
+- The login/window specification is superseded by [login-ui.md](login-ui.md):
+  630 x 920 DIPs, minimum 420 x 680, transparent custom chrome and proportional content scaling.
+- Server/connection accents remain #0066FF, success #00C853, disconnect #E53935.
+  The shared background is now #EBF0F8; the login uses its own #2563EB button and white card.
 - Vazir v30.1.0 Regular/Medium/Bold embedded under Resources/Fonts; OFL license included.
 - Windows Segoe Fluent Icons with Segoe MDL2 Assets fallback. Flags are an offline atlas
   rendered from flag-icons v7.2.3 (MIT license included), with country-code fallback.
 - 160 ms fade/slide honors Windows client-area-animation preference. No rotating transition.
-- The material is a WPF translucent/blurred-wave approximation, not native WinUI Acrylic.
+- The server cards use WPF translucency; the login is a solid white card, not native WinUI Acrylic.
   Native Windows 11 Acrylic and pixel-for-pixel WPF rendering have not been verified here.
 
 ## Functional behavior
@@ -44,7 +45,7 @@ replaced with a sample value. These requests do not gate login or connection.
 Use the existing builder to prepare Files.zip and make a fresh Release single-file build.
 Check the version header and footer show 1.4.5.8. Test before and after SmartAssembly:
 
-1. Launch with/without saved credentials; login success/failure and loading cancellation.
+1. Launch with/without saved credentials; login success/failure and disabled inputs while a request is pending.
 2. Tab through username, password toggle, remember checkbox, recovery and login. Edit a
    visible password, hide it, and verify the submitted value stays synchronized.
 3. Search Persian country names and Latin codes; clear search; select Smart and a tested
