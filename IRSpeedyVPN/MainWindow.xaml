@@ -14,7 +14,7 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
      TextElement.FontWeight="Regular"
      TextElement.FontSize="13"
       TextOptions.TextFormattingMode="Display"
-      WindowStyle="None" WindowStartupLocation="CenterScreen" Width="391.408" Height="359.311" Background="Transparent" AllowsTransparency="True" Title="IRSpeedy VPN" ResizeMode="NoResize">
+      WindowStyle="None" WindowStartupLocation="CenterScreen" Width="391.408" Height="359.311" Background="Transparent" AllowsTransparency="True" Title="IRSpeedy VPN" Icon="pack://application:,,,/Logo.ico" ResizeMode="NoResize">
     <Window.Resources>
         <ResourceDictionary>
 
@@ -37,7 +37,7 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
                         <TextBlock VerticalAlignment="Top" x:Name="txtVersion" Text="1.0.0.1" FontFamily="arial"  Foreground="#ffffff"  Width="59" HorizontalAlignment="Right" TextAlignment="Right" Margin="0,0,30,0" Height="19" FontSize="13" MouseDown="Header_MouseDown"/>
                         <TextBlock VerticalAlignment="Top" x:Name="txtUsername" Text="" FontFamily="arial"  Foreground="#ffffff"  HorizontalAlignment="Center" TextAlignment="Center" Margin="0,0,0,0" Height="19" FontSize="13" MouseDown="Header_MouseDown"/>
                         <TextBlock  x:Name="lblCtrlTitle" Text="اعتبارسنجی" FontSize="15"  FontWeight="Bold"  Foreground="#FF172458"  HorizontalAlignment="Right" Margin="0,74,60,0" />
-                        <Image HorizontalAlignment="Left" Height="85" Margin="36,16,0,-2" VerticalAlignment="Top" Width="86" Source="{StaticResource Logo}" RenderTransformOrigin="0.349,0.377" MouseDown="Header_MouseDown" />
+                        <Image HorizontalAlignment="Left" Height="85" Margin="36,16,0,-2" VerticalAlignment="Top" Width="86" Source="{StaticResource Logo}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" RenderTransformOrigin="0.349,0.377" MouseDown="Header_MouseDown" />
                         <TextBlock VerticalAlignment="Bottom" Text="IRSPEEDY" FontWeight="Bold" Foreground="#ffffff"  Width="107" HorizontalAlignment="Left" Margin="107,0,0,22" Height="26" FontSize="18" MouseDown="Header_MouseDown"/>
                         <Label Style="{StaticResource LabelButton}" Background="{x:Null}"  Foreground="#FFBB0000" FontSize="20" Content="" Width="30" Height="30" FontFamily="{StaticResource fa_ProLight}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,14,-2,0" MouseDown="Exit_PreviewMouseDown"
                     ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="خروج"/>
