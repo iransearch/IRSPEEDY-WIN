@@ -3,6 +3,8 @@ using System.IO;
 using System.Net;
 using System.Text;
 using System.Threading;
+using System.Diagnostics;
+using IRSpeedyVPN.Common;
 
 namespace IRSpeedyVPN.WebServices
 {
@@ -60,6 +62,9 @@ namespace IRSpeedyVPN.WebServices
             // Timeout/ReadWriteTimeout cover individual operations, not the full
             // upload + headers + response body. Abort also bounds a slow/dripping body.
             int deadlineExpired = 0;
+            string stage = "get-request-stream";
+            var elapsed = Stopwatch.StartNew();
+            long networkStart = ConnectionDiagnostics.EventSequence;
             int deadlineMs = timeoutMilliseconds.HasValue && timeoutMilliseconds.Value > 0
                 ? timeoutMilliseconds.Value
                 : Timeout.Infinite;
@@ -78,18 +83,31 @@ namespace IRSpeedyVPN.WebServices
                         request.ContentLength = payload.Length;
                         using (var stream = request.GetRequestStream())
                         {
+                            stage = "write-body";
                             stream.Write(payload, 0, payload.Length);
                         }
                     }
 
-                    var response = ReadResponse(request);
+                    stage = "response-headers";
+                    var response = ReadResponse(request, () => stage = "read-body");
                     if (Volatile.Read(ref deadlineExpired) != 0)
                         throw new TimeoutException("The HTTP request deadline expired.");
                     return response;
                 }
-                catch (Exception ex) when (Volatile.Read(ref deadlineExpired) != 0)
+                catch (Exception ex)
                 {
-                    throw new TimeoutException("The HTTP request deadline expired.", ex);
+                    ErrorReporting.Annotate(ex, "http.stage", stage, "http.transport", "http-fallback",
+                        "http.endpoint", ErrorReporting.EndpointAlias(url),
+                        "http.route", string.IsNullOrWhiteSpace(proxy) ? "direct-no-explicit-proxy" : "explicit-proxy",
+                        "http.budget_ms", deadlineMs.ToString(), "http.elapsed_ms", elapsed.ElapsedMilliseconds.ToString(),
+                        "http.deadline_expired", (Volatile.Read(ref deadlineExpired) != 0).ToString(),
+                        "network.start_seq", networkStart.ToString(), "network.end_seq", ConnectionDiagnostics.EventSequence.ToString(),
+                        "connection.selected", ConnectionDiagnostics.SelectedMode,
+                        "connection.observed", ConnectionDiagnostics.ObservedMode,
+                        "connection.observed_age_ms", ConnectionDiagnostics.ObservedModeAgeMs.ToString());
+                    if (Volatile.Read(ref deadlineExpired) != 0)
+                        throw new TimeoutException("The HTTP request deadline expired.", ex);
+                    throw;
                 }
             }
         }
@@ -98,12 +116,13 @@ namespace IRSpeedyVPN.WebServices
         /// curl reports the status code through -w and returns the body either way, so a
         /// 4xx or 5xx must come back as a normal response here rather than an exception.
         /// </summary>
-        private static CurlHelper.CurlResponse ReadResponse(HttpWebRequest request)
+        private static CurlHelper.CurlResponse ReadResponse(HttpWebRequest request, Action readingBody)
         {
             try
             {
                 using (var response = (HttpWebResponse)request.GetResponse())
                 {
+                    readingBody();
                     return new CurlHelper.CurlResponse(ReadBody(response), (int)response.StatusCode);
                 }
             }
@@ -115,6 +134,7 @@ namespace IRSpeedyVPN.WebServices
 
                 using (response)
                 {
+                    readingBody();
                     return new CurlHelper.CurlResponse(ReadBody(response), (int)response.StatusCode);
                 }
             }

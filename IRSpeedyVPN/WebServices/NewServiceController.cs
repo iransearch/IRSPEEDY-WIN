@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Models.Services;
@@ -239,115 +239,134 @@ namespace IRSpeedyVPN.WebServices
             int attemptNumber = 1;
             var flowStopwatch = Stopwatch.StartNew();
             long flowBudgetMs = timeoutSeconds > 0 ? timeoutSeconds * 1000L : -1;
+            var history = new List<string>();
+            string diagnosticEndpoint = "unknown";
 
-            while (attempts < _services.Count)
+            try
             {
-                var svc = _services[_index];
-                string endpoint = GetBaseUrl(svc);
-                int? perAttemptTimeout = null;
-                if (flowBudgetMs > 0)
+                while (attempts < _services.Count)
                 {
-                    long remainingMs = flowBudgetMs - flowStopwatch.ElapsedMilliseconds;
-                    // The transport accepts whole seconds. Do not round up past
-                    // the remaining budget or let one endpoint consume every retry.
-                    if (remainingMs < 1000)
-                        throw new TimeoutException(
-                            "Authentication flow timeout budget exhausted: flow=" + flowName,
-                            lastException);
+                    var svc = _services[_index];
+                    string endpoint = GetBaseUrl(svc);
+                    int? perAttemptTimeout = null;
+                    if (flowBudgetMs > 0)
+                    {
+                        long remainingMs = flowBudgetMs - flowStopwatch.ElapsedMilliseconds;
+                        // The transport accepts whole seconds. Do not round up past
+                        // the remaining budget or let one endpoint consume every retry.
+                        if (remainingMs < 1000)
+                            throw new TimeoutException(
+                                "Authentication flow timeout budget exhausted: flow=" + flowName,
+                                lastException);
 
-                    int remainingEndpoints = allowFailover ? _services.Count - attempts : 1;
-                    // Login must accommodate slow DNS/TLS and leave room for the
-                    // managed transport retry. Fast responses still return immediately.
-                    perAttemptTimeout = flowName == "Login"
-                        ? Math.Min(LoginEndpointTimeoutSeconds, (int)(remainingMs / 1000))
-                        : Math.Max(1, (int)(remainingMs / 1000 / remainingEndpoints));
-                }
+                        int remainingEndpoints = allowFailover ? _services.Count - attempts : 1;
+                        // Login must accommodate slow DNS/TLS and leave room for the
+                        // managed transport retry. Fast responses still return immediately.
+                        perAttemptTimeout = flowName == "Login"
+                            ? Math.Min(LoginEndpointTimeoutSeconds, (int)(remainingMs / 1000))
+                            : Math.Max(1, (int)(remainingMs / 1000 / remainingEndpoints));
+                    }
 
-                var attemptSw = Stopwatch.StartNew();
-                LogHelper.WriteExLog("[StartupAuth] stage=endpoint-start requestId=" + requestId
-                    + " flow=" + flowName
-                    + " attempt=" + attemptNumber
-                    + " endpoint=" + endpoint
-                    + " timeoutSec=" + (perAttemptTimeout.HasValue ? perAttemptTimeout.Value.ToString() : "")
-                    + " flowRemainingMs="
-                    + (flowBudgetMs > 0
-                        ? Math.Max(0L, flowBudgetMs - flowStopwatch.ElapsedMilliseconds).ToString()
-                        : ""));
-
-                try
-                {
-                    var result = call(svc, perAttemptTimeout);
-                    attemptSw.Stop();
-
-                    bool retryable = IsRetriableFailure(result);
-                    LogHelper.WriteExLog("[StartupAuth] stage=endpoint-end requestId=" + requestId
+                    diagnosticEndpoint = ErrorReporting.EndpointAlias(endpoint);
+                    var attemptSw = Stopwatch.StartNew();
+                    LogHelper.WriteExLog("[StartupAuth] stage=endpoint-start requestId=" + requestId
                         + " flow=" + flowName
                         + " attempt=" + attemptNumber
                         + " endpoint=" + endpoint
-                        + " status=" + GetResponseStatus(result)
-                        + " retryable=" + retryable
-                        + " elapsedMs=" + attemptSw.ElapsedMilliseconds);
+                        + " timeoutSec=" + (perAttemptTimeout.HasValue ? perAttemptTimeout.Value.ToString() : "")
+                        + " flowRemainingMs="
+                        + (flowBudgetMs > 0
+                            ? Math.Max(0L, flowBudgetMs - flowStopwatch.ElapsedMilliseconds).ToString()
+                            : ""));
 
-                    if (!retryable)
+                    try
                     {
-                        _lastGoodBaseUrl = GetBaseUrl(svc);
-                        LogHelper.WriteExLog("[StartupAuth] stage=flow-end requestId=" + requestId
+                        var result = call(svc, perAttemptTimeout);
+                        attemptSw.Stop();
+
+                        bool retryable = IsRetriableFailure(result);
+                        history.Add(diagnosticEndpoint + ":http=" + (result == null ? "none" : ((int)result.StatusCode).ToString())
+                            + ":ms=" + attemptSw.ElapsedMilliseconds);
+                        LogHelper.WriteExLog("[StartupAuth] stage=endpoint-end requestId=" + requestId
                             + " flow=" + flowName
+                            + " attempt=" + attemptNumber
                             + " endpoint=" + endpoint
-                            + " result=success");
-                        return result;
+                            + " status=" + GetResponseStatus(result)
+                            + " retryable=" + retryable
+                            + " elapsedMs=" + attemptSw.ElapsedMilliseconds);
+
+                        if (!retryable)
+                        {
+                            _lastGoodBaseUrl = GetBaseUrl(svc);
+                            LogHelper.WriteExLog("[StartupAuth] stage=flow-end requestId=" + requestId
+                                + " flow=" + flowName
+                                + " endpoint=" + endpoint
+                                + " result=success");
+                            return result;
+                        }
+
+                        if (!allowFailover)
+                        {
+                            LogHelper.WriteExLog("[StartupAuth] stage=flow-end requestId=" + requestId
+                                + " flow=" + flowName
+                                + " endpoint=" + endpoint
+                                + " result=single-endpoint-failed");
+                            return result;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        attemptSw.Stop();
+                        lastException = ex;
+                        history.Add(diagnosticEndpoint + ":error=" + ErrorReporting.FailureCode(ex)
+                            + ":ms=" + attemptSw.ElapsedMilliseconds);
+                        LogHelper.WriteExLog("[StartupAuth] stage=endpoint-end requestId=" + requestId
+                            + " flow=" + flowName
+                            + " attempt=" + attemptNumber
+                            + " endpoint=" + endpoint
+                            + " status=exception"
+                            + " elapsedMs=" + attemptSw.ElapsedMilliseconds
+                            + " exception=" + ex.GetType().FullName
+                            + " hresult=0x" + ex.HResult.ToString("X8"));
+
+                        if (!allowFailover)
+                            throw;
                     }
 
-                    if (!allowFailover)
-                    {
-                        LogHelper.WriteExLog("[StartupAuth] stage=flow-end requestId=" + requestId
-                            + " flow=" + flowName
-                            + " endpoint=" + endpoint
-                            + " result=single-endpoint-failed");
-                        return result;
-                    }
+                    _index = (_index + 1) % _services.Count;
+                    attempts++;
+                    attemptNumber++;
+
+                    if (_index == startIndex)
+                        break;
                 }
-                catch (Exception ex)
+
+                if (flowBudgetMs > 0 && flowStopwatch.ElapsedMilliseconds >= flowBudgetMs)
                 {
-                    attemptSw.Stop();
-                    lastException = ex;
-                    LogHelper.WriteExLog("[StartupAuth] stage=endpoint-end requestId=" + requestId
-                        + " flow=" + flowName
-                        + " attempt=" + attemptNumber
-                        + " endpoint=" + endpoint
-                        + " status=exception"
-                        + " elapsedMs=" + attemptSw.ElapsedMilliseconds
-                        + " exception=" + ex.GetType().FullName
-                        + " hresult=0x" + ex.HResult.ToString("X8"));
-
-                    if (!allowFailover)
-                        throw;
+                    throw new TimeoutException(
+                        "Authentication flow timeout budget exhausted: flow=" + flowName,
+                        lastException);
                 }
 
-                _index = (_index + 1) % _services.Count;
-                attempts++;
-                attemptNumber++;
+                if (lastException != null)
+                {
+                    // Rethrow with the original stack intact. Plain "throw lastException"
+                    // resets it, which is why a field report of this failing only showed the
+                    // failover frame and not the call that actually threw.
+                    ExceptionDispatchInfo.Capture(lastException).Throw();
+                }
 
-                if (_index == startIndex)
-                    break;
+                throw new Exception("All service endpoints failed.");
             }
-
-            if (flowBudgetMs > 0 && flowStopwatch.ElapsedMilliseconds >= flowBudgetMs)
+            catch (Exception ex)
             {
-                throw new TimeoutException(
-                    "Authentication flow timeout budget exhausted: flow=" + flowName,
-                    lastException);
+                ErrorReporting.Annotate(ex, "api.request_id", requestId, "api.flow", flowName,
+                    "api.endpoint", diagnosticEndpoint, "api.attempt", history.Count.ToString(),
+                    "api.elapsed_ms", flowStopwatch.ElapsedMilliseconds.ToString(), "api.budget_ms", flowBudgetMs.ToString());
+                for (int i = 0; i < history.Count && i < 4; i++)
+                    ErrorReporting.Annotate(ex, "api.attempt" + (i + 1), history[i]);
+                throw;
             }
-
-            if (lastException != null)
-            {
-                // Rethrow with the original stack intact. Plain "throw lastException"
-                // resets it, which is why a field report of this failing only showed the
-                // failover frame and not the call that actually threw.
-                ExceptionDispatchInfo.Capture(lastException).Throw();
-            }
-
-            throw new Exception("All service endpoints failed.");
         }
 
         private static bool IsRetriableFailure<TResponse>(BaseHttpResponse<TResponse> result)

@@ -24,6 +24,25 @@ namespace IRSpeedyVPN.Common
         private static long events, lastEventMs = -1, revision, snapshotAt = -1;
         private static string previous = "", snapshot = "pending";
         internal static long EventSequence => Interlocked.Read(ref events);
+        internal static bool MonitorStarted => Volatile.Read(ref started) != 0;
+        private static string observedMode = "unknown";
+        private static long observedModeAt = -1;
+        internal static string ObservedMode => Volatile.Read(ref observedMode);
+        internal static string SelectedMode
+        {
+            get
+            {
+                try { return RegHelper.GetSettingValue("VGAURDVPNMode") == "0" ? "Proxy" : "TUN"; }
+                catch { return "unknown"; }
+            }
+        }
+        internal static long ObservedModeAgeMs => Interlocked.Read(ref observedModeAt) < 0 ? -1
+            : Clock.ElapsedMilliseconds - Interlocked.Read(ref observedModeAt);
+        internal static void ObserveMode(string mode)
+        {
+            Volatile.Write(ref observedMode, mode);
+            Interlocked.Exchange(ref observedModeAt, Clock.ElapsedMilliseconds);
+        }
 
         internal static void Start()
         {

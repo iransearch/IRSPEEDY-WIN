@@ -4,6 +4,9 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Reflection;
+using System.Net;
+using System.Net.Sockets;
+using System.ComponentModel;
 using System.Text.RegularExpressions;
 using Sentry;
 using Sentry.Protocol;
@@ -18,6 +21,62 @@ namespace IRSpeedyVPN.Common
         private static readonly object Gate = new object();
         private static readonly Dictionary<string, DateTime> Recent = new Dictionary<string, DateTime>();
         private static int probeReports;
+        private static readonly string SessionId = Guid.NewGuid().ToString("N");
+        private static string installationId = SessionId;
+        private static string identityScope = "session";
+        private static readonly object DiagnosticKey = new object();
+        private static readonly string[] DiagnosticTags =
+        {
+            "http.stage", "http.transport", "http.route", "http.endpoint", "http.budget_ms", "http.elapsed_ms",
+            "http.deadline_expired", "curl.reason", "curl.exit_code", "curl.unavailable",
+            "curl.elapsed_ms", "curl.failure_type", "curl.native_error", "curl.request_id",
+            "api.request_id", "api.flow", "api.endpoint", "api.attempt", "api.elapsed_ms",
+            "api.budget_ms", "api.attempt1", "api.attempt2", "api.attempt3", "api.attempt4", "network.start_seq", "network.end_seq",
+            "connection.selected", "connection.observed", "connection.observed_age_ms", "network.monitor_started"
+        };
+
+        // Only our private dictionary is exported, never arbitrary Exception.Data.
+        internal static void Annotate(Exception exception, params string[] fields)
+        {
+            try
+            {
+                if (exception == null) return;
+                var values = exception.Data[DiagnosticKey] as Dictionary<string, string>;
+                if (values == null) exception.Data[DiagnosticKey] = values = new Dictionary<string, string>();
+                for (int i = 0; i + 1 < fields.Length; i += 2)
+                    if (DiagnosticTags.Contains(fields[i]) && SafeDiagnosticValue(fields[i + 1]))
+                        values[fields[i]] = fields[i + 1];
+            }
+            catch { }
+        }
+
+        private static bool SafeDiagnosticValue(string value)
+            => value != null && value.Length <= 200 && Regex.IsMatch(value, @"\A[A-Za-z0-9_.:;=|,-]+\z");
+
+        internal static string EndpointAlias(string url)
+        {
+            Uri uri;
+            if (!Uri.TryCreate(url, UriKind.Absolute, out uri)) return "other";
+            switch (uri.Host.ToLowerInvariant())
+            {
+                case "api1.greadia.app": return "api1";
+                case "api3.greadia.ir": return "api3";
+                case "api2.greadia.app": return "api2";
+                case "apix.myapifast.ir": return "apix";
+                default: return "other";
+            }
+        }
+
+        internal static string FailureCode(Exception exception)
+        {
+            for (var e = exception; e != null; e = e.InnerException)
+            {
+                var web = e as WebException;
+                if (web != null) return web.Status.ToString();
+                if (e is TimeoutException) return "Timeout";
+            }
+            return "Other";
+        }
         private static readonly string Release = "IRSpeedyVPN@" +
             typeof(ErrorReporting).Assembly.GetName().Version;
         private static readonly string[] AllowedTags =
@@ -33,6 +92,23 @@ namespace IRSpeedyVPN.Common
                 var cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "IRSpeedy", "Sentry");
                 Directory.CreateDirectory(cache);
+                // Random identity, independent of account, device name and hardware IDs.
+                try
+                {
+                    string path = Path.Combine(cache, "installation-id");
+                    if (!File.Exists(path))
+                    {
+                        using (var file = new FileStream(path, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
+                        using (var writer = new StreamWriter(file)) writer.Write(Guid.NewGuid().ToString("N"));
+                    }
+                    Guid parsed;
+                    if (Guid.TryParse(File.ReadAllText(path).Trim(), out parsed))
+                    {
+                        installationId = parsed.ToString("N");
+                        identityScope = "installation";
+                    }
+                }
+                catch { } // A read-only profile still gets a session identity.
                 sdk = SentrySdk.Init(o =>
                 {
                     o.Dsn = "https://3b8667a42b4e779280ce1e2a9686c500@o4512093060136960.ingest.us.sentry.io/4512093067345920";
@@ -88,6 +164,13 @@ namespace IRSpeedyVPN.Common
             };
             foreach (var key in AllowedTags)
                 if (input.Tags.TryGetValue(key, out var value)) clean.SetTag(key, value);
+            clean.SetTag("installation.id", installationId);
+            clean.SetTag("identity.scope", identityScope);
+            clean.SetTag("session.id", SessionId);
+            clean.SetTag("diagnostic.schema", "http-context-v2");
+            foreach (var key in DiagnosticTags.Concat(new[] { "diagnostic.schema", "installation.id", "identity.scope",
+                "session.id", "build.mvid", "os.version", "clr.version", "web.status", "socket.error", "native.error" }))
+                if (input.Tags.TryGetValue(key, out var value) && SafeDiagnosticValue(value)) clean.SetTag(key, value);
             // These exception objects are built by PrepareException, never from raw exceptions.
             if (kind == "exception") clean.SentryExceptions = input.SentryExceptions;
             return clean;
@@ -112,7 +195,9 @@ namespace IRSpeedyVPN.Common
                 chain.Add(new SentryException
                 {
                     Type = current.GetType().FullName,
-                    Value = "Message omitted; HRESULT=0x" + current.HResult.ToString("X8"),
+                    Value = "HRESULT=0x" + current.HResult.ToString("X8")
+                        + (current is WebException ? "; WebException.Status=" + ((WebException)current).Status : "")
+                        + (current is SocketException ? "; SocketError=" + ((SocketException)current).SocketErrorCode : ""),
                     Stacktrace = stack
                 });
             }
@@ -127,6 +212,33 @@ namespace IRSpeedyVPN.Common
             result.SetTag("exception.hresult", exception.HResult.ToString("X8"));
             result.SetTag("process.arch", Environment.Is64BitProcess ? "x64" : "x86");
             result.SetTag("error.kind", Classify(exception.ToString()));
+            result.SetTag("diagnostic.schema", "http-context-v2");
+            result.SetTag("installation.id", installationId);
+            result.SetTag("identity.scope", identityScope);
+            result.SetTag("session.id", SessionId);
+            result.SetTag("build.mvid", typeof(ErrorReporting).Assembly.ManifestModule.ModuleVersionId.ToString("N"));
+            result.SetTag("os.version", Environment.OSVersion.Version.ToString());
+            result.SetTag("clr.version", Environment.Version.ToString());
+            result.SetTag("connection.selected", ConnectionDiagnostics.SelectedMode);
+            result.SetTag("connection.observed", ConnectionDiagnostics.ObservedMode);
+            result.SetTag("connection.observed_age_ms", ConnectionDiagnostics.ObservedModeAgeMs.ToString());
+            result.SetTag("network.end_seq", ConnectionDiagnostics.EventSequence.ToString());
+            result.SetTag("network.monitor_started", ConnectionDiagnostics.MonitorStarted.ToString());
+            // Inner transport metadata survives wrapper exceptions; outer metadata wins.
+            var exceptions = new List<Exception>();
+            for (var e = exception; e != null && exceptions.Count < 8; e = e.InnerException) exceptions.Add(e);
+            foreach (var e in exceptions.AsEnumerable().Reverse())
+            {
+                var values = e.Data[DiagnosticKey] as Dictionary<string, string>;
+                if (values != null)
+                    foreach (var pair in values) result.SetTag(pair.Key, pair.Value);
+                var web = e as WebException;
+                if (web != null) result.SetTag("web.status", web.Status.ToString());
+                var socket = e as SocketException;
+                if (socket != null) result.SetTag("socket.error", socket.SocketErrorCode.ToString());
+                var native = e as Win32Exception;
+                if (native != null) result.SetTag("native.error", native.NativeErrorCode.ToString());
+            }
             return result;
         }
 
@@ -136,7 +248,7 @@ namespace IRSpeedyVPN.Common
             try
             {
                 string key = exception.GetType().FullName + ":" + exception.HResult
-                    + ":" + exception.TargetSite?.Name;
+                    + ":" + exception.TargetSite?.Name + ":" + FailureCode(exception);
                 if (!Admit(key, false)) return;
                 SentrySdk.CaptureEvent(PrepareException(exception, fatal));
                 if (fatal) SentrySdk.FlushAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();

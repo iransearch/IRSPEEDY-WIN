@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -732,6 +732,15 @@ namespace IRSpeedyVPN.WebServices
             catch (Exception ex)
             {
                 stopwatch.Stop();
+
+                ErrorReporting.Annotate(ex,
+                    "curl.reason", fallbackStage.Replace("managed-fallback: ", "").Replace(" ", "-"),
+                    "curl.exit_code", diagnostic.ExitCode.HasValue ? diagnostic.ExitCode.Value.ToString() : "unknown",
+                    "curl.unavailable", bundledCurlUnavailable.ToString(),
+                    "curl.elapsed_ms", elapsedBeforeFallbackMs.ToString(),
+                    "curl.failure_type", curlFailure == null ? "none" : curlFailure.GetType().FullName,
+                    "curl.native_error", curlFailure is Win32Exception ? ((Win32Exception)curlFailure).NativeErrorCode.ToString() : "none",
+                    "curl.request_id", diagnostic.RequestId.ToString());
 
                 diagnostic.HttpFallbackOutcome = "failure";
                 diagnostic.HttpFallbackElapsedMilliseconds = stopwatch.ElapsedMilliseconds;

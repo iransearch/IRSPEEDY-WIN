@@ -25,6 +25,7 @@ namespace IRSpeedyVPN.Services
                 var active = gInfo?.CurrentService as TunnelPlusService;
                 string activeMode = active == null ? "unknown-or-idle" : !active.IsConnected ? "not-connected"
                     : active.lastVpnMode ? "TUN" : "Proxy";
+                ConnectionDiagnostics.ObserveMode(activeMode);
                 ConnectionDiagnostics.Write(stage, "service=" + diagnosticServiceId
                     + " connection=" + diagnosticConnectionId + " countryId=" + ID + " countryIndex=" + CountryIndex
                     + " selectedMode=" + (RegHelper.GetSettingValue("VGAURDVPNMode") == "0" ? "Proxy" : "TUN")
