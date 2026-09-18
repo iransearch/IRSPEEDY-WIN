@@ -69,16 +69,6 @@
                 <Merging />
                 <Embedding Compress="1" Encrypt="1" />
             </Assembly>
-            <Assembly AssemblyName="DotRas, Culture=neutral, PublicKeyToken=b378f04384b7892a">
-                <Merging Merge="0">
-                    <Pruning />
-                    <Obfuscation />
-                    <ControlFlow />
-                    <MemberRefsProxy />
-                    <ResourcesCompression />
-                </Merging>
-                <Embedding Compress="1" Embed="0" Encrypt="1" />
-            </Assembly>
             <Assembly AssemblyName="System.Management, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a">
                 <Merging />
                 <Embedding Compress="1" Encrypt="1" />
@@ -365,13 +355,6 @@
                                 <ItemType>Class</ItemType>
                                 <Namespace>IRSpeedyVPN.Services</Namespace>
                                 <Name>SSRService</Name>
-                            </Token>
-                            <Token Table="TypeDef">
-                                <Assembly>IRSpeedyVPN</Assembly>
-                                <Module>IRSpeedyVPN.exe</Module>
-                                <ItemType>Class</ItemType>
-                                <Namespace>IRSpeedyVPN.Services</Namespace>
-                                <Name>VPNService</Name>
                             </Token>
                             <Token Table="TypeDef">
                                 <Assembly>IRSpeedyVPN</Assembly>

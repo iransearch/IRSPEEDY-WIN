@@ -26,12 +26,6 @@
         <option>library</option>
         <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="DotNetZip.dll" />
       </inputassembly>
-      <inputassembly refid="e712a3f0-613f-4433-bceb-3bce3d36dd9d">
-        <option>honoroas</option>
-        <option>stripoa</option>
-        <option>library</option>
-        <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="DotRas.dll" />
-      </inputassembly>
       <inputassembly refid="8eb338da-9e3e-4ed5-8e57-354e7972e91c">
         <option>honoroas</option>
         <option>stripoa</option>
@@ -75,7 +69,6 @@
       <type name="IRSpeedyVPN.Services.Proxifier" />
       <type name="IRSpeedyVPN.Services.sslProxyService" />
       <type name="IRSpeedyVPN.Services.SSRService" />
-      <type name="IRSpeedyVPN.Services.VPNService" />
       <type name="IRSpeedyVPN.Services.TunnelPlusService" />
       <type name="IRSpeedyVPN.Services.ServiceFactory" />
       <type name="IRSpeedyVPN.Models.GlobalInfo" />
@@ -181,9 +174,6 @@
         </assembly>
         <assembly>
           <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="DotNetZip.dll" />
-        </assembly>
-        <assembly>
-          <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="DotRas.dll" />
         </assembly>
         <assembly>
           <file dir="${configdir}\IRSpeedyVPN\bin\Release\net48" name="QRCoder.dll" />

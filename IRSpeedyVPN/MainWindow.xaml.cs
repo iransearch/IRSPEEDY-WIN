@@ -366,18 +366,8 @@ namespace IRSpeedyVPN
 
         private Assembly CurrentDomain_AssemblyResolve(object sender, ResolveEventArgs args)
         {
-            string resourcePath = null;
-           var miscPath = System.IO.Path.Combine(localResource.TempPath, "misc");
-            switch (args.Name.Split(',')[0])
-                {
-                case "DotRas":
-                    resourcePath = System.IO.Path.Combine(localResource.TempPath, "Ras", Tools.IsWinXpOrLower() ? "XP" : "7", args.Name.Split(',')[0]);
-                    break;
-                default:
-                    resourcePath = System.IO.Path.Combine(miscPath, args.Name.Split(',')[0]);
-                    break;
-
-            }
+            var miscPath = System.IO.Path.Combine(localResource.TempPath, "misc");
+            var resourcePath = System.IO.Path.Combine(miscPath, args.Name.Split(',')[0]);
            
             if (!string.IsNullOrEmpty(resourcePath))
                 return Assembly.LoadFrom(resourcePath + ".dll");
