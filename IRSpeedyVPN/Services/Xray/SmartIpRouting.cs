@@ -40,6 +40,7 @@ namespace IRSpeedyVPN.Services.Xray
         public static readonly string[] AiDomains =
         {
             "labs.google",
+            "antigravity.google",
             "google.com",
             "googleapis.com",
             "gstatic.com",
