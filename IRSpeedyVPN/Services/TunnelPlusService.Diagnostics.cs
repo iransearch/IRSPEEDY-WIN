@@ -1,4 +1,5 @@
 using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Resource;
 using System;
 using System.Diagnostics;
 using System.Threading;
