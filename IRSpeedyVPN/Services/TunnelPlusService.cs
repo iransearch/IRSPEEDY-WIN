@@ -893,6 +893,7 @@ namespace IRSpeedyVPN.Services
                                         + " maxConcurrency=" + request.MaxConcurrency + " timeoutMs=" + request.TestTimeoutMs
                                         + " needXray=" + request.NeedXray
                                         + " configId=" + ConnectionDiagnostics.Fingerprint(request.Config)
+                                        + " coreConfigId=" + CoreDiagnosticMetadata.Hash(request.Config)
                                         + " urlId=" + ConnectionDiagnostics.Fingerprint(request.Url));
                                     try
                                     {
@@ -1059,6 +1060,7 @@ namespace IRSpeedyVPN.Services
                         : UrlTestRetryPolicy.IsSuccess(result) ? "success" : "failure";
                     LogHelper.WriteExLog("[ProbeDetail] phase=" + phase + ProbeContext(testId, link)
                         + " requestId=" + requestId + " outboundTag=" + SafeProbeText(tag)
+                        + " coreTagId=" + CoreDiagnosticMetadata.Hash(tag)
                         + " memberId=" + ConnectionDiagnostics.Fingerprint(link)
                         + ConnectionDiagnostics.Context
                         + " result=" + outcome + " latencyMs=" + (result?.LatencyMs ?? -1)
@@ -1236,6 +1238,7 @@ namespace IRSpeedyVPN.Services
             {
                 if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
                 {
+                    CoreDiagnosticMetadata.ObserveListener(port);
                     Diagnostic("core-reuse", "port=" + port + " referencedPid=" + DiagnosticPid(process) + " owned=" + owned);
                     return;
                 }
@@ -1323,6 +1326,7 @@ namespace IRSpeedyVPN.Services
                 {
                     if (!startedProcess.Start())
                         throw new InvalidOperationException("Core process could not be started.");
+                    CoreDiagnosticMetadata.Register(port, startedProcess);
                     Diagnostic("core-spawn", "pid=" + DiagnosticPid(startedProcess) + " port=" + port
                         + " runtimeId=" + ConnectionDiagnostics.Fingerprint(corePath));
                     startedProcess.BeginOutputReadLine();
@@ -1934,4 +1938,5 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
+
 

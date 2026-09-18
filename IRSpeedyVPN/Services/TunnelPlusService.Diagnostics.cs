@@ -34,7 +34,7 @@ namespace IRSpeedyVPN.Services
                     + " activeMode=" + activeMode + " activeConnection=" + (active?.diagnosticConnectionId ?? "none")
                     + " serviceConnected=" + IsConnected + " appliedMode=" + (IsConnected ? (lastVpnMode ? "TUN" : "Proxy") : "not-connected")
                     + " systemProxyRequested=" + useSystemProxy + " proxifierRule=" + (int)ProxifierRuleType
-                    + " listenPort=" + lastListenPort + " corePid=" + DiagnosticPid(coreProcess)
+                    + " listenPort=" + lastListenPort + " corePid=" + CoreDiagnosticMetadata.Pid(CorePort)
                     + " coreOwned=" + coreOwned + " controlPort=" + CorePort + " " + details);
             }
             catch { }
@@ -44,6 +44,12 @@ namespace IRSpeedyVPN.Services
             try
             {
                 if (string.IsNullOrEmpty(line)) return;
+                string structured;
+                if (CoreDiagnosticMetadata.TryParse(line, out structured))
+                {
+                    ConnectionDiagnostics.Write("core-detail", "readerPid=" + DiagnosticPid(process) + " " + structured);
+                    return;
+                }
                 string lower = line.ToLowerInvariant();
                 string category = lower.Contains("network changed") ? "network-changed"
                     : lower.Contains("panic") ? "panic" : lower.Contains("fatal") ? "fatal"
@@ -59,7 +65,8 @@ namespace IRSpeedyVPN.Services
                 // Output may contain full configs or credentials: log only an allowlisted category and salted ID.
                 Diagnostic("core-output", "pid=" + DiagnosticPid(process) + " source=" + source
                     + " category=" + category + " messageId=" + ConnectionDiagnostics.Fingerprint(line));
-                ConnectionDiagnostics.RequestSnapshot();
+                if (category == "network-changed" || category == "interface" || category == "fatal" || category == "panic")
+                    ConnectionDiagnostics.RequestSnapshot();
             }
             catch { }
         }

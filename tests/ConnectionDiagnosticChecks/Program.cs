@@ -8,6 +8,19 @@ internal static class Program
 {
     private static void Main()
     {
+        string safe;
+        const string core = "[CoreDiagnostic] schema=core-network-v2 event=hy2-reset pid=7 seq=1 box=2 reason=interface-update";
+        Require(CoreDiagnosticMetadata.TryParse(core, out safe) && safe.Contains("reason=interface-update"), "Structured Core reset metadata missing.");
+        Require(!CoreDiagnosticMetadata.TryParse(core + " password=PRIVATE_VALUE", out safe), "Unknown sensitive field accepted.");
+        Require(!CoreDiagnosticMetadata.TryParse(core + " tag=private.example", out safe), "Raw tag accepted.");
+        Require(!CoreDiagnosticMetadata.TryParse(core + " reason=power-event", out safe), "Duplicate field accepted.");
+        Require(!CoreDiagnosticMetadata.TryParse(core + " index=1\n", out safe), "Control characters accepted in numeric metadata.");
+        Require(CoreDiagnosticMetadata.Hash("proxy") == "1241936d4dd3aad6", "Go/C# correlation mismatch.");
+        using (var process = System.Diagnostics.Process.GetCurrentProcess())
+        {
+            CoreDiagnosticMetadata.Register(19810, process);
+            Require(CoreDiagnosticMetadata.Pid(19810) == process.Id, "Shared Core PID unavailable to another service.");
+        }
         var lines = new ConcurrentQueue<string>();
         LogHelper.Sink = lines.Enqueue;
         TunnelPlusService.Exercise();

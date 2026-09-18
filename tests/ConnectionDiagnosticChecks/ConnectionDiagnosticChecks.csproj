@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.NET.Sdk">
  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><NoWarn>$(NoWarn);CS0649</NoWarn></PropertyGroup>
  <ItemGroup>
+  <Compile Include="../../IRSpeedyVPN/Common/CoreDiagnosticMetadata.cs" Link="CoreDiagnosticMetadata.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/ConnectionDiagnostics.cs" Link="ConnectionDiagnostics.cs"/>
   <Compile Include="../../IRSpeedyVPN/Services/TunnelPlusService.Diagnostics.cs" Link="TunnelPlusService.Diagnostics.cs"/>
  </ItemGroup>
 </Project>
+
