@@ -242,6 +242,9 @@ namespace IRSpeedyVPN.Services.SingBox
                         continue;
                     }
 
+                    if (item.configType == EConfigType.Hysteria2)
+                        throw new InvalidOperationException("Hysteria2 URL tests require an Xray SOCKS override.");
+
                     var outbound = new Outbound();
                     FillOutboundForItem(outbound, item);
                     ApplyEndpointOverride(outbound, endpointOverrides != null && endpointOverrides.TryGetValue(link.Key, out var endpointOverride) ? endpointOverride : null);
@@ -1201,3 +1204,4 @@ namespace IRSpeedyVPN.Services.SingBox
         }
     }
 }
+

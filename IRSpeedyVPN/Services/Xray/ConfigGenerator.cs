@@ -40,6 +40,22 @@ namespace IRSpeedyVPN.Services.Xray
             return NeedsXray(item);
         }
 
+        // Tests must use the same Xray Hysteria2 adapter as the Smart pool.
+        // Keep the single-server connection policy (LinkNeedsXray) independent.
+        public static bool LinkNeedsXrayForUrlTest(string link)
+        {
+            if (string.IsNullOrWhiteSpace(link))
+                return false;
+            string msg;
+            var item = ShareHandler.ImportFromConfigLink(link, out msg);
+            return NeedsXrayForUrlTest(item);
+        }
+
+        private static bool NeedsXrayForUrlTest(VmessItem item)
+        {
+            return item != null && (item.configType == EConfigType.Hysteria2 || NeedsXray(item));
+        }
+
         // Preflight uses the same outbound conversion and refusal rules as Smart.
         // Return fixed reasons only; parser exception text may contain credentials.
         public static string UrlTestRefusalReason(string link)
@@ -49,7 +65,7 @@ namespace IRSpeedyVPN.Services.Xray
                 string message;
                 var item = ShareHandler.ImportFromConfigLink(link, out message);
                 if (item == null) return "invalid-link";
-                if (!NeedsXray(item)) return null;
+                if (!NeedsXrayForUrlTest(item)) return null;
                 var outbound = new Outbound { tag = "test-preflight" };
                 FillOutboundForItem(outbound, item);
                 if (outbound.protocol == null) return "unsupported-protocol";
@@ -749,3 +765,4 @@ namespace IRSpeedyVPN.Services.Xray
         }
     }
 }
+

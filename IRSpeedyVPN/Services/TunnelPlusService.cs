@@ -788,7 +788,7 @@ namespace IRSpeedyVPN.Services
                     return;
                 }
 
-                // Separate xhttp links for Xray processing
+                // Route Hysteria2 and Xray-required links through Xray for URL tests
                 var xrayInfos = new List<Xray.ConfigGenerator.XraySocksInfo>();
                 var socksOverrides = new Dictionary<string, Tuple<int, string, string>>();
                 var urlTestHysteriaProcs = new List<Process>();
@@ -799,7 +799,7 @@ namespace IRSpeedyVPN.Services
                 {
                     foreach (var kvp in allUrls)
                     {
-                        if (Xray.ConfigGenerator.LinkNeedsXray(kvp.Key))
+                        if (Xray.ConfigGenerator.LinkNeedsXrayForUrlTest(kvp.Key))
                         {
                             var socksPort = FreePortManager.Dequeue();
                             var authUser = Guid.NewGuid().ToString("N");
@@ -1155,13 +1155,13 @@ namespace IRSpeedyVPN.Services
                     return;
                 }
 
-                // Separate xhttp links for Xray processing in VOD test
+                // Route Hysteria2 and Xray-required links through Xray in VOD tests
                 var vodXhttpInfos = new List<Xray.ConfigGenerator.XraySocksInfo>();
                 var vodSocksOverrides = new Dictionary<string, Tuple<int, string, string>>();
 
                 foreach (var kvp in vodUrls)
                 {
-                    if (Xray.ConfigGenerator.LinkNeedsXray(kvp.Key))
+                    if (Xray.ConfigGenerator.LinkNeedsXrayForUrlTest(kvp.Key))
                     {
                         var socksPort = FreePortManager.Dequeue();
                         var authUser = Guid.NewGuid().ToString("N");
@@ -1938,5 +1938,6 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
+
 
 
