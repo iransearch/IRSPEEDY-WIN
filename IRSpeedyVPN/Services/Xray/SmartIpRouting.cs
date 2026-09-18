@@ -52,7 +52,6 @@ namespace IRSpeedyVPN.Services.Xray
             "gemini.google.com",
             "makersuite.google.com",
             "aistudio.google.com",
-            "googlevideo.com",
             "ggpht.com",
             "withgoogle.com",
             "openai.com",
