@@ -10,35 +10,39 @@ internal sealed class WindowsBackend : IHotspotBackend
 {
     private NetworkOperatorTetheringManager? manager;
     private Guid? preparedId;
-    public bool IsOn => Manager.TetheringOperationalState != TetheringOperationalState.Off;
+    public bool IsOn => Step("winrt.read-state", () => Manager.TetheringOperationalState != TetheringOperationalState.Off);
     public uint ClientCount => Manager.ClientCount;
     private NetworkOperatorTetheringManager Manager => manager ?? throw new HotspotException("not-prepared");
 
     public void Prepare(Guid publicId)
     {
         if (preparedId == publicId && manager is not null) return;
-        var profiles = NetworkInformation.GetConnectionProfiles()
-            .Where(p => p.NetworkAdapter?.NetworkAdapterId == publicId).ToArray();
+        var profiles = Step("winrt.find-profile", () => NetworkInformation.GetConnectionProfiles()
+            .Where(p => p.NetworkAdapter?.NetworkAdapterId == publicId).ToArray());
         if (profiles.Length != 1) throw new HotspotException("tun-winrt-profile-unavailable");
-        var capability = NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profiles[0]);
+        var capability = Step("winrt.check-capability", () => NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profiles[0]));
         if (capability != TetheringCapability.Enabled)
             throw new HotspotException("tethering-" + capability);
         // This overload explicitly uses the supplied profile as upstream. Never
         // call GetInternetConnectionProfile as fallback: that can share ISP traffic.
-        manager = NetworkOperatorTetheringManager.CreateFromConnectionProfile(profiles[0]);
+        manager = Step("winrt.create-manager", () => NetworkOperatorTetheringManager.CreateFromConnectionProfile(profiles[0]));
         preparedId = publicId;
     }
 
     public async Task Start(string ssid, string password)
     {
-        if (Manager.TetheringOperationalState != TetheringOperationalState.Off)
+        if (IsOn)
             throw new HotspotException("hotspot-not-off");
-        await Manager.ConfigureAccessPointAsync(new NetworkOperatorTetheringAccessPointConfiguration
+        await StepAsync("winrt.configure-ap", async () =>
         {
-            Ssid = ssid,
-            Passphrase = password
+            await Manager.ConfigureAccessPointAsync(new NetworkOperatorTetheringAccessPointConfiguration
+            {
+                Ssid = ssid,
+                Passphrase = password
+            });
+            return true;
         });
-        var result = await Manager.StartTetheringAsync();
+        var result = await StepAsync("winrt.start-tethering", async () => await Manager.StartTetheringAsync());
         if (result.Status != TetheringOperationStatus.Success)
             throw new HotspotException("hotspot-start-" + result.Status);
         // No password, SSID, MAC addresses or AdditionalErrorMessage in diagnostics.
@@ -47,14 +51,16 @@ internal sealed class WindowsBackend : IHotspotBackend
     public async Task Stop()
     {
         if (Manager.TetheringOperationalState == TetheringOperationalState.Off) return;
-        var result = await Manager.StopTetheringAsync();
+        var result = await StepAsync("winrt.stop-tethering", async () => await Manager.StopTetheringAsync());
         if (result.Status != TetheringOperationStatus.Success)
             throw new HotspotException("hotspot-stop-" + result.Status);
         if (Manager.TetheringOperationalState != TetheringOperationalState.Off)
             throw new HotspotException("hotspot-stop-not-confirmed");
     }
 
-    public IReadOnlyList<Adapter> ReadAdapters()
+    public IReadOnlyList<Adapter> ReadAdapters() => Step("ics.enumerate", ReadAdaptersCore);
+
+    private IReadOnlyList<Adapter> ReadAdaptersCore()
     {
         var nics = NetworkInterface.GetAllNetworkInterfaces().ToDictionary(a => Guid.Parse(a.Id));
         var result = new List<Adapter>();
@@ -92,8 +98,23 @@ internal sealed class WindowsBackend : IHotspotBackend
         if (!state.Any(a => a.Id == privateId && a.SharingRole == 1)) Enable(privateId, 1);
     }
 
-    private static void Enable(Guid id, int role) => WithConfiguration(id, c =>
-        Marshal.ThrowExceptionForHR(c.EnableSharing(role)));
+    private static void Enable(Guid id, int role) => Step(role == 0 ? "ics.enable-public" : "ics.enable-private", () =>
+    {
+        WithConfiguration(id, c => Marshal.ThrowExceptionForHR(c.EnableSharing(role)));
+        return true;
+    });
+
+    private static T Step<T>(string stage, Func<T> action)
+    {
+        try { return action(); }
+        catch (Exception ex) { if (!ex.Data.Contains("hotspot.stage")) ex.Data["hotspot.stage"] = stage; throw; }
+    }
+
+    private static async Task<T> StepAsync<T>(string stage, Func<Task<T>> action)
+    {
+        try { return await action(); }
+        catch (Exception ex) { if (!ex.Data.Contains("hotspot.stage")) ex.Data["hotspot.stage"] = stage; throw; }
+    }
 
     public void Disable(Guid id, int expectedRole) => WithConfiguration(id, c =>
     {

@@ -29,11 +29,12 @@ try {
 
     # Windows does not expose reliable TUN ownership via Get-NetAdapter. Do NOT
     # guess ownership from a name or pick the first Xray/core process automatically.
-    $candidates = @(Get-Process | Where-Object { $_.ProcessName -match 'sing|core|xray|throne|irspeedy' })
+    $candidates = @(Get-Process | Where-Object { $_.ProcessName -match '^(SGuard(?:7)?(?:32|64)|sing-box|xray|throne|IRSpeedyVPN)$' })
     if ($candidates.Count -gt 0) {
         $candidates | Select-Object Id, ProcessName | Format-Table -AutoSize | Out-Host
     }
-    Write-Host 'Enter the PID of the core owning irspeedy-tun (often the sing-box/TUN core).'
+    Write-Host 'IRSPEEDY starts SGuard64.exe on current x64 Windows (SGuard32 on x86).'
+    Write-Host 'Enter its PID. SGuard can remain running after VPN disconnect because the app stops the tunnel over RPC.'
     Write-Host 'Do not select only the UI or Xray process if another core owns the TUN.'
     $coreProcessId = 0
     if (-not [int]::TryParse((Read-Host 'TUN core PID'), [ref]$coreProcessId) -or $coreProcessId -le 0) {

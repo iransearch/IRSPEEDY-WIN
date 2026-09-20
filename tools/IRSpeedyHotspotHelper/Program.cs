@@ -167,7 +167,10 @@ internal static class Program
         ok = false,
         code = ex is HotspotException h ? h.Code : "operation-failed",
         exceptionType = ex.GetType().Name,
-        hresult = ex.HResult.ToString("X8")
+        hresult = ex.HResult.ToString("X8"),
+        stage = ex.Data["hotspot.stage"] as string ?? "unclassified",
+        callSites = new StackTrace(ex, false).GetFrames()?.Select(frame =>
+            frame.GetMethod()?.DeclaringType?.FullName + "." + frame.GetMethod()?.Name).Take(12).ToArray()
         // Never serialize request, Exception.Message/ToString(), password or MACs.
     });
 }

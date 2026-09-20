@@ -35,7 +35,10 @@ function Read-Reply {
     $line = $read.Result
     if ($null -eq $line) { throw 'Helper exited. Check Mobile Hotspot state and run recover if needed.' }
     $reply = $line | ConvertFrom-Json
-    if (-not $reply.ok) { throw ('Helper: ' + $reply.code) }
+    if (-not $reply.ok) {
+        throw ("Helper: {0}; Stage: {1}; Type: {2}; HRESULT: {3}; Calls: {4}" -f
+            $reply.code, $reply.stage, $reply.exceptionType, $reply.hresult, ($reply.callSites -join ' -> '))
+    }
     return $reply
 }
 function Send-Request($request) {
