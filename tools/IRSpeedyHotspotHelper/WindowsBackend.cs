@@ -1,0 +1,146 @@
+using System.Collections;
+using System.Net.NetworkInformation;
+using System.Runtime.InteropServices;
+using Windows.Networking.Connectivity;
+using Windows.Networking.NetworkOperators;
+
+namespace IRSpeedy.Hotspot;
+
+internal sealed class WindowsBackend : IHotspotBackend
+{
+    private NetworkOperatorTetheringManager? manager;
+    private Guid? preparedId;
+    public bool IsOn => Manager.TetheringOperationalState != TetheringOperationalState.Off;
+    public uint ClientCount => Manager.ClientCount;
+    private NetworkOperatorTetheringManager Manager => manager ?? throw new HotspotException("not-prepared");
+
+    public void Prepare(Guid publicId)
+    {
+        if (preparedId == publicId && manager is not null) return;
+        var profiles = NetworkInformation.GetConnectionProfiles()
+            .Where(p => p.NetworkAdapter?.NetworkAdapterId == publicId).ToArray();
+        if (profiles.Length != 1) throw new HotspotException("tun-winrt-profile-unavailable");
+        var capability = NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profiles[0]);
+        if (capability != TetheringCapability.Enabled)
+            throw new HotspotException("tethering-" + capability);
+        // This overload explicitly uses the supplied profile as upstream. Never
+        // call GetInternetConnectionProfile as fallback: that can share ISP traffic.
+        manager = NetworkOperatorTetheringManager.CreateFromConnectionProfile(profiles[0]);
+        preparedId = publicId;
+    }
+
+    public async Task Start(string ssid, string password)
+    {
+        if (Manager.TetheringOperationalState != TetheringOperationalState.Off)
+            throw new HotspotException("hotspot-not-off");
+        await Manager.ConfigureAccessPointAsync(new NetworkOperatorTetheringAccessPointConfiguration
+        {
+            Ssid = ssid,
+            Passphrase = password
+        });
+        var result = await Manager.StartTetheringAsync();
+        if (result.Status != TetheringOperationStatus.Success)
+            throw new HotspotException("hotspot-start-" + result.Status);
+        // No password, SSID, MAC addresses or AdditionalErrorMessage in diagnostics.
+    }
+
+    public async Task Stop()
+    {
+        if (Manager.TetheringOperationalState == TetheringOperationalState.Off) return;
+        var result = await Manager.StopTetheringAsync();
+        if (result.Status != TetheringOperationStatus.Success)
+            throw new HotspotException("hotspot-stop-" + result.Status);
+        if (Manager.TetheringOperationalState != TetheringOperationalState.Off)
+            throw new HotspotException("hotspot-stop-not-confirmed");
+    }
+
+    public IReadOnlyList<Adapter> ReadAdapters()
+    {
+        var nics = NetworkInterface.GetAllNetworkInterfaces().ToDictionary(a => Guid.Parse(a.Id));
+        var result = new List<Adapter>();
+        Visit((id, configuration) =>
+        {
+            Marshal.ThrowExceptionForHR(configuration.get_SharingEnabled(out bool enabled));
+            int? role = null;
+            if (enabled)
+            {
+                Marshal.ThrowExceptionForHR(configuration.get_SharingConnectionType(out int value));
+                role = value;
+            }
+            // Include unknown/disconnected COM connections so conflict checks cannot
+            // silently miss sharing on an adapter not present in NetworkInterface.
+            nics.TryGetValue(id, out var nic);
+            result.Add(new Adapter(id, nic?.Name ?? "", nic?.Description ?? "",
+                nic?.OperationalStatus == OperationalStatus.Up, role));
+        });
+        return result;
+    }
+
+    public void Bind(Guid publicId, Guid privateId)
+    {
+        var state = ReadAdapters();
+        Safety.RequireTun(state, publicId);
+        if (publicId == privateId || !state.Any(a => a.Id == privateId && a.Up &&
+            a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)))
+            throw new HotspotException("invalid-private-adapter");
+        if (state.Any(a => a.SharingRole.HasValue && !
+            (a.Id == publicId && a.SharingRole == 0 || a.Id == privateId && a.SharingRole == 1)))
+            throw new HotspotException("ics-ownership-conflict");
+        // Enabling public ICS can disable someone else's public ICS, so refuse all
+        // conflicts above. No global DisableSharing loop, regsvr32 or service reset.
+        if (!state.Any(a => a.Id == publicId && a.SharingRole == 0)) Enable(publicId, 0);
+        if (!state.Any(a => a.Id == privateId && a.SharingRole == 1)) Enable(privateId, 1);
+    }
+
+    private static void Enable(Guid id, int role) => WithConfiguration(id, c =>
+        Marshal.ThrowExceptionForHR(c.EnableSharing(role)));
+
+    public void Disable(Guid id, int expectedRole) => WithConfiguration(id, c =>
+    {
+        Marshal.ThrowExceptionForHR(c.get_SharingEnabled(out bool enabled));
+        if (!enabled) return;
+        Marshal.ThrowExceptionForHR(c.get_SharingConnectionType(out int role));
+        if (role != expectedRole) throw new HotspotException("ics-ownership-conflict");
+        Marshal.ThrowExceptionForHR(c.DisableSharing());
+    });
+
+    private static void WithConfiguration(Guid id, Action<IcsConfiguration> action)
+    {
+        bool found = false;
+        Visit((current, c) => { if (current == id) { found = true; action(c); } });
+        if (!found) throw new HotspotException("ics-adapter-disappeared");
+    }
+
+    private static void Visit(Action<Guid, IcsConfiguration> action)
+    {
+        object root = Activator.CreateInstance(Type.GetTypeFromProgID("HNetCfg.HNetShare", true)!)!;
+        object? collection = null;
+        IEnumerator? enumerator = null;
+        try
+        {
+            dynamic sharing = root;
+            collection = sharing.EnumEveryConnection;
+            enumerator = ((IEnumerable)collection).GetEnumerator();
+            while (enumerator.MoveNext())
+            {
+                object connection = enumerator.Current!;
+                object? properties = null;
+                object? configuration = null;
+                try
+                {
+                    properties = sharing.NetConnectionProps(connection);
+                    Guid id = Guid.Parse((string)((dynamic)properties).Guid);
+                    configuration = sharing.INetSharingConfigurationForINetConnection(connection);
+                    action(id, (IcsConfiguration)configuration);
+                }
+                finally { Release(configuration); Release(properties); Release(connection); }
+            }
+        }
+        finally { Release(enumerator); Release(collection); Release(root); }
+    }
+
+    private static void Release(object? value)
+    {
+        if (value is not null && Marshal.IsComObject(value)) Marshal.ReleaseComObject(value);
+    }
+}
