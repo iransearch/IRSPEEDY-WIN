@@ -13,6 +13,41 @@ public sealed record SharingAdapter(Guid Id, bool Up, int? Role);
 public sealed record SharingObservation(string Phase, int Poll, Guid PublicId, Guid? PrivateId, SharingAdapter[] Adapters);
 public sealed record IcsAttempt(int Attempt, int Role, string Result, string? Hresult = null);
 
+public static class IcsPreparation
+{
+    public static void ResetIncompletePrivate(Guid publicId, Guid privateId,
+        Func<IReadOnlyList<Adapter>> read, Action<Guid, int> disable,
+        Action<int> delay, Action<string> report)
+    {
+        IReadOnlyList<Adapter> CheckedRead()
+        {
+            var state = read();
+            Safety.RequireTun(state, publicId);
+            if (publicId == privateId || !state.Any(a => a.Id == privateId && a.Up &&
+                a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)))
+                throw new HotspotException("invalid-private-adapter");
+            Safety.RequireRebindPair(state, publicId, privateId, null);
+            return state;
+        }
+        var current = CheckedRead();
+        if (Safety.PairMatches(current, publicId, privateId)) { report("complete-pair-preserved"); return; }
+        if (!current.Any(a => a.Id == privateId && a.SharingRole == 1)) return;
+        report("incomplete-private-detected");
+        // This is the selected session-owned adapter, never a disable-all reset.
+        disable(privateId, 1);
+        report("disable-private-returned");
+        for (int poll = 0; poll < 5; poll++)
+        {
+            current = CheckedRead();
+            if (Safety.PairMatches(current, publicId, privateId)) { report("complete-pair-observed"); return; }
+            if (!current.Any(a => a.Id == privateId && a.SharingRole == 1))
+            { report("private-reset-verified"); return; }
+            if (poll < 4) delay(250);
+        }
+        throw new HotspotException("private-reset-not-confirmed");
+    }
+}
+
 public static class IcsRetry
 {
     // Only this HRESULT is eligible, and each fresh read revalidates ownership.

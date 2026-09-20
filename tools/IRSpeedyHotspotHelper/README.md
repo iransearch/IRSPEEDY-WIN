@@ -60,6 +60,17 @@ No firewall resets, global ICS disable, service restart or policy bypass is used
 
 ## Diagnostics
 
+Incomplete private pair: before enabling the public role, Bind re-enumerates and
+validates both owned adapters. If only the selected private has role 1, disable
+that private once, then verify the reset with up to five reads/250 ms intervals.
+A complete pair is preserved. Foreign sharing, adapter loss, disable errors or
+an unconfirmed reset abort the transaction and use normal rollback. No global
+disable loop or hard-coded private GUID is used. Diagnostics include
+ics.preparation with incomplete-private-detected / private-reset-verified and
+the failure stage ics.reset-incomplete-private. This tests the observed difference
+between a clean successful start and failing private-only starts; it does not
+prove that the private role was left over from a previous run.
+
 ICS subscriber-failure retry: EnableSharing retries only COM HRESULT 80040201,
 up to five calls per role with 250/350/500/500 ms waits. Each call uses a fresh
 EnumEveryConnection read and revalidates TUN, private adapter and sharing ownership.
@@ -109,7 +120,8 @@ persistent packet-level protection and real Windows acceptance testing.
 
 ## Verification and sources
 
-54 pure-C# simulated-backend checks pass, including bounded HRESULT-specific retries,
+59 pure-C# simulated-backend checks pass, including private-only reset ordering,
+complete-pair preservation, reset verification/conflict checks, bounded HRESULT-specific retries,
 partial native success, foreign sharing during retries, TUN loss, immediate Wi-Fi Direct binding,
 delayed/missing adapters, no client admission on ICS failure and backend-specific
 journal recovery. All helper sources compile with .NET 8 / Windows SDK 10.0.19041.56

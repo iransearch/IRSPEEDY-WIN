@@ -33,7 +33,7 @@ function Read-Reply {
     if ($null -eq $line) { throw 'Helper exited. Check Mobile Hotspot state and run recover if needed.' }
     $reply = $line | ConvertFrom-Json
     if ($null -ne $reply.backendState) {
-        Write-Host ('Wi-Fi backend: ' + ($reply.backendState | ConvertTo-Json -Compress))
+        Write-Host ('Wi-Fi backend: ' + ($reply.backendState | ConvertTo-Json -Depth 8 -Compress))
     }
     if ($null -ne $reply.observations) {
         Write-Host ('ICS observations: ' + ($reply.observations | ConvertTo-Json -Depth 6 -Compress))

@@ -347,6 +347,61 @@ internal static class Program
             });
             Check(calls == 1);
         });
+        await Test("private-only role is cleared before enabling public then private", () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true, SharingRole = 1 });
+            var calls = new List<string>();
+            IcsPreparation.ResetIncompletePrivate(Tun, Private, b.ReadAdapters, (id, role) => {
+                Check(id == Private && role == 1); calls.Add("disable-private"); b.Set(id, a => a with { SharingRole = null });
+            }, _ => { }, _ => { });
+            foreach (int role in new[] { 0, 1 })
+                IcsRetry.Enable(Tun, Private, role, b.ReadAdapters, (id, value) => {
+                    calls.Add("enable-" + value); b.Set(id, a => a with { SharingRole = value });
+                }, _ => { }, _ => { });
+            Check(calls.SequenceEqual(new[] { "disable-private", "enable-0", "enable-1" }) && Safety.PairMatches(b.Adapters, Tun, Private));
+            return Task.CompletedTask;
+        });
+        await Test("complete pair and clean baseline are never reset", () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true });
+            IcsPreparation.ResetIncompletePrivate(Tun, Private, b.ReadAdapters,
+                (_, _) => throw new Exception("Unexpected disable"), _ => { }, _ => { });
+            b.Set(Tun, a => a with { SharingRole = 0 }); b.Set(Private, a => a with { SharingRole = 1 });
+            IcsPreparation.ResetIncompletePrivate(Tun, Private, b.ReadAdapters,
+                (_, _) => throw new Exception("Unexpected disable"), _ => { }, _ => { });
+            return Task.CompletedTask;
+        });
+        await Test("foreign public prevents private reset", async () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true, SharingRole = 1 });
+            b.Set(Physical, a => a with { SharingRole = 0 });
+            await Reject("ics-ownership-conflict", () => {
+                IcsPreparation.ResetIncompletePrivate(Tun, Private, b.ReadAdapters,
+                    (_, _) => throw new Exception("Unexpected disable"), _ => { }, _ => { });
+                return Task.CompletedTask;
+            });
+        });
+        await Test("private reset must be verified before enabling anything", async () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true, SharingRole = 1 });
+            int calls = 0, delays = 0;
+            await Reject("private-reset-not-confirmed", () => {
+                IcsPreparation.ResetIncompletePrivate(Tun, Private, b.ReadAdapters, (_, _) => calls++, _ => delays++, _ => { });
+                return Task.CompletedTask;
+            });
+            Check(calls == 1 && delays == 4);
+        });
+        await Test("foreign sharing appearing during reset stops verification", async () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true, SharingRole = 1 });
+            await Reject("ics-ownership-conflict", () => {
+                IcsPreparation.ResetIncompletePrivate(Tun, Private, b.ReadAdapters, (_, _) => {
+                    b.Set(Physical, a => a with { SharingRole = 0 });
+                }, _ => throw new Exception("Unexpected wait"), _ => { });
+                return Task.CompletedTask;
+            });
+            Check(b.Adapters.Single(a => a.Id == Physical).SharingRole == 0);
+        });
         Console.WriteLine($"PASS: {passed} hotspot safety checks; no Windows/network mutation performed.");
     }
 
