@@ -26,6 +26,14 @@ tun2socks is added; SGuard continues to own the existing TUN.
 The ordering is independently implemented; no nestchao source was copied.
 Keep THIRD-PARTY-NOTICES.txt for the existing ICS interface attribution.
 
+Profile lookup correction: startup now passes the ConnectionProfile returned by
+GetInternetConnectionProfile directly to the tethering APIs. It no longer assumes
+GetConnectionProfiles contains exactly one match for that adapter. Recovery uses
+the current Internet profile only when its GUID matches the journal, otherwise
+it requires one exact enumerated match. Missing and ambiguous recovery profiles
+have separate errors with an explicit stage. This addresses the observed
+pre-start winrt-profile-unavailable failure; hardware verification is still needed.
+
 ## Build and run
 
 Download the complete agent/windows-hotspot-poc branch and run Build-Hotspot.cmd

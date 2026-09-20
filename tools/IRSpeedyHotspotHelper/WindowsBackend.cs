@@ -18,25 +18,51 @@ internal sealed class WindowsBackend : IHotspotBackend
     public void PrepareBootstrap(Guid publicId)
     {
         Safety.RequireTun(ReadAdapters(), publicId);
-        var profile = Step("winrt.find-bootstrap-profile", NetworkInformation.GetInternetConnectionProfile);
-        var id = profile?.NetworkAdapter?.NetworkAdapterId;
-        if (id is null || id == Guid.Empty) throw new HotspotException("internet-profile-unavailable");
-        Prepare(id.Value);
-        BootstrapId = id.Value;
+        var profile = Step("winrt.find-bootstrap-profile", () =>
+            NetworkInformation.GetInternetConnectionProfile() ?? throw new HotspotException("internet-profile-unavailable"));
+        var id = Step("winrt.read-bootstrap-adapter", () =>
+        {
+            var value = profile.NetworkAdapter?.NetworkAdapterId;
+            if (value is null || value == Guid.Empty) throw new HotspotException("internet-profile-adapter-unavailable");
+            return value.Value;
+        });
+        // Keep the actual object returned by WinRT. Re-enumeration can omit it
+        // or return multiple profiles on the same adapter; neither invalidates it.
+        PrepareProfile(profile, id);
+        BootstrapId = id;
     }
 
     public void Prepare(Guid publicId)
     {
         if (preparedId == publicId && manager is not null) return;
-        var profiles = Step("winrt.find-profile", () => NetworkInformation.GetConnectionProfiles()
-            .Where(p => p.NetworkAdapter?.NetworkAdapterId == publicId).ToArray());
-        if (profiles.Length != 1) throw new HotspotException("winrt-profile-unavailable");
-        var capability = Step("winrt.check-capability", () => NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profiles[0]));
-        if (capability != TetheringCapability.Enabled)
-            throw new HotspotException("tethering-" + capability);
+        var profile = Step("winrt.find-recovery-profile", () =>
+        {
+            // The default is usable for recovery ONLY if it matches the saved GUID.
+            var current = NetworkInformation.GetInternetConnectionProfile();
+            if (current?.NetworkAdapter?.NetworkAdapterId == publicId) return current;
+            var matches = NetworkInformation.GetConnectionProfiles()
+                .Where(p => p.NetworkAdapter?.NetworkAdapterId == publicId).ToArray();
+            if (matches.Length == 0) throw new HotspotException("winrt-profile-unavailable");
+            if (matches.Length != 1) throw new HotspotException("winrt-profile-ambiguous");
+            return matches[0];
+        });
+        PrepareProfile(profile, publicId);
+    }
+
+    private void PrepareProfile(ConnectionProfile profile, Guid adapterId)
+    {
+        Step("winrt.check-capability", () =>
+        {
+            if (profile.NetworkAdapter?.NetworkAdapterId != adapterId)
+                throw new HotspotException("winrt-profile-adapter-changed");
+            var capability = NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profile);
+            if (capability != TetheringCapability.Enabled)
+                throw new HotspotException("tethering-" + capability);
+            return true;
+        });
         // Exact recorded profile: recovery must never choose a new default upstream.
-        manager = Step("winrt.create-manager", () => NetworkOperatorTetheringManager.CreateFromConnectionProfile(profiles[0]));
-        preparedId = publicId;
+        manager = Step("winrt.create-manager", () => NetworkOperatorTetheringManager.CreateFromConnectionProfile(profile));
+        preparedId = adapterId;
     }
 
     public async Task Start(string ssid, string password)
