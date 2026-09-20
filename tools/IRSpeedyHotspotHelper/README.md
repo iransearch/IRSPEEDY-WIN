@@ -37,6 +37,24 @@ The existing proxy-based Share VPN remains unchanged. Base reviewed:
 
 ## Build and automated checks
 
+For the guided Windows path, double-click `Build-Hotspot.cmd` at the repository
+root. Install the **.NET 8 SDK x64** first (not just the runtime) and download the
+complete `agent/windows-hotspot-poc` branch. The CMD runs safety checks, builds and
+publishes a self-contained win-x64 helper to a fresh
+`artifacts/hotspot-poc/build-*/publish` directory. Its sibling `build.log` records all
+build/test output. A failed step stops the flow; an older executable is never launched.
+
+Choose Y after a successful build to open the guided test. Only the test requests
+UAC elevation. It finds the active TUN GUID, shows candidate process names/PIDs,
+and asks you to identify the core owning the TUN; names alone cannot prove ownership.
+It then prompts for the temporary Wi-Fi password and runs for 120 seconds (Q stops).
+No PowerShell execution policy is changed. This wrapper has been source-reviewed;
+CMD/PowerShell execution, UAC, publishing and Wi-Fi operation require a Windows test.
+
+Keep the entire published folder together when moving to another x64 test PC.
+The build machine needs SDK/NuGet; the self-contained output does not need a
+separate .NET runtime install. Do not put passwords in CMD arguments or build logs.
+
 From the repository root, with .NET 8 SDK and NuGet access:
 
 ```powershell
