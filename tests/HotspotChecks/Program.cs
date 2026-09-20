@@ -278,6 +278,75 @@ internal static class Program
             await new Session(b, j).Stop();
             Check(j.Value is null && !b.IsOn && !b.ClientsEnabled);
         });
+        await Test("ICS subscriber failure succeeds on third attempt", () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true });
+            int calls = 0; var waits = new List<int>();
+            IcsRetry.Enable(Tun, Private, 0, b.ReadAdapters, (id, role) =>
+            {
+                if (++calls < 3) throw new System.Runtime.InteropServices.COMException("test", IcsRetry.SubscriberFailure);
+                b.Set(id, a => a with { SharingRole = role });
+            }, waits.Add, _ => { });
+            Check(calls == 3 && waits.SequenceEqual(new[] { 250, 350 }));
+            return Task.CompletedTask;
+        });
+        await Test("persistent subscriber failure is bounded to five attempts", () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true });
+            int calls = 0, sleeps = 0;
+            try {
+                IcsRetry.Enable(Tun, Private, 0, b.ReadAdapters, (_, _) => {
+                    calls++; throw new System.Runtime.InteropServices.COMException("test", IcsRetry.SubscriberFailure);
+                }, _ => sleeps++, _ => { });
+                throw new Exception("Expected failure");
+            } catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult == IcsRetry.SubscriberFailure) { }
+            Check(calls == 5 && sleeps == 4); return Task.CompletedTask;
+        });
+        await Test("other HRESULT is not retried", () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true });
+            int calls = 0;
+            try {
+                IcsRetry.Enable(Tun, Private, 0, b.ReadAdapters, (_, _) => {
+                    calls++; throw new System.Runtime.InteropServices.COMException("test", unchecked((int)0x80070005));
+                }, _ => throw new Exception("Unexpected delay"), _ => { });
+                throw new Exception("Expected failure");
+            } catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult == unchecked((int)0x80070005)) { }
+            Check(calls == 1); return Task.CompletedTask;
+        });
+        await Test("foreign sharing appearing after failed call stops retries", async () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true }); int calls = 0;
+            await Reject("ics-ownership-conflict", () => {
+                IcsRetry.Enable(Tun, Private, 0, b.ReadAdapters, (_, _) => {
+                    calls++; b.Set(Physical, a => a with { SharingRole = 0 });
+                    throw new System.Runtime.InteropServices.COMException("test", IcsRetry.SubscriberFailure);
+                }, _ => throw new Exception("Unexpected delay"), _ => { });
+                return Task.CompletedTask;
+            });
+            Check(calls == 1 && b.Adapters.Single(a => a.Id == Physical).SharingRole == 0);
+        });
+        await Test("partially successful call is verified without duplicate write", () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true }); int calls = 0;
+            var reports = new List<IcsAttempt>();
+            IcsRetry.Enable(Tun, Private, 0, b.ReadAdapters, (id, role) => {
+                calls++; b.Set(id, a => a with { SharingRole = role });
+                throw new System.Runtime.InteropServices.COMException("test", IcsRetry.SubscriberFailure);
+            }, _ => throw new Exception("Unexpected delay"), reports.Add);
+            Check(calls == 1 && reports.Last().Result == "verified-after-error"); return Task.CompletedTask;
+        });
+        await Test("TUN disappears during backoff aborts before next write", async () =>
+        {
+            var (_, b, _) = New(); b.Set(Private, a => a with { Up = true }); int calls = 0;
+            await Reject("active-irspeedy-tun-required", () => {
+                IcsRetry.Enable(Tun, Private, 0, b.ReadAdapters, (_, _) => {
+                    calls++; throw new System.Runtime.InteropServices.COMException("test", IcsRetry.SubscriberFailure);
+                }, _ => b.Set(Tun, a => a with { Up = false }), _ => { });
+                return Task.CompletedTask;
+            });
+            Check(calls == 1);
+        });
         Console.WriteLine($"PASS: {passed} hotspot safety checks; no Windows/network mutation performed.");
     }
 

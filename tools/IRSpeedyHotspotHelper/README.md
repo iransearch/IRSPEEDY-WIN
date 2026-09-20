@@ -60,6 +60,17 @@ No firewall resets, global ICS disable, service restart or policy bypass is used
 
 ## Diagnostics
 
+ICS subscriber-failure retry: EnableSharing retries only COM HRESULT 80040201,
+up to five calls per role with 250/350/500/500 ms waits. Each call uses a fresh
+EnumEveryConnection read and revalidates TUN, private adapter and sharing ownership.
+Foreign sharing, missing/down adapters and other HRESULTs abort immediately.
+After a failing call, inspect actual state: an already-applied role is not written
+twice. The complete pair must still pass normal verification before credentials
+are released. Exhaustion preserves the COM error and triggers rollback.
+The diagnostic ics.enableAttempts array records each attempt/result/HRESULT.
+On failure the test driver also reads SharedAccess, Netman and EventSystem status;
+it does not restart services. A transient cause is not yet established on the test PC.
+
 Startup mode is wifi-direct. Errors expose separate wfd.* or ics.* stages.
 Wi-Fi backend reports publisherStatus, publisherError and sanitized connectionError.
 ICS observations record wfd-adapter-ready, before-bind, bind-verify and failure state.
@@ -98,7 +109,8 @@ persistent packet-level protection and real Windows acceptance testing.
 
 ## Verification and sources
 
-48 pure-C# simulated-backend checks pass, including immediate Wi-Fi Direct binding,
+54 pure-C# simulated-backend checks pass, including bounded HRESULT-specific retries,
+partial native success, foreign sharing during retries, TUN loss, immediate Wi-Fi Direct binding,
 delayed/missing adapters, no client admission on ICS failure and backend-specific
 journal recovery. All helper sources compile with .NET 8 / Windows SDK 10.0.19041.56
 using Roslyn directly on Linux. This does not validate Windows publishing, UAC,

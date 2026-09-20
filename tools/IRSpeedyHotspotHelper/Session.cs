@@ -11,6 +11,44 @@ public sealed record Adapter(Guid Id, string Name, string Description, bool Up, 
 public sealed record Journal(int Version, Guid PublicId, Guid? PrivateId, bool StartAttempted, Guid? BootstrapId = null, string Kind = "mobile-hotspot");
 public sealed record SharingAdapter(Guid Id, bool Up, int? Role);
 public sealed record SharingObservation(string Phase, int Poll, Guid PublicId, Guid? PrivateId, SharingAdapter[] Adapters);
+public sealed record IcsAttempt(int Attempt, int Role, string Result, string? Hresult = null);
+
+public static class IcsRetry
+{
+    // Only this HRESULT is eligible, and each fresh read revalidates ownership.
+    public const int SubscriberFailure = unchecked((int)0x80040201);
+    public static void Enable(Guid publicId, Guid privateId, int role,
+        Func<IReadOnlyList<Adapter>> read, Action<Guid, int> enable,
+        Action<int> delay, Action<IcsAttempt> report)
+    {
+        int[] waits = [250, 350, 500, 500];
+        Guid target = role == 0 ? publicId : privateId;
+        bool AlreadyEnabled()
+        {
+            var state = read();
+            Safety.RequireTun(state, publicId);
+            if (publicId == privateId || !state.Any(a => a.Id == privateId && a.Up &&
+                a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)))
+                throw new HotspotException("invalid-private-adapter");
+            Safety.RequireRebindPair(state, publicId, privateId, null);
+            return state.Any(a => a.Id == target && a.SharingRole == role);
+        }
+        for (int attempt = 1; attempt <= waits.Length + 1; attempt++)
+        {
+            if (AlreadyEnabled()) { report(new(attempt, role, "already-enabled")); return; }
+            try { enable(target, role); report(new(attempt, role, "call-succeeded")); return; }
+            catch (System.Runtime.InteropServices.COMException ex) when (ex.HResult == SubscriberFailure)
+            {
+                report(new(attempt, role, "subscriber-failure", ex.HResult.ToString("X8")));
+                // A failing native call may nevertheless have changed ICS. Never
+                // repeat a mutation blindly or overwrite a newly shared foreign pair.
+                if (AlreadyEnabled()) { report(new(attempt, role, "verified-after-error")); return; }
+                if (attempt > waits.Length) throw;
+                delay(waits[attempt - 1]);
+            }
+        }
+    }
+}
 
 public interface IJournal
 {
@@ -126,7 +164,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
                 if (State.PrivateId is not Guid privateId)
                     throw new HotspotException("hotspot-adapter-not-ready");
                 Observe("before-bind", 0, backend.ReadAdapters());
-                backend.Bind(publicId, privateId); // at most one attempt; errors remain failures
+                backend.Bind(publicId, privateId); // one transaction; native retry is bounded by IcsRetry
                 if (!await WaitForPair(before, publicId, "bind-verify"))
                     throw new HotspotException("ics-verification-failed");
             }

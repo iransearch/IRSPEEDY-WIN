@@ -10,6 +10,8 @@ internal sealed class WindowsBackend : IHotspotBackend
 {
     private NetworkOperatorTetheringManager? manager;
     private Guid? preparedId;
+    private readonly List<IcsAttempt> attempts = new();
+    public object Diagnostics => new { enableAttempts = attempts.ToArray() };
     public Guid? BootstrapId { get; private set; }
     public bool IsOn => Step("winrt.read-state", () => Manager.TetheringOperationalState != TetheringOperationalState.Off);
     public uint ClientCount => Manager.ClientCount;
@@ -120,6 +122,7 @@ internal sealed class WindowsBackend : IHotspotBackend
 
     public void Bind(Guid publicId, Guid privateId)
     {
+        attempts.Clear();
         var state = ReadAdapters();
         Safety.RequireTun(state, publicId);
         if (publicId == privateId || !state.Any(a => a.Id == privateId && a.Up &&
@@ -142,9 +145,16 @@ internal sealed class WindowsBackend : IHotspotBackend
             throw new HotspotException("ics-ownership-conflict");
         // Enabling public ICS can disable someone else's public ICS, so refuse all
         // conflicts above. No global DisableSharing loop, regsvr32 or service reset.
-        if (!state.Any(a => a.Id == publicId && a.SharingRole == 0)) Enable(publicId, 0);
-        if (!state.Any(a => a.Id == privateId && a.SharingRole == 1)) Enable(privateId, 1);
+        EnableWithRetry(publicId, privateId, 0);
+        EnableWithRetry(publicId, privateId, 1);
     }
+
+    private void EnableWithRetry(Guid publicId, Guid privateId, int role) =>
+        Step(role == 0 ? "ics.enable-public" : "ics.enable-private", () =>
+        {
+            IcsRetry.Enable(publicId, privateId, role, ReadAdapters, Enable, Thread.Sleep, attempts.Add);
+            return true;
+        });
 
     private static void Enable(Guid id, int role) => Step(role == 0 ? "ics.enable-public" : "ics.enable-private", () =>
     {

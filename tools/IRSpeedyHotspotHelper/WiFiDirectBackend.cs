@@ -24,7 +24,7 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
     public bool IsOn => publisher?.Status == WiFiDirectAdvertisementPublisherStatus.Started;
     public uint ClientCount { get { lock (sync) return (uint)clients.Count; } }
     public object Diagnostics { get { lock (sync) return new { mode = Kind, publisherStatus = status,
-        publisherError, connectionError, pendingConnections = pending }; } }
+        publisherError, connectionError, pendingConnections = pending, ics = sharing.Diagnostics }; } }
 
     public IReadOnlyList<Adapter> ReadAdapters() => sharing.ReadAdapters();
     public void Prepare(Guid publicId) { } // Recovery needs no TUN/Internet profile.
