@@ -54,7 +54,7 @@ internal static class Program
             await Reject("existing-hotspot-conflict", () => s.Start(Tun, "Test", "12345678", true));
             Check(b.Stops == 0);
         });
-        await Test("missing TUN WinRT profile is not replaced by physical profile", async () =>
+        await Test("unavailable startup profile prevents network mutation", async () =>
         {
             var (s, b, j) = New(); b.FailPrepare = true;
             await Reject("tun-winrt-profile-unavailable", () => s.Start(Tun, "Test", "12345678", true));
@@ -134,7 +134,7 @@ internal static class Program
         });
         await Test("unknown journal version rejected", async () =>
         {
-            var (s, b, j) = New(); j.Value = new Journal(2, Tun, Private, true);
+            var (s, b, j) = New(); j.Value = new Journal(3, Tun, Private, true);
             await Reject("invalid-recovery-journal", () => s.Stop()); Check(b.Stops == 0);
         });
         await Test("WinRT-ready pair avoids all Bind writes", async () =>
@@ -193,6 +193,49 @@ internal static class Program
             await Reject("active-irspeedy-tun-required", () => s.Start(Tun, "Test", "12345678", true));
             Check(b.BindCalls == 0 && !b.IsOn);
         });
+        await Test("bootstrap pair transfers to TUN and is journaled before start", async () =>
+        {
+            var (s, b, j) = New(); b.BootstrapId = Physical;
+            b.OnRead = x => { if (x.BindCalls == 0) {
+                x.Set(Physical, a => a with { SharingRole = 0 });
+                x.Set(Private, a => a with { SharingRole = 1 });
+            }};
+            await s.Start(Tun, "Test", "12345678", true);
+            Check(s.Active && s.Healthy() && j.Value?.BootstrapId == Physical && j.Value.Version == 2);
+            Check(b.Adapters.Single(a => a.Id == Physical).SharingRole is null);
+            await s.Stop(); Check(j.Value is null);
+        });
+        await Test("incomplete bootstrap pair fails without claiming success", async () =>
+        {
+            var (s, b, j) = New(); b.BootstrapId = Physical;
+            b.OnRead = x => x.Set(Physical, a => a with { SharingRole = 0 });
+            await Reject("bootstrap-pair-incomplete", () => s.Start(Tun, "Test", "12345678", true));
+            Check(!s.Active && j.Value is null && b.Adapters.All(a => a.SharingRole is null));
+        });
+        await Test("unrelated sharing during bootstrap is preserved", async () =>
+        {
+            var (s, b, j) = New(); b.BootstrapId = Physical;
+            b.Adapters.Add(new(Other, "Other", "Ethernet", true, null));
+            b.OnRead = x => x.Set(Other, a => a with { SharingRole = 0 });
+            await Reject("start-failed-recovery-required", () => s.Start(Tun, "Test", "12345678", true));
+            Check(b.BindCalls == 0 && j.Value is not null && b.Adapters.Single(a => a.Id == Other).SharingRole == 0);
+        });
+        await Test("bootstrap hard-crash journal cleans up startup upstream", async () =>
+        {
+            var (s, b, j) = New(); b.BootstrapId = Physical;
+            j.Value = new Journal(2, Tun, Private, true, Physical); b.IsOn = true;
+            b.Set(Physical, a => a with { SharingRole = 0 }); b.Set(Private, a => a with { SharingRole = 1 });
+            await s.Stop(); Check(j.Value is null && b.Adapters.All(a => a.SharingRole is null));
+        });
+        await Test("bootstrap failure rolls back both upstreams", async () =>
+        {
+            var (s, b, j) = New(); b.BootstrapId = Physical; b.FailBind = true;
+            b.OnRead = x => { if (x.BindCalls == 0) {
+                x.Set(Physical, a => a with { SharingRole = 0 }); x.Set(Private, a => a with { SharingRole = 1 });
+            }};
+            await Reject("bind-failed", () => s.Start(Tun, "Test", "12345678", true));
+            Check(j.Value is null && !s.Active && b.Adapters.All(a => a.SharingRole is null));
+        });
         Console.WriteLine($"PASS: {passed} hotspot safety checks; no Windows/network mutation performed.");
     }
 
@@ -226,13 +269,16 @@ internal static class Program
         public int Starts, Stops, BindCalls;
         public Action<FakeBackend>? OnRead;
         public bool IsOn { get; set; }
+        public Guid? BootstrapId { get; set; }
+        public void PrepareBootstrap(Guid id) { Prepare(id); }
         public uint ClientCount => 0;
         public IReadOnlyList<Adapter> ReadAdapters() { if (IsOn) OnRead?.Invoke(this); return Adapters.ToArray(); }
         public void Set(Guid id, Func<Adapter, Adapter> update) => Adapters = Adapters.Select(a => a.Id == id ? update(a) : a).ToList();
-        public void Prepare(Guid id) { Check(id == Tun); if (FailPrepare) throw new HotspotException("tun-winrt-profile-unavailable"); }
+        public void Prepare(Guid id) { Check(id == Tun || id == BootstrapId); if (FailPrepare) throw new HotspotException("tun-winrt-profile-unavailable"); }
         public Task Start(string ssid, string password)
         {
             Check(journal.Value?.StartAttempted == true); Starts++; IsOn = true;
+            Check(journal.Value!.BootstrapId == BootstrapId);
             Set(Private, a => a with { Up = true });
             if (AmbiguousPrivate) Adapters.Add(new(Other, "Other", "Microsoft Wi-Fi Direct Virtual Adapter #2", true, null));
             if (FailStart) throw new HotspotException("start-failed");
@@ -247,13 +293,15 @@ internal static class Program
         {
             BindCalls++;
             Check(publicId == Tun && privateId == Private && journal.Value?.PrivateId == Private);
+            Safety.RequireRebindPair(Adapters, publicId, privateId, BootstrapId);
+            if (BootstrapId is Guid bootstrap && bootstrap != Tun) Set(bootstrap, a => a with { SharingRole = null });
             Set(Tun, a => a with { SharingRole = 0 });
             if (FailBind) throw new HotspotException("bind-failed");
             if (!SkipBind) Set(Private, a => a with { SharingRole = 1 });
         }
         public void Disable(Guid id, int expectedRole)
         {
-            Check(id == Tun || id == Private);
+            Check(id == Tun || id == Private || id == BootstrapId);
             Set(id, a => a with { SharingRole = null });
         }
     }

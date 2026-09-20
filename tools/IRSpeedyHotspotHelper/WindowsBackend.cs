@@ -10,21 +10,31 @@ internal sealed class WindowsBackend : IHotspotBackend
 {
     private NetworkOperatorTetheringManager? manager;
     private Guid? preparedId;
+    public Guid? BootstrapId { get; private set; }
     public bool IsOn => Step("winrt.read-state", () => Manager.TetheringOperationalState != TetheringOperationalState.Off);
     public uint ClientCount => Manager.ClientCount;
     private NetworkOperatorTetheringManager Manager => manager ?? throw new HotspotException("not-prepared");
+
+    public void PrepareBootstrap(Guid publicId)
+    {
+        Safety.RequireTun(ReadAdapters(), publicId);
+        var profile = Step("winrt.find-bootstrap-profile", NetworkInformation.GetInternetConnectionProfile);
+        var id = profile?.NetworkAdapter?.NetworkAdapterId;
+        if (id is null || id == Guid.Empty) throw new HotspotException("internet-profile-unavailable");
+        Prepare(id.Value);
+        BootstrapId = id.Value;
+    }
 
     public void Prepare(Guid publicId)
     {
         if (preparedId == publicId && manager is not null) return;
         var profiles = Step("winrt.find-profile", () => NetworkInformation.GetConnectionProfiles()
             .Where(p => p.NetworkAdapter?.NetworkAdapterId == publicId).ToArray());
-        if (profiles.Length != 1) throw new HotspotException("tun-winrt-profile-unavailable");
+        if (profiles.Length != 1) throw new HotspotException("winrt-profile-unavailable");
         var capability = Step("winrt.check-capability", () => NetworkOperatorTetheringManager.GetTetheringCapabilityFromConnectionProfile(profiles[0]));
         if (capability != TetheringCapability.Enabled)
             throw new HotspotException("tethering-" + capability);
-        // This overload explicitly uses the supplied profile as upstream. Never
-        // call GetInternetConnectionProfile as fallback: that can share ISP traffic.
+        // Exact recorded profile: recovery must never choose a new default upstream.
         manager = Step("winrt.create-manager", () => NetworkOperatorTetheringManager.CreateFromConnectionProfile(profiles[0]));
         preparedId = publicId;
     }
@@ -89,6 +99,18 @@ internal sealed class WindowsBackend : IHotspotBackend
         if (publicId == privateId || !state.Any(a => a.Id == privateId && a.Up &&
             a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)))
             throw new HotspotException("invalid-private-adapter");
+        Safety.RequireRebindPair(state, publicId, privateId, BootstrapId);
+        if (Safety.PairMatches(state, publicId, privateId)) return;
+        if (BootstrapId is Guid bootstrapId && bootstrapId != publicId &&
+            state.Any(a => a.Id == bootstrapId && a.SharingRole == 0))
+        {
+            // Only the pair created after our empty baseline can be transferred.
+            Step("ics.disable-bootstrap-public", () => { Disable(bootstrapId, 0); return true; });
+            if (state.Any(a => a.Id == privateId && a.SharingRole == 1))
+                Step("ics.disable-bootstrap-private", () => { Disable(privateId, 1); return true; });
+        }
+        state = ReadAdapters();
+        Safety.RequireTun(state, publicId);
         if (state.Any(a => a.SharingRole.HasValue && !
             (a.Id == publicId && a.SharingRole == 0 || a.Id == privateId && a.SharingRole == 1)))
             throw new HotspotException("ics-ownership-conflict");

@@ -4,7 +4,6 @@ param(
     [Parameter(Mandatory=$true)][string]$HelperPath,
     [Parameter(Mandatory=$true)][Guid]$TunId,
     [Parameter(Mandatory=$true)][int]$CorePid,
-    [string]$Ssid = 'IRSpeedy-Test',
     [ValidateRange(10, 600)][int]$Seconds = 120,
     [switch]$Experimental
 )
@@ -24,8 +23,6 @@ $start.StandardOutputEncoding = [Text.UTF8Encoding]::new($false)
 $start.CreateNoWindow = $true
 $process = [Diagnostics.Process]::new()
 $process.StartInfo = $start
-$securePassword = $null
-$plainPassword = $null
 $started = $false
 $inputWriter = $null
 
@@ -52,18 +49,18 @@ function Send-Request($request) {
 }
 
 try {
-    $securePassword = Read-Host 'Temporary hotspot password (8-63 printable ASCII characters)' -AsSecureString
+    Write-Host 'Preparing hotspot, then transferring sharing to irspeedy-tun. Credentials appear only after verification.'
     $started = $process.Start()
     $inputWriter = [IO.StreamWriter]::new($process.StandardInput.BaseStream, [Text.UTF8Encoding]::new($false))
     $ready = Read-Reply
     if ($ready.recoveryRequired) { throw 'Run recover before starting a new test.' }
-    $pointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-    try { $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($pointer) }
-    finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($pointer) }
     $request = @{ command='start'; tunId=$TunId.ToString(); corePid=$CorePid;
-        ssid=$Ssid; password=$plainPassword; experimental=$true }
-    try { Send-Request $request | Out-Host }
-    finally { $request.password = ''; $plainPassword = $null }
+        experimental=$true }
+    $active = Send-Request $request
+    Write-Host ('Startup mode: ' + $active.startupMode)
+    Write-Host ('Test Wi-Fi: ' + $active.ssid)
+    Write-Host ('Temporary Wi-Fi password: ' + $active.password)
+    $active.password = ''
     Write-Host 'Connect a test device with proxy disabled. Press Q to stop. Do not use sensitive traffic.'
     $clock = [Diagnostics.Stopwatch]::StartNew()
     while ($clock.Elapsed.TotalSeconds -lt $Seconds -and -not $process.HasExited) {
@@ -75,8 +72,6 @@ try {
     Send-Request @{ command='stop' } | Out-Host
 }
 finally {
-    $plainPassword = $null
-    if ($null -ne $securePassword) { $securePassword.Dispose() }
     if ($started -and -not $process.HasExited) {
         # EOF requests orderly cleanup. Never force-kill an elevated network helper
         # here: a Windows API call could still be completing in the background.

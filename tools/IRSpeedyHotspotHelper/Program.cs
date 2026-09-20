@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Security.Principal;
+using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace IRSpeedy.Hotspot;
@@ -83,7 +84,8 @@ internal static class Program
                     {
                         case "capability":
                             Emit(new { ok = true, command = request.Command, adapters = backend.ReadAdapters(),
-                                recoveryRequired = journal.Read() is not null, requiresTunProfile = true,
+                                recoveryRequired = journal.Read() is not null, requiresTunProfile = false,
+                                startupMode = "default-profile-then-tun-v2",
                                 leakProtectionVerified = false });
                             break;
                         case "start":
@@ -93,10 +95,24 @@ internal static class Program
                             core = Process.GetProcessById(request.CorePid);
                             if (core.HasExited) throw new HotspotException("core-not-running");
                             coreStarted = core.StartTime.ToUniversalTime();
-                            try { await session.Start(request.TunId, request.Ssid, request.Password, request.Experimental); }
+                            // Never start a physical upstream with credentials already known to clients.
+                            // This secret is returned only after exact TUN/private ICS verification.
+                            var accessPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+                            var accessSsid = "IRSpeedy-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
+                            try
+                            {
+                                await session.Start(request.TunId, accessSsid, accessPassword, request.Experimental);
+                                if (core.HasExited || core.StartTime.ToUniversalTime() != coreStarted || !session.Healthy())
+                                {
+                                    await session.Stop();
+                                    throw new HotspotException("core-or-tun-lost-during-start");
+                                }
+                            }
                             finally { request.Password = ""; }
                             lease.Restart();
-                            Emit(new { ok = true, state = "active", experimental = true, observations = session.Observations });
+                            Emit(new { ok = true, state = "active", experimental = true,
+                                startupMode = "default-profile-then-tun-v2", ssid = accessSsid, password = accessPassword,
+                                observations = session.Observations });
                             break;
                         case "heartbeat":
                             lease.Restart();

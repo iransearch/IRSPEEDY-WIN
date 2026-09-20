@@ -8,7 +8,7 @@ public sealed class HotspotException(string code) : Exception(code)
 }
 
 public sealed record Adapter(Guid Id, string Name, string Description, bool Up, int? SharingRole);
-public sealed record Journal(int Version, Guid PublicId, Guid? PrivateId, bool StartAttempted);
+public sealed record Journal(int Version, Guid PublicId, Guid? PrivateId, bool StartAttempted, Guid? BootstrapId = null);
 public sealed record SharingAdapter(Guid Id, bool Up, int? Role);
 public sealed record SharingObservation(string Phase, int Poll, Guid PublicId, Guid? PrivateId, SharingAdapter[] Adapters);
 
@@ -23,6 +23,8 @@ public interface IHotspotBackend
 {
     IReadOnlyList<Adapter> ReadAdapters();
     void Prepare(Guid publicId);
+    void PrepareBootstrap(Guid publicId);
+    Guid? BootstrapId { get; }
     Task Start(string ssid, string password);
     Task Stop();
     void Bind(Guid publicId, Guid privateId);
@@ -69,6 +71,17 @@ public static class Safety
         return shared.Length == 2 && shared.Any(a => a.Id == publicId && a.Up && a.SharingRole == 0) &&
             shared.Any(a => a.Id == privateId && a.Up && a.SharingRole == 1);
     }
+
+    public static void RequireRebindPair(IReadOnlyList<Adapter> adapters, Guid publicId, Guid privateId, Guid? bootstrapId)
+    {
+        var shared = adapters.Where(a => a.SharingRole.HasValue).ToArray();
+        if (shared.Any(a => !(a.Id == publicId && a.SharingRole == 0 ||
+            a.Id == privateId && a.SharingRole == 1 || a.Id == bootstrapId && a.SharingRole == 0)))
+            throw new HotspotException("ics-ownership-conflict");
+        if (bootstrapId != publicId && shared.Any(a => a.Id == bootstrapId && a.SharingRole == 0) &&
+            !PairMatches(adapters, bootstrapId!.Value, privateId))
+            throw new HotspotException("bootstrap-pair-incomplete");
+    }
 }
 
 // Commands are serialized by the host. No thread is allowed to start/stop concurrently.
@@ -92,9 +105,9 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
         // Existing ICS is deliberately NOT taken over in this PoC. Its empty baseline
         // is the snapshot, so rollback never needs to disturb another application's pair.
         if (before.Any(a => a.SharingRole.HasValue)) throw new HotspotException("existing-ics-conflict");
-        backend.Prepare(publicId);
+        backend.PrepareBootstrap(publicId);
         if (backend.IsOn) throw new HotspotException("existing-hotspot-conflict");
-        State = new Journal(1, publicId, null, false);
+        State = new Journal(backend.BootstrapId.HasValue ? 2 : 1, publicId, null, false, backend.BootstrapId);
         journal.Write(State);
         try
         {
@@ -153,7 +166,8 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
                 catch (HotspotException ex) when (ex.Code == "hotspot-adapter-not-ready") { }
             }
             if (current.Any(a => a.SharingRole.HasValue && !
-                (a.Id == publicId && a.SharingRole == 0 || a.Id == State.PrivateId && a.SharingRole == 1)))
+                (a.Id == publicId && a.SharingRole == 0 || a.Id == State.PrivateId && a.SharingRole == 1 ||
+                 phase == "winrt-settle" && a.Id == State.BootstrapId && a.SharingRole == 0)))
                 throw new HotspotException("ics-ownership-conflict");
             if (State.PrivateId is Guid privateId && Safety.PairMatches(current, publicId, privateId)) return true;
             if (poll < LastPoll) await pause();
@@ -183,17 +197,21 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
         Active = false;
         var state = State ?? journal.Read();
         if (state is null) return;
-        if (state.Version != 1 || state.PublicId == Guid.Empty || state.PrivateId == state.PublicId)
+        if (state.Version is not (1 or 2) || state.Version == 2 && state.BootstrapId is null ||
+            state.Version == 1 && state.BootstrapId.HasValue ||
+            state.PublicId == Guid.Empty || state.PrivateId == state.PublicId ||
+            state.BootstrapId == Guid.Empty || state.BootstrapId.HasValue && state.BootstrapId == state.PrivateId)
             throw new HotspotException("invalid-recovery-journal");
         State = state;
-        // If the original TUN profile is gone, Prepare fails. Keep the journal and
-        // require manual hotspot shutdown; never start or select a physical upstream.
-        backend.Prepare(state.PublicId);
+        // Recover the exact recorded startup profile, never the current default.
+        backend.Prepare(state.BootstrapId ?? state.PublicId);
         if (state.StartAttempted) await backend.Stop();
         var afterStop = backend.ReadAdapters();
         if (state.PrivateId is Guid privateId && afterStop.Any(a => a.Id == privateId))
             backend.Disable(privateId, 1);
         if (afterStop.Any(a => a.Id == state.PublicId)) backend.Disable(state.PublicId, 0);
+        if (state.BootstrapId is Guid bootstrapId && bootstrapId != state.PublicId &&
+            afterStop.Any(a => a.Id == bootstrapId)) backend.Disable(bootstrapId, 0);
         // The accepted baseline had NO ICS; any remaining sharing means restoration
         // is not proven. Keep the journal, but do not disable an unrelated pair.
         if (backend.IsOn || backend.ReadAdapters().Any(a => a.SharingRole.HasValue))
