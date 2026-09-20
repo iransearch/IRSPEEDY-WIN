@@ -8,7 +8,7 @@ public sealed class HotspotException(string code) : Exception(code)
 }
 
 public sealed record Adapter(Guid Id, string Name, string Description, bool Up, int? SharingRole);
-public sealed record Journal(int Version, Guid PublicId, Guid? PrivateId, bool StartAttempted, Guid? BootstrapId = null);
+public sealed record Journal(int Version, Guid PublicId, Guid? PrivateId, bool StartAttempted, Guid? BootstrapId = null, string Kind = "mobile-hotspot");
 public sealed record SharingAdapter(Guid Id, bool Up, int? Role);
 public sealed record SharingObservation(string Phase, int Poll, Guid PublicId, Guid? PrivateId, SharingAdapter[] Adapters);
 
@@ -21,6 +21,10 @@ public interface IJournal
 
 public interface IHotspotBackend
 {
+    string Kind => "mobile-hotspot";
+    bool AutomaticSharing => true;
+    object? Diagnostics => null;
+    void EnableClients() { }
     IReadOnlyList<Adapter> ReadAdapters();
     void Prepare(Guid publicId);
     void PrepareBootstrap(Guid publicId);
@@ -107,7 +111,8 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
         if (before.Any(a => a.SharingRole.HasValue)) throw new HotspotException("existing-ics-conflict");
         backend.PrepareBootstrap(publicId);
         if (backend.IsOn) throw new HotspotException("existing-hotspot-conflict");
-        State = new Journal(backend.BootstrapId.HasValue ? 2 : 1, publicId, null, false, backend.BootstrapId);
+        State = new Journal(backend.Kind == "wifi-direct" ? 3 : backend.BootstrapId.HasValue ? 2 : 1,
+            publicId, null, false, backend.BootstrapId, backend.Kind);
         journal.Write(State);
         try
         {
@@ -116,7 +121,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
             await backend.Start(ssid, password);
             // Give WinRT time to finish publishing its ICS state before attempting
             // any legacy write. A working pair bypasses Bind entirely.
-            if (!await WaitForPair(before, publicId, "winrt-settle"))
+            if (!await WaitForPair(before, publicId, backend.AutomaticSharing ? "winrt-settle" : "wfd-adapter-ready"))
             {
                 if (State.PrivateId is not Guid privateId)
                     throw new HotspotException("hotspot-adapter-not-ready");
@@ -125,6 +130,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
                 if (!await WaitForPair(before, publicId, "bind-verify"))
                     throw new HotspotException("ics-verification-failed");
             }
+            backend.EnableClients();
             Active = true;
         }
         catch (Exception primary)
@@ -133,6 +139,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
             // read itself fails. Never capture names, SSID, passphrase or MAC addresses.
             try { Observe("failure-before-cleanup", 0, backend.ReadAdapters()); } catch { }
             primary.Data["hotspot.observations"] = observations.ToArray();
+            primary.Data["hotspot.backendState"] = backend.Diagnostics;
             try { await Stop(); }
             catch (Exception cleanup)
             {
@@ -142,6 +149,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
                 failure.Data["hotspot.stage"] = primary.Data["hotspot.stage"];
                 failure.Data["hotspot.cleanupHresult"] = cleanup.HResult.ToString("X8");
                 failure.Data["hotspot.observations"] = observations.ToArray();
+                failure.Data["hotspot.backendState"] = primary.Data["hotspot.backendState"];
                 throw failure;
             }
             throw;
@@ -170,6 +178,8 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
                  phase == "winrt-settle" && a.Id == State.BootstrapId && a.SharingRole == 0)))
                 throw new HotspotException("ics-ownership-conflict");
             if (State.PrivateId is Guid privateId && Safety.PairMatches(current, publicId, privateId)) return true;
+            // Legacy AP does not set up ICS; bind as soon as its adapter appears.
+            if (phase == "wfd-adapter-ready" && State.PrivateId.HasValue) return false;
             if (poll < LastPoll) await pause();
         }
         return false;
@@ -197,7 +207,9 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
         Active = false;
         var state = State ?? journal.Read();
         if (state is null) return;
-        if (state.Version is not (1 or 2) || state.Version == 2 && state.BootstrapId is null ||
+        if (state.Version is not (1 or 2 or 3) || state.Version == 2 && state.BootstrapId is null ||
+            state.Version == 3 && (state.Kind != "wifi-direct" || state.BootstrapId.HasValue) ||
+            state.Version < 3 && state.Kind != "mobile-hotspot" || state.Kind != backend.Kind ||
             state.Version == 1 && state.BootstrapId.HasValue ||
             state.PublicId == Guid.Empty || state.PrivateId == state.PublicId ||
             state.BootstrapId == Guid.Empty || state.BootstrapId.HasValue && state.BootstrapId == state.PrivateId)

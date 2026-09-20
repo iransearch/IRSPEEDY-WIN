@@ -32,6 +32,9 @@ function Read-Reply {
     $line = $read.Result
     if ($null -eq $line) { throw 'Helper exited. Check Mobile Hotspot state and run recover if needed.' }
     $reply = $line | ConvertFrom-Json
+    if ($null -ne $reply.backendState) {
+        Write-Host ('Wi-Fi backend: ' + ($reply.backendState | ConvertTo-Json -Compress))
+    }
     if ($null -ne $reply.observations) {
         Write-Host ('ICS observations: ' + ($reply.observations | ConvertTo-Json -Depth 6 -Compress))
     }
@@ -49,7 +52,7 @@ function Send-Request($request) {
 }
 
 try {
-    Write-Host 'Preparing hotspot, then transferring sharing to irspeedy-tun. Credentials appear only after verification.'
+    Write-Host 'Starting Wi-Fi Direct Legacy AP, then binding ICS to irspeedy-tun. Credentials appear only after verification.'
     $started = $process.Start()
     $inputWriter = [IO.StreamWriter]::new($process.StandardInput.BaseStream, [Text.UTF8Encoding]::new($false))
     $ready = Read-Reply

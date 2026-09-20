@@ -45,8 +45,10 @@ internal static class Program
 
     private static async Task<int> Run()
     {
-        var backend = new WindowsBackend();
         var journal = new JournalStore();
+        var recovery = journal.Read();
+        IHotspotBackend backend = recovery is not null && recovery.Version < 3
+            ? new WindowsBackend() : new WiFiDirectBackend(recovery?.PrivateId);
         var session = new Session(backend, journal);
         Process? core = null;
         DateTime coreStarted = default;
@@ -85,7 +87,7 @@ internal static class Program
                         case "capability":
                             Emit(new { ok = true, command = request.Command, adapters = backend.ReadAdapters(),
                                 recoveryRequired = journal.Read() is not null, requiresTunProfile = false,
-                                startupMode = "default-profile-then-tun-v2",
+                                startupMode = backend.Kind,
                                 leakProtectionVerified = false });
                             break;
                         case "start":
@@ -95,7 +97,7 @@ internal static class Program
                             core = Process.GetProcessById(request.CorePid);
                             if (core.HasExited) throw new HotspotException("core-not-running");
                             coreStarted = core.StartTime.ToUniversalTime();
-                            // Never start a physical upstream with credentials already known to clients.
+                            // Fresh credentials prevent remembered clients from joining during setup.
                             // This secret is returned only after exact TUN/private ICS verification.
                             var accessPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
                             var accessSsid = "IRSpeedy-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
@@ -111,7 +113,7 @@ internal static class Program
                             finally { request.Password = ""; }
                             lease.Restart();
                             Emit(new { ok = true, state = "active", experimental = true,
-                                startupMode = "default-profile-then-tun-v2", ssid = accessSsid, password = accessPassword,
+                                startupMode = backend.Kind, backendState = backend.Diagnostics, ssid = accessSsid, password = accessPassword,
                                 observations = session.Observations });
                             break;
                         case "heartbeat":
@@ -121,20 +123,23 @@ internal static class Program
                         case "status":
                         case "clients":
                             Emit(new { ok = true, active = session.Active,
-                                clientCount = session.Active ? backend.ClientCount : 0,
+                                clientCount = session.Active ? backend.ClientCount : 0, backendState = backend.Diagnostics,
                                 recoveryRequired = journal.Read() is not null && !session.Active });
                             break;
                         case "stop":
                         case "recover":
                             await session.Stop();
                             Emit(new { ok = true, state = "stopped" });
+                            // A legacy journal is recovered with its original API only.
+                            // The next helper process always selects Wi-Fi Direct.
+                            if (backend.Kind != "wifi-direct") return exitCode;
                             break;
                         default: throw new HotspotException("unknown-command");
                     }
                 }
                 catch (Exception ex)
                 {
-                    EmitError(ex);
+                    EmitError(ex, backend.Diagnostics);
                     // A failed rollback retains ownership; don't accept more starts.
                     if (!session.Active && session.State is not null) { exitCode = 2; break; }
                 }
@@ -178,9 +183,10 @@ internal static class Program
         try { Console.Out.WriteLine(JsonSerializer.Serialize(value)); Console.Out.Flush(); }
         catch (IOException) { }
     }
-    private static void EmitError(Exception ex) => Emit(new
+    private static void EmitError(Exception ex, object? backendState = null) => Emit(new
     {
         ok = false,
+        backendState = ex.Data["hotspot.backendState"] ?? backendState,
         code = ex is HotspotException h ? h.Code : "operation-failed",
         exceptionType = ex.GetType().Name,
         hresult = ex.HResult.ToString("X8"),

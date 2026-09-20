@@ -20,7 +20,7 @@ try {
 
     Write-Host 'Experimental IRSPEEDY hotspot test - not a verified kill switch.'
     Write-Host 'Connect IRSPEEDY in full TUN mode before continuing.'
-    Write-Host 'Startup v2: normal Windows hotspot, then transfer sharing to TUN; a fresh Wi-Fi password is shown only after verification.'
+    Write-Host 'Startup v3: Wi-Fi Direct Legacy AP + ICS. Turn off Windows Mobile Hotspot and competitor sharing before testing.'
     $adapters = @(Get-NetAdapter -IncludeHidden | Where-Object {
         $_.Name -eq 'irspeedy-tun' -and $_.Status -eq 'Up'
     })

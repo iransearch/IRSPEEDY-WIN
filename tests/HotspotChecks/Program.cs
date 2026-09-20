@@ -134,7 +134,7 @@ internal static class Program
         });
         await Test("unknown journal version rejected", async () =>
         {
-            var (s, b, j) = New(); j.Value = new Journal(3, Tun, Private, true);
+            var (s, b, j) = New(); j.Value = new Journal(4, Tun, Private, true);
             await Reject("invalid-recovery-journal", () => s.Stop()); Check(b.Stops == 0);
         });
         await Test("WinRT-ready pair avoids all Bind writes", async () =>
@@ -236,6 +236,48 @@ internal static class Program
             await Reject("bind-failed", () => s.Start(Tun, "Test", "12345678", true));
             Check(j.Value is null && !s.Active && b.Adapters.All(a => a.SharingRole is null));
         });
+        await Test("Wi-Fi Direct binds immediately when adapter ready", async () =>
+        {
+            var (s, b, j) = New(); b.Kind = "wifi-direct";
+            await s.Start(Tun, "Test", "12345678", true);
+            Check(s.Active && b.ClientsEnabled && b.BindCalls == 1 && j.Value?.Version == 3 && j.Value.Kind == "wifi-direct");
+            Check(s.Observations.Count(x => x.Phase == "wfd-adapter-ready") == 1);
+            await s.Stop(); Check(!b.ClientsEnabled && j.Value is null);
+        });
+        await Test("Wi-Fi Direct ICS failure does not admit clients", async () =>
+        {
+            var (s, b, j) = New(); b.Kind = "wifi-direct"; b.FailBind = true;
+            await Reject("bind-failed", () => s.Start(Tun, "Test", "12345678", true));
+            Check(!b.ClientsEnabled && !s.Active && j.Value is null);
+        });
+        await Test("Wi-Fi Direct waits for adapter before binding", async () =>
+        {
+            var (s, b, _) = New(); b.Kind = "wifi-direct"; int reads = 0;
+            b.OnRead = x => x.Set(Private, a => a with { Up = ++reads >= 3 });
+            await s.Start(Tun, "Test", "12345678", true);
+            Check(s.Observations.Count(x => x.Phase == "wfd-adapter-ready") == 3 && b.ClientsEnabled);
+            await s.Stop();
+        });
+        await Test("Wi-Fi Direct missing adapter never binds", async () =>
+        {
+            var (s, b, _) = New(); b.Kind = "wifi-direct";
+            b.OnRead = x => x.Set(Private, a => a with { Up = false });
+            await Reject("hotspot-adapter-not-ready", () => s.Start(Tun, "Test", "12345678", true));
+            Check(b.BindCalls == 0 && !b.ClientsEnabled);
+        });
+        await Test("Wi-Fi Direct journal cannot use legacy recovery backend", async () =>
+        {
+            var (s, b, j) = New(); j.Value = new Journal(3, Tun, Private, true, null, "wifi-direct");
+            await Reject("invalid-recovery-journal", () => s.Stop());
+            Check(b.Stops == 0 && j.Value is not null);
+        });
+        await Test("Wi-Fi Direct journal recovers with matching backend", async () =>
+        {
+            var (s, b, j) = New(); b.Kind = "wifi-direct";
+            await s.Start(Tun, "Test", "12345678", true);
+            await new Session(b, j).Stop();
+            Check(j.Value is null && !b.IsOn && !b.ClientsEnabled);
+        });
         Console.WriteLine($"PASS: {passed} hotspot safety checks; no Windows/network mutation performed.");
     }
 
@@ -262,6 +304,13 @@ internal static class Program
     }
     private sealed class FakeBackend(MemoryJournal journal) : IHotspotBackend
     {
+        public string Kind { get; set; } = "mobile-hotspot";
+        public bool AutomaticSharing => Kind != "wifi-direct";
+        public bool ClientsEnabled;
+        public void EnableClients()
+        {
+            Check(Safety.PairMatches(Adapters, Tun, Private)); ClientsEnabled = true;
+        }
         public List<Adapter> Adapters = [new(Tun, "irspeedy-tun", "Wintun", true, null),
             new(Private, "Local Area Connection* 1", "Microsoft Wi-Fi Direct Virtual Adapter", false, null),
             new(Physical, "Wi-Fi", "Wi-Fi", true, null)];
@@ -287,7 +336,7 @@ internal static class Program
         public Task Stop()
         {
             if (FailStop) throw new HotspotException("stop-failed");
-            Stops++; IsOn = false; return Task.CompletedTask;
+            Stops++; IsOn = false; ClientsEnabled = false; return Task.CompletedTask;
         }
         public void Bind(Guid publicId, Guid privateId)
         {
