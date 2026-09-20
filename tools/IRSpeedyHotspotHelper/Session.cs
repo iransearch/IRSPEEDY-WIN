@@ -9,6 +9,8 @@ public sealed class HotspotException(string code) : Exception(code)
 
 public sealed record Adapter(Guid Id, string Name, string Description, bool Up, int? SharingRole);
 public sealed record Journal(int Version, Guid PublicId, Guid? PrivateId, bool StartAttempted);
+public sealed record SharingAdapter(Guid Id, bool Up, int? Role);
+public sealed record SharingObservation(string Phase, int Poll, Guid PublicId, Guid? PrivateId, SharingAdapter[] Adapters);
 
 public interface IJournal
 {
@@ -56,6 +58,7 @@ public static class Safety
         if (shared.Length == 1) return shared[0].Id;
         if (shared.Length > 1) throw new HotspotException("ambiguous-hotspot-adapter");
         var activated = candidates.Where(a => !before.Any(b => b.Id == a.Id && b.Up)).ToArray();
+        if (activated.Length == 0) throw new HotspotException("hotspot-adapter-not-ready");
         if (activated.Length != 1) throw new HotspotException("ambiguous-hotspot-adapter");
         return activated[0].Id;
     }
@@ -69,8 +72,12 @@ public static class Safety
 }
 
 // Commands are serialized by the host. No thread is allowed to start/stop concurrently.
-public sealed class Session(IHotspotBackend backend, IJournal journal)
+public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task>? pollDelay = null)
 {
+    private const int LastPoll = 16; // immediate read + 16 x 500 ms = 8 seconds per phase
+    private readonly Func<Task> pause = pollDelay ?? (() => Task.Delay(500));
+    private readonly List<SharingObservation> observations = new();
+    public IReadOnlyList<SharingObservation> Observations => observations;
     public bool Active { get; private set; }
     public Journal? State { get; private set; }
 
@@ -78,6 +85,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal)
     {
         if (!experimental) throw new HotspotException("experimental-opt-in-required");
         if (Active || journal.Read() is not null) throw new HotspotException("recovery-required");
+        observations.Clear();
         Safety.ValidateCredentials(ssid, password);
         var before = backend.ReadAdapters();
         Safety.RequireTun(before, publicId);
@@ -93,23 +101,73 @@ public sealed class Session(IHotspotBackend backend, IJournal journal)
             State = State with { StartAttempted = true };
             journal.Write(State); // durable BEFORE any networking mutation
             await backend.Start(ssid, password);
-            var after = backend.ReadAdapters();
-            Safety.RequireTun(after, publicId);
-            State = State with { PrivateId = Safety.SelectPrivate(before, after, publicId) };
-            journal.Write(State);
-            // Windows normally establishes this pair itself. Validate/reconcile only
-            // the selected pair; never disable all ICS connections.
-            backend.Bind(publicId, State.PrivateId.Value);
-            if (!Safety.PairMatches(backend.ReadAdapters(), publicId, State.PrivateId.Value))
-                throw new HotspotException("ics-verification-failed");
+            // Give WinRT time to finish publishing its ICS state before attempting
+            // any legacy write. A working pair bypasses Bind entirely.
+            if (!await WaitForPair(before, publicId, "winrt-settle"))
+            {
+                if (State.PrivateId is not Guid privateId)
+                    throw new HotspotException("hotspot-adapter-not-ready");
+                Observe("before-bind", 0, backend.ReadAdapters());
+                backend.Bind(publicId, privateId); // at most one attempt; errors remain failures
+                if (!await WaitForPair(before, publicId, "bind-verify"))
+                    throw new HotspotException("ics-verification-failed");
+            }
             Active = true;
         }
-        catch
+        catch (Exception primary)
         {
+            // Snapshot BEFORE rollback; preserve the original failure if a diagnostic
+            // read itself fails. Never capture names, SSID, passphrase or MAC addresses.
+            try { Observe("failure-before-cleanup", 0, backend.ReadAdapters()); } catch { }
+            primary.Data["hotspot.observations"] = observations.ToArray();
             try { await Stop(); }
-            catch { throw new HotspotException("start-failed-recovery-required"); }
+            catch (Exception cleanup)
+            {
+                var failure = new HotspotException("start-failed-recovery-required");
+                failure.Data["hotspot.primaryType"] = primary.GetType().Name;
+                failure.Data["hotspot.primaryHresult"] = primary.HResult.ToString("X8");
+                failure.Data["hotspot.stage"] = primary.Data["hotspot.stage"];
+                failure.Data["hotspot.cleanupHresult"] = cleanup.HResult.ToString("X8");
+                failure.Data["hotspot.observations"] = observations.ToArray();
+                throw failure;
+            }
             throw;
         }
+    }
+
+    private async Task<bool> WaitForPair(IReadOnlyList<Adapter> before, Guid publicId, string phase)
+    {
+        for (int poll = 0; poll <= LastPoll; poll++)
+        {
+            var current = backend.ReadAdapters();
+            Observe(phase, poll, current);
+            Safety.RequireTun(current, publicId);
+            if (!backend.IsOn) throw new HotspotException("hotspot-stopped-during-settle");
+            if (State!.PrivateId is null)
+            {
+                try
+                {
+                    State = State with { PrivateId = Safety.SelectPrivate(before, current, publicId) };
+                    journal.Write(State);
+                }
+                catch (HotspotException ex) when (ex.Code == "hotspot-adapter-not-ready") { }
+            }
+            if (current.Any(a => a.SharingRole.HasValue && !
+                (a.Id == publicId && a.SharingRole == 0 || a.Id == State.PrivateId && a.SharingRole == 1)))
+                throw new HotspotException("ics-ownership-conflict");
+            if (State.PrivateId is Guid privateId && Safety.PairMatches(current, publicId, privateId)) return true;
+            if (poll < LastPoll) await pause();
+        }
+        return false;
+    }
+
+    private void Observe(string phase, int poll, IReadOnlyList<Adapter> adapters)
+    {
+        if (State is null || observations.Count >= 40) return;
+        observations.Add(new SharingObservation(phase, poll, State.PublicId, State.PrivateId,
+            adapters.Where(a => a.Id == State.PublicId || a.Id == State.PrivateId || a.SharingRole.HasValue ||
+                a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase))
+            .Select(a => new SharingAdapter(a.Id, a.Up, a.SharingRole)).ToArray()));
     }
 
     public bool Healthy()

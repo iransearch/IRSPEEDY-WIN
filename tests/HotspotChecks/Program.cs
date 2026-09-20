@@ -137,12 +137,68 @@ internal static class Program
             var (s, b, j) = New(); j.Value = new Journal(2, Tun, Private, true);
             await Reject("invalid-recovery-journal", () => s.Stop()); Check(b.Stops == 0);
         });
+        await Test("WinRT-ready pair avoids all Bind writes", async () =>
+        {
+            var (s, b, _) = New();
+            b.OnRead = x => { x.Set(Tun, a => a with { SharingRole = 0 }); x.Set(Private, a => a with { SharingRole = 1 }); };
+            await s.Start(Tun, "Test", "12345678", true);
+            Check(s.Active && b.BindCalls == 0); await s.Stop();
+        });
+        await Test("delayed private adapter and WinRT roles settle without Bind", async () =>
+        {
+            var (s, b, _) = New(); int reads = 0;
+            b.OnRead = x =>
+            {
+                reads++;
+                x.Set(Private, a => a with { Up = reads >= 3, SharingRole = reads >= 3 ? 1 : null });
+                if (reads >= 3) x.Set(Tun, a => a with { SharingRole = 0 });
+            };
+            await s.Start(Tun, "Test", "12345678", true);
+            Check(b.BindCalls == 0 && reads == 3 && s.Active); await s.Stop();
+        });
+        await Test("bounded settle performs exactly one fallback bind", async () =>
+        {
+            var (s, b, _) = New(); await s.Start(Tun, "Test", "12345678", true);
+            Check(b.BindCalls == 1 && s.Observations.Count(x => x.Phase == "winrt-settle") == 17);
+            await s.Stop();
+        });
+        await Test("bind verification waits for delayed private role", async () =>
+        {
+            var (s, b, _) = New(); b.SkipBind = true; int reads = 0;
+            b.OnRead = x => { if (x.BindCalls > 0 && ++reads >= 3) x.Set(Private, a => a with { SharingRole = 1 }); };
+            await s.Start(Tun, "Test", "12345678", true);
+            Check(s.Active && b.BindCalls == 1 && reads == 3); await s.Stop();
+        });
+        await Test("bind error preserves pre-cleanup roles", async () =>
+        {
+            var (s, b, _) = New(); b.FailBind = true;
+            try { await s.Start(Tun, "Test", "12345678", true); throw new Exception("Expected failure"); }
+            catch (HotspotException ex) when (ex.Code == "bind-failed")
+            {
+                var snapshots = (SharingObservation[])ex.Data["hotspot.observations"]!;
+                Check(snapshots.Last().Phase == "failure-before-cleanup" &&
+                    snapshots.Last().Adapters.Any(a => a.Id == Tun && a.Role == 0));
+                Check(b.Adapters.All(a => a.SharingRole is null) && !s.Active && b.BindCalls == 1);
+            }
+        });
+        await Test("missing private adapter times out without ICS writes", async () =>
+        {
+            var (s, b, _) = New(); b.OnRead = x => x.Set(Private, a => a with { Up = false });
+            await Reject("hotspot-adapter-not-ready", () => s.Start(Tun, "Test", "12345678", true));
+            Check(b.BindCalls == 0 && b.Stops == 1);
+        });
+        await Test("TUN lost during settling aborts without Bind", async () =>
+        {
+            var (s, b, _) = New(); b.OnRead = x => x.Set(Tun, a => a with { Up = false });
+            await Reject("active-irspeedy-tun-required", () => s.Start(Tun, "Test", "12345678", true));
+            Check(b.BindCalls == 0 && !b.IsOn);
+        });
         Console.WriteLine($"PASS: {passed} hotspot safety checks; no Windows/network mutation performed.");
     }
 
     private static (Session s, FakeBackend b, MemoryJournal j) New()
     {
-        var j = new MemoryJournal(); var b = new FakeBackend(j); return (new Session(b, j), b, j);
+        var j = new MemoryJournal(); var b = new FakeBackend(j); return (new Session(b, j, () => Task.CompletedTask), b, j);
     }
     private static void Check(bool condition) { if (!condition) throw new Exception("Assertion failed"); }
     private static async Task Reject(string code, Func<Task> action)
@@ -167,10 +223,11 @@ internal static class Program
             new(Private, "Local Area Connection* 1", "Microsoft Wi-Fi Direct Virtual Adapter", false, null),
             new(Physical, "Wi-Fi", "Wi-Fi", true, null)];
         public bool FailPrepare, FailStart, FailStop, FailBind, SkipBind, AmbiguousPrivate;
-        public int Starts, Stops;
+        public int Starts, Stops, BindCalls;
+        public Action<FakeBackend>? OnRead;
         public bool IsOn { get; set; }
         public uint ClientCount => 0;
-        public IReadOnlyList<Adapter> ReadAdapters() => Adapters.ToArray();
+        public IReadOnlyList<Adapter> ReadAdapters() { if (IsOn) OnRead?.Invoke(this); return Adapters.ToArray(); }
         public void Set(Guid id, Func<Adapter, Adapter> update) => Adapters = Adapters.Select(a => a.Id == id ? update(a) : a).ToList();
         public void Prepare(Guid id) { Check(id == Tun); if (FailPrepare) throw new HotspotException("tun-winrt-profile-unavailable"); }
         public Task Start(string ssid, string password)
@@ -188,6 +245,7 @@ internal static class Program
         }
         public void Bind(Guid publicId, Guid privateId)
         {
+            BindCalls++;
             Check(publicId == Tun && privateId == Private && journal.Value?.PrivateId == Private);
             Set(Tun, a => a with { SharingRole = 0 });
             if (FailBind) throw new HotspotException("bind-failed");

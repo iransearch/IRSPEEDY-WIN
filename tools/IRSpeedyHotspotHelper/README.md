@@ -132,6 +132,33 @@ exception text. `active:true` means API/ICS verification only, not verified VPN 
 
 ## Recovery
 
+### ICS readiness diagnostics
+
+After WinRT reports a successful hotspot start, the helper now polls ICS immediately
+and every 500 ms for up to 8 seconds before any manual binding. If the exact TUN
+public / Wi-Fi Direct private pair appears, it skips `Bind` entirely. If the private
+adapter is still missing, it fails without binding; ambiguity or a foreign shared
+connection also aborts. Otherwise it makes at most one guarded Bind attempt, followed
+by another up-to-8-second verification window. It never treats a COM failure as success.
+
+The driver prints `ICS observations` on success or error: phase, poll index, adapter
+GUIDs, up/down and sharing roles (0 public, 1 private, null disabled). These bounded
+snapshots include the state before rollback; they exclude SSID, password, adapter
+names, MAC addresses and traffic. Include that line and the Stage/HRESULT error when
+reporting the next Windows result. If rollback also fails, the original failure's
+stage/type/HRESULT is retained separately from the cleanup HRESULT.
+
+Windscribe's `src/helper/windows/changeics/icsmanager.cpp` was reviewed as a technical
+reference: it avoids reconfiguration when the pair is already correct, and otherwise
+disables existing sharing before enabling public then private. This helper does NOT
+copy that code or disable ICS globally. The new bounded wait and diagnostics are
+independent implementation; they test a readiness-race hypothesis, not a confirmed
+fix for HRESULT 80040201. No additional Windscribe dependency/license is introduced.
+
+The updated pure-C# suite contains 37 passing checks, including delayed WinRT state,
+skipped redundant binding, timeout, delayed bind verification, TUN loss and preservation
+of error-time state. Actual Windows retest is still required.
+
 Before mutation, an atomic, flushed, administrator/SYSTEM-only journal is saved in
 `%ProgramData%\IRSpeedyHotspotPoC\session.json`. It contains adapter GUIDs and phase,
 not password or user identity. Only one helper holds the machine-wide mutex.

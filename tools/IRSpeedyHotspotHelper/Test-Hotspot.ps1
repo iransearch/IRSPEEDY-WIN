@@ -35,9 +35,13 @@ function Read-Reply {
     $line = $read.Result
     if ($null -eq $line) { throw 'Helper exited. Check Mobile Hotspot state and run recover if needed.' }
     $reply = $line | ConvertFrom-Json
+    if ($null -ne $reply.observations) {
+        Write-Host ('ICS observations: ' + ($reply.observations | ConvertTo-Json -Depth 6 -Compress))
+    }
     if (-not $reply.ok) {
-        throw ("Helper: {0}; Stage: {1}; Type: {2}; HRESULT: {3}; Calls: {4}" -f
-            $reply.code, $reply.stage, $reply.exceptionType, $reply.hresult, ($reply.callSites -join ' -> '))
+        throw ("Helper: {0}; Stage: {1}; Type: {2}; HRESULT: {3}; Calls: {4}; PrimaryType: {5}; PrimaryHRESULT: {6}; CleanupHRESULT: {7}" -f
+            $reply.code, $reply.stage, $reply.exceptionType, $reply.hresult, ($reply.callSites -join ' -> '),
+            $reply.primaryType, $reply.primaryHresult, $reply.cleanupHresult)
     }
     return $reply
 }

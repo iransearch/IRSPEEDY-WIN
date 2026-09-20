@@ -96,7 +96,7 @@ internal static class Program
                             try { await session.Start(request.TunId, request.Ssid, request.Password, request.Experimental); }
                             finally { request.Password = ""; }
                             lease.Restart();
-                            Emit(new { ok = true, state = "active", experimental = true });
+                            Emit(new { ok = true, state = "active", experimental = true, observations = session.Observations });
                             break;
                         case "heartbeat":
                             lease.Restart();
@@ -169,6 +169,10 @@ internal static class Program
         exceptionType = ex.GetType().Name,
         hresult = ex.HResult.ToString("X8"),
         stage = ex.Data["hotspot.stage"] as string ?? "unclassified",
+        observations = ex.Data["hotspot.observations"],
+        primaryType = ex.Data["hotspot.primaryType"],
+        primaryHresult = ex.Data["hotspot.primaryHresult"],
+        cleanupHresult = ex.Data["hotspot.cleanupHresult"],
         callSites = new StackTrace(ex, false).GetFrames()?.Select(frame =>
             frame.GetMethod()?.DeclaringType?.FullName + "." + frame.GetMethod()?.Name).Take(12).ToArray()
         // Never serialize request, Exception.Message/ToString(), password or MACs.
