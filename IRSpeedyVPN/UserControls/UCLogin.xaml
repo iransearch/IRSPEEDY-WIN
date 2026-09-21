@@ -4,7 +4,8 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:IRSpeedyVPN.UserControls"
-             mc:Ignorable="d" Loaded="UserControl_Loaded"           >
+             mc:Ignorable="d" Loaded="UserControl_Loaded"
+             FontFamily="/IRSpeedyVPN;component/Resources/#B Yekan+" FontWeight="Bold">
     <UserControl.Resources>
         <ResourceDictionary>
 
@@ -165,23 +166,22 @@
             <TranslateTransform x:Name="CardTransform" Y="0"/>
         </Grid.RenderTransform>
 
-        <!-- The card. Children are positioned from its top edge so the layout
-             matches the approved design exactly and never reflows. -->
-        <Border VerticalAlignment="Top" Margin="20,0,20,0" Height="333" CornerRadius="16"
+        <!-- Keep every action inside MainWindow's 250-DIP content area. -->
+        <Border VerticalAlignment="Top" Margin="20,0,20,0" Height="248" CornerRadius="16"
                 Background="White" BorderBrush="#E8EDF7" BorderThickness="1.2">
             <Grid Margin="17,0,17,0">
 
                 <!-- Heading -->
-                <StackPanel VerticalAlignment="Top" Margin="0,19,0,0">
+                <StackPanel VerticalAlignment="Top" Margin="0,6,0,0">
                     <TextBlock Text="ورود به حساب" FontSize="19" FontWeight="Bold"
                                Foreground="{StaticResource LoginNavy}" TextAlignment="Center"/>
                     <TextBlock Text="به دنیای بدون محدودیت متصل شوید" FontSize="12.5"
-                               Foreground="{StaticResource LoginMuted}" TextAlignment="Center" Margin="0,9,0,0"/>
+                               Foreground="{StaticResource LoginMuted}" TextAlignment="Center" Margin="0,2,0,0"/>
                 </StackPanel>
 
                 <!-- Renewal banner: an overlay over the heading, so it costs no
                      layout space while hidden and the card keeps its exact size. -->
-                <Border x:Name="boxRenew" Visibility="Hidden" VerticalAlignment="Top" Margin="0,14,0,0" Height="58"
+                <Border x:Name="boxRenew" Visibility="Hidden" VerticalAlignment="Top" Margin="0,4,0,0" Height="54"
                         CornerRadius="12" Background="#EEF3FF" BorderBrush="#BFCEEF" BorderThickness="1.2">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Button x:Name="btnRenew" Margin="0,0,8,0" Click="btnRenew_Click"
@@ -192,7 +192,7 @@
                 </Border>
 
                 <!-- Username -->
-                <Border VerticalAlignment="Top" Margin="0,92,0,0" Style="{StaticResource LoginFieldChrome}">
+                <Border VerticalAlignment="Top" Margin="0,64,0,0" Style="{StaticResource LoginFieldChrome}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*"/>
@@ -220,7 +220,7 @@
                 </Border>
 
                 <!-- Password -->
-                <Border VerticalAlignment="Top" Margin="0,144,0,0" Style="{StaticResource LoginFieldChrome}">
+                <Border VerticalAlignment="Top" Margin="0,110,0,0" Style="{StaticResource LoginFieldChrome}">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="Auto"/>
@@ -244,12 +244,8 @@
                     </Grid>
                 </Border>
 
-                <!-- Recover link (left) + remember me (right) -->
-                <Grid VerticalAlignment="Top" Margin="0,202,0,0" Height="24">
-                    <TextBlock x:Name="lnkRecover" Text="بازیابی رمز عبور" FontSize="12" FontWeight="Bold"
-                               Foreground="{StaticResource LoginAccent}" Cursor="Hand"
-                               HorizontalAlignment="Left" VerticalAlignment="Center"
-                               MouseLeftButtonUp="lnkRecover_MouseLeftButtonUp"/>
+                <!-- Remember me -->
+                <Grid VerticalAlignment="Top" Margin="0,156,0,0" Height="24">
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
                         <TextBlock Text="مرا به خاطر بسپار" FontSize="12" Foreground="#5B6584"
                                    VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -259,7 +255,7 @@
                 </Grid>
 
                 <!-- Login -->
-                <Button x:Name="btnLogin" VerticalAlignment="Top" Margin="0,261,0,0" Height="49"
+                <Button x:Name="btnLogin" VerticalAlignment="Top" Margin="0,188,0,0" Height="49"
                         Style="{StaticResource LoginPrimaryButton}" Click="btnLogin_Click" IsDefault="True">
                     <Grid>
                         <Border Width="34" Height="34" CornerRadius="10" Background="{StaticResource LoginAccent}"
