@@ -159,7 +159,7 @@ internal static class Program
         await Test("bounded settle performs exactly one fallback bind", async () =>
         {
             var (s, b, _) = New(); await s.Start(Tun, "Test", "12345678", true);
-            Check(b.BindCalls == 1 && s.Observations.Count(x => x.Phase == "winrt-settle") == 40);
+            Check(b.BindCalls == 1 && s.Observations.Count(x => x.Phase == "winrt-settle") == 54);
             await s.Stop();
         });
         await Test("bind verification waits for delayed private role", async () =>

@@ -271,7 +271,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
 
     private void Observe(string phase, int poll, IReadOnlyList<Adapter> adapters)
     {
-        if (State is null || observations.Count >= 40) return;
+        if (State is null || observations.Count >= 128) return;
         observations.Add(new SharingObservation(phase, poll, State.PublicId, State.PrivateId,
             adapters.Where(a => a.Id == State.PublicId || a.Id == State.PrivateId || a.SharingRole.HasValue ||
                 a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase))
