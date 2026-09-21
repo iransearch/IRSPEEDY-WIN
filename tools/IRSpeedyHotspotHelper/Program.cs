@@ -63,7 +63,14 @@ internal static class Program
         int exitCode = 0;
         try
         {
-            Emit(new { ok = true, state = "ready", protocol = 2, experimental = true, recoveryRequired = journal.Read() is not null });
+            Emit(new { ok = true, state = "ready", protocol = 2, experimental = true,
+                recoveryRequired = journal.Read() is not null, environment = new {
+                    osVersion = Environment.OSVersion.Version.ToString(),
+                    runtimeVersion = Environment.Version.ToString(),
+                    helperVersion = typeof(Program).Assembly.GetName().Version?.ToString(),
+                    processArchitecture = System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString(),
+                    osArchitecture = System.Runtime.InteropServices.RuntimeInformation.OSArchitecture.ToString(),
+                    backend = backend.Kind } });
             var pending = Task.Run(() => ReadBoundedLine(cancellation.Token));
             while (!cancellation.IsCancellationRequested)
             {
@@ -151,7 +158,8 @@ internal static class Program
                             lease.Restart();
                             Emit(new { ok = true, state = "active", experimental = true,
                                 startupMode = backend.Kind, backendState = backend.Diagnostics, ssid = accessSsid, password = accessPassword,
-                                observations = session.Observations, timings = session.Timings });
+                                observations = session.Observations, timings = session.Timings,
+                                preflight = session.Preflight });
                             break;
                         case "heartbeat":
                             lease.Restart();
@@ -235,6 +243,7 @@ internal static class Program
         hresult = ex.HResult.ToString("X8"),
         stage = ex.Data["hotspot.stage"] as string ?? "unclassified",
         observations = ex.Data["hotspot.observations"],
+        preflight = ex.Data["hotspot.preflight"],
         timings = ex.Data["hotspot.timings"],
         primaryType = ex.Data["hotspot.primaryType"],
         primaryHresult = ex.Data["hotspot.primaryHresult"],

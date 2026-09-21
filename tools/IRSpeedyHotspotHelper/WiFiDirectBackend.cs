@@ -18,19 +18,23 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
     private string status = "NotStarted";
     private string publisherError = "None";
     private string? connectionError;
+    private AdapterEvidence[] preflight = [];
     public string Kind => "wifi-direct";
     public bool AutomaticSharing => false;
     public Guid? BootstrapId => null;
     public bool IsOn => publisher?.Status == WiFiDirectAdvertisementPublisherStatus.Started;
     public uint ClientCount { get { lock (sync) return (uint)clients.Count; } }
     public object Diagnostics { get { lock (sync) return new { mode = Kind, publisherStatus = status,
-        publisherError, connectionError, pendingConnections = pending, ics = sharing.Diagnostics }; } }
+        publisherError, connectionError, pendingConnections = pending, preflight,
+        publisherCreated = publisher is not null,
+        ics = sharing.Diagnostics }; } }
 
     public IReadOnlyList<Adapter> ReadAdapters() => sharing.ReadAdapters();
     public void Prepare(Guid publicId) { } // Recovery needs no TUN/Internet profile.
     public void PrepareBootstrap(Guid publicId)
     {
         var adapters = ReadAdapters();
+        lock (sync) preflight = HotspotEvidence.Capture(adapters, publicId);
         Safety.RequireTun(adapters, publicId);
         if (adapters.Any(a => a.Up && a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)))
             throw Failure("wifi-direct-already-active", "wfd.preflight");

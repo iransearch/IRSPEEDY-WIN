@@ -116,7 +116,9 @@ internal sealed class WindowsBackend : IHotspotBackend
             // silently miss sharing on an adapter not present in NetworkInterface.
             nics.TryGetValue(id, out var nic);
             result.Add(new Adapter(id, nic?.Name ?? "", nic?.Description ?? "",
-                nic?.OperationalStatus == OperationalStatus.Up, role));
+                nic?.OperationalStatus == OperationalStatus.Up, role,
+                nic?.OperationalStatus.ToString() ?? "Unknown",
+                nic?.NetworkInterfaceType.ToString() ?? "Unknown", nic is not null));
         });
         return result;
     }

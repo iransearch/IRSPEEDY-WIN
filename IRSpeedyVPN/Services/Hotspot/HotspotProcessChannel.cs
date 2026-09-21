@@ -120,6 +120,7 @@ namespace IRSpeedyVPN.Services.Hotspot
         private void Check(JObject value)
         {
             LogStartupTimings(value);
+            LogDiagnosticEvidence(value);
             if ((bool?)value["ok"] == true) return;
             string code = SafeToken(value["code"]);
             // Never write the whole reply: successful replies contain the Wi-Fi password.
@@ -155,9 +156,18 @@ namespace IRSpeedyVPN.Services.Hotspot
         {
             performanceAttempt = Guid.NewGuid().ToString("N");
             activationClock = Stopwatch.StartNew();
+            WriteDiagnostic("app", "version=" + typeof(HotspotProcessChannel).Assembly.GetName().Version
+                + " osVersion=" + Environment.OSVersion.Version + " process64Bit=" + Environment.Is64BitProcess);
             try
             {
                 MeasureStartup("activation-total", () => { StartCore(tun, ssid, password); return true; });
+            }
+            catch (Exception ex)
+            {
+                WriteDiagnostic("channel-failure", "type=" + SafeToken(ex.GetType().Name)
+                    + " hresult=" + ex.HResult.ToString("X8")
+                    + " code=" + (ex is HotspotChannelException ? SafeToken(((HotspotChannelException)ex).Code) : "unknown"));
+                throw;
             }
             finally { activationClock.Stop(); }
         }
@@ -268,6 +278,104 @@ namespace IRSpeedyVPN.Services.Hotspot
                 }
             }
             catch { /* Ignore malformed optional telemetry, not the protocol result. */ }
+        }
+
+        private void WriteDiagnostic(string stage, string detail)
+        {
+            try { LogHelper.WriteLog("[HotspotDiagnostic] attempt=" + performanceAttempt
+                + " stage=" + stage + " " + detail); }
+            catch { }
+        }
+
+        private void LogFields(string stage, JObject value, params string[] fields)
+        {
+            if (value == null) return;
+            var detail = new StringBuilder();
+            foreach (string field in fields)
+            {
+                var token = value[field];
+                if (token == null) continue;
+                if (token.Type != JTokenType.String && token.Type != JTokenType.Integer &&
+                    token.Type != JTokenType.Boolean && token.Type != JTokenType.Null) continue;
+                if (detail.Length > 0) detail.Append(' ');
+                detail.Append(field == "stage" ? "sourceStage" : field).Append('=');
+                if (token.Type == JTokenType.String &&
+                    (field == "connectionError" || field == "coreCheckError" || field == "cleanupError"))
+                    token = new JValue(((string)token).Replace(':', '-'));
+                detail.Append(token.Type == JTokenType.Null ? "none" :
+                    SafeToken(token.Type == JTokenType.String ? token : new JValue(token.ToString())));
+            }
+            WriteDiagnostic(stage, detail.ToString());
+        }
+
+        private void LogAdapters(string stage, JToken value)
+        {
+            var adapters = value as JArray;
+            if (adapters == null) return;
+            WriteDiagnostic(stage, "count=" + adapters.Count + " logged=" + Math.Min(adapters.Count, 64));
+            for (int i = 0; i < adapters.Count && i < 64; i++)
+                LogFields(stage + "-adapter", adapters[i] as JObject,
+                    "Key", "IsTun", "IsSelectedTun", "IsWifiDirect", "Up", "Role", "Status", "Type", "Present");
+        }
+
+        private void LogDiagnosticEvidence(JObject reply)
+        {
+            // Never serialize whole replies, backend objects, adapter names or raw GUIDs.
+            try
+            {
+                LogFields("environment", reply["environment"] as JObject, "osVersion",
+                    "runtimeVersion", "helperVersion", "processArchitecture", "osArchitecture", "backend");
+                if ((string)reply["state"] == "ready")
+                    LogFields("helper-ready", reply, "protocol", "recoveryRequired");
+                if ((bool?)reply["ok"] == false)
+                    LogFields("failure", reply, "code", "reason", "stage", "exceptionType", "hresult",
+                        "primaryType", "primaryHresult", "cleanupHresult", "cleanupConfirmed",
+                        "leaseAgeMs", "coreCheckError", "cleanupError");
+                LogAdapters("session-preflight", reply["preflight"]);
+                // Only emit backend evidence for start/error responses, not each heartbeat/status.
+                if ((bool?)reply["ok"] != false && (string)reply["state"] != "active") return;
+                var backend = reply["backendState"] as JObject;
+                if (backend != null)
+                {
+                    LogFields("publisher", backend, "mode", "publisherStatus", "publisherError",
+                        "publisherCreated", "connectionError", "pendingConnections");
+                    LogAdapters("wfd-preflight", backend["preflight"]);
+                    var ics = backend["ics"] as JObject ?? backend;
+                    var attempts = ics["enableAttempts"] as JArray;
+                    if (attempts != null)
+                        for (int i = 0; i < attempts.Count && i < 16; i++)
+                            LogFields("ics-attempt", attempts[i] as JObject, "Attempt", "Role", "Result", "Hresult");
+                    var preparation = ics["preparation"] as JArray;
+                    if (preparation != null)
+                        for (int i = 0; i < preparation.Count && i < 16; i++)
+                            if (preparation[i].Type == JTokenType.String)
+                                WriteDiagnostic("ics-preparation", "result=" + SafeToken(preparation[i]));
+                }
+                var observations = reply["observations"] as JArray;
+                if (observations != null)
+                {
+                    WriteDiagnostic("ics-observations", "count=" + observations.Count);
+                    // Last snapshots are most useful for settle failures; bound log volume.
+                    for (int i = Math.Max(0, observations.Count - 8); i < observations.Count; i++)
+                    {
+                        var observation = observations[i] as JObject;
+                        if (observation == null) continue;
+                        LogFields("ics-observation", observation, "Phase", "Poll");
+                        var adapters = observation["Adapters"] as JArray;
+                        if (adapters == null) continue;
+                        for (int j = 0; j < adapters.Count && j < 32; j++)
+                        {
+                            var adapter = adapters[j] as JObject;
+                            if (adapter == null) continue;
+                            string role = JToken.DeepEquals(adapter["Id"], observation["PublicId"]) ? "public" :
+                                JToken.DeepEquals(adapter["Id"], observation["PrivateId"]) ? "private" : "other";
+                            LogFields("ics-" + role, adapter, "Up", "Role");
+                        }
+                    }
+                }
+                LogFields("health", reply["health"] as JObject, "Reason", "BackendOn", "ExceptionType", "Hresult");
+            }
+            catch { /* Optional diagnostics cannot change the command's outcome. */ }
         }
     }
 }

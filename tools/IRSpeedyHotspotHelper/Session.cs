@@ -7,7 +7,22 @@ public sealed class HotspotException(string code) : Exception(code)
     public string Code { get; } = code;
 }
 
-public sealed record Adapter(Guid Id, string Name, string Description, bool Up, int? SharingRole);
+public sealed record Adapter(Guid Id, string Name, string Description, bool Up, int? SharingRole,
+    string OperationalStatus = "Unknown", string InterfaceType = "Unknown", bool Present = false);
+public sealed record AdapterEvidence(string Key, bool IsTun, bool IsSelectedTun, bool IsWifiDirect, bool Up,
+    int? Role, string Status, string Type, bool Present);
+public static class HotspotEvidence
+{
+    private static readonly string Salt = Guid.NewGuid().ToString("N");
+    public static AdapterEvidence[] Capture(IEnumerable<Adapter> adapters, Guid? publicId = null) => adapters.Take(64)
+        .Select(a => new AdapterEvidence(
+            Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(
+                Encoding.UTF8.GetBytes(Salt + a.Id.ToString("N")))).Substring(0, 12),
+            string.Equals(a.Name, "irspeedy-tun", StringComparison.OrdinalIgnoreCase),
+            a.Id == publicId,
+            a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase),
+            a.Up, a.SharingRole, a.OperationalStatus, a.InterfaceType, a.Present)).ToArray();
+}
 public sealed record Journal(int Version, Guid PublicId, Guid? PrivateId, bool StartAttempted, Guid? BootstrapId = null, string Kind = "mobile-hotspot");
 public sealed record SharingAdapter(Guid Id, bool Up, int? Role);
 public sealed record SharingObservation(string Phase, int Poll, Guid PublicId, Guid? PrivateId, SharingAdapter[] Adapters);
@@ -181,12 +196,14 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
     public IReadOnlyList<SharingObservation> Observations => observations;
     private readonly StartupTimings startupTimings = new();
     public StartupTiming[] Timings => startupTimings.Snapshot;
+    public AdapterEvidence[] Preflight { get; private set; } = [];
     public bool Active { get; private set; }
     public Journal? State { get; private set; }
 
     public async Task Start(Guid publicId, string ssid, string password, bool experimental)
     {
         startupTimings.Restart();
+        Preflight = [];
         try
         {
             await startupTimings.MeasureAsync("session-start",
@@ -195,6 +212,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
         catch (Exception ex)
         {
             ex.Data["hotspot.timings"] = Timings;
+            ex.Data["hotspot.preflight"] = Preflight;
             throw;
         }
     }
@@ -206,6 +224,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
         observations.Clear();
         Safety.ValidateCredentials(ssid, password);
         var before = startupTimings.Measure("preflight-adapters", backend.ReadAdapters);
+        Preflight = HotspotEvidence.Capture(before, publicId);
         Safety.RequireTun(before, publicId);
         // Existing ICS is deliberately NOT taken over in this PoC. Its empty baseline
         // is the snapshot, so rollback never needs to disturb another application's pair.

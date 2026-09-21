@@ -11,6 +11,37 @@ internal static class Program
     private static async Task Main()
     {
         await PublisherWaitChecks();
+        await Test("preflight evidence excludes names and identifiers", () =>
+        {
+            var adapters = new[] {
+                new Adapter(Tun, "irspeedy-tun", "Wintun", true, null, "Up", "Tunnel", true),
+                new Adapter(Private, "private-network-label", "Microsoft Wi-Fi Direct Virtual Adapter",
+                    true, 1, "Up", "Wireless80211", true),
+                new Adapter(Physical, "private-user-label", "private-driver-label", false, null) };
+            var evidence = HotspotEvidence.Capture(adapters, Tun);
+            Check(evidence[0].IsSelectedTun && evidence[0].IsTun);
+            Check(evidence[1].IsWifiDirect && evidence[1].Up && evidence[1].Role == 1);
+            Check(evidence[1].Present && !evidence[2].Present);
+            Check(evidence[1].Key == HotspotEvidence.Capture(adapters, Tun)[1].Key);
+            string json = System.Text.Json.JsonSerializer.Serialize(evidence);
+            Check(!json.Contains("private-network-label") && !json.Contains("private-user-label")
+                && !json.Contains("private-driver-label") && !json.Contains(Tun.ToString())
+                && !json.Contains(Private.ToString()) && !json.Contains(Physical.ToString()));
+            Check(HotspotEvidence.Capture(Enumerable.Repeat(adapters[0], 100)).Length == 64);
+            return Task.CompletedTask;
+        });
+        await Test("early preflight failure carries adapter evidence", async () =>
+        {
+            var (s, b, _) = New(); b.Set(Physical, a => a with { SharingRole = 0 });
+            try { await s.Start(Tun, "Test", "12345678", true); throw new Exception("Expected rejection"); }
+            catch (HotspotException ex) when (ex.Code == "existing-ics-conflict")
+            {
+                var evidence = (AdapterEvidence[])ex.Data["hotspot.preflight"]!;
+                Check(evidence.Any(a => a.IsSelectedTun && a.Up));
+                Check(evidence.Any(a => !a.IsSelectedTun && a.Role == 0));
+                Check(b.Starts == 0 && b.Stops == 0);
+            }
+        });
         await Test("startup timings cover phases without credentials", async () =>
         {
             var (s, b, _) = New(); b.Kind = "wifi-direct";
