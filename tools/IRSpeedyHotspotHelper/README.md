@@ -20,7 +20,7 @@ AP creation and Internet sharing are separate:
    only if it has not appeared. Ambiguity or foreign sharing aborts.
 5. Enable ICS on the selected TUN/public and Wi-Fi Direct/private pair and verify
    the pair. No eight-second wait for automatic ICS: this AP API does not create it.
-6. Admit password-authenticated clients and disclose credentials only after the
+6. Admit password-authenticated clients and display credentials only after the
    pair is verified. Keep WiFiDirectDevice handles until disconnect or stop.
 7. Poll health/parent heartbeat as before; stop the publisher and clean owned ICS.
 
@@ -39,8 +39,9 @@ The sibling build.log contains build output. The test requests UAC elevation.
 Before testing, stop the competitor VPN/sharing and Windows Mobile Hotspot.
 Connect IRSPEEDY in full TUN mode; select the CURRENT SGuard64 PID in the launcher.
 The launcher must show Startup v3: Wi-Fi Direct Legacy AP + ICS.
-There is no password prompt. Only a verified start displays the generated SSID and
-temporary password. Connect a phone with proxy None and mobile data disabled.
+There is no password prompt. The experimental test password is fixed to
+0000000000 (ten ASCII zeros), as requested. SSID remains random per session.
+Client admission is still gated on verified ICS. Connect a phone with proxy None and mobile data disabled.
 Keep the terminal open; the test runs for 120 seconds, Q stops early.
 
 Confirm DHCP, VPN exit IPv4, IPv6, DNS and video/UDP connectivity independently.
@@ -59,6 +60,16 @@ Keep the entire published folder together and retain THIRD-PARTY-NOTICES.txt.
 No firewall resets, global ICS disable, service restart or policy bypass is used.
 
 ## Diagnostics
+
+Watchdog errors now include reason, leaseAgeMs and a pre-cleanup health snapshot
+(publisher state and selected/shared adapter GUID/up/role). Reasons distinguish
+lease-expired, core-missing/exited/pid-reused/check-failed, backend-stopped,
+tun-missing/down/name-changed, private-missing/down, ics-pair-changed and
+health-read-failed. A single health read supplies both the verdict and evidence.
+The error response also reports cleanupConfirmed and sanitized cleanupError after
+attempting Stop. This does not establish packet-level kill-switch protection.
+The 10-second lease and immediate shutdown behavior are unchanged. A driver sending
+heartbeats every two seconds does not rule out a console/pipe stall or delayed delivery.
 
 Incomplete private pair: before enabling the public role, Bind re-enumerates and
 validates both owned adapters. If only the selected private has role 1, disable
@@ -120,7 +131,7 @@ persistent packet-level protection and real Windows acceptance testing.
 
 ## Verification and sources
 
-59 pure-C# simulated-backend checks pass, including private-only reset ordering,
+69 pure-C# simulated-backend checks pass, including detailed health verdicts and read failures, private-only reset ordering,
 complete-pair preservation, reset verification/conflict checks, bounded HRESULT-specific retries,
 partial native success, foreign sharing during retries, TUN loss, immediate Wi-Fi Direct binding,
 delayed/missing adapters, no client admission on ICS failure and backend-specific

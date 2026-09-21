@@ -12,6 +12,11 @@ public sealed record Journal(int Version, Guid PublicId, Guid? PrivateId, bool S
 public sealed record SharingAdapter(Guid Id, bool Up, int? Role);
 public sealed record SharingObservation(string Phase, int Poll, Guid PublicId, Guid? PrivateId, SharingAdapter[] Adapters);
 public sealed record IcsAttempt(int Attempt, int Role, string Result, string? Hresult = null);
+public sealed record HealthReport(string? Reason, bool? BackendOn, SharingAdapter[] Adapters,
+    string? ExceptionType = null, string? Hresult = null)
+{
+    public bool Healthy => Reason is null;
+}
 
 public static class IcsPreparation
 {
@@ -267,12 +272,32 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
             .Select(a => new SharingAdapter(a.Id, a.Up, a.SharingRole)).ToArray()));
     }
 
-    public bool Healthy()
+    public bool Healthy() => CheckHealth().Healthy;
+
+    public HealthReport CheckHealth()
     {
-        if (!Active || State?.PrivateId is not Guid privateId) return false;
-        var adapters = backend.ReadAdapters();
-        return backend.IsOn && Safety.PairMatches(adapters, State.PublicId, privateId) &&
-            adapters.Any(a => a.Id == State.PublicId && a.Name.Equals("irspeedy-tun", StringComparison.OrdinalIgnoreCase));
+        if (!Active || State?.PrivateId is not Guid privateId)
+            return new("session-inactive", null, []);
+        bool? on = null;
+        SharingAdapter[] snapshot = [];
+        try
+        {
+            var adapters = backend.ReadAdapters();
+            snapshot = adapters.Where(a => a.Id == State.PublicId || a.Id == privateId || a.SharingRole.HasValue)
+                .Select(a => new SharingAdapter(a.Id, a.Up, a.SharingRole)).ToArray();
+            on = backend.IsOn;
+            var tun = adapters.SingleOrDefault(a => a.Id == State.PublicId);
+            var output = adapters.SingleOrDefault(a => a.Id == privateId);
+            string? reason = !on.Value ? "backend-stopped"
+                : tun is null ? "tun-missing"
+                : !tun.Up ? "tun-down"
+                : !tun.Name.Equals("irspeedy-tun", StringComparison.OrdinalIgnoreCase) ? "tun-name-changed"
+                : output is null ? "private-missing"
+                : !output.Up ? "private-down"
+                : !Safety.PairMatches(adapters, State.PublicId, privateId) ? "ics-pair-changed" : null;
+            return new(reason, on, snapshot);
+        }
+        catch (Exception ex) { return new("health-read-failed", on, snapshot, ex.GetType().Name, ex.HResult.ToString("X8")); }
     }
 
     public async Task Stop()

@@ -39,13 +39,16 @@ function Read-Reply {
         Write-Host ('ICS observations: ' + ($reply.observations | ConvertTo-Json -Depth 6 -Compress))
     }
     if (-not $reply.ok) {
+        if ($reply.code -eq 'session-health-or-lease-lost') {
+            Write-Host ('Watchdog: ' + ($reply | Select-Object reason,leaseAgeMs,coreCheckError,health,cleanupConfirmed,cleanupError | ConvertTo-Json -Depth 8 -Compress))
+        }
         try {
             Get-Service -Name SharedAccess,Netman,EventSystem -ErrorAction Stop |
                 Select-Object Name,Status | Format-Table -AutoSize | Out-Host
         } catch { Write-Host 'Service status could not be read.' }
-        throw ("Helper: {0}; Stage: {1}; Type: {2}; HRESULT: {3}; Calls: {4}; PrimaryType: {5}; PrimaryHRESULT: {6}; CleanupHRESULT: {7}" -f
+        throw ("Helper: {0}; Stage: {1}; Type: {2}; HRESULT: {3}; Calls: {4}; PrimaryType: {5}; PrimaryHRESULT: {6}; CleanupHRESULT: {7}; Reason: {8}" -f
             $reply.code, $reply.stage, $reply.exceptionType, $reply.hresult, ($reply.callSites -join ' -> '),
-            $reply.primaryType, $reply.primaryHresult, $reply.cleanupHresult)
+            $reply.primaryType, $reply.primaryHresult, $reply.cleanupHresult, $reply.reason)
     }
     return $reply
 }

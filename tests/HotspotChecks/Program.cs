@@ -402,6 +402,32 @@ internal static class Program
             });
             Check(b.Adapters.Single(a => a.Id == Physical).SharingRole == 0);
         });
+        foreach (var item in new (string? Reason, Action<FakeBackend> Change)[] {
+            (null, b => { }),
+            ("backend-stopped", b => b.IsOn = false),
+            ("tun-missing", b => b.Adapters.RemoveAll(a => a.Id == Tun)),
+            ("tun-down", b => b.Set(Tun, a => a with { Up = false })),
+            ("tun-name-changed", b => b.Set(Tun, a => a with { Name = "Other" })),
+            ("private-missing", b => b.Adapters.RemoveAll(a => a.Id == Private)),
+            ("private-down", b => b.Set(Private, a => a with { Up = false })),
+            ("ics-pair-changed", b => b.Set(Tun, a => a with { SharingRole = null })),
+            ("ics-pair-changed", b => b.Set(Physical, a => a with { SharingRole = 0 }))
+        })
+            await Test("health snapshot reports " + (item.Reason ?? "healthy"), async () =>
+            {
+                var (s, b, _) = New(); await s.Start(Tun, "Test", "12345678", true);
+                item.Change(b); var report = s.CheckHealth();
+                Check(report.Reason == item.Reason && report.Healthy == (item.Reason is null));
+                Check(report.Adapters.All(a => a.Id == Tun || a.Id == Private || a.Role.HasValue));
+            });
+        await Test("health read error remains fail-closed with sanitized evidence", async () =>
+        {
+            var (s, b, _) = New(); await s.Start(Tun, "Test", "12345678", true);
+            b.OnRead = _ => throw new System.Runtime.InteropServices.COMException("private text", unchecked((int)0x80070005));
+            var report = s.CheckHealth();
+            Check(!report.Healthy && report.Reason == "health-read-failed" && report.Hresult == "80070005" && report.ExceptionType == "COMException");
+            b.OnRead = null; await s.Stop();
+        });
         Console.WriteLine($"PASS: {passed} hotspot safety checks; no Windows/network mutation performed.");
     }
 

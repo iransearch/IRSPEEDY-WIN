@@ -66,11 +66,33 @@ internal static class Program
                 await Task.WhenAny(pending, Task.Delay(500, cancellation.Token));
                 if (session.Active)
                 {
-                    if (lease.Elapsed > TimeSpan.FromSeconds(10) || core is null || core.HasExited ||
-                        core.StartTime.ToUniversalTime() != coreStarted || !session.Healthy())
+                    var leaseAgeMs = lease.ElapsedMilliseconds;
+                    string? reason;
+                    string? coreCheckError = null;
+                    HealthReport? health = null;
+                    try
                     {
-                        Emit(new { ok = false, code = "session-health-or-lease-lost" });
-                        await session.Stop();
+                        reason = leaseAgeMs > 10000 ? "lease-expired"
+                            : core is null ? "core-missing"
+                            : core.HasExited ? "core-exited"
+                            : core.StartTime.ToUniversalTime() != coreStarted ? "core-pid-reused" : null;
+                    }
+                    catch (Exception ex)
+                    {
+                        reason = "core-check-failed";
+                        coreCheckError = ex.GetType().Name + ":" + ex.HResult.ToString("X8");
+                    }
+                    if (reason is null) { health = session.CheckHealth(); reason = health.Reason; }
+                    if (reason is not null)
+                    {
+                        // Preserve pre-cleanup state; do not re-read health to guess a reason.
+                        var backendState = backend.Diagnostics;
+                        bool cleanupConfirmed = false;
+                        string? cleanupError = null;
+                        try { await session.Stop(); cleanupConfirmed = true; }
+                        catch (Exception ex) { cleanupError = ex.GetType().Name + ":" + ex.HResult.ToString("X8"); }
+                        Emit(new { ok = false, code = "session-health-or-lease-lost", reason,
+                            leaseAgeMs, coreCheckError, health, backendState, cleanupConfirmed, cleanupError });
                         exitCode = 2;
                         break;
                     }
@@ -97,9 +119,9 @@ internal static class Program
                             core = Process.GetProcessById(request.CorePid);
                             if (core.HasExited) throw new HotspotException("core-not-running");
                             coreStarted = core.StartTime.ToUniversalTime();
-                            // Fresh credentials prevent remembered clients from joining during setup.
-                            // This secret is returned only after exact TUN/private ICS verification.
-                            var accessPassword = Convert.ToHexString(RandomNumberGenerator.GetBytes(16));
+                            // Fixed password requested for this experimental test build only.
+                            // SSID still rotates; client admission remains gated on verified ICS.
+                            var accessPassword = "0000000000";
                             var accessSsid = "IRSpeedy-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
                             try
                             {
