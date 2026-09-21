@@ -9,11 +9,16 @@ dotnet run --project tests\HotspotChecks\HotspotChecks.csproj -c Release
 if errorlevel 1 goto failed
 dotnet run --project tests\HotspotIntegrationChecks\HotspotIntegrationChecks.csproj -c Release
 if errorlevel 1 goto failed
-dotnet build IRSpeedyVPN\IRSpeedyVPN.csproj -c Release -p:IncludeDirectHotspot=true
+dotnet run --project tests\HotspotPayloadChecks\HotspotPayloadChecks.csproj -c Release
+if errorlevel 1 goto failed
+dotnet build IRSpeedyVPN\IRSpeedyVPN.csproj -c Release -p:IncludeDirectHotspot=true -p:UseCosturaSingleFile=true
+if errorlevel 1 goto failed
+powershell -NoProfile -ExecutionPolicy Bypass -File tools\Test-HotspotPayload.ps1 -AssemblyPath IRSpeedyVPN\bin\Release\net48\IRSpeedyVPN.exe
 if errorlevel 1 goto failed
 echo Build succeeded: IRSpeedyVPN\bin\Release\net48
-echo Deploy the complete output, including Hotspot\win-x64 and Hotspot\win-x86.
-echo Do not merge the helper with SmartAssembly. Keep its entire folder next to the final EXE.
+echo Single-file EXE: managed dependencies and both hotspot payloads are embedded.
+echo Use your existing final packaging workflow. No external Hotspot folder is required.
+echo If using SmartAssembly, run tools\Test-HotspotPayload.ps1 against its final EXE too.
 pause
 popd
 exit /b 0

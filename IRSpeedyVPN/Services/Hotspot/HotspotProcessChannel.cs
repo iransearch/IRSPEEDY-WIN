@@ -19,9 +19,7 @@ namespace IRSpeedyVPN.Services.Hotspot
         private long sequence;
         private bool stopped;
         private bool cleanupConfirmed;
-        private static string HelperPath => Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Hotspot",
-            Environment.Is64BitOperatingSystem ? "win-x64" : "win-x86", "IRSpeedyHotspotHelper.exe");
-        internal static bool Installed => File.Exists(HelperPath);
+        internal static bool Installed => HotspotPayload.Included;
         internal static bool SupportedWindows
         {
             get
@@ -41,13 +39,16 @@ namespace IRSpeedyVPN.Services.Hotspot
         {
             if (!SupportedWindows) throw new HotspotChannelException("windows-10-2004-or-later-required");
             if (!Installed) throw new HotspotChannelException("helper-missing");
+            string helperPath;
+            try { helperPath = HotspotPayload.Prepare(); }
+            catch { throw new HotspotChannelException("helper-extraction-failed"); }
             cleanupConfirmed = true; // No start/recover request has been issued by this process yet.
             replies = new BlockingCollection<JObject>(128);
             var queue = replies;
-            var start = new ProcessStartInfo(HelperPath)
+            var start = new ProcessStartInfo(helperPath)
             {
                 UseShellExecute = false, CreateNoWindow = true,
-                WorkingDirectory = Path.GetDirectoryName(HelperPath),
+                WorkingDirectory = Path.GetDirectoryName(helperPath),
                 RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
                 StandardOutputEncoding = new UTF8Encoding(false), StandardErrorEncoding = new UTF8Encoding(false)
             };

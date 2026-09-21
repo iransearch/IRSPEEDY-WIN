@@ -41,6 +41,7 @@
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Security" />
+    <Reference Include="System.IO.Compression" />
     <Reference Include="System.ComponentModel.Composition" />
     <Reference Include="System.Configuration" />
     <Reference Include="System.Data" />
@@ -139,16 +140,8 @@
     <DotfuscatorProject Condition="'$(DotfuscatorProject)' == ''">$(MSBuildThisFileDirectory)..\IRSpeedyVPN.Dotfuscator.xml</DotfuscatorProject>
   </PropertyGroup>
 
-  <!-- Keep the .NET 8 helper separate from the .NET Framework WPF executable.
-       Deploy the WHOLE Hotspot folder, including beside obfuscated builds. -->
-  <PropertyGroup>
-    <IncludeDirectHotspot Condition="'$(IncludeDirectHotspot)' == '' And '$(OS)' == 'Windows_NT'">true</IncludeDirectHotspot>
-  </PropertyGroup>
-  <Target Name="PublishDirectHotspot" AfterTargets="Build" BeforeTargets="RunDotfuscator"
-          Condition="'$(IncludeDirectHotspot)' == 'true' And '$(DesignTimeBuild)' != 'true'">
-    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\tools\IRSpeedyHotspotHelper\IRSpeedyHotspotHelper.csproj&quot; -c Release -r win-x64 --self-contained true -o &quot;$(TargetDir)Hotspot\win-x64&quot;" />
-    <Exec Command="dotnet publish &quot;$(MSBuildThisFileDirectory)..\tools\IRSpeedyHotspotHelper\IRSpeedyHotspotHelper.csproj&quot; -c Release -r win-x86 --self-contained true -o &quot;$(TargetDir)Hotspot\win-x86&quot;" />
-  </Target>
+  <!-- Embed opaque helper payloads before compilation and the existing single-file packer. -->
+  <Import Project="..\tools\HotspotPayload.targets" />
 
   <Target Name="RunDotfuscator" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' And Exists('$(DotfuscatorExe)')">
     <MakeDir Directories="$(TargetDir)Obfuscated" />
@@ -162,11 +155,6 @@
     </Exec>
     <Warning Condition="'$(DotfuscatorExitCode)' != '0'" Text="Dotfuscator exited with code $(DotfuscatorExitCode); obfuscated output may be missing. Check the Dotfuscator installation, license, and config (IRSpeedyVPN.Dotfuscator.xml)." />
     <Copy SourceFiles="$(TargetDir)$(TargetName).exe.config" DestinationFolder="$(TargetDir)Obfuscated" Condition="'$(DotfuscatorExitCode)' == '0' And Exists('$(TargetDir)$(TargetName).exe.config')" />
-    <ItemGroup>
-      <DirectHotspotFiles Include="$(TargetDir)Hotspot\**\*" />
-    </ItemGroup>
-    <Copy SourceFiles="@(DirectHotspotFiles)" DestinationFiles="@(DirectHotspotFiles->'$(TargetDir)Obfuscated\Hotspot\%(RecursiveDir)%(Filename)%(Extension)')"
-          Condition="'$(DotfuscatorExitCode)' == '0'" />
   </Target>
 </Project>
 

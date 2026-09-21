@@ -41,7 +41,7 @@ namespace IRSpeedyVPN.Windows
             else if (view.State == "paused") hotspotStatus.Text = "در انتظار اتصال مجدد VPN…";
             else if (view.State == "starting") hotspotStatus.Text = "در حال راه‌اندازی…";
             else if (!HotspotProcessChannel.SupportedWindows) hotspotStatus.Text = "این قابلیت به ویندوز ۱۰ نسخه ۲۰۰۴ یا جدیدتر نیاز دارد.";
-            else if (!HotspotProcessChannel.Installed) hotspotStatus.Text = "فایل‌های هات‌اسپات نصب نشده‌اند؛ نسخه کامل برنامه را نصب کنید.";
+            else if (!HotspotProcessChannel.Installed) hotspotStatus.Text = "این نسخهٔ برنامه قابلیت هات‌اسپات را ندارد؛ نسخهٔ کامل را دریافت کنید.";
             else hotspotStatus.Text = eligible ? "آماده فعال‌سازی" : "ابتدا VPN را در حالت TUN متصل کنید.";
         }
         private async void HotspotToggle_Click(object sender, RoutedEventArgs e)
@@ -95,7 +95,8 @@ namespace IRSpeedyVPN.Windows
         {
             switch (code)
             {
-                case "helper-missing": return "فایل‌های هات‌اسپات نصب نشده‌اند؛ نسخه کامل برنامه را نصب کنید.";
+                case "helper-missing": return "این نسخهٔ برنامه قابلیت هات‌اسپات را ندارد؛ نسخهٔ کامل را دریافت کنید.";
+                case "helper-extraction-failed": return "آماده‌سازی هات‌اسپات انجام نشد. فضای خالی دیسک و دسترسی برنامه را بررسی کنید و دوباره تلاش کنید.";
                 case "windows-10-2004-or-later-required": return "این قابلیت به ویندوز ۱۰ نسخه ۲۰۰۴ یا جدیدتر نیاز دارد.";
                 case "tun-required": case "tun-lost": case "tun-changed-during-start":
                     return "تونل فعال در دسترس نیست. VPN را در حالت TUN متصل کنید.";

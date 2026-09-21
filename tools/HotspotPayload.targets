@@ -1,0 +1,28 @@
+<Project>
+  <PropertyGroup>
+    <IncludeDirectHotspot Condition="'$(IncludeDirectHotspot)' == '' And '$(OS)' == 'Windows_NT'">true</IncludeDirectHotspot>
+    <_HotspotHelperProject>$(MSBuildThisFileDirectory)IRSpeedyHotspotHelper\IRSpeedyHotspotHelper.csproj</_HotspotHelperProject>
+  </PropertyGroup>
+
+  <!-- AssignTargetPaths precedes resource naming and WPF's temporary compilation.
+       These archives must already exist when those targets enumerate resources. -->
+  <Target Name="EmbedDirectHotspot" BeforeTargets="AssignTargetPaths"
+          Condition="'$(IncludeDirectHotspot)' == 'true' And '$(DesignTimeBuild)' != 'true' And '$(_TargetAssemblyProjectName)' == ''">
+    <PropertyGroup>
+      <_HotspotPayloadRoot>$([System.IO.Path]::Combine('$(MSBuildProjectDirectory)', '$(IntermediateOutputPath)', 'HotspotPayload'))</_HotspotPayloadRoot>
+    </PropertyGroup>
+    <RemoveDir Directories="$(_HotspotPayloadRoot)\publish" />
+    <MakeDir Directories="$(_HotspotPayloadRoot)" />
+    <Exec Command="dotnet publish &quot;$(_HotspotHelperProject)&quot; -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o &quot;$(_HotspotPayloadRoot)\publish\win-x64&quot;" />
+    <Exec Command="dotnet publish &quot;$(_HotspotHelperProject)&quot; -c Release -r win-x86 --self-contained true -p:PublishSingleFile=false -p:PublishTrimmed=false -p:DebugType=None -p:DebugSymbols=false -o &quot;$(_HotspotPayloadRoot)\publish\win-x86&quot;" />
+    <Error Condition="!Exists('$(_HotspotPayloadRoot)\publish\win-x64\IRSpeedyHotspotHelper.exe') Or !Exists('$(_HotspotPayloadRoot)\publish\win-x86\IRSpeedyHotspotHelper.exe')"
+           Text="The self-contained hotspot helpers are missing. Refusing to build an incomplete executable." />
+    <ZipDirectory SourceDirectory="$(_HotspotPayloadRoot)\publish\win-x64" DestinationFile="$(_HotspotPayloadRoot)\win-x64.zip" Overwrite="true" />
+    <ZipDirectory SourceDirectory="$(_HotspotPayloadRoot)\publish\win-x86" DestinationFile="$(_HotspotPayloadRoot)\win-x86.zip" Overwrite="true" />
+    <ItemGroup>
+      <EmbeddedResource Include="$(_HotspotPayloadRoot)\win-x64.zip" LogicalName="IRSpeedyVPN.Hotspot.win-x64.zip" />
+      <EmbeddedResource Include="$(_HotspotPayloadRoot)\win-x86.zip" LogicalName="IRSpeedyVPN.Hotspot.win-x86.zip" />
+      <FileWrites Include="$(_HotspotPayloadRoot)\win-x64.zip;$(_HotspotPayloadRoot)\win-x86.zip" />
+    </ItemGroup>
+  </Target>
+</Project>
