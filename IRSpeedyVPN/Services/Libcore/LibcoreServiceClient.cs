@@ -27,6 +27,13 @@ namespace IRSpeedyVPN.Services.Libcore
             return Call("LibcoreService.Stop", LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeErrorResp);
         }
 
+        public ErrorResp StopWithDeadline(int timeoutMs)
+        {
+            using (var client = ProtorpcClient.Connect(_host, _port, timeoutMs))
+                return client.CallWithDeadline("LibcoreService.Stop", LibcoreProto.EncodeEmptyReq(),
+                    LibcoreProto.DecodeErrorResp, timeoutMs);
+        }
+
         public ErrorResp CheckConfig(LoadConfigReq req)
         {
             return Call("LibcoreService.CheckConfig", LibcoreProto.EncodeLoadConfigReq(req), LibcoreProto.DecodeErrorResp);

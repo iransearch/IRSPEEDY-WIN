@@ -123,7 +123,9 @@ namespace IRSpeedyVPN.Services
         const int CorePort = 19810;
         const int VpnCorePort = 19811;
         const int CoreConnectTimeoutMs = 8000;
-        const int CoreConnectRetryDelayMs = 200;        
+        const int CoreConnectRetryDelayMs = 200;
+        const int SharedDisconnectStopDeadlineMs = 750;
+        const int SharedDisconnectKillWaitMs = 1000;        
         const string SniScheme = "sni://";
         int nextSniListenPort = 40443;
         public TunnelPlusService(IServer server, GlobalInfo globalInfo)
@@ -665,16 +667,17 @@ namespace IRSpeedyVPN.Services
                 if (chkprocess)
                 {
                     StopSniServers(serviceSniServers);
-                    TryStopCore();
+                    StopCoreForDisconnect();
               
                     if (vpnCoreOwned && vpnCoreProcess != null)
                     {
-                        TryKillProcess(vpnCoreProcess);
+                        TryKillProcess(vpnCoreProcess,
+                            IsShareActive ? SharedDisconnectKillWaitMs : Timeout.Infinite);
                     }
                 }
                 else
                 {
-                    KillAll();
+                    KillAll(true);
                 }
                 if (_xraySocksPort > 0)
                 {
@@ -693,13 +696,16 @@ namespace IRSpeedyVPN.Services
 
             }
         }
-        void KillAll()
+        void KillAll(bool disconnecting = false)
         {
             if (IsConnected)
             {
 
             }
-            TryStopCore();
+            if (disconnecting)
+                StopCoreForDisconnect();
+            else
+                TryStopCore();
             StopSniServers(serviceSniServers);
             ShellExecute.KillProccess("sni");
             ShellExecute.KillProccess("hysteria");
@@ -1461,9 +1467,46 @@ namespace IRSpeedyVPN.Services
         }
 
 
-        private void TryStopCore()
+        private void StopCoreForDisconnect()
         {
-            PauseSharingBeforeCoreRestart();
+            // A shared listener can have long-lived client connections. Waiting for the
+            // normal eight-second Stop RPC makes an explicit user disconnect feel hung.
+            // The process is ours, so terminate it directly and bound the wait. A reused
+            // external Core cannot be killed; give its graceful Stop a short deadline.
+            if (IsShareActive && coreOwned && coreProcess != null)
+            {
+                Diagnostic("core-stop-shared-fast", "owned=true pid=" + DiagnosticPid(coreProcess));
+                var ownedProcess = coreProcess;
+                if (TryKillProcess(ownedProcess, SharedDisconnectKillWaitMs))
+                {
+                    try { ownedProcess.Dispose(); } catch { }
+                    coreProcess = null;
+                    coreOwned = false;
+                }
+                return;
+            }
+
+            if (IsShareActive)
+            {
+                Diagnostic("core-stop-shared-fast", "owned=false");
+                try
+                {
+                    if (!ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
+                        return;
+                    var client = new LibcoreServiceClient("127.0.0.1", CorePort, SharedDisconnectStopDeadlineMs);
+                    client.StopWithDeadline(SharedDisconnectStopDeadlineMs);
+                }
+                catch { }
+                return;
+            }
+
+            TryStopCore(true);
+        }
+
+        private void TryStopCore(bool sharingAlreadyPaused = false)
+        {
+            if (!sharingAlreadyPaused)
+                PauseSharingBeforeCoreRestart();
             try
             {
                 if (!ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
@@ -1471,7 +1514,7 @@ namespace IRSpeedyVPN.Services
                     return;
                 }
                 var client = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs);                
-                SafeStopCore(client);
+                SafeStopCore(client, true);
             }
             catch { }
         }
@@ -1512,9 +1555,10 @@ namespace IRSpeedyVPN.Services
             Diagnostic("tests-drain-complete");
         }
 
-        private void SafeStopCore(LibcoreServiceClient client)
+        private void SafeStopCore(LibcoreServiceClient client, bool sharingAlreadyPaused = false)
         {
-            PauseSharingBeforeCoreRestart();
+            if (!sharingAlreadyPaused)
+                PauseSharingBeforeCoreRestart();
             try
             {
                 Diagnostic("core-stop-rpc-begin");
@@ -1541,7 +1585,7 @@ namespace IRSpeedyVPN.Services
             }
         }
 
-        private void TryKillProcess(Process process)
+        private bool TryKillProcess(Process process, int waitForExitMs = Timeout.Infinite)
         {
             try
             {
@@ -1549,10 +1593,14 @@ namespace IRSpeedyVPN.Services
                 {
                     Diagnostic("process-kill-request", "pid=" + DiagnosticPid(process));
                     process.Kill();
-                    process.WaitForExit();
+                    if (waitForExitMs == Timeout.Infinite)
+                        process.WaitForExit();
+                    else if (!process.WaitForExit(waitForExitMs))
+                        return false;
                 }
+                return true;
             }
-            catch { }
+            catch { return false; }
         }
 
         private SniRuntime EnsureSniRuntime(string sniLink, Dictionary<string, SniRuntime> runtimes, bool persistent)
