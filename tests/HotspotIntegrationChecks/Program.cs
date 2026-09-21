@@ -12,11 +12,11 @@ class Source : IHotspotSource
 class Channel : IHotspotChannel
 {
     internal Action OnStart, OnStop;
-    internal bool FailStop, FailPoll;
+    internal bool FailStop, FailPoll, CoreLost;
     internal int Starts, Stops;
     internal Guid Bound;
     public void Start(TunContext tun, string ssid, string password) { Starts++; Bound = tun.Id; OnStart?.Invoke(); }
-    public int Poll() { if (FailPoll) throw new HotspotChannelException("session-health-or-lease-lost"); return 2; }
+    public int Poll() { if (FailPoll) throw new HotspotChannelException("session-health-or-lease-lost", CoreLost); return 2; }
     public void Stop() { Stops++; OnStop?.Invoke(); if (FailStop) throw new Exception(); }
     public void Dispose() { }
 }
@@ -103,6 +103,20 @@ class Program
         shared.Poll();
         Check(shared.View.State == "active", "delayed adapter rebinds on background poll");
         shared.Stop();
+        source = new Source();
+        var lateChannels = new List<Channel>();
+        var lateHook = new HotspotCoordinator(() => { var x = new Channel(); lateChannels.Add(x); return x; });
+        lateHook.Start(source, "IRSPEEDY-TEST", "0123456789");
+        source.Context = null; lateHook.Poll();
+        Check(lateHook.View.State == "paused", "core loss before lifecycle hook retains reconnect intent");
+        lateHook.Pause(source, true, sharedCore: true);
+        source.Context = new TunContext { Id = Guid.NewGuid(), Pid = 99, StartedUtcTicks = 1000 };
+        lateHook.Ready(source); lateHook.Poll();
+        Check(lateHook.View.State == "active" && lateChannels.Count == 2, "late reconnect hook still rebinds fresh session");
+        lateChannels[1].FailPoll = true; lateChannels[1].CoreLost = true; lateHook.Poll();
+        Check(lateHook.View.State == "paused", "helper-reported core loss also preserves intent");
+        lateHook.Poll(); Check(lateChannels.Count == 2, "health failure alone never restarts sharing");
+        lateHook.Stop();
         Console.WriteLine($"{checks} hotspot integration checks passed.");
     }
 }

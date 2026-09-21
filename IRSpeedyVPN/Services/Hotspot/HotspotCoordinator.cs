@@ -141,10 +141,15 @@ namespace IRSpeedyVPN.Services.Hotspot
                 }
                 catch (Exception ex)
                 {
-                    requested = false;
+                    // The watchdog may observe an exited core before TryReconnect's hook.
+                    // Preserve intent for that ordering, but wait for a new successful core
+                    // start signal; never restart directly from a failing health poll.
+                    bool tunnelLost = (ex is InvalidOperationException && ex.Message == "tun-lost") ||
+                        (ex is HotspotChannelException && ((HotspotChannelException)ex).TunnelLost);
+                    requested = tunnelLost && requested;
                     string code = ErrorCode(ex);
-                    if (!CloseLocked()) code = "cleanup-not-confirmed";
-                    view = new HotspotView("error", error: code);
+                    if (!CloseLocked()) { requested = false; code = "cleanup-not-confirmed"; }
+                    view = requested ? new HotspotView("paused") : new HotspotView("error", error: code);
                 }
             }
         }
@@ -169,6 +174,8 @@ namespace IRSpeedyVPN.Services.Hotspot
     internal sealed class HotspotChannelException : Exception
     {
         internal readonly string Code;
-        internal HotspotChannelException(string code) : base(code) { Code = code; }
+        internal readonly bool TunnelLost;
+        internal HotspotChannelException(string code, bool tunnelLost = false) : base(code)
+        { Code = code; TunnelLost = tunnelLost; }
     }
 }

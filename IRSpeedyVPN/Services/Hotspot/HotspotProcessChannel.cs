@@ -112,7 +112,10 @@ namespace IRSpeedyVPN.Services.Hotspot
             // Never write the whole reply: successful replies contain the Wi-Fi password.
             LogHelper.WriteLog("[Hotspot] code=" + code + " reason=" + SafeToken(value["reason"])
                 + " stage=" + SafeToken(value["stage"]) + " hresult=" + SafeToken(value["hresult"]));
-            throw new HotspotChannelException(code);
+            string reason = SafeToken(value["reason"]);
+            bool tunnelLost = code == "session-health-or-lease-lost" &&
+                (reason == "core-exited" || reason == "core-pid-reused" || reason == "tun-missing" || reason == "tun-down");
+            throw new HotspotChannelException(code, tunnelLost);
         }
         private JObject Request(string command, JObject value = null)
         {
