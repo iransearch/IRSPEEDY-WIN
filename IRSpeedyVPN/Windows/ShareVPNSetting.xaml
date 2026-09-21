@@ -262,13 +262,6 @@
                         </DockPanel>
                         <TextBlock x:Name="hotspotClients" Margin="0,8"/>
                     </StackPanel>
-                    <Expander Header="تغییر رمز وای‌فای" Margin="0,12,0,0">
-                        <StackPanel Margin="0,8">
-                            <TextBlock Text="رمز اولیه خودکار ساخته می‌شود. برای تغییر، هنگام خاموش‌بودن هات‌اسپات دقیقاً ۱۰ رقم انگلیسی وارد کنید." TextWrapping="Wrap"/>
-                            <TextBox x:Name="hotspotPasswordEditor" MaxLength="10" FlowDirection="LeftToRight" Margin="0,8" FontSize="16"/>
-                            <Button x:Name="hotspotSavePassword" Content="ذخیره رمز جدید" Click="HotspotSavePassword_Click" Padding="8"/>
-                        </StackPanel>
-                    </Expander>
                 </StackPanel>
 
                 <!-- Divider between the two sections -->
