@@ -29,8 +29,26 @@ namespace IRSpeedyVPN.Services.Hotspot
             return Assembly.GetExecutingAssembly().GetManifestResourceStream(ResourceName);
         }
 
+        // HotspotPayloadArchive.Prepare() re-hashes every extracted file (the whole
+        // self-contained runtime: hostfxr/hostpolicy/coreclr/dlls) from disk on every
+        // single call, even though nothing can legitimately change it between two
+        // hotspot starts in the same running app instance (the directory is
+        // admin/system-only per EnsureProtectedDirectory, enforced once below). Cache
+        // a successful Prepare() result for the lifetime of this process so repeated
+        // starts (toggle off/on, reconnects) skip both the lock-file wait and the
+        // full re-verification; a deleted/moved output still falls back to the normal
+        // verify-and-extract path.
+        private static string _cachedHelperPath;
+        private static readonly object CacheLock = new object();
+
         internal static string Prepare()
         {
+            lock (CacheLock)
+            {
+                if (_cachedHelperPath != null && File.Exists(_cachedHelperPath))
+                    return _cachedHelperPath;
+            }
+
             // The helper runs elevated. Never execute it from a user-writable temp
             // directory or prefer an arbitrary Hotspot folder next to the application.
             string root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
@@ -50,7 +68,10 @@ namespace IRSpeedyVPN.Services.Hotspot
                     Thread.Sleep(100);
                 }
             }
-            using (lease) return Archive.Value.Prepare(root);
+            string helperPath;
+            using (lease) helperPath = Archive.Value.Prepare(root);
+            lock (CacheLock) _cachedHelperPath = helperPath;
+            return helperPath;
         }
 
         private static void EnsureProtectedDirectory(string path)

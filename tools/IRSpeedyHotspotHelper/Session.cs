@@ -169,8 +169,14 @@ public static class Safety
 // Commands are serialized by the host. No thread is allowed to start/stop concurrently.
 public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task>? pollDelay = null)
 {
-    private const int LastPoll = 16; // immediate read + 16 x 500 ms = 8 seconds per phase
-    private readonly Func<Task> pause = pollDelay ?? (() => Task.Delay(500));
+    // Immediate read + 53 x 150 ms ~= 8 seconds per phase - the SAME worst-case
+    // ceiling as the previous 16 x 500 ms, just polled more finely. The 8s ceiling
+    // itself is left untouched (it was tuned against real ICS settle-time logs and
+    // shortening it risks reintroducing the flaky failures that ceiling was chosen to
+    // avoid); only the polling grain shrank, so a pair that settles quickly is
+    // observed up to ~350 ms sooner on average without changing slow-device behavior.
+    private const int LastPoll = 53;
+    private readonly Func<Task> pause = pollDelay ?? (() => Task.Delay(150));
     private readonly List<SharingObservation> observations = new();
     public IReadOnlyList<SharingObservation> Observations => observations;
     public bool Active { get; private set; }

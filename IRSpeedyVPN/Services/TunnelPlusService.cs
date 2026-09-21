@@ -174,7 +174,12 @@ namespace IRSpeedyVPN.Services
                 if (serviceController.CheckUserPermission(gInfo.Username, gInfo.Password))
                 // if (ServiceHelper.CheckAvailabilty(gInfo.Username,gInfo.Password))
                 {
-                    StopAndDrainUrlTests();
+                    // goUrl != null (share toggle / reconnect-with-known-link) never runs
+                    // the UrlTest block below and is about to call TryStopCore() on this
+                    // same core a few lines down, so the core-RPC half of the drain would
+                    // just be undone immediately after; skip it there (see
+                    // StopAndDrainUrlTests' comment).
+                    StopAndDrainUrlTests(skipCoreRpc: goUrl != null);
                     if (goUrl == null)
                     {
                         KillAll();
@@ -556,27 +561,54 @@ namespace IRSpeedyVPN.Services
             return EnsureSniRuntime(sniLink, runtimes, persistent);
         }
 
+        // chain.txt is a static deployed file that essentially never changes while the
+        // app is running, but GetDefaultChainLink() is called repeatedly on every
+        // connect/reconnect/share-toggle and from inside the per-URL test loop, each
+        // time re-reading and re-parsing it from disk. Cache the parsed result and only
+        // re-read when the file's last-write time actually changes, so a share toggle
+        // (RunV2ray -> ApplyShareSetting) doesn't pay for redundant disk I/O + parsing.
+        private string _defaultChainLinkCache;
+        private DateTime _defaultChainLinkCacheWriteTimeUtc;
+        private bool _defaultChainLinkCacheValid;
+
         private string GetDefaultChainLink()
         {
             try
             {
                 var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "chain.txt");
                 if (!File.Exists(path))
+                {
+                    _defaultChainLinkCacheValid = false;
                     return null;
+                }
+
+                var writeTimeUtc = File.GetLastWriteTimeUtc(path);
+                if (_defaultChainLinkCacheValid && writeTimeUtc == _defaultChainLinkCacheWriteTimeUtc)
+                    return _defaultChainLinkCache;
 
                 var content = File.ReadAllText(path).Trim();
                 if (string.IsNullOrWhiteSpace(content))
+                {
+                    _defaultChainLinkCacheValid = false;
                     return null;
+                }
 
                 string msg;
                 var item = ShareHandler.ImportFromConfigLink(content, out msg);
                 if (item == null)
+                {
+                    _defaultChainLinkCacheValid = false;
                     return null;
+                }
 
+                _defaultChainLinkCache = content;
+                _defaultChainLinkCacheWriteTimeUtc = writeTimeUtc;
+                _defaultChainLinkCacheValid = true;
                 return content;
             }
             catch
             {
+                _defaultChainLinkCacheValid = false;
                 return null;
             }
         }
@@ -1444,22 +1476,33 @@ namespace IRSpeedyVPN.Services
             catch { }
         }
 
-        private void StopAndDrainUrlTests()
+        // skipCoreRpc=true is for callers that are about to fully Stop() the core
+        // themselves right after this returns (share-toggle / reconnect-with-known-link,
+        // i.e. RunV2ray(goUrl != null) -> TryStopCore()). In that case a UrlTest RPC, if
+        // any is even in flight, is about to be torn down anyway by the imminent core
+        // Stop(), so probing+calling StopTest() here first is a redundant network round
+        // trip (a 200ms connect probe plus an RPC) on what is otherwise a hot, frequent
+        // path. The in-memory abort signal (CancelAll) and the drain barrier still run
+        // unconditionally, so behavior is unchanged for any test that IS actually running.
+        private void StopAndDrainUrlTests(bool skipCoreRpc = false)
         {
             Diagnostic("tests-cancel-request");
             UrlTestCoordinator.CancelAll();
-            try
+            if (!skipCoreRpc)
             {
-                if (ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
+                try
                 {
-                    var client = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs);
-                    client.StopTest();
-                    Diagnostic("tests-stop-rpc-complete");
+                    if (ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
+                    {
+                        var client = new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs);
+                        client.StopTest();
+                        Diagnostic("tests-stop-rpc-complete");
+                    }
                 }
-            }
-            catch
-            {
-                // The barrier below still waits for the in-flight call to unwind.
+                catch
+                {
+                    // The barrier below still waits for the in-flight call to unwind.
+                }
             }
 
             lock (grpcLock)
