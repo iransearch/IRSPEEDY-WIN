@@ -124,8 +124,8 @@ namespace IRSpeedyVPN.Services
         const int VpnCorePort = 19811;
         const int CoreConnectTimeoutMs = 8000;
         const int CoreConnectRetryDelayMs = 200;
-        const int SharedDisconnectStopDeadlineMs = 750;
-        const int SharedDisconnectKillWaitMs = 1000;        
+        const int DisconnectStopDeadlineMs = 750;
+        const int DisconnectKillWaitMs = 1000;        
         const string SniScheme = "sni://";
         int nextSniListenPort = 40443;
         public TunnelPlusService(IServer server, GlobalInfo globalInfo)
@@ -655,10 +655,11 @@ namespace IRSpeedyVPN.Services
         }
         private void DisconnectInternal(bool chkprocess, bool silent, bool userCanceled)
         {
-            PauseSharingBeforeCoreRestart(!userCanceled);
-            Diagnostic("disconnect-request", "userCanceled=" + userCanceled + " checkProcess=" + chkprocess + " silent=" + silent);
+            // Cancel reconnect intent before potentially waiting for hotspot cleanup.
             if (userCanceled)
                 userCancelRequested = true;
+            PauseSharingBeforeCoreRestart(!userCanceled);
+            Diagnostic("disconnect-request", "userCanceled=" + userCanceled + " checkProcess=" + chkprocess + " silent=" + silent);
             if (useSystemProxy)
                 SystemProxy.Disable();
             lock (this)
@@ -672,7 +673,7 @@ namespace IRSpeedyVPN.Services
                     if (vpnCoreOwned && vpnCoreProcess != null)
                     {
                         TryKillProcess(vpnCoreProcess,
-                            IsShareActive ? SharedDisconnectKillWaitMs : Timeout.Infinite);
+                            (IsShareActive || lastVpnMode) ? DisconnectKillWaitMs : Timeout.Infinite);
                     }
                 }
                 else
@@ -1469,15 +1470,15 @@ namespace IRSpeedyVPN.Services
 
         private void StopCoreForDisconnect()
         {
-            // A shared listener can have long-lived client connections. Waiting for the
-            // normal eight-second Stop RPC makes an explicit user disconnect feel hung.
-            // The process is ours, so terminate it directly and bound the wait. A reused
-            // external Core cannot be killed; give its graceful Stop a short deadline.
-            if (IsShareActive && coreOwned && coreProcess != null)
+            // TUN and shared listeners must not wait for the normal eight-second Stop RPC.
+            // Hotspot cleanup has already run before this point. Terminate only our owned
+            // Core, with a bounded wait; reused external Cores get a short graceful deadline.
+            bool fastStop = lastVpnMode || IsShareActive;
+            if (fastStop && coreOwned && coreProcess != null)
             {
-                Diagnostic("core-stop-shared-fast", "owned=true pid=" + DiagnosticPid(coreProcess));
+                Diagnostic("core-stop-disconnect-fast", "owned=true pid=" + DiagnosticPid(coreProcess));
                 var ownedProcess = coreProcess;
-                if (TryKillProcess(ownedProcess, SharedDisconnectKillWaitMs))
+                if (TryKillProcess(ownedProcess, DisconnectKillWaitMs))
                 {
                     try { ownedProcess.Dispose(); } catch { }
                     coreProcess = null;
@@ -1486,15 +1487,15 @@ namespace IRSpeedyVPN.Services
                 return;
             }
 
-            if (IsShareActive)
+            if (fastStop)
             {
-                Diagnostic("core-stop-shared-fast", "owned=false");
+                Diagnostic("core-stop-disconnect-fast", "owned=false");
                 try
                 {
                     if (!ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
                         return;
-                    var client = new LibcoreServiceClient("127.0.0.1", CorePort, SharedDisconnectStopDeadlineMs);
-                    client.StopWithDeadline(SharedDisconnectStopDeadlineMs);
+                    var client = new LibcoreServiceClient("127.0.0.1", CorePort, DisconnectStopDeadlineMs);
+                    client.StopWithDeadline(DisconnectStopDeadlineMs);
                 }
                 catch { }
                 return;

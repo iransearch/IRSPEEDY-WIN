@@ -416,7 +416,15 @@ namespace IRSpeedyVPN
             if (Interlocked.Exchange(ref disconnectInProgress, 1) != 0)
                 return;
 
-            ShowLoading(null);
+            // A disconnect must not put a loading overlay over the UI.
+            // Show the list immediately, but prevent a new connection from racing cleanup.
+            HideLoading();
+            uCServerList.IsEnabled = false;
+            if (IsUserLogin)
+            {
+                ShowControl(uCServerList);
+                ShowMessage("در حال قطع اتصال در پس‌زمینه…");
+            }
             Task.Run(() =>
             {
                 try
@@ -429,12 +437,18 @@ namespace IRSpeedyVPN
                     Dispatcher.BeginInvoke(new Action(() =>
                     {
                         HideLoading();
+                        if (IsUserLogin)
+                            ShowControl(uCUserInfo);
                         ShowMessage(ex.Message);
                     }));
                 }
                 finally
                 {
-                    Interlocked.Exchange(ref disconnectInProgress, 0);
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        Interlocked.Exchange(ref disconnectInProgress, 0);
+                        uCServerList.IsEnabled = true;
+                    }));
                 }
             });
         }
@@ -446,6 +460,9 @@ namespace IRSpeedyVPN
 
         private void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service, string protocol)
         {
+            if (Interlocked.CompareExchange(ref disconnectInProgress, 0, 0) != 0)
+                return;
+
             Dispatcher.Invoke((Action)(() =>
             {
                 ShowMessage("");
