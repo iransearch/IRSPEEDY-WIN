@@ -7,5 +7,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../tools/IRSpeedyHotspotHelper/Session.cs" Link="Session.cs" />
+    <Compile Include="../../tools/IRSpeedyHotspotHelper/StartupTimings.cs" Link="StartupTimings.cs" />
+    <Compile Include="../../tools/IRSpeedyHotspotHelper/StatusChangeWaiter.cs" Link="StatusChangeWaiter.cs" />
   </ItemGroup>
 </Project>

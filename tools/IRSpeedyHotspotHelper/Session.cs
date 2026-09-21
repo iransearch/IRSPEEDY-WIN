@@ -179,42 +179,68 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
     private readonly Func<Task> pause = pollDelay ?? (() => Task.Delay(150));
     private readonly List<SharingObservation> observations = new();
     public IReadOnlyList<SharingObservation> Observations => observations;
+    private readonly StartupTimings startupTimings = new();
+    public StartupTiming[] Timings => startupTimings.Snapshot;
     public bool Active { get; private set; }
     public Journal? State { get; private set; }
 
     public async Task Start(Guid publicId, string ssid, string password, bool experimental)
     {
+        startupTimings.Restart();
+        try
+        {
+            await startupTimings.MeasureAsync("session-start",
+                () => StartCore(publicId, ssid, password, experimental));
+        }
+        catch (Exception ex)
+        {
+            ex.Data["hotspot.timings"] = Timings;
+            throw;
+        }
+    }
+
+    private async Task StartCore(Guid publicId, string ssid, string password, bool experimental)
+    {
         if (!experimental) throw new HotspotException("experimental-opt-in-required");
         if (Active || journal.Read() is not null) throw new HotspotException("recovery-required");
         observations.Clear();
         Safety.ValidateCredentials(ssid, password);
-        var before = backend.ReadAdapters();
+        var before = startupTimings.Measure("preflight-adapters", backend.ReadAdapters);
         Safety.RequireTun(before, publicId);
         // Existing ICS is deliberately NOT taken over in this PoC. Its empty baseline
         // is the snapshot, so rollback never needs to disturb another application's pair.
         if (before.Any(a => a.SharingRole.HasValue)) throw new HotspotException("existing-ics-conflict");
-        backend.PrepareBootstrap(publicId);
+        startupTimings.Measure("backend-prepare", () => backend.PrepareBootstrap(publicId));
         if (backend.IsOn) throw new HotspotException("existing-hotspot-conflict");
         State = new Journal(backend.Kind == "wifi-direct" ? 3 : backend.BootstrapId.HasValue ? 2 : 1,
             publicId, null, false, backend.BootstrapId, backend.Kind);
-        journal.Write(State);
+        startupTimings.Measure("journal-create", () => journal.Write(State!));
         try
         {
             State = State with { StartAttempted = true };
-            journal.Write(State); // durable BEFORE any networking mutation
-            await backend.Start(ssid, password);
+            startupTimings.Measure("journal-start", () => journal.Write(State!)); // durable BEFORE any networking mutation
+            await startupTimings.MeasureAsync("publisher-start", () => backend.Start(ssid, password));
             // Give WinRT time to finish publishing its ICS state before attempting
             // any legacy write. A working pair bypasses Bind entirely.
-            if (!await WaitForPair(before, publicId, backend.AutomaticSharing ? "winrt-settle" : "wfd-adapter-ready"))
+            if (!await startupTimings.MeasureAsync("adapter-ready", async () =>
+            {
+                bool paired = await WaitForPair(before, publicId, backend.AutomaticSharing ? "winrt-settle" : "wfd-adapter-ready");
+                if (State!.PrivateId is null) throw new HotspotException("hotspot-adapter-not-ready");
+                return paired;
+            }))
             {
                 if (State.PrivateId is not Guid privateId)
                     throw new HotspotException("hotspot-adapter-not-ready");
                 Observe("before-bind", 0, backend.ReadAdapters());
-                backend.Bind(publicId, privateId); // one transaction; native retry is bounded by IcsRetry
-                if (!await WaitForPair(before, publicId, "bind-verify"))
-                    throw new HotspotException("ics-verification-failed");
+                // One transaction; native retry is still bounded by IcsRetry.
+                startupTimings.Measure("ics-bind", () => backend.Bind(publicId, privateId));
+                await startupTimings.MeasureAsync("ics-verify", async () =>
+                {
+                    if (!await WaitForPair(before, publicId, "bind-verify"))
+                        throw new HotspotException("ics-verification-failed");
+                });
             }
-            backend.EnableClients();
+            startupTimings.Measure("clients-enable", backend.EnableClients);
             Active = true;
         }
         catch (Exception primary)
@@ -224,7 +250,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
             try { Observe("failure-before-cleanup", 0, backend.ReadAdapters()); } catch { }
             primary.Data["hotspot.observations"] = observations.ToArray();
             primary.Data["hotspot.backendState"] = backend.Diagnostics;
-            try { await Stop(); }
+            try { await startupTimings.MeasureAsync("rollback", Stop); }
             catch (Exception cleanup)
             {
                 var failure = new HotspotException("start-failed-recovery-required");

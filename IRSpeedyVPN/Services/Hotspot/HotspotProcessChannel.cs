@@ -19,6 +19,8 @@ namespace IRSpeedyVPN.Services.Hotspot
         private long sequence;
         private bool stopped;
         private bool cleanupConfirmed;
+        private string performanceAttempt = Guid.NewGuid().ToString("N");
+        private Stopwatch activationClock;
         internal static bool Installed => HotspotPayload.Included;
         internal static bool SupportedWindows
         {
@@ -40,7 +42,7 @@ namespace IRSpeedyVPN.Services.Hotspot
             if (!SupportedWindows) throw new HotspotChannelException("windows-10-2004-or-later-required");
             if (!Installed) throw new HotspotChannelException("helper-missing");
             string helperPath;
-            try { helperPath = HotspotPayload.Prepare(); }
+            try { helperPath = MeasureStartup("payload-prepare", HotspotPayload.Prepare); }
             catch { throw new HotspotChannelException("helper-extraction-failed"); }
             cleanupConfirmed = true; // No start/recover request has been issued by this process yet.
             replies = new BlockingCollection<JObject>(128);
@@ -55,7 +57,11 @@ namespace IRSpeedyVPN.Services.Hotspot
             process = new Process { StartInfo = start };
             try
             {
-                if (!process.Start()) throw new HotspotChannelException("helper-start-failed");
+                MeasureStartup("process-launch", () =>
+                {
+                    if (!process.Start()) throw new HotspotChannelException("helper-start-failed");
+                    return true;
+                });
             }
             catch
             {
@@ -78,13 +84,18 @@ namespace IRSpeedyVPN.Services.Hotspot
                 finally { queue.CompleteAdding(); }
             });
             Task.Run(() => { try { while (stderr.ReadLine() != null) { } } catch { } });
-            var ready = Read(15000);
-            Check(ready);
-            if ((string)ready["state"] != "ready" || (int?)ready["protocol"] != 2) throw new HotspotChannelException("helper-protocol-mismatch");
+            var ready = MeasureStartup("helper-ready", () =>
+            {
+                var response = Read(15000);
+                Check(response);
+                if ((string)response["state"] != "ready" || (int?)response["protocol"] != 2)
+                    throw new HotspotChannelException("helper-protocol-mismatch");
+                return response;
+            });
             if ((bool?)ready["recoveryRequired"] == true)
             {
                 cleanupConfirmed = false;
-                Request("recover");
+                MeasureStartup("recovery", () => Request("recover"));
                 cleanupConfirmed = true;
                 // A legacy backend exits after recovery. A fresh process always uses Wi-Fi Direct.
                 DisposeProcess();
@@ -108,6 +119,7 @@ namespace IRSpeedyVPN.Services.Hotspot
         }
         private void Check(JObject value)
         {
+            LogStartupTimings(value);
             if ((bool?)value["ok"] == true) return;
             string code = SafeToken(value["code"]);
             // Never write the whole reply: successful replies contain the Wi-Fi password.
@@ -140,6 +152,16 @@ namespace IRSpeedyVPN.Services.Hotspot
             throw new HotspotChannelException("helper-response-timeout");
         }
         public void Start(TunContext tun, string ssid, string password)
+        {
+            performanceAttempt = Guid.NewGuid().ToString("N");
+            activationClock = Stopwatch.StartNew();
+            try
+            {
+                MeasureStartup("activation-total", () => { StartCore(tun, ssid, password); return true; });
+            }
+            finally { activationClock.Stop(); }
+        }
+        private void StartCore(TunContext tun, string ssid, string password)
         {
             Open();
             cleanupConfirmed = false;
@@ -191,5 +213,61 @@ namespace IRSpeedyVPN.Services.Hotspot
             process.Dispose(); process = null;
         }
         public void Dispose() { DisposeProcess(); }
+
+        private T MeasureStartup<T>(string stage, Func<T> action)
+        {
+            var clock = Stopwatch.StartNew();
+            bool success = false;
+            try { var result = action(); success = true; return result; }
+            finally
+            {
+                WritePerformance("app", stage, clock.ElapsedMilliseconds,
+                    activationClock == null ? 0 : activationClock.ElapsedMilliseconds, success);
+            }
+        }
+
+        private void WritePerformance(string clock, string stage, long elapsedMs, long totalMs, bool success)
+        {
+            try
+            {
+                LogHelper.WriteLog("[HotspotPerformance] attempt=" + performanceAttempt
+                    + " clock=" + clock + " stage=" + stage + " elapsedMs=" + elapsedMs
+                    + " totalMs=" + totalMs + " outcome=" + (success ? "ok" : "error"));
+            }
+            catch { /* Diagnostics must never break startup or cleanup. */ }
+        }
+
+        private void LogStartupTimings(JObject value)
+        {
+            // Success replies contain secrets: only allowlisted timing fields may be logged.
+            try
+            {
+                var timings = value["timings"] as JArray;
+                if (timings == null) return;
+                int count = 0;
+                foreach (var item in timings)
+                {
+                    if (++count > 32) break;
+                    var entry = item as JObject;
+                    if (entry == null || entry["Stage"]?.Type != JTokenType.String) continue;
+                    string stage = (string)entry["Stage"];
+                    switch (stage)
+                    {
+                        case "preflight-adapters": case "backend-prepare": case "journal-create":
+                        case "journal-start": case "publisher-start": case "adapter-ready":
+                        case "ics-bind": case "ics-verify": case "clients-enable":
+                        case "rollback": case "session-start": break;
+                        default: continue;
+                    }
+                    if (entry["ElapsedMs"]?.Type != JTokenType.Integer ||
+                        entry["TotalMs"]?.Type != JTokenType.Integer ||
+                        entry["Success"]?.Type != JTokenType.Boolean) continue;
+                    long elapsed = (long)entry["ElapsedMs"], total = (long)entry["TotalMs"];
+                    if (elapsed < 0 || total < 0) continue;
+                    WritePerformance("helper", stage, elapsed, total, (bool)entry["Success"]);
+                }
+            }
+            catch { /* Ignore malformed optional telemetry, not the protocol result. */ }
+        }
     }
 }

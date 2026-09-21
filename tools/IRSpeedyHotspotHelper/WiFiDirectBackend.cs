@@ -49,19 +49,33 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
             publisher.Advertisement.LegacySettings.Passphrase = new PasswordCredential { Password = password };
             listener = new WiFiDirectConnectionListener();
             listener.ConnectionRequested += ConnectionRequested;
-            publisher.Start();
-            for (int poll = 0; poll <= 40; poll++)
-            {
-                var current = publisher.Status;
-                lock (sync) status = current.ToString();
-                if (current == WiFiDirectAdvertisementPublisherStatus.Started) return;
-                if (current is WiFiDirectAdvertisementPublisherStatus.Aborted or WiFiDirectAdvertisementPublisherStatus.Stopped)
-                    throw Failure("publisher-" + current, "wfd.start");
-                if (poll < 40) await Task.Delay(250);
-            }
-            throw Failure("publisher-start-timeout", "wfd.start");
+            await WaitForPublisher(publisher, starting: true);
         }
         catch (Exception ex) { ex.Data["hotspot.stage"] ??= "wfd.start"; throw; }
+    }
+
+    private static Task WaitForPublisher(WiFiDirectAdvertisementPublisher current, bool starting)
+    {
+        return StatusChangeWaiter.WaitAsync<WiFiDirectAdvertisementPublisherStatus>(
+            notify =>
+            {
+                Windows.Foundation.TypedEventHandler<WiFiDirectAdvertisementPublisher,
+                    WiFiDirectAdvertisementPublisherStatusChangedEventArgs> handler =
+                    (_, args) => notify(args.Status);
+                current.StatusChanged += handler;
+                return () => current.StatusChanged -= handler;
+            },
+            () => { if (starting) current.Start(); else current.Stop(); },
+            () => current.Status,
+            value => starting ? value == WiFiDirectAdvertisementPublisherStatus.Started :
+                value is WiFiDirectAdvertisementPublisherStatus.Stopped or
+                    WiFiDirectAdvertisementPublisherStatus.Aborted or WiFiDirectAdvertisementPublisherStatus.Created,
+            value => starting && (value is WiFiDirectAdvertisementPublisherStatus.Aborted or
+                WiFiDirectAdvertisementPublisherStatus.Stopped)
+                ? Failure("publisher-" + value, "wfd.start") : null,
+            TimeSpan.FromSeconds(10),
+            () => Failure(starting ? "publisher-start-timeout" : "publisher-stop-timeout",
+                starting ? "wfd.start" : "wfd.stop"));
     }
 
     private void StatusChanged(WiFiDirectAdvertisementPublisher sender, WiFiDirectAdvertisementPublisherStatusChangedEventArgs args)
@@ -165,20 +179,11 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
                     throw Failure("wifi-direct-recovery-adapter-still-active", "wfd.recover");
                 return;
             }
-            publisher.Stop();
-            for (int poll = 0; poll <= 40; poll++)
-            {
-                var current = publisher.Status;
-                if (current is WiFiDirectAdvertisementPublisherStatus.Stopped or WiFiDirectAdvertisementPublisherStatus.Aborted or WiFiDirectAdvertisementPublisherStatus.Created)
-                {
-                    lock (sync) status = current.ToString();
-                    publisher.StatusChanged -= StatusChanged;
-                    publisher = null;
-                    return;
-                }
-                if (poll < 40) await Task.Delay(250);
-            }
-            throw Failure("publisher-stop-timeout", "wfd.stop");
+            var stopping = publisher;
+            await WaitForPublisher(stopping, starting: false);
+            lock (sync) status = stopping.Status.ToString();
+            stopping.StatusChanged -= StatusChanged;
+            publisher = null;
         }
         catch (Exception ex) { ex.Data["hotspot.stage"] ??= "wfd.stop"; throw; }
     }

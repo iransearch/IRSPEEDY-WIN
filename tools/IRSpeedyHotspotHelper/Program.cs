@@ -142,11 +142,16 @@ internal static class Program
                                     throw new HotspotException("core-or-tun-lost-during-start");
                                 }
                             }
+                            catch (Exception ex)
+                            {
+                                ex.Data["hotspot.timings"] ??= session.Timings;
+                                throw;
+                            }
                             finally { request.Password = ""; }
                             lease.Restart();
                             Emit(new { ok = true, state = "active", experimental = true,
                                 startupMode = backend.Kind, backendState = backend.Diagnostics, ssid = accessSsid, password = accessPassword,
-                                observations = session.Observations });
+                                observations = session.Observations, timings = session.Timings });
                             break;
                         case "heartbeat":
                             lease.Restart();
@@ -230,6 +235,7 @@ internal static class Program
         hresult = ex.HResult.ToString("X8"),
         stage = ex.Data["hotspot.stage"] as string ?? "unclassified",
         observations = ex.Data["hotspot.observations"],
+        timings = ex.Data["hotspot.timings"],
         primaryType = ex.Data["hotspot.primaryType"],
         primaryHresult = ex.Data["hotspot.primaryHresult"],
         cleanupHresult = ex.Data["hotspot.cleanupHresult"],

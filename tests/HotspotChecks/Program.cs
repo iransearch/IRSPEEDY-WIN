@@ -10,6 +10,44 @@ internal static class Program
 
     private static async Task Main()
     {
+        await PublisherWaitChecks();
+        await Test("startup timings cover phases without credentials", async () =>
+        {
+            var (s, b, _) = New(); b.Kind = "wifi-direct";
+            await s.Start(Tun, "TimingFixtureSSID", "Timing-Secret-9876", true);
+            var stages = s.Timings.Select(t => t.Stage).ToArray();
+            Check(stages.SequenceEqual(new[] { "preflight-adapters", "backend-prepare",
+                "journal-create", "journal-start", "publisher-start", "adapter-ready",
+                "ics-bind", "ics-verify", "clients-enable", "session-start" }));
+            Check(s.Timings.All(t => t.Success && t.ElapsedMs >= 0 && t.TotalMs >= 0));
+            Check(s.Timings.Zip(s.Timings.Skip(1), (a, b) => a.TotalMs <= b.TotalMs).All(x => x));
+            string json = System.Text.Json.JsonSerializer.Serialize(s.Timings);
+            Check(!json.Contains("TimingFixtureSSID") && !json.Contains("Timing-Secret-9876"));
+            await s.Stop();
+            b.Set(Private, a => a with { Up = false }); // emulate adapter teardown before the next activation
+            await s.Start(Tun, "Test", "12345678", true);
+            Check(s.Timings.Length == stages.Length); // no accumulation across sessions
+            await s.Stop();
+        });
+        await Test("failed startup includes phase and rollback timings", async () =>
+        {
+            var (s, b, _) = New(); b.FailStart = true;
+            try { await s.Start(Tun, "Test", "12345678", true); throw new Exception("Expected failure"); }
+            catch (HotspotException ex) when (ex.Code == "start-failed")
+            {
+                var timings = (StartupTiming[])ex.Data["hotspot.timings"]!;
+                Check(timings.Any(t => t.Stage == "publisher-start" && !t.Success));
+                Check(timings.Any(t => t.Stage == "rollback" && t.Success));
+                Check(timings.Last().Stage == "session-start" && !timings.Last().Success);
+                Check(!timings.Any(t => t.Stage == "clients-enable"));
+            }
+        });
+        await Test("ICS verification failure is marked in timings", async () =>
+        {
+            var (s, b, _) = New(); b.Kind = "wifi-direct"; b.SkipBind = true;
+            await Reject("ics-verification-failed", () => s.Start(Tun, "Test", "12345678", true));
+            Check(s.Timings.Any(t => t.Stage == "ics-verify" && !t.Success));
+        });
         await Test("opt-in required before writes", async () =>
         {
             var (s, b, j) = New();
@@ -430,6 +468,110 @@ internal static class Program
         });
         Console.WriteLine($"PASS: {passed} hotspot safety checks; no Windows/network mutation performed.");
     }
+
+    private static async Task PublisherWaitChecks()
+    {
+        await Test("publisher inline event is not missed", async () =>
+        {
+            var p = new FakePublisher();
+            await WaitPublisher(p, true, () => p.Raise(PublisherState.Started));
+            Check(p.Subscribers == 0);
+        });
+        await Test("publisher snapshot catches status without event", async () =>
+        {
+            var p = new FakePublisher();
+            await WaitPublisher(p, true, () => p.State = PublisherState.Started);
+            Check(p.Subscribers == 0);
+        });
+        await Test("publisher delayed event completes without polling", async () =>
+        {
+            var p = new FakePublisher();
+            var wait = WaitPublisher(p, true, () => { });
+            Check(!wait.IsCompleted && p.Reads == 1 && p.Subscribers == 1);
+            p.Raise(PublisherState.Started);
+            await wait.WaitAsync(TimeSpan.FromSeconds(3));
+            Check(p.Reads == 1 && p.Subscribers == 0);
+        });
+        foreach (var state in new[] { PublisherState.Stopped, PublisherState.Aborted })
+            await Test("publisher start rejects " + state, async () =>
+            {
+                var p = new FakePublisher();
+                await Reject("publisher-" + state, () => WaitPublisher(p, true, () => p.Raise(state)));
+                Check(p.Subscribers == 0);
+            });
+        foreach (var state in new[] { PublisherState.Stopped, PublisherState.Aborted, PublisherState.Created })
+            await Test("publisher stop accepts " + state, async () =>
+            {
+                var p = new FakePublisher { State = PublisherState.Started };
+                await WaitPublisher(p, false, () => p.Raise(state));
+                Check(p.Subscribers == 0);
+            });
+        foreach (bool starting in new[] { true, false })
+            await Test("publisher timeout unsubscribes and tolerates late event " + starting, async () =>
+            {
+                var p = new FakePublisher { State = starting ? PublisherState.Created : PublisherState.Started };
+                Action<PublisherState>? late = null;
+                await Reject(starting ? "publisher-start-timeout" : "publisher-stop-timeout",
+                    () => WaitPublisher(p, starting, () => late = p.Handler, TimeSpan.Zero));
+                Check(p.Subscribers == 0);
+                late!(PublisherState.Aborted); // native callback already in flight at timeout
+            });
+        await Test("publisher request failure unsubscribes", async () =>
+        {
+            var p = new FakePublisher();
+            await Reject("request-failed", () => WaitPublisher(p, true,
+                () => throw new HotspotException("request-failed")));
+            Check(p.Subscribers == 0);
+        });
+        await Test("publisher status read failure unsubscribes", async () =>
+        {
+            var p = new FakePublisher { FailRead = true };
+            await Reject("read-failed", () => WaitPublisher(p, true, () => { }));
+            Check(p.Subscribers == 0);
+        });
+        await Test("late publisher callback cannot complete the next wait", async () =>
+        {
+            var p = new FakePublisher();
+            Action<PublisherState>? late = null;
+            await Reject("publisher-start-timeout",
+                () => WaitPublisher(p, true, () => late = p.Handler, TimeSpan.Zero));
+            var next = WaitPublisher(p, true, () => { });
+            late!(PublisherState.Started);
+            Check(!next.IsCompleted);
+            p.Raise(PublisherState.Started);
+            await next.WaitAsync(TimeSpan.FromSeconds(3));
+            Check(p.Subscribers == 0);
+        });
+    }
+
+    private enum PublisherState { Created, Started, Stopped, Aborted }
+    private sealed class FakePublisher
+    {
+        internal PublisherState State;
+        internal int Subscribers, Reads;
+        internal bool FailRead;
+        internal Action<PublisherState>? Handler;
+        internal Action Subscribe(Action<PublisherState> handler)
+        {
+            Handler += handler; Subscribers++;
+            return () => { Handler -= handler; Subscribers--; };
+        }
+        internal PublisherState Read()
+        {
+            Reads++;
+            if (FailRead) throw new HotspotException("read-failed");
+            return State;
+        }
+        internal void Raise(PublisherState state) { State = state; Handler?.Invoke(state); }
+    }
+    private static Task WaitPublisher(FakePublisher p, bool starting, Action request, TimeSpan? timeout = null) =>
+        StatusChangeWaiter.WaitAsync<PublisherState>(p.Subscribe, request, p.Read,
+            state => starting ? state == PublisherState.Started :
+                state is PublisherState.Stopped or PublisherState.Aborted or PublisherState.Created,
+            state => starting && (state is PublisherState.Stopped or PublisherState.Aborted)
+                ? new HotspotException("publisher-" + state) : null,
+            timeout ?? TimeSpan.FromSeconds(3),
+            () => new HotspotException(starting ? "publisher-start-timeout" : "publisher-stop-timeout"));
 
     private static (Session s, FakeBackend b, MemoryJournal j) New()
     {
