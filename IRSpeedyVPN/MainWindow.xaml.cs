@@ -70,7 +70,10 @@ namespace IRSpeedyVPN
         readonly Dictionary<object, List<HeaderIconRegistration>> headerIconMap = new Dictionary<object, List<HeaderIconRegistration>>();
         object currentHeaderOwner;
         private Stopwatch loginUiStopwatch;
-        private int disconnectInProgress;
+        private readonly SemaphoreSlim connectionRequestGate = new SemaphoreSlim(1, 1);
+        private long connectionRequestVersion;
+        private IVPNService registeredVpnService;
+        private IRSpeedyVPN.Events.OnConnectDisconnect registeredVpnHandler;
         public MainWindow()
         {
 
@@ -402,55 +405,18 @@ namespace IRSpeedyVPN
             HideLoading();
         }
 
-        private void UCUserInfo_OnDisconnectRequest(object sender, EventArgs e)
+        private async void UCUserInfo_OnDisconnectRequest(object sender, EventArgs e)
         {
-            var service = gInfo?.CurrentService;
-            if (service == null)
-            {
-                HideLoading();
-                return;
-            }
-
-            // Disconnect may wait for Core, active shared clients, or direct-hotspot
-            // cleanup. Never run that work on WPF's dispatcher thread.
-            if (Interlocked.Exchange(ref disconnectInProgress, 1) != 0)
-                return;
-
-            // A disconnect must not put a loading overlay over the UI.
-            // Show the list immediately, but prevent a new connection from racing cleanup.
+            // Accept the user's intent immediately, without exposing cleanup details.
+            long version = Interlocked.Increment(ref connectionRequestVersion);
+            UnRegiserVpnService();
             HideLoading();
-            uCServerList.IsEnabled = false;
             if (IsUserLogin)
             {
                 ShowControl(uCServerList);
-                ShowMessage("در حال قطع اتصال در پس‌زمینه…");
+                ShowMessage("");
             }
-            Task.Run(() =>
-            {
-                try
-                {
-                    service.Disconnect();
-                }
-                catch (Exception ex)
-                {
-                    LogHelper.WriteLog(ex);
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        HideLoading();
-                        if (IsUserLogin)
-                            ShowControl(uCUserInfo);
-                        ShowMessage(ex.Message);
-                    }));
-                }
-                finally
-                {
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        Interlocked.Exchange(ref disconnectInProgress, 0);
-                        uCServerList.IsEnabled = true;
-                    }));
-                }
-            });
+            await ApplyConnectionRequestAsync(null, null, version);
         }
 
         private void UCUserInfo_OnChangeServerRequest(object sender, EventArgs e)
@@ -458,65 +424,93 @@ namespace IRSpeedyVPN
             throw new NotImplementedException();
         }
 
-        private void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service, string protocol)
+        private async void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service, string protocol)
         {
-            if (Interlocked.CompareExchange(ref disconnectInProgress, 0, 0) != 0)
-                return;
-
-            Dispatcher.Invoke((Action)(() =>
+            if (isUpdateAvailable)
             {
-                ShowMessage("");
-            }));
+                ShowMessage("Please Upddate Program now");
+                return;
+            }
 
+            long version = Interlocked.Increment(ref connectionRequestVersion);
+            UnRegiserVpnService();
+            // Keep selection available while an older session is being drained.
+            HideLoading();
+            ShowMessage("");
+            await ApplyConnectionRequestAsync(service, protocol, version);
+        }
+
+        private async Task ApplyConnectionRequestAsync(IVPNService next, string protocol, long version)
+        {
+            await connectionRequestGate.WaitAsync();
             try
             {
-                if (!isUpdateAvailable)
+                if (version != Interlocked.Read(ref connectionRequestVersion)) return;
+                var previous = gInfo.CurrentService;
+                if (previous != null)
                 {
-                    gInfo.CurrentService = service;
-                    RegiserVpnService();
-                    gInfo.CurrentService.Connect(protocol);
-                    ShowLoading("در حال اتصال به سرویس");
-                }
-                else
-                {
-                    throw new Exception("Please Upddate Program now");
+                    // Disconnect drains the previous startup too, not just its current Core.
+                    await Task.Run(() => previous.Disconnect());
+                    proxifier.Detach();
+                    if (ReferenceEquals(gInfo.CurrentService, previous))
+                        gInfo.CurrentService = null;
                 }
 
+                // Several clicks may arrive during cleanup. Only the latest one starts.
+                if (version != Interlocked.Read(ref connectionRequestVersion) || next == null || !IsUserLogin)
+                    return;
+
+                gInfo.CurrentService = next;
+                RegiserVpnService();
+                ShowLoading("در حال اتصال به سرویس");
+                await Task.Run(() => next.Connect(protocol));
             }
-            catch(Exception ex)
+            catch (Exception ex)
             {
-                notify.Visible = true;
-                ShowMessage(ex.Message);
+                LogHelper.WriteLog(ex);
+                if (version == Interlocked.Read(ref connectionRequestVersion))
+                {
+                    UnRegiserVpnService();
+                    HideLoading();
+                    if (IsUserLogin) ShowControl(uCServerList);
+                    ShowMessage(ex.Message);
+                }
             }
             finally
             {
-                
+                connectionRequestGate.Release();
             }
-           
         }
+
         void RegiserVpnService()
         {
-            if(!gInfo.CurrentService.IsRequirementAvailable())
+            UnRegiserVpnService();
+            var service = gInfo.CurrentService;
+            if (!service.IsRequirementAvailable())
                 localResource.ExtractResource(true);
-            gInfo.CurrentService.onConnectDisconnect += CurrentService_onConnectDisconnect;
+            long version = Interlocked.Read(ref connectionRequestVersion);
+            registeredVpnService = service;
+            registeredVpnHandler = (source, connected, port, message) =>
+                CurrentService_onConnectDisconnect(source, connected, port, message, version);
+            service.onConnectDisconnect += registeredVpnHandler;
         }
 
-
-        private void CurrentService_onConnectDisconnect(IVPNService Service, bool connected,int listenPort, string message)
+        private void CurrentService_onConnectDisconnect(IVPNService service, bool connected,
+            int listenPort, string message, long version)
         {
-
-            if (!Service.IsUsingProxifire || !connected)
-                HideLoading();
-            Dispatcher.Invoke((Action)(() =>
+            Dispatcher.BeginInvoke(new Action(() =>
             {
-
-                if (connected && Service.IsUsingProxifire)
-                    proxifier.Attach("127.0.0.1",
-                        listenPort,
-                        Service.ProxifierWithPassword?gInfo.Username:null,
-                        Service.ProxifierWithPassword ? gInfo.Password : null,
-                        Service.ProxyType,
-                        Service.ProxifierRuleType);
+                // Check on the dispatcher as well: an old callback may already be queued.
+                if (version != Interlocked.Read(ref connectionRequestVersion) ||
+                    !ReferenceEquals(service, gInfo.CurrentService))
+                    return;
+                if (!service.IsUsingProxifire || !connected)
+                    HideLoading();
+                if (connected && service.IsUsingProxifire)
+                    proxifier.Attach("127.0.0.1", listenPort,
+                        service.ProxifierWithPassword ? gInfo.Username : null,
+                        service.ProxifierWithPassword ? gInfo.Password : null,
+                        service.ProxyType, service.ProxifierRuleType);
                 else
                     ProcessConnectionResult(connected, message);
             }));
@@ -698,7 +692,10 @@ namespace IRSpeedyVPN
 
         void UnRegiserVpnService()
         {
-            gInfo.CurrentService.onConnectDisconnect -= CurrentService_onConnectDisconnect;
+            if (registeredVpnService != null && registeredVpnHandler != null)
+                registeredVpnService.onConnectDisconnect -= registeredVpnHandler;
+            registeredVpnService = null;
+            registeredVpnHandler = null;
         }
 
 
@@ -1024,6 +1021,8 @@ namespace IRSpeedyVPN
         }
         private void DisconnectAll()
         {
+            Interlocked.Increment(ref connectionRequestVersion);
+            UnRegiserVpnService();
             if (serviceFactory.Services != null)
                 serviceFactory.Services.GroupBy(x => x.GetType())
                    .Select(grp => grp.First())
@@ -1116,6 +1115,8 @@ namespace IRSpeedyVPN
         void Logout(string Message,bool resetInput=true)
         {
 
+            Interlocked.Increment(ref connectionRequestVersion);
+            UnRegiserVpnService();
             IsUserLogin = false;
             mainTimer.Change(int.MaxValue,int.MaxValue);
             if (gInfo?.CurrentService != null)

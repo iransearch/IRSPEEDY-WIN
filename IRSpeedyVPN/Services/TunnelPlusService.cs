@@ -63,7 +63,9 @@ namespace IRSpeedyVPN.Services
         public string SelectedUrl => selectedUrl ?? server.urls.FirstOrDefault()?.url;
         string[] _smartFastUrls;
         bool IsConnected=false;
-        bool userCancelRequested;
+        volatile bool userCancelRequested;
+        private readonly object connectionLifecycleGate = new object();
+        private long connectionGeneration;
         int reconnecting;
 
 
@@ -148,7 +150,8 @@ namespace IRSpeedyVPN.Services
             userCancelRequested = false;
             useSystemProxy = (ProxifierRuleType == ProxifierType.None);
             IsConnected = false;
-            ((Action)(() => RunV2ray(/*SelectedUrl*/))).BeginInvoke(null, null);
+            long generation = Interlocked.Increment(ref connectionGeneration);
+            Task.Run(() => RunV2ray(generation: generation));
         }
         public bool IsSmartFast => _smartFastUrls != null && _smartFastUrls.Length > 0;
 
@@ -163,7 +166,18 @@ namespace IRSpeedyVPN.Services
         // Fixed local listen port for the proxy and the Share VPN endpoint. Kept constant
         // (not 1080, which is reserved on Hyper-V/WSL/Docker machines and forced a fallback)
         // so the shared address never changes between connects.
-        void RunV2ray(string goUrl=null,int port=10808)
+        void RunV2ray(string goUrl = null, int port = 10808, long? generation = null)
+        {
+            long expected = generation ?? Interlocked.Read(ref connectionGeneration);
+            lock (connectionLifecycleGate)
+            {
+                if (userCancelRequested || expected != Interlocked.Read(ref connectionGeneration))
+                    return;
+                RunV2rayLocked(goUrl, port);
+            }
+        }
+
+        private void RunV2rayLocked(string goUrl, int port)
         {
             if (!PauseSharingBeforeCoreRestart())
             {
@@ -378,6 +392,7 @@ namespace IRSpeedyVPN.Services
                         );
                     }
 
+                    if (userCancelRequested) return;
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))
                     {
                         LogHelper.WriteExLog(
@@ -394,6 +409,7 @@ namespace IRSpeedyVPN.Services
                         return;
                     }
 
+                    if (userCancelRequested) return;
                     IsConnected = true;
                     ResumeSharingAfterCoreStart();
                     Diagnostic("connection-established", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy"));
@@ -655,10 +671,24 @@ namespace IRSpeedyVPN.Services
         }
         private void DisconnectInternal(bool chkprocess, bool silent, bool userCanceled)
         {
-            // Cancel reconnect intent before potentially waiting for hotspot cleanup.
+            // Invalidate queued starts before waiting for an in-flight startup to drain.
             if (userCanceled)
+            {
                 userCancelRequested = true;
-            PauseSharingBeforeCoreRestart(!userCanceled);
+                Interlocked.Increment(ref connectionGeneration);
+            }
+            lock (connectionLifecycleGate)
+                DisconnectLocked(chkprocess, silent, userCanceled);
+        }
+
+        private void DisconnectLocked(bool chkprocess, bool silent, bool userCanceled)
+        {
+            if (!PauseSharingBeforeCoreRestart(!userCanceled))
+            {
+                if (userCanceled)
+                    throw new InvalidOperationException("پاک‌سازی اشتراک‌گذاری مستقیم کامل نشد؛ دوباره تلاش کنید.");
+                return;
+            }
             Diagnostic("disconnect-request", "userCanceled=" + userCanceled + " checkProcess=" + chkprocess + " silent=" + silent);
             if (useSystemProxy)
                 SystemProxy.Disable();
@@ -1901,30 +1931,25 @@ namespace IRSpeedyVPN.Services
         private void CoreProcess_Exited(object sender, EventArgs e)
         {
             DiagnosticExit(sender as Process);
-            if (suppressCoreExit)
-                return;
-            if (!IsConnected)
+            if (suppressCoreExit) return;
+            long generation = Interlocked.Read(ref connectionGeneration);
+            // Never block Process.Exited on a lifecycle lock held by a process wait.
+            Task.Run(() =>
             {
-                try
+                lock (connectionLifecycleGate)
                 {
-                    var exitedProcess = sender as Process;
-                    if (exitedProcess != null)
-                        LogHelper.WriteLog($"Core exited while idle or URL testing. Exit code: {exitedProcess.ExitCode}.");
+                    if (suppressCoreExit || userCancelRequested ||
+                        generation != Interlocked.Read(ref connectionGeneration) ||
+                        !ReferenceEquals(sender, coreProcess) || !IsConnected)
+                        return;
+                    if (!ShouldRetryCoreExit())
+                    {
+                        DisconnectLocked(true, false, false);
+                        return;
+                    }
+                    TryReconnect();
                 }
-                catch { }
-                return;
-            }
-            if (userCancelRequested)
-            {
-                DisconnectInternal(true, false, false);
-                return;
-            }
-            if (!ShouldRetryCoreExit())
-            {
-                DisconnectInternal(true, false, false);
-                return;
-            }
-            TryReconnect();
+            });
         }
         private bool ShouldRetryCoreExit()
         {
@@ -1946,7 +1971,8 @@ namespace IRSpeedyVPN.Services
         }
         private void TryReconnect()
         {
-            if (!PauseSharingBeforeCoreRestart()) return;
+            long generation = Interlocked.Read(ref connectionGeneration);
+            if (userCancelRequested) return;
             Diagnostic("reconnect-request");
             if (Interlocked.CompareExchange(ref reconnecting, 1, 0) != 0)
                 return;
@@ -1954,12 +1980,14 @@ namespace IRSpeedyVPN.Services
             {
                 try
                 {
-                    DisconnectInternal(true, true, false);
+                    lock (connectionLifecycleGate)
+                    {
+                        if (userCancelRequested || generation != Interlocked.Read(ref connectionGeneration))
+                            return;
+                        DisconnectLocked(true, true, false);
+                    }
                     Thread.Sleep(1000);
-                    if (userCancelRequested)
-                        return;
-                    var link = lastLink ?? SelectedUrl;
-                    RunV2ray(link, lastListenPort);
+                    RunV2ray(lastLink ?? SelectedUrl, lastListenPort, generation);
                 }
                 finally
                 {
