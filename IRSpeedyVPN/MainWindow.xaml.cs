@@ -70,6 +70,7 @@ namespace IRSpeedyVPN
         readonly Dictionary<object, List<HeaderIconRegistration>> headerIconMap = new Dictionary<object, List<HeaderIconRegistration>>();
         object currentHeaderOwner;
         private Stopwatch loginUiStopwatch;
+        private int disconnectInProgress;
         public MainWindow()
         {
 
@@ -403,13 +404,39 @@ namespace IRSpeedyVPN
 
         private void UCUserInfo_OnDisconnectRequest(object sender, EventArgs e)
         {
-            ShowLoading(null);
-            if (gInfo?.CurrentService != null)
-                gInfo.CurrentService.Disconnect();
-            else
+            var service = gInfo?.CurrentService;
+            if (service == null)
             {
                 HideLoading();
+                return;
             }
+
+            // Disconnect may wait for Core, active shared clients, or direct-hotspot
+            // cleanup. Never run that work on WPF's dispatcher thread.
+            if (Interlocked.Exchange(ref disconnectInProgress, 1) != 0)
+                return;
+
+            ShowLoading(null);
+            Task.Run(() =>
+            {
+                try
+                {
+                    service.Disconnect();
+                }
+                catch (Exception ex)
+                {
+                    LogHelper.WriteLog(ex);
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        HideLoading();
+                        ShowMessage(ex.Message);
+                    }));
+                }
+                finally
+                {
+                    Interlocked.Exchange(ref disconnectInProgress, 0);
+                }
+            });
         }
 
         private void UCUserInfo_OnChangeServerRequest(object sender, EventArgs e)
