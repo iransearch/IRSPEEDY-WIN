@@ -10,6 +10,7 @@ namespace IRSpeedyVPN.Windows
     {
         private readonly DispatcherTimer hotspotUiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         private bool hotspotBusy;
+        private string pendingHotspotSsid, pendingHotspotPassword;
         private void InitializeHotspotUi()
         {
             hotspotUiTimer.Tick += HotspotUiTick;
@@ -24,18 +25,22 @@ namespace IRSpeedyVPN.Windows
             var view = DirectHotspot.Controller.View;
             bool active = view.State == "active";
             bool running = active || view.State == "paused" || view.State == "starting";
-            bool eligible = !DirectHotspot.Controller.CoreChanging && (Service as IHotspotSource)?.CaptureTun() != null;
+            bool starting = view.State == "starting" || (pendingHotspotSsid != null && view.State != "error");
+            bool showCredentials = active || starting;
+            bool eligible = !running && !hotspotBusy && !DirectHotspot.Controller.CoreChanging
+                && (Service as IHotspotSource)?.CaptureTun() != null;
             hotspotToggle.Content = running ? "توقف اشتراک‌گذاری مستقیم" : "فعال‌سازی اشتراک‌گذاری مستقیم";
             hotspotToggle.IsEnabled = !hotspotBusy && (running || (eligible && HotspotProcessChannel.Installed && HotspotProcessChannel.SupportedWindows));
             hotspotRetryStop.Visibility = view.State == "error" ? Visibility.Visible : Visibility.Collapsed;
             hotspotRetryStop.IsEnabled = !hotspotBusy;
-            hotspotCredentials.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
-            hotspotName.Text = active ? view.Ssid : "";
-            hotspotPassword.Text = active ? view.Password : "";
+            hotspotCredentials.Visibility = showCredentials ? Visibility.Visible : Visibility.Collapsed;
+            hotspotName.Text = active || view.State == "starting" ? view.Ssid : starting ? pendingHotspotSsid : "";
+            hotspotPassword.Text = active || view.State == "starting" ? view.Password : starting ? pendingHotspotPassword : "";
             hotspotClients.Text = active ? "دستگاه‌های متصل: " + view.Clients : "";
             hotspotPasswordEditor.IsEnabled = !hotspotBusy && view.State == "off";
             hotspotSavePassword.IsEnabled = !hotspotBusy && view.State == "off";
-            if (hotspotBusy) hotspotStatus.Text = "در حال آماده‌سازی یا توقف…";
+            if (starting) hotspotStatus.Text = "در حال راه‌اندازی… اتصال پس از فعال‌شدن امکان‌پذیر است.";
+            else if (hotspotBusy) hotspotStatus.Text = "در حال آماده‌سازی یا توقف…";
             else if (view.State == "error") hotspotStatus.Text = FriendlyHotspotError(view.Error);
             else if (active) hotspotStatus.Text = "فعال — دستگاه را به این وای‌فای متصل کنید.";
             else if (view.State == "paused") hotspotStatus.Text = "در انتظار اتصال مجدد VPN…";
@@ -58,11 +63,25 @@ namespace IRSpeedyVPN.Windows
                 {
                     var source = Service as IHotspotSource;
                     string ssid = DirectHotspot.Ssid, password = DirectHotspot.Password;
+                    // Publish exactly the credentials passed to the worker before it starts.
+                    pendingHotspotSsid = ssid;
+                    pendingHotspotPassword = password;
+                    RefreshHotspotUi();
                     await Task.Run(() => DirectHotspot.Controller.Start(source, ssid, password));
                 }
             }
-            catch { if (IsLoaded) MessageBox.Show(this, "راه‌اندازی انجام نشد. وضعیت اتصال و توقف جلسه قبلی را بررسی کنید.", "اشتراک‌گذاری مستقیم"); }
-            finally { hotspotBusy = false; RefreshHotspotUi(); }
+            catch
+            {
+                pendingHotspotSsid = pendingHotspotPassword = null;
+                RefreshHotspotUi();
+                if (IsLoaded) MessageBox.Show(this, "راه‌اندازی انجام نشد. وضعیت اتصال و توقف جلسه قبلی را بررسی کنید.", "اشتراک‌گذاری مستقیم");
+            }
+            finally
+            {
+                pendingHotspotSsid = pendingHotspotPassword = null;
+                hotspotBusy = false;
+                RefreshHotspotUi();
+            }
         }
         private async void HotspotStop_Click(object sender, RoutedEventArgs e)
         {
@@ -87,9 +106,11 @@ namespace IRSpeedyVPN.Windows
         private void HotspotCopyPassword_Click(object sender, RoutedEventArgs e) { CopyHotspotValue(true); }
         private void CopyHotspotValue(bool password)
         {
-            var view = DirectHotspot.Controller.View;
-            if (view.State != "active") return;
-            try { Clipboard.SetText(password ? view.Password : view.Ssid); } catch { }
+            RefreshHotspotUi();
+            if (hotspotCredentials.Visibility != Visibility.Visible) return;
+            string value = password ? hotspotPassword.Text : hotspotName.Text;
+            if (string.IsNullOrEmpty(value)) return;
+            try { Clipboard.SetText(value); } catch { }
         }
         private static string FriendlyHotspotError(string code)
         {

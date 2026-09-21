@@ -33,7 +33,15 @@ class Program
             Check(!HotspotCoordinator.ValidPassword(bad), "reject non-ASCII/length");
         var source = new Source();
         var channels = new List<Channel>();
-        var c = new HotspotCoordinator(() => { var channel = new Channel(); channels.Add(channel); return channel; });
+        HotspotCoordinator c = null;
+        c = new HotspotCoordinator(() => {
+            var channel = new Channel { OnStart = () => {
+                Check(c.View.State == "starting", "not active before startup completes");
+                Check(c.View.Ssid == "IRSPEEDY-TEST" && c.View.Password == "0123456789",
+                    "credentials available before startup completes");
+            } };
+            channels.Add(channel); return channel;
+        });
         c.Start(source, "IRSPEEDY-TEST", "0123456789");
         Check(c.View.State == "active", "start verified");
         c.Poll(); Check(c.View.Clients == 2, "client count");

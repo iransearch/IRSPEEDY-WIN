@@ -62,7 +62,7 @@ namespace IRSpeedyVPN.Services.Hotspot
         }
         private void StartLocked()
         {
-            view = new HotspotView("starting");
+            view = new HotspotView("starting", ssid, password);
             try
             {
                 var tun = owner.CaptureTun();
