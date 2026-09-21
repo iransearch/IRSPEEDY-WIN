@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d"
         Title="اشتراک گذاری اتصال VPN"
-        Width="392"
+        Width="380"
         SizeToContent="Height"
         MinHeight="320"
         Background="Transparent"
@@ -24,7 +24,7 @@
             <Setter Property="CornerRadius" Value="26"/>
             <Setter Property="BorderThickness" Value="1.5"/>
             <Setter Property="BorderBrush" Value="#FF393F78"/>
-            <Setter Property="Background" Value="#CFFFFFFF"/>
+            <Setter Property="Background" Value="#FAFFFFFF"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
             <Setter Property="Effect">
                 <Setter.Value>
@@ -53,30 +53,30 @@
 
         <!-- Section index badge (١ / ٢) -->
         <Style x:Key="SectionBadge" TargetType="Border">
-            <Setter Property="Width" Value="26"/>
-            <Setter Property="Height" Value="26"/>
-            <Setter Property="CornerRadius" Value="13"/>
+            <Setter Property="Width" Value="19"/>
+            <Setter Property="Height" Value="19"/>
+            <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="Background" Value="#1F2B57"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
         </Style>
 
-        <!-- Small badge (HTTP / SOCKS5) -->
+        <!-- Small badge (HTTP / SOCKS5 / SSID / رمز) -->
         <Style x:Key="ProtoBadge" TargetType="Border">
             <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="Background" Value="#1F2B57"/>
             <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="Margin" Value="0,0,8,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
-        <!-- Value box (IP/Port) -->
+        <!-- Value box (IP/Port/SSID/password) -->
         <Style x:Key="ValueBox" TargetType="Border">
-            <Setter Property="CornerRadius" Value="10"/>
+            <Setter Property="CornerRadius" Value="8"/>
             <Setter Property="Background" Value="#F2F3F8"/>
             <Setter Property="BorderBrush" Value="#D0D4EA"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="10,6"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
+            <Setter Property="Padding" Value="8,5"/>
+            <Setter Property="Margin" Value="0,0,6,0"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
         </Style>
 
@@ -112,11 +112,41 @@
             </Setter>
         </Style>
 
-        <!-- Big Start/Stop toggle button -->
+        <!-- Compact borderless icon button (copy icons that must raise Click,
+             e.g. the hotspot SSID/password rows whose handlers take
+             RoutedEventArgs, unlike the proxy rows' TextBlock MouseLeftButtonUp icons) -->
+        <Style x:Key="CompactIconButton" TargetType="Button">
+            <Setter Property="Background" Value="#EEF0FA"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="7,5"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Foreground" Value="#1F2B57"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border Background="{TemplateBinding Background}"
+                                CornerRadius="8"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.8"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Big Start/Stop toggle button (proxy section) -->
         <Style x:Key="StartStopToggleStyle" TargetType="ToggleButton">
-            <Setter Property="Height" Value="52"/>
-            <Setter Property="Margin" Value="14,16,14,0"/>
-            <Setter Property="FontSize" Value="18"/>
+            <Setter Property="Height" Value="46"/>
+            <Setter Property="Margin" Value="14,12,14,0"/>
+            <Setter Property="FontSize" Value="16"/>
             <Setter Property="FontWeight" Value="Bold"/>
             <Setter Property="Foreground" Value="White"/>
             <Setter Property="Cursor" Value="Hand"/>
@@ -124,7 +154,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ToggleButton">
                         <Border x:Name="bd"
-                                CornerRadius="14"
+                                CornerRadius="12"
                                 BorderBrush="#18234A"
                                 BorderThickness="1">
                             <Border.Background>
@@ -163,6 +193,71 @@
             </Setter>
         </Style>
 
+        <!-- Big action button (hotspot section) — same gradient/rounding as
+             StartStopToggleStyle so the two sections read as one visual
+             system, but a plain Button (hotspotToggle's Content text is
+             driven from code, so it stays a Button rather than a ToggleButton). -->
+        <Style x:Key="BigActionButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="46"/>
+            <Setter Property="FontSize" Value="16"/>
+            <Setter Property="FontWeight" Value="Bold"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="12"
+                                BorderBrush="#18234A"
+                                BorderThickness="1">
+                            <Border.Background>
+                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                                    <GradientStop Color="#24325E" Offset="0"/>
+                                    <GradientStop Color="#131A36" Offset="1"/>
+                                </LinearGradientBrush>
+                            </Border.Background>
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.95"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.55"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Secondary/lighter button (retry stop, save password) -->
+        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
+            <Setter Property="Height" Value="36"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Foreground" Value="#1F2B57"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border CornerRadius="10"
+                                Background="#F2F3F8"
+                                BorderBrush="#D0D4EA"
+                                BorderThickness="1">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter Property="Opacity" Value="0.85"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <!-- Spinner storyboard (dots) -->
         <Storyboard x:Key="SpinnerStoryboard" RepeatBehavior="Forever">
             <DoubleAnimation Storyboard.TargetName="Dot1" Storyboard.TargetProperty="Opacity"
@@ -178,11 +273,11 @@
     <Border Style="{StaticResource OuterCard}">
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="52"/>
+                <RowDefinition Height="48"/>
                 <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
 
-            <!-- HEADER (your version) -->
+            <!-- HEADER -->
             <Border Grid.Row="0"
                     CornerRadius="24,24,0,0"
                     Background="#E9ECF7"
@@ -199,7 +294,7 @@
                     <TextBlock Grid.Column="1"
                                FlowDirection="RightToLeft"
                                Text="اشتراک گذاری اتصال VPN"
-                               FontSize="18"
+                               FontSize="17"
                                FontWeight="Bold"
                                Foreground="#FF393F78"
                                VerticalAlignment="Center"
@@ -229,57 +324,92 @@
 
             <!-- CONTENT: single continuous page (no tabs). Section 1 = direct
                  Wi-Fi Direct hotspot, Section 2 = HTTP/SOCKS5 proxy sharing.
-                 Both sections keep every x:Name/event handler used by
-                 ShareVPNSetting.xaml.cs and ShareVPNSetting.Hotspot.cs unchanged. -->
-            <StackPanel Grid.Row="1" Margin="8">
+                 Every x:Name/event handler used by ShareVPNSetting.xaml.cs and
+                 ShareVPNSetting.Hotspot.cs is unchanged from before this pass -
+                 only the visual layout/spacing/skin around them changed. -->
+            <StackPanel Grid.Row="1" Margin="0,4,0,6">
 
                 <!-- ===================== SECTION 1: DIRECT HOTSPOT ===================== -->
-                <StackPanel Margin="8,12,8,4">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <Border Style="{StaticResource SectionBadge}">
-                            <TextBlock Text="۱" Foreground="White" FontWeight="Bold" FontSize="13"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="اینترنت VPN روی وای‌فای" FontSize="18" FontWeight="Bold"
-                                   Foreground="#1F2B57" VerticalAlignment="Center"/>
-                    </StackPanel>
-                    <TextBlock Text="گوشی یا تلویزیون را بدون تنظیم پراکسی متصل کنید. فقط هنگام اتصال TUN در دسترس است."
-                               TextWrapping="Wrap" Margin="34,4,0,0" FontSize="14"/>
-                    <TextBlock Text="ترافیک دستگاه‌ها از قواعد مسیریابی فعلی VPN پیروی می‌کند." TextWrapping="Wrap" Margin="34,2,0,0" Foreground="#555"/>
-                    <Button x:Name="hotspotToggle" Content="فعال‌سازی اشتراک‌گذاری مستقیم" Click="HotspotToggle_Click" Padding="10" Margin="0,12,0,8"/>
-                    <TextBlock x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,4" Foreground="#1F2B57"/>
-                    <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click" Visibility="Collapsed" Padding="8"/>
-                    <StackPanel x:Name="hotspotCredentials" Visibility="Collapsed" Margin="0,10">
-                        <TextBlock Text="نام وای‌فای"/>
-                        <DockPanel Margin="0,4">
-                            <Button DockPanel.Dock="Left" Content="کپی" Click="HotspotCopyName_Click" Padding="8,4"/>
-                            <TextBox x:Name="hotspotName" IsReadOnly="True" FlowDirection="LeftToRight" Margin="6,0" FontSize="16"/>
-                        </DockPanel>
-                        <TextBlock Text="رمز وای‌فای" Margin="0,8,0,0"/>
-                        <DockPanel Margin="0,4">
-                            <Button DockPanel.Dock="Left" Content="کپی" Click="HotspotCopyPassword_Click" Padding="8,4"/>
-                            <TextBox x:Name="hotspotPassword" IsReadOnly="True" FlowDirection="LeftToRight" Margin="6,0" FontSize="18"/>
-                        </DockPanel>
-                        <TextBlock x:Name="hotspotClients" Margin="0,8"/>
-                    </StackPanel>
-                </StackPanel>
+                <Border Style="{StaticResource SettingRowBorder}" Margin="14,8,14,0">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal">
+                            <Border Style="{StaticResource SectionBadge}">
+                                <TextBlock Text="۱" Foreground="White" FontWeight="Bold" FontSize="10"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="هات‌اسپات مستقیم VPN" FontSize="15" FontWeight="Bold"
+                                       Foreground="#1F2B57" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock Text="گوشی یا تلویزیون را بدون تنظیم پراکسی، طبق مسیریابی فعلی VPN وصل کنید (فقط با TUN فعال)."
+                                   TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12.5" Foreground="#555"/>
 
-                <!-- Divider between the two sections -->
-                <Border Height="1" Background="#D8DCEF" Margin="14,14,14,4"/>
+                        <Button x:Name="hotspotToggle" Content="فعال‌سازی اشتراک‌گذاری مستقیم"
+                                Click="HotspotToggle_Click" Style="{StaticResource BigActionButtonStyle}"
+                                Margin="0,10,0,0"/>
+                        <TextBlock x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12.5" Foreground="#1F2B57"/>
+                        <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click"
+                                Style="{StaticResource SecondaryButtonStyle}" Visibility="Collapsed" Margin="0,6,0,0"/>
+
+                        <StackPanel x:Name="hotspotCredentials" Visibility="Collapsed" Margin="0,8,0,0">
+
+                            <!-- SSID row: badge + value + copy, one row -->
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource ProtoBadge}">
+                                    <TextBlock Text="SSID" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                                <Border Grid.Column="1" Style="{StaticResource ValueBox}">
+                                    <TextBox x:Name="hotspotName" IsReadOnly="True" BorderThickness="0"
+                                             Background="Transparent" FlowDirection="LeftToRight" FontSize="13"
+                                             VerticalAlignment="Center" Padding="0" IsReadOnlyCaretVisible="False"/>
+                                </Border>
+                                <Button Grid.Column="2" Style="{StaticResource CompactIconButton}" Click="HotspotCopyName_Click">
+                                    <TextBlock Text="&#xF0C5;" FontFamily="{StaticResource fa_ProLight}" FontSize="15"/>
+                                </Button>
+                            </Grid>
+
+                            <!-- Password row: badge + value + copy, one row -->
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource ProtoBadge}">
+                                    <TextBlock Text="رمز" FontSize="12" FontWeight="Bold" Foreground="White"/>
+                                </Border>
+                                <Border Grid.Column="1" Style="{StaticResource ValueBox}">
+                                    <TextBox x:Name="hotspotPassword" IsReadOnly="True" BorderThickness="0"
+                                             Background="Transparent" FlowDirection="LeftToRight" FontSize="14"
+                                             VerticalAlignment="Center" Padding="0" IsReadOnlyCaretVisible="False"/>
+                                </Border>
+                                <Button Grid.Column="2" Style="{StaticResource CompactIconButton}" Click="HotspotCopyPassword_Click">
+                                    <TextBlock Text="&#xF0C5;" FontFamily="{StaticResource fa_ProLight}" FontSize="15"/>
+                                </Button>
+                            </Grid>
+
+                            <TextBlock x:Name="hotspotClients" FontSize="12" Foreground="#666"/>
+                        </StackPanel>
+
+                        <Expander Header="تغییر رمز وای‌فای" Margin="0,10,0,0" FontSize="13">
+                            <StackPanel Margin="0,8,0,0">
+                                <TextBlock Text="رمز اولیه خودکار ساخته می‌شود. برای تغییر، هنگام خاموش‌بودن هات‌اسپات دقیقاً ۱۰ رقم انگلیسی وارد کنید."
+                                           TextWrapping="Wrap" FontSize="12" Foreground="#555"/>
+                                <TextBox x:Name="hotspotPasswordEditor" MaxLength="10" FlowDirection="LeftToRight"
+                                         Margin="0,6,0,0" FontSize="14" Padding="6,4"/>
+                                <Button x:Name="hotspotSavePassword" Content="ذخیره رمز جدید" Click="HotspotSavePassword_Click"
+                                        Style="{StaticResource SecondaryButtonStyle}" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </Border>
 
                 <!-- ===================== SECTION 2: HTTP/SOCKS5 PROXY ===================== -->
-                <StackPanel Margin="8,8,8,0">
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                        <Border Style="{StaticResource SectionBadge}">
-                            <TextBlock Text="۲" Foreground="White" FontWeight="Bold" FontSize="13"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <TextBlock Text="اشتراک‌گذاری با پراکسی" FontSize="18" FontWeight="Bold"
-                                   Foreground="#1F2B57" VerticalAlignment="Center"/>
-                    </StackPanel>
-                </StackPanel>
-
-                <Grid x:Name="ContentGrid">
+                <Grid x:Name="ContentGrid" Margin="0,8,0,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="Auto"/>
@@ -288,37 +418,27 @@
                     </Grid.RowDefinitions>
 
                     <!-- Instructions box -->
-                    <Border  Style="{StaticResource SettingRowBorder}" >
+                    <Border Style="{StaticResource SettingRowBorder}" Margin="14,0,14,0">
                         <StackPanel>
-                            <TextBlock Text="۱ . فعالسازی اشتراک"
-                                       FontSize="16"
-                                       FontWeight="Bold"
-                                       Foreground="#1F2B57"
-                                       TextAlignment="Left"/>
-                            <TextBlock Text="اشتراک گذاری VPN را روی این دستگاه فعال کنید."
-                                       Margin="0,4,0,0"
-                                       FontSize="14"
-                                       Foreground="#333"
-                                       TextAlignment="Left"/>
-
-                            <TextBlock Text="۲ . تنظیم پراکسی روی دستگاه دوم"
-                                       Margin="0,10,0,0"
-                                       FontSize="16"
-                                       FontWeight="Bold"
-                                       Foreground="#1F2B57"
-                                       TextAlignment="Left"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Border Style="{StaticResource SectionBadge}">
+                                    <TextBlock Text="۲" Foreground="White" FontWeight="Bold" FontSize="10"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                                <TextBlock Text="اشتراک‌گذاری با پراکسی" FontSize="15" FontWeight="Bold"
+                                           Foreground="#1F2B57" VerticalAlignment="Center"/>
+                            </StackPanel>
                             <TextBlock Text="روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید."
                                        Margin="0,4,0,0"
-                                       FontSize="14"
-                                       Foreground="#333"
+                                       FontSize="12.5"
+                                       Foreground="#555"
                                        TextAlignment="Left"
-                                       TextWrapping="Wrap"
-                                       Height="46"/>
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
                     </Border>
 
                     <!-- Start/Stop + Spinner -->
-                    <Grid Grid.Row="1" Margin="0,6,0,0">
+                    <Grid Grid.Row="1" Margin="0,4,0,0">
 
                         <!-- connectionId=3 -->
                         <ToggleButton x:Name="btnStartStop"
@@ -331,7 +451,7 @@
                               VerticalAlignment="Center"
                               Visibility="Collapsed"
                               IsHitTestVisible="False"
-                              Margin="0,14,0,0" >
+                              Margin="0,12,0,0" >
                             <Border Background="#66000000"
                                     Padding="30,8"
 
@@ -348,15 +468,15 @@
 
                     <!-- Proxy rows (hidden until share active) -->
                     <!-- connectionId=9 -->
-                    <StackPanel Grid.Row="2" x:Name="pnlShowIP" Visibility="Visible" Margin="0,2,0,14">
+                    <StackPanel Grid.Row="2" x:Name="pnlShowIP" Visibility="Visible" Margin="0,2,0,8">
 
                         <!-- HTTP row.
                              Badge/IP/Port/spacer/QR/Copy columns are Auto (+ one "*" spacer)
                              so this row always stays on ONE row regardless of the fixed
-                             392px window width; the previous fixed 80/110/72 px columns
+                             380px window width; the previous fixed 80/110/72 px columns
                              could overflow the card on real builds and pushed the copy
                              icon out of view. -->
-                       <Border  Style="{StaticResource SettingRowBorder}">
+                       <Border  Style="{StaticResource SettingRowBorder}" Margin="14,6,14,0">
                             <Grid  FlowDirection="LeftToRight" VerticalAlignment="Center"  TextElement.FontFamily="Arial">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -369,8 +489,8 @@
 
                                 <Border Grid.Column="0"
                                         CornerRadius="5"
-                                        Height="26"
-                                        Padding="10,0"
+                                        Height="24"
+                                        Padding="9,0"
                                         Margin="0,0,3,0"
                                         VerticalAlignment="Center">
                                     <Border.Background>
@@ -380,7 +500,7 @@
                                         </LinearGradientBrush>
                                     </Border.Background>
                                     <TextBlock  Text="HTTP"
-                                               FontSize="13"
+                                               FontSize="12"
                                                FontWeight="Bold"
                                                Foreground="White"
                                                TextAlignment="Center"
@@ -389,8 +509,8 @@
 
                                 <Border Grid.Column="1"
                                         CornerRadius="5"
-                                        Height="26"
-                                        Padding="10,0"
+                                        Height="24"
+                                        Padding="9,0"
                                         Margin="0,0,3,0"
                                         VerticalAlignment="Center">
                                     <Border.Background>
@@ -402,7 +522,7 @@
                                     <TextBlock   x:Name="txtIp0"
                                                FlowDirection="LeftToRight"
                                                Text="192.168.3.190"
-                                               FontSize="13"
+                                               FontSize="12"
                                                Foreground="White"
                                                TextAlignment="Center"
                                                VerticalAlignment="Center"/>
@@ -410,10 +530,10 @@
 
                                 <Border Grid.Column="2"
                                         CornerRadius="5"
-                                        Height="26"
-                                        Padding="10,0"
-                                        Margin="0,0,8,0"
-                                        MinWidth="62"
+                                        Height="24"
+                                        Padding="9,0"
+                                        Margin="0,0,6,0"
+                                        MinWidth="52"
                                         VerticalAlignment="Center">
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -424,7 +544,7 @@
                                     <TextBlock x:Name="txtPortHttp"
                                                FlowDirection="LeftToRight"
                                                Text="10808"
-                                               FontSize="13"
+                                               FontSize="12"
                                                Foreground="White"
                                                VerticalAlignment="Center"
                                                HorizontalAlignment="Center"/>
@@ -433,17 +553,17 @@
                                 <TextBlock Grid.Column="4"
                                            Text="&#xF029;"
                                            FontFamily="{StaticResource fa_ProLight}"
-                                           FontSize="20"
+                                           FontSize="18"
                                            Foreground="#1F2B57"
                                            Cursor="Hand"
                                            VerticalAlignment="Center"
-                                           Padding="10 0"
+                                           Padding="8,0"
                                            MouseLeftButtonUp="lblHttpQR_MouseLeftButtonUp"/>
 
                                 <TextBlock Grid.Column="5"
                                            Text="&#xF0C5;"
                                            FontFamily="{StaticResource fa_ProLight}"
-                                           FontSize="20"
+                                           FontSize="18"
                                            Foreground="#1F2B57"
                                            Cursor="Hand"
                                            VerticalAlignment="Center"
@@ -453,7 +573,7 @@
 
 
                         <!-- SOCKS5 row (same Auto/spacer column fix as the HTTP row above) -->
-                        <Border Style="{StaticResource SettingRowBorder}">
+                        <Border Style="{StaticResource SettingRowBorder}" Margin="14,6,14,0">
                             <Grid FlowDirection="LeftToRight" VerticalAlignment="Center"  TextElement.FontFamily="Arial">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -466,8 +586,8 @@
 
                                 <Border Grid.Column="0"
                                         CornerRadius="5"
-                                        Height="26"
-                                        Padding="10,0"
+                                        Height="24"
+                                        Padding="9,0"
                                         Margin="0,0,3,0"
                                         VerticalAlignment="Center">
                                     <Border.Background>
@@ -477,7 +597,7 @@
                                         </LinearGradientBrush>
                                     </Border.Background>
                                     <TextBlock Text="SOCKS5"
-                                               FontSize="13"
+                                               FontSize="12"
                                                FontWeight="Bold"
                                                Foreground="White"
                                                VerticalAlignment="Center"/>
@@ -485,8 +605,8 @@
 
                                 <Border Grid.Column="1"
                                         CornerRadius="5"
-                                        Height="26"
-                                        Padding="10,0"
+                                        Height="24"
+                                        Padding="9,0"
                                         Margin="0,0,3,0"
                                         VerticalAlignment="Center">
                                     <Border.Background>
@@ -498,7 +618,7 @@
                                     <TextBlock x:Name="txtIp1"
                                                FlowDirection="LeftToRight"
                                                Text="192.168.3.190"
-                                               FontSize="13"
+                                               FontSize="12"
                                                Foreground="White"
                                                TextAlignment="Center"
                                                VerticalAlignment="Center"/>
@@ -506,10 +626,10 @@
 
                                 <Border Grid.Column="2"
                                         CornerRadius="5"
-                                        Height="26"
-                                        Padding="10,0"
-                                        Margin="0,0,8,0"
-                                        MinWidth="62"
+                                        Height="24"
+                                        Padding="9,0"
+                                        Margin="0,0,6,0"
+                                        MinWidth="52"
                                         VerticalAlignment="Center">
                                     <Border.Background>
                                         <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -520,7 +640,7 @@
                                     <TextBlock x:Name="txtPortSocks"
                                                FlowDirection="LeftToRight"
                                                Text="10808"
-                                               FontSize="13"
+                                               FontSize="12"
                                                Foreground="White"
                                                VerticalAlignment="Center"
                                                HorizontalAlignment="Center"/>
@@ -529,17 +649,17 @@
                                 <TextBlock Grid.Column="4"
                                            Text="&#xF029;"
                                            FontFamily="{StaticResource fa_ProLight}"
-                                           FontSize="20"
+                                           FontSize="18"
                                            Foreground="#1F2B57"
                                            Cursor="Hand"
                                            VerticalAlignment="Center"
-                                           Padding="10 0"
+                                           Padding="8,0"
                                            MouseLeftButtonUp="lblSocksQR_MouseLeftButtonUp"/>
 
                                 <TextBlock Grid.Column="5"
                                            Text="&#xF0C5;"
                                            FontFamily="{StaticResource fa_ProLight}"
-                                           FontSize="20"
+                                           FontSize="18"
                                            Foreground="#1F2B57"
                                            Cursor="Hand"
                                            VerticalAlignment="Center"
