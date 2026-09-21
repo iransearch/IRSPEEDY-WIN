@@ -13,10 +13,14 @@ internal sealed class Request
     public string Password { get; set; } = "";
     public int CorePid { get; set; }
     public bool Experimental { get; set; }
+    public bool Integrated { get; set; }
+    public long CoreStartedUtcTicks { get; set; }
+    public long? RequestId { get; set; }
 }
 
 internal static class Program
 {
+    private static long? responseId;
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     // The mutex stays on this OS thread; async continuations must not release it.
@@ -59,7 +63,7 @@ internal static class Program
         int exitCode = 0;
         try
         {
-            Emit(new { ok = true, state = "ready", experimental = true, recoveryRequired = journal.Read() is not null });
+            Emit(new { ok = true, state = "ready", protocol = 2, experimental = true, recoveryRequired = journal.Read() is not null });
             var pending = Task.Run(() => ReadBoundedLine(cancellation.Token));
             while (!cancellation.IsCancellationRequested)
             {
@@ -104,6 +108,7 @@ internal static class Program
                 {
                     var request = JsonSerializer.Deserialize<Request>(line, JsonOptions) ??
                         throw new HotspotException("invalid-request");
+                    responseId = request.RequestId;
                     switch (request.Command)
                     {
                         case "capability":
@@ -119,10 +124,15 @@ internal static class Program
                             core = Process.GetProcessById(request.CorePid);
                             if (core.HasExited) throw new HotspotException("core-not-running");
                             coreStarted = core.StartTime.ToUniversalTime();
-                            // Fixed password requested for this experimental test build only.
-                            // SSID still rotates; client admission remains gated on verified ICS.
-                            var accessPassword = "0000000000";
-                            var accessSsid = "IRSpeedy-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
+                            if (request.Integrated && request.CoreStartedUtcTicks != coreStarted.Ticks)
+                                throw new HotspotException("core-pid-reused");
+                            if (request.Integrated && (request.Password.Length != 10 ||
+                                request.Password.Any(c => c < '0' || c > '9')))
+                                throw new HotspotException("invalid-numeric-password");
+                            // The standalone test keeps ten zeros; integrated UI supplies persisted credentials.
+                            var accessPassword = request.Integrated ? request.Password : "0000000000";
+                            var accessSsid = request.Integrated ? request.Ssid :
+                                "IRSpeedy-" + Convert.ToHexString(RandomNumberGenerator.GetBytes(4));
                             try
                             {
                                 await session.Start(request.TunId, accessSsid, accessPassword, request.Experimental);
@@ -165,6 +175,7 @@ internal static class Program
                     // A failed rollback retains ownership; don't accept more starts.
                     if (!session.Active && session.State is not null) { exitCode = 2; break; }
                 }
+                responseId = null;
                 pending = Task.Run(() => ReadBoundedLine(cancellation.Token));
             }
         }
@@ -202,7 +213,12 @@ internal static class Program
     private static void Emit(object value)
     {
         // A broken parent pipe must not prevent cleanup.
-        try { Console.Out.WriteLine(JsonSerializer.Serialize(value)); Console.Out.Flush(); }
+        try
+        {
+            var fields = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(JsonSerializer.Serialize(value))!;
+            fields["requestId"] = JsonSerializer.SerializeToElement(responseId);
+            Console.Out.WriteLine(JsonSerializer.Serialize(fields)); Console.Out.Flush();
+        }
         catch (IOException) { }
     }
     private static void EmitError(Exception ex, object? backendState = null) => Emit(new

@@ -16,6 +16,12 @@ namespace IRSpeedyVPN
     /// </summary>
     public partial class App : Application
     {
+        protected override void OnExit(ExitEventArgs e)
+        {
+            Services.Hotspot.DirectHotspot.Controller.Stop();
+            base.OnExit(e);
+        }
+
         protected override void OnStartup(StartupEventArgs e)
         {
 
@@ -24,3 +30,4 @@ namespace IRSpeedyVPN
         }
     }
 }
+

@@ -35,6 +35,7 @@ namespace IRSpeedyVPN.Windows
 
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            InitializeHotspotUi();
             btnStartStop.IsChecked = Service?.IsShareActive ?? false;
             pnlShowIP.Visibility = (Service?.IsShareActive ?? false) ? Visibility.Visible : Visibility.Collapsed;
             UpdatePortTexts();
@@ -293,3 +294,4 @@ private static string GetInternetInterfaceIp()
         }
     }
 }
+

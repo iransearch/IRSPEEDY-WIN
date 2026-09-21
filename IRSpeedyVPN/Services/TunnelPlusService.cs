@@ -136,6 +136,11 @@ namespace IRSpeedyVPN.Services
 
         public void Connect(string protocol)
         {
+            if (!PauseSharingBeforeCoreRestart(false))
+            {
+                onConnectDisconnect?.Invoke(this, false, 0, "پاک‌سازی اشتراک‌گذاری مستقیم کامل نشد؛ ابتدا آن را متوقف کنید.");
+                return;
+            }
             diagnosticConnectionId = Guid.NewGuid().ToString("N");
             Diagnostic("connect-request");
             userCancelRequested = false;
@@ -158,6 +163,11 @@ namespace IRSpeedyVPN.Services
         // so the shared address never changes between connects.
         void RunV2ray(string goUrl=null,int port=10808)
         {
+            if (!PauseSharingBeforeCoreRestart())
+            {
+                onConnectDisconnect?.Invoke(this, false, 0, "پاک‌سازی اشتراک‌گذاری مستقیم کامل نشد؛ ابتدا آن را متوقف کنید.");
+                return;
+            }
             try
             {
                 bool isVodEnabled = RegHelper.GetSettingValue("VGAURDVodService") == "1";
@@ -378,6 +388,7 @@ namespace IRSpeedyVPN.Services
                     }
 
                     IsConnected = true;
+                    ResumeSharingAfterCoreStart();
                     Diagnostic("connection-established", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy"));
                     ConnectionDiagnostics.RequestSnapshot();
                     if (vpnmode)
@@ -437,6 +448,8 @@ namespace IRSpeedyVPN.Services
         private bool TryStartCoreWithConfig(string configData, out string error, bool needXray = false, string xrayConfig = null)
         {
             error = null;
+            if (!PauseSharingBeforeCoreRestart())
+            { error = "Hotspot cleanup was not confirmed."; return false; }
             Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData) + " needXray=" + needXray);
             EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
             ErrorResp startResp;
@@ -608,6 +621,7 @@ namespace IRSpeedyVPN.Services
         }
         private void DisconnectInternal(bool chkprocess, bool silent, bool userCanceled)
         {
+            PauseSharingBeforeCoreRestart(!userCanceled);
             Diagnostic("disconnect-request", "userCanceled=" + userCanceled + " checkProcess=" + chkprocess + " silent=" + silent);
             if (userCanceled)
                 userCancelRequested = true;
@@ -1243,6 +1257,8 @@ namespace IRSpeedyVPN.Services
                     return;
                 }
 
+                if (port == CorePort && !PauseSharingBeforeCoreRestart())
+                    throw new InvalidOperationException("Hotspot cleanup was not confirmed.");
                 if (process != null)
                 {
                     var staleProcess = process;
@@ -1415,6 +1431,7 @@ namespace IRSpeedyVPN.Services
 
         private void TryStopCore()
         {
+            PauseSharingBeforeCoreRestart();
             try
             {
                 if (!ProtorpcClient.CanConnect("127.0.0.1", CorePort, 200))
@@ -1454,6 +1471,7 @@ namespace IRSpeedyVPN.Services
 
         private void SafeStopCore(LibcoreServiceClient client)
         {
+            PauseSharingBeforeCoreRestart();
             try
             {
                 Diagnostic("core-stop-rpc-begin");
@@ -1836,6 +1854,7 @@ namespace IRSpeedyVPN.Services
         }
         private void TryReconnect()
         {
+            if (!PauseSharingBeforeCoreRestart()) return;
             Diagnostic("reconnect-request");
             if (Interlocked.CompareExchange(ref reconnecting, 1, 0) != 0)
                 return;
@@ -1938,6 +1957,7 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
+
 
 
 

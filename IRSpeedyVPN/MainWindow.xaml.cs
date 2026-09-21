@@ -134,6 +134,7 @@ namespace IRSpeedyVPN
 
         private void Notify_Exit(object sender, EventArgs e)
         {
+            Services.Hotspot.DirectHotspot.Controller.Stop();
             proxifier.Detach();
             DisconnectAll();
             System.Windows.Application.Current.Shutdown();
@@ -1126,3 +1127,4 @@ namespace IRSpeedyVPN
         }
     }
 }
+

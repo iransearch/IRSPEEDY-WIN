@@ -219,7 +219,40 @@
             </Border>
 
             <!-- CONTENT -->
-            <Grid Grid.Row="1" x:Name="ContentGrid">
+            <TabControl Grid.Row="1" Margin="8" Background="Transparent" BorderThickness="0">
+                <TabItem Header="اشتراک‌گذاری مستقیم">
+                    <StackPanel Margin="8,12">
+                        <TextBlock Text="اینترنت VPN روی وای‌فای" FontSize="18" FontWeight="Bold" Foreground="#1F2B57"/>
+                        <TextBlock Text="گوشی یا تلویزیون را بدون تنظیم پراکسی متصل کنید. فقط هنگام اتصال TUN در دسترس است."
+                                   TextWrapping="Wrap" Margin="0,8" FontSize="14"/>
+                        <TextBlock Text="ترافیک دستگاه‌ها از قواعد مسیریابی فعلی VPN پیروی می‌کند." TextWrapping="Wrap" Foreground="#555"/>
+                        <Button x:Name="hotspotToggle" Content="فعال‌سازی اشتراک‌گذاری مستقیم" Click="HotspotToggle_Click" Padding="10" Margin="0,12,0,8"/>
+                        <TextBlock x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,4" Foreground="#1F2B57"/>
+                        <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click" Visibility="Collapsed" Padding="8"/>
+                        <StackPanel x:Name="hotspotCredentials" Visibility="Collapsed" Margin="0,10">
+                            <TextBlock Text="نام وای‌فای"/>
+                            <DockPanel Margin="0,4">
+                                <Button DockPanel.Dock="Left" Content="کپی" Click="HotspotCopyName_Click" Padding="8,4"/>
+                                <TextBox x:Name="hotspotName" IsReadOnly="True" FlowDirection="LeftToRight" Margin="6,0" FontSize="16"/>
+                            </DockPanel>
+                            <TextBlock Text="رمز وای‌فای" Margin="0,8,0,0"/>
+                            <DockPanel Margin="0,4">
+                                <Button DockPanel.Dock="Left" Content="کپی" Click="HotspotCopyPassword_Click" Padding="8,4"/>
+                                <TextBox x:Name="hotspotPassword" IsReadOnly="True" FlowDirection="LeftToRight" Margin="6,0" FontSize="18"/>
+                            </DockPanel>
+                            <TextBlock x:Name="hotspotClients" Margin="0,8"/>
+                        </StackPanel>
+                        <Expander Header="تغییر رمز وای‌فای" Margin="0,12,0,0">
+                            <StackPanel Margin="0,8">
+                                <TextBlock Text="رمز اولیه خودکار ساخته می‌شود. برای تغییر، هنگام خاموش‌بودن هات‌اسپات دقیقاً ۱۰ رقم انگلیسی وارد کنید." TextWrapping="Wrap"/>
+                                <TextBox x:Name="hotspotPasswordEditor" MaxLength="10" FlowDirection="LeftToRight" Margin="0,8" FontSize="16"/>
+                                <Button x:Name="hotspotSavePassword" Content="ذخیره رمز جدید" Click="HotspotSavePassword_Click" Padding="8"/>
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </TabItem>
+                <TabItem Header="اشتراک‌گذاری با پراکسی">
+            <Grid x:Name="ContentGrid">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="Auto"/>
                     <RowDefinition Height="Auto"/>
@@ -548,6 +581,9 @@
 
                 </StackPanel>
             </Grid>
+                </TabItem>
+            </TabControl>
         </Grid>
     </Border>
 </Window>
+
