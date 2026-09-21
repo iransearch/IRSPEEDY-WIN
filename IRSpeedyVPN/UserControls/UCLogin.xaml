@@ -8,66 +8,78 @@
     <UserControl.Resources>
         <ResourceDictionary>
 
-            <!-- Redesign pass: local-only resources, scoped to this control so the
-                 shared theme (Theme.TextBox.xaml / Theme.Button.xaml, used by
-                 UCChangePassword and others) is left untouched. -->
-            <SolidColorBrush x:Key="LoginAccentBrush" Color="#2F5FE3"/>
-            <SolidColorBrush x:Key="LoginDarkBrush" Color="#16215B"/>
-            <SolidColorBrush x:Key="LoginTextBrush" Color="#16215B"/>
-            <SolidColorBrush x:Key="LoginMutedBrush" Color="#7A8399"/>
-            <SolidColorBrush x:Key="LoginFieldBg" Color="#F2F4F9"/>
-            <SolidColorBrush x:Key="LoginFieldBorder" Color="#DEE3EF"/>
+            <!-- Local-only resources, scoped to this control so the shared theme
+                 (Theme.TextBox.xaml / Theme.Button.xaml, used by UCChangePassword
+                 and others) is left untouched. -->
+            <SolidColorBrush x:Key="LoginNavy" Color="#1B2559"/>
+            <SolidColorBrush x:Key="LoginAccent" Color="#2F5FE3"/>
+            <SolidColorBrush x:Key="LoginMuted" Color="#8B93A8"/>
+            <SolidColorBrush x:Key="LoginPlaceholder" Color="#A6AEC2"/>
+            <SolidColorBrush x:Key="LoginFieldBg" Color="#FCFDFF"/>
+            <SolidColorBrush x:Key="LoginFieldBorder" Color="#E1E7F2"/>
 
-            <!-- Field chip: the bordered pill each input sits inside. Its border
-                 brightens on focus via the triggers below (IsFocused / IsKeyboardFocusWithin). -->
+            <!-- The pill each input sits inside; its border lifts to the accent
+                 colour while the input has keyboard focus. -->
             <Style x:Key="LoginFieldChrome" TargetType="Border">
-                <Setter Property="CornerRadius" Value="10"/>
+                <Setter Property="CornerRadius" Value="12"/>
                 <Setter Property="Background" Value="{StaticResource LoginFieldBg}"/>
                 <Setter Property="BorderBrush" Value="{StaticResource LoginFieldBorder}"/>
                 <Setter Property="BorderThickness" Value="1.2"/>
-                <Setter Property="Padding" Value="10,0"/>
-                <Setter Property="Height" Value="33"/>
+                <Setter Property="Padding" Value="12,0"/>
+                <Setter Property="Height" Value="40"/>
+                <Style.Triggers>
+                    <Trigger Property="IsKeyboardFocusWithin" Value="True">
+                        <Setter Property="BorderBrush" Value="{StaticResource LoginAccent}"/>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
-            <Style x:Key="LoginTextBoxStyle" TargetType="TextBox">
+            <Style x:Key="LoginInputBox" TargetType="TextBox">
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="BorderThickness" Value="0"/>
                 <Setter Property="FontSize" Value="13"/>
-                <Setter Property="Foreground" Value="{StaticResource LoginTextBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource LoginNavy}"/>
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="TextAlignment" Value="Right"/>
                 <Setter Property="Padding" Value="0"/>
-                <Setter Property="CaretBrush" Value="{StaticResource LoginAccentBrush}"/>
+                <Setter Property="CaretBrush" Value="{StaticResource LoginAccent}"/>
             </Style>
 
-            <Style x:Key="LoginPasswordBoxStyle" TargetType="PasswordBox">
+            <Style x:Key="LoginInputPassword" TargetType="PasswordBox">
                 <Setter Property="Background" Value="Transparent"/>
                 <Setter Property="BorderThickness" Value="0"/>
                 <Setter Property="FontSize" Value="13"/>
-                <Setter Property="Foreground" Value="{StaticResource LoginTextBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource LoginNavy}"/>
                 <Setter Property="VerticalContentAlignment" Value="Center"/>
+                <Setter Property="HorizontalContentAlignment" Value="Right"/>
                 <Setter Property="Padding" Value="0"/>
-                <Setter Property="CaretBrush" Value="{StaticResource LoginAccentBrush}"/>
+                <Setter Property="CaretBrush" Value="{StaticResource LoginAccent}"/>
             </Style>
 
-            <!-- Primary "ورود" button: same rounded-gradient language used in the
-                 redesigned ShareVPNSetting window, for a consistent look app-wide. -->
+            <!-- Placeholder text: visible only while its input is empty. -->
+            <Style x:Key="LoginPlaceholderText" TargetType="TextBlock">
+                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="Foreground" Value="{StaticResource LoginPlaceholder}"/>
+                <Setter Property="VerticalAlignment" Value="Center"/>
+                <Setter Property="TextAlignment" Value="Right"/>
+                <Setter Property="IsHitTestVisible" Value="False"/>
+            </Style>
+
+            <!-- Primary "ورود" button: navy pill, arrow badge pinned to its left. -->
             <Style x:Key="LoginPrimaryButton" TargetType="Button">
-                <Setter Property="Height" Value="37"/>
-                <Setter Property="FontSize" Value="14.5"/>
-                <Setter Property="FontWeight" Value="Bold"/>
                 <Setter Property="Foreground" Value="White"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Border x:Name="bd" CornerRadius="11" BorderBrush="#18234A" BorderThickness="1">
+                            <Border x:Name="bd" CornerRadius="12">
                                 <Border.Background>
                                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                        <GradientStop Color="#2A4FD1" Offset="0"/>
+                                        <GradientStop Color="#223072" Offset="0"/>
                                         <GradientStop Color="#16215B" Offset="1"/>
                                     </LinearGradientBrush>
                                 </Border.Background>
-                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                <ContentPresenter HorizontalAlignment="Stretch" VerticalAlignment="Stretch" Margin="7"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsMouseOver" Value="True">
@@ -84,14 +96,14 @@
 
             <!-- Small ghost button for the renewal banner -->
             <Style x:Key="LoginGhostButton" TargetType="Button">
-                <Setter Property="FontSize" Value="13"/>
+                <Setter Property="FontSize" Value="12.5"/>
                 <Setter Property="FontWeight" Value="Bold"/>
-                <Setter Property="Foreground" Value="{StaticResource LoginAccentBrush}"/>
+                <Setter Property="Foreground" Value="{StaticResource LoginAccent}"/>
                 <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="Button">
-                            <Border x:Name="bd" CornerRadius="8" Background="White" BorderBrush="{StaticResource LoginAccentBrush}" BorderThickness="1" Padding="10,4">
+                            <Border x:Name="bd" CornerRadius="8" Background="White" BorderBrush="{StaticResource LoginAccent}" BorderThickness="1" Padding="10,4">
                                 <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
@@ -104,20 +116,24 @@
                 </Setter>
             </Style>
 
-            <!-- "مرا به خاطر بسپار" as a small rounded switch instead of a native checkbox -->
+            <!-- "مرا به خاطر بسپار": rounded navy square with a white tick. -->
             <Style x:Key="LoginCheckBox" TargetType="CheckBox">
+                <Setter Property="Cursor" Value="Hand"/>
                 <Setter Property="Template">
                     <Setter.Value>
                         <ControlTemplate TargetType="CheckBox">
-                            <Border x:Name="track" Width="30" Height="17" CornerRadius="9" Background="#C7CEDE">
-                                <Border x:Name="knob" Width="13" Height="13" CornerRadius="7" Background="White"
-                                        HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0"/>
+                            <Border x:Name="box" Width="22" Height="22" CornerRadius="7"
+                                    Background="White" BorderBrush="#C7CEDE" BorderThickness="1.4">
+                                <Path x:Name="tick" Visibility="Collapsed" Stroke="White" StrokeThickness="2.2"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                      Data="M 4,8.5 L 7.5,12 L 14,4.5"
+                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
                             <ControlTemplate.Triggers>
                                 <Trigger Property="IsChecked" Value="True">
-                                    <Setter TargetName="track" Property="Background" Value="{StaticResource LoginAccentBrush}"/>
-                                    <Setter TargetName="knob" Property="HorizontalAlignment" Value="Right"/>
-                                    <Setter TargetName="knob" Property="Margin" Value="0,0,2,0"/>
+                                    <Setter TargetName="box" Property="Background" Value="{StaticResource LoginNavy}"/>
+                                    <Setter TargetName="box" Property="BorderBrush" Value="{StaticResource LoginNavy}"/>
+                                    <Setter TargetName="tick" Property="Visibility" Value="Visible"/>
                                 </Trigger>
                             </ControlTemplate.Triggers>
                         </ControlTemplate>
@@ -125,14 +141,12 @@
                 </Setter>
             </Style>
 
-            <!-- Gentle entrance: the card fades/slides up once when the control loads
-                 (mirrors the reviewed mockup's light animation pass; kept short and
-                 one-shot, no loops, so it never distracts on repeated logins). -->
+            <!-- One-shot entrance: the card fades and lifts into place. -->
             <Storyboard x:Key="CardInStoryboard">
                 <DoubleAnimation Storyboard.TargetName="LoginRoot" Storyboard.TargetProperty="Opacity"
                                  From="0" To="1" Duration="0:0:0.3"/>
                 <DoubleAnimation Storyboard.TargetName="CardTransform" Storyboard.TargetProperty="Y"
-                                 From="10" To="0" Duration="0:0:0.35">
+                                 From="12" To="0" Duration="0:0:0.35">
                     <DoubleAnimation.EasingFunction><CubicEase EasingMode="EaseOut"/></DoubleAnimation.EasingFunction>
                 </DoubleAnimation>
             </Storyboard>
@@ -151,81 +165,114 @@
             <TranslateTransform x:Name="CardTransform" Y="0"/>
         </Grid.RenderTransform>
 
-        <Border Background="Transparent" CornerRadius="5">
-            <StackPanel Margin="40,14,40,0">
+        <!-- The card. Children are positioned from its top edge so the layout
+             matches the approved design exactly and never reflows. -->
+        <Border VerticalAlignment="Top" Margin="20,0,20,0" Height="333" CornerRadius="16"
+                Background="White" BorderBrush="#E8EDF7" BorderThickness="1.2">
+            <Grid Margin="17,0,17,0">
 
-                <!-- Username -->
-                <StackPanel Margin="0,0,0,6">
-                    <TextBlock FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource LoginMutedBrush}"
-                               Text="نام کاربری" HorizontalAlignment="Right" Margin="2,0,2,3"/>
-                    <Border Style="{StaticResource LoginFieldChrome}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox x:Name="txtUsername" Grid.Column="0" Style="{StaticResource LoginTextBoxStyle}"/>
-                            <TextBlock Grid.Column="1" Text="&#xF007;" FontFamily="{StaticResource fa_ProLight}"
-                                       FontSize="14" Foreground="{StaticResource LoginMutedBrush}"
-                                       VerticalAlignment="Center" Margin="8,0,0,0"/>
-                        </Grid>
-                    </Border>
+                <!-- Heading -->
+                <StackPanel VerticalAlignment="Top" Margin="0,19,0,0">
+                    <TextBlock Text="ورود به حساب" FontSize="19" FontWeight="Bold"
+                               Foreground="{StaticResource LoginNavy}" TextAlignment="Center"/>
+                    <TextBlock Text="به دنیای بدون محدودیت متصل شوید" FontSize="12.5"
+                               Foreground="{StaticResource LoginMuted}" TextAlignment="Center" Margin="0,9,0,0"/>
                 </StackPanel>
 
-                <!-- Password -->
-                <StackPanel Margin="0,0,0,6">
-                    <TextBlock FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource LoginMutedBrush}"
-                               Text="رمز عبور" HorizontalAlignment="Right" Margin="2,0,2,3"/>
-                    <Border Style="{StaticResource LoginFieldChrome}">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*"/>
-                                <ColumnDefinition Width="Auto"/>
-                            </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0" Visibility="Hidden" IsReadOnly="True" x:Name="txtPasswordShow"
-                                     Style="{StaticResource LoginTextBoxStyle}"/>
-                            <PasswordBox Grid.Column="0" x:Name="txtPassword" Style="{StaticResource LoginPasswordBoxStyle}"/>
-                            <Image Grid.Column="1" x:Name="imgEye" Width="16" Height="16" Margin="8,0,0,0"
-                                   Cursor="Hand" Source="{StaticResource eye}"
-                                   MouseDown="eye_MouseDown" MouseUp="eye_MouseUp"/>
-                        </Grid>
-                    </Border>
-                </StackPanel>
-
-                <!-- Remember me -->
-                <Grid Margin="2,2,2,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="Auto"/>
-                    </Grid.ColumnDefinitions>
-                    <TextBlock Grid.Column="0" FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource LoginMutedBrush}"
-                               Text="مـرا به خاطر بسپار" HorizontalAlignment="Right" VerticalAlignment="Center"/>
-                    <CheckBox Grid.Column="1" x:Name="chkRemember" IsChecked="True" Style="{StaticResource LoginCheckBox}"
-                              VerticalAlignment="Center" Margin="8,0,0,0"/>
-                </Grid>
-
-                <!-- Renewal banner (kept Hidden by default, exactly as before) -->
-                <Border x:Name="boxRenew" Visibility="Hidden" BorderBrush="#B9C6E8" BorderThickness="1"
-                        CornerRadius="10" Background="#EEF2FE" Margin="0,6,0,0" Padding="8,4">
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <!-- Renewal banner: an overlay over the heading, so it costs no
+                     layout space while hidden and the card keeps its exact size. -->
+                <Border x:Name="boxRenew" Visibility="Hidden" VerticalAlignment="Top" Margin="0,14,0,0" Height="58"
+                        CornerRadius="12" Background="#EEF3FF" BorderBrush="#BFCEEF" BorderThickness="1.2">
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <Button x:Name="btnRenew" Margin="0,0,8,0" Click="btnRenew_Click"
                                 Style="{StaticResource LoginGhostButton}" Content="تمدید"/>
-                        <TextBlock FontSize="11" FontWeight="Bold" Foreground="{StaticResource LoginAccentBrush}"
+                        <TextBlock FontSize="11.5" FontWeight="Bold" Foreground="{StaticResource LoginAccent}"
                                    Text="لطفا برای تمدید روی دکمه روبرو کلیک کنید" VerticalAlignment="Center"/>
                     </StackPanel>
                 </Border>
 
-                <!-- Login -->
-                <Button x:Name="btnLogin" Margin="0,10,0,0" Style="{StaticResource LoginPrimaryButton}"
-                        Click="btnLogin_Click" IsDefault="True">
-                    <StackPanel Orientation="Horizontal">
-                        <TextBlock Text="ورود" VerticalAlignment="Center"/>
-                        <TextBlock Text="&#xF060;" FontFamily="{StaticResource fa_ProLight}" FontSize="13"
-                                   Margin="8,0,0,0" VerticalAlignment="Center"/>
+                <!-- Username -->
+                <Border VerticalAlignment="Top" Margin="0,92,0,0" Style="{StaticResource LoginFieldChrome}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Column="0">
+                            <TextBox x:Name="txtUsername" Style="{StaticResource LoginInputBox}"/>
+                            <TextBlock Text="نام کاربری">
+                                <TextBlock.Style>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource LoginPlaceholderText}">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding Text, ElementName=txtUsername}" Value="">
+                                                <Setter Property="Visibility" Value="Visible"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </TextBlock.Style>
+                            </TextBlock>
+                        </Grid>
+                        <TextBlock Grid.Column="1" Text="&#xF007;" FontFamily="{StaticResource fa_ProLight}"
+                                   FontSize="15" Foreground="{StaticResource LoginMuted}"
+                                   VerticalAlignment="Center" Margin="9,0,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- Password -->
+                <Border VerticalAlignment="Top" Margin="0,144,0,0" Style="{StaticResource LoginFieldChrome}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Image Grid.Column="0" x:Name="imgEye" Width="18" Height="18" Margin="0,0,9,0"
+                               Cursor="Hand" Source="{StaticResource eye}"
+                               MouseDown="eye_MouseDown" MouseUp="eye_MouseUp"/>
+                        <Grid Grid.Column="1">
+                            <TextBox Visibility="Hidden" IsReadOnly="True" x:Name="txtPasswordShow"
+                                     Style="{StaticResource LoginInputBox}"/>
+                            <PasswordBox x:Name="txtPassword" Style="{StaticResource LoginInputPassword}"
+                                         PasswordChanged="txtPassword_PasswordChanged"/>
+                            <TextBlock x:Name="lblPasswordPlaceholder" Text="رمز عبور"
+                                       Style="{StaticResource LoginPlaceholderText}"/>
+                        </Grid>
+                        <TextBlock Grid.Column="2" Text="&#xF023;" FontFamily="{StaticResource fa_ProLight}"
+                                   FontSize="15" Foreground="{StaticResource LoginMuted}"
+                                   VerticalAlignment="Center" Margin="9,0,0,0"/>
+                    </Grid>
+                </Border>
+
+                <!-- Recover link (left) + remember me (right) -->
+                <Grid VerticalAlignment="Top" Margin="0,202,0,0" Height="24">
+                    <TextBlock x:Name="lnkRecover" Text="بازیابی رمز عبور" FontSize="12" FontWeight="Bold"
+                               Foreground="{StaticResource LoginAccent}" Cursor="Hand"
+                               HorizontalAlignment="Left" VerticalAlignment="Center"
+                               MouseLeftButtonUp="lnkRecover_MouseLeftButtonUp"/>
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center">
+                        <TextBlock Text="مرا به خاطر بسپار" FontSize="12" Foreground="#5B6584"
+                                   VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <CheckBox x:Name="chkRemember" IsChecked="True" Style="{StaticResource LoginCheckBox}"
+                                  VerticalAlignment="Center"/>
                     </StackPanel>
+                </Grid>
+
+                <!-- Login -->
+                <Button x:Name="btnLogin" VerticalAlignment="Top" Margin="0,261,0,0" Height="49"
+                        Style="{StaticResource LoginPrimaryButton}" Click="btnLogin_Click" IsDefault="True">
+                    <Grid>
+                        <Border Width="34" Height="34" CornerRadius="10" Background="{StaticResource LoginAccent}"
+                                HorizontalAlignment="Left" VerticalAlignment="Center">
+                            <TextBlock Text="&#xF061;" FontFamily="{StaticResource fa_ProLight}" FontSize="15"
+                                       Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <TextBlock Text="ورود" FontSize="15.5" FontWeight="Bold" Foreground="White"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Grid>
                 </Button>
 
-            </StackPanel>
+            </Grid>
         </Border>
     </Grid>
 </UserControl>

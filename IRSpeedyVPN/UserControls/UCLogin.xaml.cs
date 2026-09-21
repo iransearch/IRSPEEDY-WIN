@@ -26,6 +26,12 @@ namespace IRSpeedyVPN.UserControls
         public event UserPasswordEntered OnCredentialEntered;
         string renewLink;
 
+        /// <summary>
+        /// Target of the "بازیابی رمز عبور" link on the login card. Empty until the
+        /// account-recovery address is known, so the link never opens a wrong page.
+        /// </summary>
+        static readonly string RecoverPasswordUrl = "";
+
         public string Title => "";
 
         public UCLogin()
@@ -100,6 +106,31 @@ namespace IRSpeedyVPN.UserControls
         private void btnRenew_Click(object sender, RoutedEventArgs e)
         {
             Process.Start(renewLink);
+        }
+
+        private void txtPassword_PasswordChanged(object sender, RoutedEventArgs e)
+        {
+            UpdatePasswordPlaceholder();
+        }
+
+        /// <summary>
+        /// The password box has no placeholder of its own, so the "رمز عبور" label
+        /// behind it is shown only while both the masked and the revealed field are empty.
+        /// </summary>
+        void UpdatePasswordPlaceholder()
+        {
+            if (lblPasswordPlaceholder == null)
+                return;
+
+            bool empty = string.IsNullOrEmpty(txtPassword.Password)
+                         && string.IsNullOrEmpty(txtPasswordShow.Text);
+            lblPasswordPlaceholder.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        private void lnkRecover_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        {
+            if (!string.IsNullOrWhiteSpace(RecoverPasswordUrl))
+                Process.Start(RecoverPasswordUrl);
         }
 
     }
