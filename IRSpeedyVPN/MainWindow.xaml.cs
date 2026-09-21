@@ -434,9 +434,9 @@ namespace IRSpeedyVPN
 
             long version = Interlocked.Increment(ref connectionRequestVersion);
             UnRegiserVpnService();
-            // Keep selection available while an older session is being drained.
-            HideLoading();
-            ShowMessage("");
+            // Acknowledge Connect immediately, including time spent waiting for cleanup.
+            // The same loading view remains visible until this request completes or is cancelled.
+            ShowLoading("در حال اتصال به سرویس");
             await ApplyConnectionRequestAsync(service, protocol, version);
         }
 
@@ -462,7 +462,6 @@ namespace IRSpeedyVPN
 
                 gInfo.CurrentService = next;
                 RegiserVpnService();
-                ShowLoading("در حال اتصال به سرویس");
                 await Task.Run(() => next.Connect(protocol));
             }
             catch (Exception ex)
