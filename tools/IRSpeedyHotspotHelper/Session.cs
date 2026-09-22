@@ -149,10 +149,21 @@ public static class Safety
         return a;
     }
 
-    public static Guid SelectPrivate(IReadOnlyList<Adapter> before, IReadOnlyList<Adapter> after, Guid publicId)
+    public static void RequireWifiDirectStart(IReadOnlyList<Adapter> adapters, Guid publicId)
+    {
+        RequireTun(adapters, publicId);
+        // Recheck the no-ICS baseline immediately before publisher creation.
+        // An unshared Wi-Fi Direct interface can already be Up without an AP.
+        if (adapters.Any(a => a.SharingRole.HasValue))
+            throw new HotspotException("existing-ics-conflict");
+    }
+
+    public static Guid SelectPrivate(IReadOnlyList<Adapter> before, IReadOnlyList<Adapter> after, Guid publicId,
+        bool requireActivation = false)
     {
         var candidates = after.Where(a => a.Id != publicId && a.Up &&
-            a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)).ToArray();
+            a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase) &&
+            (!requireActivation || !before.Any(b => b.Id == a.Id && b.Up))).ToArray();
         var shared = candidates.Where(a => a.SharingRole == 1).ToArray();
         if (shared.Length == 1) return shared[0].Id;
         if (shared.Length > 1) throw new HotspotException("ambiguous-hotspot-adapter");
@@ -297,7 +308,7 @@ public sealed class Session(IHotspotBackend backend, IJournal journal, Func<Task
             {
                 try
                 {
-                    State = State with { PrivateId = Safety.SelectPrivate(before, current, publicId) };
+                    State = State with { PrivateId = Safety.SelectPrivate(before, current, publicId, requireActivation: backend.Kind == "wifi-direct") };
                     journal.Write(State);
                 }
                 catch (HotspotException ex) when (ex.Code == "hotspot-adapter-not-ready") { }

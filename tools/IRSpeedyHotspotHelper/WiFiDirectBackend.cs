@@ -35,9 +35,11 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
     {
         var adapters = ReadAdapters();
         lock (sync) preflight = HotspotEvidence.Capture(adapters, publicId);
-        Safety.RequireTun(adapters, publicId);
-        if (adapters.Any(a => a.Up && a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)))
-            throw Failure("wifi-direct-already-active", "wfd.preflight");
+        // Up is an interface state, not proof of an active advertisement. Let
+        // WinRT start our publisher; Session still requires a newly activated
+        // adapter before binding ICS and never adopts an already-up adapter.
+        try { Safety.RequireWifiDirectStart(adapters, publicId); }
+        catch (Exception ex) { ex.Data["hotspot.stage"] = "wfd.preflight"; throw; }
     }
 
     public async Task Start(string ssid, string password)

@@ -11,6 +11,48 @@ internal static class Program
     private static async Task Main()
     {
         await PublisherWaitChecks();
+        await Test("unshared up Wi-Fi Direct does not block publisher preflight", () =>
+        {
+            var (_, b, _) = New();
+            b.Set(Private, a => a with { Up = true });
+            Safety.RequireWifiDirectStart(b.Adapters, Tun);
+            return Task.CompletedTask;
+        });
+        await Test("Wi-Fi Direct preflight rejects existing ICS", async () =>
+        {
+            var (_, b, _) = New();
+            b.Set(Physical, a => a with { SharingRole = 0 });
+            await Reject("existing-ics-conflict", () =>
+            {
+                Safety.RequireWifiDirectStart(b.Adapters, Tun);
+                return Task.CompletedTask;
+            });
+        });
+        await Test("already-up foreign adapter is preserved during Wi-Fi Direct startup", async () =>
+        {
+            var (s, b, _) = New(); b.Kind = "wifi-direct";
+            b.Adapters.Add(new(Other, "Foreign", "Microsoft Wi-Fi Direct Virtual Adapter", true, null));
+            await s.Start(Tun, "Test", "12345678", true);
+            Check(s.Active && s.State!.PrivateId == Private && b.Starts == 1);
+            Check(b.Adapters.Single(a => a.Id == Other).SharingRole is null);
+            await s.Stop();
+            Check(b.Adapters.Single(a => a.Id == Other).Up);
+        });
+        await Test("foreign adapter gaining ICS is not adopted by Wi-Fi Direct", async () =>
+        {
+            var (s, b, _) = New(); b.Kind = "wifi-direct";
+            b.Adapters.Add(new(Other, "Foreign", "Microsoft Wi-Fi Direct Virtual Adapter", true, null));
+            b.OnRead = backend => backend.Set(Other, a => a with { SharingRole = 1 });
+            await Reject("start-failed-recovery-required", () => s.Start(Tun, "Test", "12345678", true));
+            Check(b.BindCalls == 0 && b.Adapters.Single(a => a.Id == Other).SharingRole == 1);
+        });
+        await Test("already-up adapter alone is never adopted for ICS", async () =>
+        {
+            var (s, b, j) = New(); b.Kind = "wifi-direct";
+            b.Set(Private, a => a with { Up = true });
+            await Reject("hotspot-adapter-not-ready", () => s.Start(Tun, "Test", "12345678", true));
+            Check(b.Starts == 1 && b.BindCalls == 0 && b.Stops == 1 && j.Value is null);
+        });
         await Test("preflight evidence excludes names and identifiers", () =>
         {
             var adapters = new[] {
@@ -642,7 +684,7 @@ internal static class Program
         public Action<FakeBackend>? OnRead;
         public bool IsOn { get; set; }
         public Guid? BootstrapId { get; set; }
-        public void PrepareBootstrap(Guid id) { Prepare(id); }
+        public void PrepareBootstrap(Guid id) { Prepare(id); if (Kind == "wifi-direct") Safety.RequireWifiDirectStart(Adapters, id); }
         public uint ClientCount => 0;
         public IReadOnlyList<Adapter> ReadAdapters() { if (IsOn) OnRead?.Invoke(this); return Adapters.ToArray(); }
         public void Set(Guid id, Func<Adapter, Adapter> update) => Adapters = Adapters.Select(a => a.Id == id ? update(a) : a).ToList();
