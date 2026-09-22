@@ -24,6 +24,13 @@ namespace IRSpeedyVPN.UserControls
 
         public string Title => "لیست سرورها";
 
+        // The service picker (§ "بخش انتخاب سرویس") was removed from the UI; the app
+        // now always connects through this service by name, matched case-insensitively
+        // against whatever the backend returns (group title / server.Service). If the
+        // backend has no service by this name, the first available one is used instead
+        // -- see ResolveServiceAndProtocol().
+        private const string DefaultServiceName = "xfast";
+
         internal delegate void LoadingRequest(bool Show, string Message);
         internal delegate void ConnectRequest(UCServerList sender, IVPNService service, string protocol);
         internal event LoadingRequest OnLoadingRequest;
@@ -31,6 +38,7 @@ namespace IRSpeedyVPN.UserControls
 
         internal IVPNService selectedService;
         private string selectedProtocol;
+        private string _selectedServiceName;
         private bool _isLoading = true;
         private bool _isUrlTestSupported;
         private CancellationTokenSource _urlTestCts;
@@ -51,19 +59,8 @@ namespace IRSpeedyVPN.UserControls
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
             _isLoading = true;
-
-            if (serviceFactory.Services != null)
-            {
-                var items = serviceFactory.Services
-                    .OrderBy(y => y.Order).GroupBy(x => x.Name).Select(x => x.Key).ToArray();
-
-                cmbService.Items.Clear();
-                cmbService.Items.AddRange(items);
-                cmbService.SelectedItem = (_isLoading && globalInfo?.CurrentService != null)
-                    ? globalInfo.CurrentService.Name
-                    : items.FirstOrDefault();
-            }
-
+            txtSearch.Text = "";
+            ResolveServiceAndProtocol();
             UpdateHeaderIcons();
         }
 
@@ -75,24 +72,39 @@ namespace IRSpeedyVPN.UserControls
 
         #endregion
 
-        #region Service / Protocol
+        #region Service / Protocol (no UI -- resolved automatically)
 
-        private void cmbService_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        /// <summary>
+        /// Picks the default service ("xfast", case-insensitive; falls back to the
+        /// currently-connected service on reload, then to the first service the
+        /// backend returned) and its protocol, then loads the country/server list for
+        /// it. This replaces the old cmbService/cmbProtocol combo boxes.
+        /// </summary>
+        private void ResolveServiceAndProtocol()
         {
-            if (cmbService.SelectedItem == null) return;
+            if (serviceFactory.Services == null || serviceFactory.Services.Count == 0)
+            {
+                _selectedServiceName = null;
+                selectedProtocol = null;
+                return;
+            }
 
-            var serviceName = cmbService.SelectedItem.ToString();
+            var names = serviceFactory.Services
+                .OrderBy(y => y.Order).GroupBy(x => x.Name).Select(x => x.Key).ToArray();
+
+            _selectedServiceName = names.FirstOrDefault(n => string.Equals(n, DefaultServiceName, StringComparison.OrdinalIgnoreCase))
+                ?? ((_isLoading && globalInfo?.CurrentService != null && names.Contains(globalInfo.CurrentService.Name))
+                    ? globalInfo.CurrentService.Name
+                    : names.FirstOrDefault());
+
             var protocols = serviceFactory.Services
-                .Where(x => x.Name == serviceName)
+                .Where(x => x.Name == _selectedServiceName)
                 .SelectMany(i => i.Protocols).Distinct().ToArray();
 
             if (protocols.Length > 1)
             {
-                cmbProtocol.Items.Clear();
-                cmbProtocol.Items.AddRange(protocols);
-
                 string preferred = null;
-                if (_isLoading && globalInfo?.CurrentService != null)
+                if (_isLoading && globalInfo?.CurrentService != null && globalInfo.CurrentService.Name == _selectedServiceName)
                 {
                     var cur = globalInfo.CurrentService;
                     preferred = !string.IsNullOrEmpty(cur.SelectedProtocol)
@@ -100,23 +112,19 @@ namespace IRSpeedyVPN.UserControls
                         : protocols.FirstOrDefault(p => cur.Protocols != null && cur.Protocols.Contains(p));
                 }
 
-                cmbProtocol.SelectedItem = (preferred != null && protocols.Contains(preferred))
-                    ? preferred : protocols[0];
-                gProtocol.Visibility = Visibility.Visible;
+                selectedProtocol = (preferred != null && protocols.Contains(preferred)) ? preferred : protocols[0];
             }
             else
             {
-                gProtocol.Visibility = Visibility.Collapsed;
                 selectedProtocol = null;
-                RefreshCountry(null);
             }
+
+            RefreshCountry(selectedProtocol);
         }
 
-        private void cmbProtocol_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        private void txtSearch_TextChanged(object sender, TextChangedEventArgs e)
         {
-            if (cmbProtocol.SelectedItem == null) return;
-            selectedProtocol = cmbProtocol.SelectedItem.ToString();
-            RefreshCountry(selectedProtocol);
+            countryPicker.SetFilter(txtSearch.Text);
         }
 
         #endregion
@@ -125,11 +133,10 @@ namespace IRSpeedyVPN.UserControls
 
         private void RefreshCountry(string protocol)
         {
-            if (cmbService.SelectedItem == null) return;
+            if (_selectedServiceName == null) return;
 
-            var serviceName = cmbService.SelectedItem.ToString();
             var services = serviceFactory.Services
-                .Where(x => x.Name == serviceName && (protocol == null || x.Protocols.Contains(protocol)))
+                .Where(x => x.Name == _selectedServiceName && (protocol == null || x.Protocols.Contains(protocol)))
                 .OrderBy(x => x.Country).ToArray();
 
             // Preserve distinct API service records for the same CountryCode. If two
@@ -286,15 +293,14 @@ namespace IRSpeedyVPN.UserControls
 
         private void ConnectToFastestServer()
         {
-            if (cmbService.SelectedItem == null) return;
+            if (_selectedServiceName == null) return;
 
             _urlTestCts?.Cancel();
             UrlTestCoordinator.BeginBatch();
 
-            var serviceName = cmbService.SelectedItem.ToString();
             var services = serviceFactory.Services
                 .Where(x => x.IsUrlTestSupported
-                    && x.Name == serviceName
+                    && x.Name == _selectedServiceName
                     && (string.IsNullOrEmpty(selectedProtocol) || x.Protocols.Contains(selectedProtocol)))
                 .Randomize().ToList();
 
@@ -361,11 +367,11 @@ namespace IRSpeedyVPN.UserControls
             var icons = new List<HeaderIconRegistration>();
 
             if (!string.IsNullOrWhiteSpace(TunnelPlusService.selectedChain))
-                icons.Add(new HeaderIconRegistration("", "حذف سرویس پایه", RemoveBaseService));
+                icons.Add(new HeaderIconRegistration("", "حذف سرویس پایه", RemoveBaseService));
             if (sService?.SettingType != null)
-                icons.Add(new HeaderIconRegistration("", "تنظیمات سرویس", OpenServiceSettings));
+                icons.Add(new HeaderIconRegistration("", "تنظیمات سرویس", OpenServiceSettings));
             if (sService?.ShowSpeedyShieldSetting == true)
-                icons.Add(new HeaderIconRegistration("", "تنظیمات Speedy Shield", OpenSpeedyShieldSetting));
+                icons.Add(new HeaderIconRegistration("", "تنظیمات Speedy Shield", OpenSpeedyShieldSetting));
 
             host.SetHeaderIcons(this, icons);
         }
@@ -411,8 +417,8 @@ namespace IRSpeedyVPN.UserControls
 
         private IVPNService GetFallbackService()
         {
-            if (cmbService.SelectedItem == null) return null;
-            return serviceFactory.Services?.FirstOrDefault(s => s.Name == cmbService.SelectedItem.ToString());
+            if (_selectedServiceName == null) return null;
+            return serviceFactory.Services?.FirstOrDefault(s => s.Name == _selectedServiceName);
         }
 
         #endregion

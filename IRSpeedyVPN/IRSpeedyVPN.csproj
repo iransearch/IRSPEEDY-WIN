@@ -120,6 +120,30 @@
 		<Resource Include="Logo-v2.ico" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<!-- New window design (DESIGN-SPEC handoff): brand assets -->
+		<Resource Include="Resources\Irspeedy\Logo\icon-16.png" />
+		<Resource Include="Resources\Irspeedy\Logo\icon-24.png" />
+		<Resource Include="Resources\Irspeedy\Logo\icon-32.png" />
+		<Resource Include="Resources\Irspeedy\Logo\icon-48.png" />
+		<Resource Include="Resources\Irspeedy\Logo\icon-64.png" />
+		<Resource Include="Resources\Irspeedy\Logo\icon-128.png" />
+		<Resource Include="Resources\Irspeedy\Logo\icon-256.png" />
+		<Resource Include="Resources\Irspeedy\Logo\logo-header.png" />
+		<Resource Include="Resources\Irspeedy\Logo\irspeedy.ico" />
+		<Resource Include="Resources\Irspeedy\Flags\germany.png" />
+		<Resource Include="Resources\Irspeedy\Flags\netherlands.png" />
+		<Resource Include="Resources\Irspeedy\Flags\turkey.png" />
+		<Resource Include="Resources\Irspeedy\Flags\france.png" />
+		<Resource Include="Resources\Irspeedy\Flags\uk.png" />
+		<!-- Vazirmatn (OFL), bundled locally per DESIGN-SPEC §5 — no network font loading -->
+		<Resource Include="Fonts\Vazirmatn\Vazirmatn-Regular.ttf" />
+		<Resource Include="Fonts\Vazirmatn\Vazirmatn-Medium.ttf" />
+		<Resource Include="Fonts\Vazirmatn\Vazirmatn-SemiBold.ttf" />
+		<Resource Include="Fonts\Vazirmatn\Vazirmatn-Bold.ttf" />
+		<Resource Include="Fonts\Vazirmatn\Vazirmatn-ExtraBold.ttf" />
+	</ItemGroup>
+
   <ItemGroup>
     <EmbeddedResource Include="Components\ToggleSwitch\Icons\ToggleSwitch.HorizontalToggleSwitch.Expression.Large.png" />
     <EmbeddedResource Include="Components\ToggleSwitch\Icons\ToggleSwitch.HorizontalToggleSwitch.Expression.Small.png" />

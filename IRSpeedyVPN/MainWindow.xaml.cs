@@ -104,7 +104,7 @@ namespace IRSpeedyVPN
             notify = new System.Windows.Forms.NotifyIcon();
             // Read the embedded branding resource, not Windows' executable icon cache.
             using (var stream = Application.GetResourceStream(
-                new Uri("pack://application:,,,/Logo-v2.ico", UriKind.Absolute)).Stream)
+                new Uri("pack://application:,,,/Resources/Irspeedy/Logo/irspeedy.ico", UriKind.Absolute)).Stream)
             using (var icon = new System.Drawing.Icon(stream))
             {
                 notify.Icon = (System.Drawing.Icon)icon.Clone();
@@ -552,7 +552,8 @@ namespace IRSpeedyVPN
                     {
                         TransitionBox.Transition = null;
                         TransitionBox.Content = ctrl;
-                        lblCtrlTitle.Text = uCServerList.Title;
+                        // The new server-list design has no header title slot (the
+                        // search field replaces it) -- leave lblCtrlTitle blank here.
                     }
                     finally
                     {
@@ -612,9 +613,15 @@ namespace IRSpeedyVPN
                     Style = (Style)FindResource("LabelButton"),
                     Content = icon.Icon,
                     Background = null,
-                    Foreground = Brushes.White,
+                    // New header is a light Mica/gradient surface (DESIGN-SPEC §2), not
+                    // the old dark-blue banner -- icons need the dark stroke colour.
+                    Foreground = (Brush)FindResource("IconStrokeBrush"),
                     FontFamily = (FontFamily)FindResource("fa_ProLight"),
-                    FontSize = 20,
+                    FontSize = 16,
+                    Width = 30,
+                    Height = 30,
+                    HorizontalContentAlignment = HorizontalAlignment.Center,
+                    VerticalContentAlignment = VerticalAlignment.Center,
                     ToolTip = icon.ToolTip,
                 };
                 ToolTipService.SetInitialShowDelay(label, 400);
@@ -1085,6 +1092,12 @@ namespace IRSpeedyVPN
         private void Header_MouseDown(object sender, MouseButtonEventArgs e)
         {
             this.DragMove();
+        }
+
+        private void Minimize_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            this.Visibility = Visibility.Hidden;
+            notify.Visible = true;
         }
 
         private void Exit_PreviewMouseDown(object sender, MouseButtonEventArgs e)

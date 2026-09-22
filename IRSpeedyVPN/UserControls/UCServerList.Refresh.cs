@@ -22,7 +22,7 @@ namespace IRSpeedyVPN.UserControls
             if (!IsVisible || serviceFactory.Services == null)
                 return;
 
-            var previousServiceName = cmbService.SelectedItem?.ToString();
+            var previousServiceName = _selectedServiceName;
             var items = serviceFactory.Services
                 .OrderBy(y => y.Order)
                 .GroupBy(x => x.Name)
@@ -32,19 +32,27 @@ namespace IRSpeedyVPN.UserControls
             _isLoading = true;
             selectedService = null;
 
-            cmbService.Items.Clear();
-            cmbService.Items.AddRange(items);
-
             var preferred = !string.IsNullOrWhiteSpace(previousServiceName)
                 && items.Contains(previousServiceName)
                 ? previousServiceName
                 : globalInfo?.CurrentService?.Name;
 
-            cmbService.SelectedItem = !string.IsNullOrWhiteSpace(preferred)
+            _selectedServiceName = !string.IsNullOrWhiteSpace(preferred)
                 && items.Contains(preferred)
                 ? preferred
                 : items.FirstOrDefault();
 
+            // No visible protocol picker any more (§ service selection removed) --
+            // resolve it the same way ResolveServiceAndProtocol() does on first load.
+            var protocols = serviceFactory.Services
+                .Where(x => x.Name == _selectedServiceName)
+                .SelectMany(i => i.Protocols).Distinct().ToArray();
+
+            selectedProtocol = protocols.Length > 1
+                ? (selectedProtocol != null && protocols.Contains(selectedProtocol) ? selectedProtocol : protocols[0])
+                : null;
+
+            RefreshCountry(selectedProtocol);
             UpdateHeaderIcons();
         }
     }

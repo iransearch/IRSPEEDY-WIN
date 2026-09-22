@@ -14,6 +14,7 @@
                 <ResourceDictionary Source="Themes/Theme.CountryPicker.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.TextBlock.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.LabelButton.xaml"/>
+                <ResourceDictionary Source="Themes/IrspeedyTheme.xaml"/>
             </ResourceDictionary.MergedDictionaries>
         </ResourceDictionary>
     </Application.Resources>
