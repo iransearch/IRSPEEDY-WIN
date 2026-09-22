@@ -1,4 +1,58 @@
 <UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker" mc:Ignorable="d" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}">
+    <UserControl.Resources>
+        <!-- Scoped to the server list: a transparent rail and a rounded 5-DIP thumb. -->
+        <Style x:Key="ServerScrollPage" TargetType="RepeatButton">
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RepeatButton">
+                <Border Background="Transparent"/>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="ServerScrollThumb" TargetType="Thumb">
+            <Setter Property="MinHeight" Value="28"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Thumb">
+                <Grid Background="Transparent">
+                    <Border x:Name="grip" Width="5" CornerRadius="2.5" Background="#757D8C" Opacity="0.5"/>
+                </Grid>
+                <ControlTemplate.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="grip" Property="Opacity" Value="0.8"/></Trigger>
+                    <Trigger Property="IsDragging" Value="True"><Setter TargetName="grip" Property="Opacity" Value="1"/></Trigger>
+                </ControlTemplate.Triggers>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="ServerScrollBar" TargetType="ScrollBar">
+            <Setter Property="Width" Value="10"/>
+            <Setter Property="Orientation" Value="Vertical"/>
+            <Setter Property="Focusable" Value="False"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
+                <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"
+                       Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                       Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                       ViewportSize="{TemplateBinding ViewportSize}">
+                    <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource ServerScrollPage}"/></Track.DecreaseRepeatButton>
+                    <Track.Thumb><Thumb Style="{StaticResource ServerScrollThumb}"/></Track.Thumb>
+                    <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource ServerScrollPage}"/></Track.IncreaseRepeatButton>
+                </Track>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+        <Style x:Key="ServerScrollViewer" TargetType="ScrollViewer">
+            <Setter Property="CanContentScroll" Value="False"/>
+            <Setter Property="HorizontalScrollBarVisibility" Value="Disabled"/>
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto"/>
+            <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollViewer">
+                <!-- Explicit physical columns keep the rail on the left in RTL. -->
+                <Grid FlowDirection="LeftToRight" ClipToBounds="True">
+                    <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                    <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="1" FlowDirection="RightToLeft"
+                        Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
+                        CanContentScroll="{TemplateBinding CanContentScroll}" Margin="{TemplateBinding Padding}"/>
+                    <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="0" Style="{StaticResource ServerScrollBar}"
+                        Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" Value="{TemplateBinding VerticalOffset}"
+                        ViewportSize="{TemplateBinding ViewportHeight}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+                </Grid>
+            </ControlTemplate></Setter.Value></Setter>
+        </Style>
+    </UserControl.Resources>
+
 
     <!-- Physical columns are LTR; Persian Run content is RTL. This keeps the
          right-aligned text edge stable without mirroring the text container. -->
@@ -35,7 +89,7 @@
         </Border>
 
         <!-- ═══ Country rows (scrollable) ═══ -->
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" Padding="0,0,2,0">
+        <ScrollViewer Grid.Row="1" Style="{StaticResource ServerScrollViewer}" Padding="0,0,2,0">
             <ItemsControl x:Name="icCountries" Focusable="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
