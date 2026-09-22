@@ -53,7 +53,7 @@ namespace IRSpeedyVPN.UserControls
                 if (globalInfo == null || !IsVisible) return;
                 var elapsed = DateTime.Now - globalInfo.ConnectionTime;
                 if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
-                txtConnectionTime.Text = ((int)elapsed.TotalHours).ToString("00") + elapsed.ToString(@"\:mm\:ss");
+                txtConnectionTime.Text = PersianDigits(((int)elapsed.TotalHours).ToString("00") + elapsed.ToString(@"\:mm\:ss"));
             }));
         }
         private void btn_ChangeServer_Click(object sender, RoutedEventArgs e)
@@ -141,6 +141,7 @@ namespace IRSpeedyVPN.UserControls
 
             globalInfo = AppServices.GlobalInfo;
             timerTick = 0;
+            baseServiceMenu.Visibility = File.Exists("./chainplus.txt") && string.IsNullOrWhiteSpace(TunnelPlusService.selectedChain) ? Visibility.Visible : Visibility.Collapsed;
             uiTimer.Change(1000, 1000);
 
             // Global Fast has no country scope marker (SelectedServerUrl == null).
@@ -160,7 +161,7 @@ namespace IRSpeedyVPN.UserControls
                 + (isGlobalSmart ? (ping > 0 ? " · " : "") + "موقعیت هوشمند" : "");
 
             txtServiceName.Text = globalInfo.CurrentService.Name + (proxifier.IsAttached() && proxifier.ProxyType.GetDescription().Length > 0 ? " / " + proxifier.ProxyType.GetDescription() : "");
-            txtConnectionTime.Text = "00:00:00";
+            txtConnectionTime.Text = "۰۰:۰۰:۰۰";
 
             txtExpireDate.Text = (globalInfo.ExpiryDate != null) ? globalInfo.ExpiryDate.Value.ToPresianDate() : "اولین اتصال";
             txtRemainedTime.Text = (globalInfo.ExpiryDate != null) ? globalInfo.ExpiryDate.Value.TotalDays() : "اولین اتصال";
@@ -189,22 +190,17 @@ namespace IRSpeedyVPN.UserControls
             return string.Concat((value ?? "").Select(c => c >= '0' && c <= '9' ? (char)('۰' + c - '0') : c));
         }
 
+        private void ShareMenu_Click(object sender, RoutedEventArgs e) => ShareConnection_PreviewMouseDown(sender, null);
+        private void TestMenu_Click(object sender, RoutedEventArgs e) => ConnectionTest_PreviewMouseDown(sender, null);
+        private void BaseMenu_Click(object sender, RoutedEventArgs e) => RegisterBaseService();
+
         private void RegisterHeaderIcons()
         {
             var host = GetMainWindow();
             if (host == null) return;
 
 
-            var icons = new List<HeaderIconRegistration>
-            {
-                new HeaderIconRegistration("", "تست سرویس", () => ConnectionTest_PreviewMouseDown(this, null)),
-                new HeaderIconRegistration("", "اشتراک‌گذاری اتصال", () => ShareConnection_PreviewMouseDown(this, null))
-            };
-            if (File.Exists("./chainplus.txt") && string.IsNullOrWhiteSpace(TunnelPlusService.selectedChain))
-            {
-                icons.Insert(0,new HeaderIconRegistration("", "تنظیم بصورت سرویس پایه", RegisterBaseService));
-            }
-            host.SetHeaderIcons(this, icons);
+            host.ClearHeaderIcons(this);
         }
 
         private void ClearHeaderIcons()

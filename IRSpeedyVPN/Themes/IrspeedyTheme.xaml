@@ -1,20 +1,15 @@
-<!--
-  IRSPEEDY — new Windows app-window design (DESIGN-SPEC handoff).
-  Adapted from the approved Design artifact's WPF handoff
-  (wpf/IrspeedyTheme.xaml) for this project's folder layout.
-  Merged into App.xaml.
--->
-<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                     xmlns:sys="clr-namespace:System;assembly=mscorlib">
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=mscorlib">
 
   <!-- ===================== Colors ===================== -->
   <Color x:Key="AccentColor">#FF1E3A8A</Color>
   <Color x:Key="AccentGradientTopColor">#FF2447A8</Color>
   <Color x:Key="AccentGradientBottomColor">#FF1E3A8A</Color>
 
-  <Color x:Key="WindowBgTopColor">#FFFFFFFF</Color>     <!-- rgba(255,255,255,0.88) -->
-  <Color x:Key="WindowBgBottomColor">#FFF8FAFC</Color>  <!-- rgba(248,250,252,0.86) -->
+  <!-- Window background: fully opaque (no transparency anywhere in the app) -->
+  <Color x:Key="WindowBgTopColor">#FFFFFFFF</Color>
+  <Color x:Key="WindowBgBottomColor">#FFF8FAFC</Color>
+  <Color x:Key="DesktopBackdropTopColor">#FFEAF1FB</Color>
+  <Color x:Key="DesktopBackdropBottomColor">#FFCBD8ED</Color>
 
   <Color x:Key="TextPrimaryColor">#FF141B33</Color>
   <Color x:Key="TextSecondaryColor">#FF9CA3B4</Color>
@@ -27,7 +22,6 @@
 
   <Color x:Key="SearchBorderColor">#FFE1E4EC</Color>
   <Color x:Key="DividerColor">#FFE1E4EC</Color>
-  <Color x:Key="HeaderHoverColor">#FFF1F2F4</Color> <!-- rgba(17,24,39,0.06) -->
 
   <Color x:Key="SmartLocationBorderColor">#FFC9DBFB</Color>
   <Color x:Key="SmartLocationBgTopColor">#FFEFF5FF</Color>
@@ -39,6 +33,40 @@
   <Color x:Key="PingGoodColor">#FF17A366</Color>
   <Color x:Key="RadioBorderColor">#FFD5D9E3</Color>
 
+  <!-- Login screen -->
+  <Color x:Key="FieldBorderColor">#FFE1E4EC</Color>
+  <Color x:Key="FieldFocusBorderColor">#FF1E3A8A</Color>
+  <Color x:Key="FieldLabelColor">#FF5B6478</Color>
+  <Color x:Key="FieldPlaceholderIconColor">#FF9CA3B4</Color>
+  <Color x:Key="DividerTextColor">#FF9CA3B4</Color>
+  <Color x:Key="MutedTextColor">#FF6B7280</Color>
+
+  <!-- Connected screen -->
+  <Color x:Key="ConnectedGreenColor">#FF17A366</Color>
+  <Color x:Key="ConnectedGreenDarkColor">#FF0F7A4C</Color>
+  <Color x:Key="ConnectedGlowColor">#2917A366</Color>       <!-- rgba(23,163,102,0.16) -->
+  <Color x:Key="ConnectedRingColor">#4017A366</Color>       <!-- rgba(23,163,102,0.25) -->
+  <Color x:Key="ConnectedHeroBgTopColor">#FFFFFFFF</Color>
+  <Color x:Key="ConnectedHeroBgBottomColor">#FFF3FBF7</Color>
+  <Color x:Key="DisconnectGradientTopColor">#FFDC2626</Color>
+  <Color x:Key="DisconnectGradientBottomColor">#FFB91C1C</Color>
+  <Color x:Key="StatCardBorderColor">#FFE1E4EC</Color>
+  <Color x:Key="StatCardDividerColor">#FFEEF0F4</Color>
+  <Color x:Key="ServerCardBorderColor">#FFC9DBFB</Color>
+
+  <!-- Settings screen -->
+  <Color x:Key="SettingsCloseTopColor">#FFEF4444</Color>
+  <Color x:Key="SettingsCloseBottomColor">#FFDC2626</Color>
+  <Color x:Key="ToggleTrackColor">#FFE9EBF1</Color>
+  <Color x:Key="ToggleOnTopColor">#FF22B37A</Color>
+  <Color x:Key="ToggleOnBottomColor">#FF159A63</Color>
+  <Color x:Key="ToggleOffTopColor">#FFF04A4A</Color>
+  <Color x:Key="ToggleOffBottomColor">#FFDC2626</Color>
+  <Color x:Key="SettingsRowBorderColor">#FFE8EAF0</Color>
+  <Color x:Key="ConfirmButtonBgColor">#FFEDEFF3</Color>
+  <Color x:Key="ConfirmButtonBorderColor">#FFDCDFE6</Color>
+  <Color x:Key="ConfirmButtonTextColor">#FF3A4054</Color>
+
   <!-- ===================== Brushes ===================== -->
   <SolidColorBrush x:Key="AccentBrush" Color="{StaticResource AccentColor}"/>
   <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="0,1">
@@ -46,10 +74,19 @@
     <GradientStop Color="{StaticResource AccentGradientBottomColor}" Offset="1"/>
   </LinearGradientBrush>
 
-  <!-- Opaque window surface on every supported Windows version. -->
-  <LinearGradientBrush x:Key="WindowBackgroundFallbackBrush" StartPoint="0,0" EndPoint="0,1">
+  <!-- App window background: opaque solid gradient (no Mica/Acrylic — the
+       approved design uses a plain, fully opaque card, not a glass/blur
+       material). Set Window.Background to this brush directly. -->
+  <LinearGradientBrush x:Key="WindowBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
     <GradientStop Color="{StaticResource WindowBgTopColor}" Offset="0"/>
     <GradientStop Color="{StaticResource WindowBgBottomColor}" Offset="1"/>
+  </LinearGradientBrush>
+
+  <!-- Desktop backdrop behind the floating window, for the mockup/preview
+       frame only — not part of the app window itself. -->
+  <LinearGradientBrush x:Key="DesktopBackdropBrush" StartPoint="0.2,0" EndPoint="0.8,1">
+    <GradientStop Color="{StaticResource DesktopBackdropTopColor}" Offset="0"/>
+    <GradientStop Color="{StaticResource DesktopBackdropBottomColor}" Offset="1"/>
   </LinearGradientBrush>
 
   <SolidColorBrush x:Key="TextPrimaryBrush" Color="{StaticResource TextPrimaryColor}"/>
@@ -63,7 +100,6 @@
 
   <SolidColorBrush x:Key="SearchBorderBrush" Color="{StaticResource SearchBorderColor}"/>
   <SolidColorBrush x:Key="DividerBrush" Color="{StaticResource DividerColor}"/>
-  <SolidColorBrush x:Key="HeaderHoverBrush" Color="{StaticResource HeaderHoverColor}"/>
 
   <SolidColorBrush x:Key="SmartLocationBorderBrush" Color="{StaticResource SmartLocationBorderColor}"/>
   <LinearGradientBrush x:Key="SmartLocationBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
@@ -77,15 +113,49 @@
   <SolidColorBrush x:Key="PingGoodBrush" Color="{StaticResource PingGoodColor}"/>
   <SolidColorBrush x:Key="RadioBorderBrush" Color="{StaticResource RadioBorderColor}"/>
 
+  <SolidColorBrush x:Key="FieldBorderBrush" Color="{StaticResource FieldBorderColor}"/>
+  <SolidColorBrush x:Key="FieldFocusBorderBrush" Color="{StaticResource FieldFocusBorderColor}"/>
+  <SolidColorBrush x:Key="FieldLabelBrush" Color="{StaticResource FieldLabelColor}"/>
+  <SolidColorBrush x:Key="FieldPlaceholderIconBrush" Color="{StaticResource FieldPlaceholderIconColor}"/>
+  <SolidColorBrush x:Key="DividerTextBrush" Color="{StaticResource DividerTextColor}"/>
+  <SolidColorBrush x:Key="MutedTextBrush" Color="{StaticResource MutedTextColor}"/>
+
+  <SolidColorBrush x:Key="ConnectedGreenBrush" Color="{StaticResource ConnectedGreenColor}"/>
+  <SolidColorBrush x:Key="ConnectedGreenDarkBrush" Color="{StaticResource ConnectedGreenDarkColor}"/>
+  <LinearGradientBrush x:Key="ConnectedHeroBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="{StaticResource ConnectedHeroBgTopColor}" Offset="0"/>
+    <GradientStop Color="{StaticResource ConnectedHeroBgBottomColor}" Offset="1"/>
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="DisconnectGradientBrush" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="{StaticResource DisconnectGradientTopColor}" Offset="0"/>
+    <GradientStop Color="{StaticResource DisconnectGradientBottomColor}" Offset="1"/>
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="StatCardBorderBrush" Color="{StaticResource StatCardBorderColor}"/>
+  <SolidColorBrush x:Key="StatCardDividerBrush" Color="{StaticResource StatCardDividerColor}"/>
+  <SolidColorBrush x:Key="ServerCardBorderBrush" Color="{StaticResource ServerCardBorderColor}"/>
+
+  <LinearGradientBrush x:Key="SettingsCloseBrush" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="{StaticResource SettingsCloseTopColor}" Offset="0"/>
+    <GradientStop Color="{StaticResource SettingsCloseBottomColor}" Offset="1"/>
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="ToggleTrackBrush" Color="{StaticResource ToggleTrackColor}"/>
+  <LinearGradientBrush x:Key="ToggleOnBrush" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="{StaticResource ToggleOnTopColor}" Offset="0"/>
+    <GradientStop Color="{StaticResource ToggleOnBottomColor}" Offset="1"/>
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="ToggleOffBrush" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="{StaticResource ToggleOffTopColor}" Offset="0"/>
+    <GradientStop Color="{StaticResource ToggleOffBottomColor}" Offset="1"/>
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="SettingsRowBorderBrush" Color="{StaticResource SettingsRowBorderColor}"/>
+  <SolidColorBrush x:Key="ConfirmButtonBackgroundBrush" Color="{StaticResource ConfirmButtonBgColor}"/>
+  <SolidColorBrush x:Key="ConfirmButtonBorderBrush" Color="{StaticResource ConfirmButtonBorderColor}"/>
+  <SolidColorBrush x:Key="ConfirmButtonTextBrush" Color="{StaticResource ConfirmButtonTextColor}"/>
+
   <!-- ===================== Typography ===================== -->
-  <!--
-    The supplied BYekanPlus-Bold.ttf is embedded under Resources. All design
-    weight aliases intentionally use its internal family name, B Yekan+.
-  -->
-  <FontFamily x:Key="AppFontFamily">pack://application:,,,/Resources/#B Yekan+</FontFamily>
-  <FontFamily x:Key="AppFontFamilyMedium">pack://application:,,,/Resources/#B Yekan+</FontFamily>
-  <FontFamily x:Key="AppFontFamilySemiBold">pack://application:,,,/Resources/#B Yekan+</FontFamily>
-  <FontFamily x:Key="AppFontFamilyExtraBold">pack://application:,,,/Resources/#B Yekan+</FontFamily>
+  <!-- Load Vazirmatn as a bundled font resource; family name below assumes
+       the .ttf/.otf internal font-family name is "Vazirmatn". -->
+  <FontFamily x:Key="AppFontFamily">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn</FontFamily>
 
   <sys:Double x:Key="FontSizeVersion">11</sys:Double>
   <sys:Double x:Key="FontSizeMuted">12</sys:Double>
@@ -93,6 +163,9 @@
   <sys:Double x:Key="FontSizeRow">14.5</sys:Double>
   <sys:Double x:Key="FontSizeTitle">15</sys:Double>
   <sys:Double x:Key="FontSizeCardTitle">14</sys:Double>
+  <sys:Double x:Key="FontSizeSettingsTitle">16.5</sys:Double>
+  <sys:Double x:Key="FontSizeSettingsRow">15</sys:Double>
+  <sys:Double x:Key="FontSizeToggleLabel">11</sys:Double>
 
   <!-- ===================== Layout constants (DIP, 1 px = 1 DIP) ===================== -->
   <sys:Double x:Key="WindowWidth">420</sys:Double>
@@ -108,38 +181,59 @@
   <sys:Double x:Key="RadioDiameter">20</sys:Double>
   <sys:Double x:Key="ConnectButtonHeight">56</sys:Double>
   <CornerRadius x:Key="ConnectButtonCornerRadius">14</CornerRadius>
+  <!-- Main/server-list screen content bottom padding (Connect button gap
+       from window edge) — Connected screen's Disconnect button uses the
+       same value so both primary actions sit the same distance from the
+       bottom edge. -->
+  <Thickness x:Key="MainContentPadding">18,4,18,18</Thickness>
 
-  <!-- ===================== Header icon geometry (16x16 viewBox) ===================== -->
+  <!-- Login screen -->
+  <sys:Double x:Key="LoginBadgeDiameter">200</sys:Double>
+  <CornerRadius x:Key="LoginBadgeCornerRadius">52</CornerRadius>
+  <sys:Double x:Key="LoginLogoWidth">100</sys:Double>
+  <sys:Double x:Key="LoginLogoHeight">135</sys:Double>
+  <sys:Double x:Key="LoginFieldHeight">48</sys:Double>
+  <CornerRadius x:Key="LoginFieldCornerRadius">12</CornerRadius>
+  <sys:Double x:Key="LoginButtonHeight">52</sys:Double>
 
-  <Color x:Key="FieldBorderColor">#FFE1E4EC</Color>
-  <Color x:Key="FieldFocusBorderColor">#FF1E3A8A</Color>
-  <Color x:Key="FieldLabelColor">#FF5B6478</Color>
-  <Color x:Key="FieldPlaceholderIconColor">#FF9CA3B4</Color>
-  <Color x:Key="DividerTextColor">#FF9CA3B4</Color>
-  <Color x:Key="MutedTextColor">#FF6B7280</Color>
-  <Color x:Key="ConnectedGreenColor">#FF17A366</Color>
-  <Color x:Key="ConnectedGreenDarkColor">#FF0F7A4C</Color>
-  <Color x:Key="ConnectedGlowColor">#FFDAF0E7</Color>
-  <Color x:Key="ConnectedRingColor">#FFC5E8D9</Color>
-  <Color x:Key="DisconnectGradientTopColor">#FFDC2626</Color>
-  <Color x:Key="DisconnectGradientBottomColor">#FFB91C1C</Color>
-  <Color x:Key="StatCardBorderColor">#FFE1E4EC</Color>
-  <Color x:Key="StatCardDividerColor">#FFEEF0F4</Color>
-  <SolidColorBrush x:Key="FieldBorderBrush" Color="{StaticResource FieldBorderColor}"/>
-  <SolidColorBrush x:Key="FieldFocusBorderBrush" Color="{StaticResource FieldFocusBorderColor}"/>
-  <SolidColorBrush x:Key="FieldLabelBrush" Color="{StaticResource FieldLabelColor}"/>
-  <SolidColorBrush x:Key="FieldPlaceholderIconBrush" Color="{StaticResource FieldPlaceholderIconColor}"/>
-  <SolidColorBrush x:Key="DividerTextBrush" Color="{StaticResource DividerTextColor}"/>
-  <SolidColorBrush x:Key="MutedTextBrush" Color="{StaticResource MutedTextColor}"/>
-  <SolidColorBrush x:Key="ConnectedGreenBrush" Color="{StaticResource ConnectedGreenColor}"/>
-  <SolidColorBrush x:Key="ConnectedGreenDarkBrush" Color="{StaticResource ConnectedGreenDarkColor}"/>
-  <LinearGradientBrush x:Key="DisconnectGradientBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{StaticResource DisconnectGradientTopColor}" Offset="0"/>
-    <GradientStop Color="{StaticResource DisconnectGradientBottomColor}" Offset="1"/>
+  <!-- Connected screen -->
+  <sys:Double x:Key="ConnectedHeroOuterDiameter">336</sys:Double>
+  <sys:Double x:Key="ConnectedHeroInnerDiameter">248</sys:Double>
+  <sys:Double x:Key="ConnectedHeroLogoWidth">124</sys:Double>
+  <sys:Double x:Key="ConnectedHeroLogoHeight">168</sys:Double>
+  <sys:Double x:Key="ConnectedCheckBadgeDiameter">60</sys:Double>
+  <sys:Double x:Key="ConnectedCheckBadgeBorder">6</sys:Double>
+  <sys:Double x:Key="ServerCardHeight">50</sys:Double>
+  <CornerRadius x:Key="ServerCardCornerRadius">14</CornerRadius>
+  <sys:Double x:Key="SwapButtonSize">32</sys:Double>
+  <CornerRadius x:Key="SwapButtonCornerRadius">9</CornerRadius>
+  <sys:Double x:Key="StatCardRowPadding">7</sys:Double>
+  <CornerRadius x:Key="StatCardCornerRadius">12</CornerRadius>
+  <sys:Double x:Key="DisconnectButtonHeight">46</sys:Double>
+  <CornerRadius x:Key="DisconnectButtonCornerRadius">14</CornerRadius>
+
+  <!-- Settings screen -->
+  <sys:Double x:Key="SettingsHeaderHeight">64</sys:Double>
+  <sys:Double x:Key="SettingsCloseDiameter">30</sys:Double>
+  <sys:Double x:Key="SettingsRowHeight">68</sys:Double>
+  <CornerRadius x:Key="SettingsRowCornerRadius">16</CornerRadius>
+  <sys:Double x:Key="ToggleWidth">86</sys:Double>
+  <sys:Double x:Key="ToggleHeight">32</sys:Double>
+  <sys:Double x:Key="ToggleThumbDiameter">26</sys:Double>
+  <sys:Double x:Key="ConfirmButtonHeight">50</sys:Double>
+  <CornerRadius x:Key="ConfirmButtonCornerRadius">14</CornerRadius>
+
+<Color x:Key="HeaderHoverColor">#FFF1F2F4</Color> <LinearGradientBrush x:Key="WindowBackgroundFallbackBrush" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="{StaticResource WindowBgTopColor}" Offset="0"/>
+    <GradientStop Color="{StaticResource WindowBgBottomColor}" Offset="1"/>
   </LinearGradientBrush>
-  <SolidColorBrush x:Key="StatCardBorderBrush" Color="{StaticResource StatCardBorderColor}"/>
-  <SolidColorBrush x:Key="StatCardDividerBrush" Color="{StaticResource StatCardDividerColor}"/>
-  <GeometryGroup x:Key="IconGear"><PathGeometry Figures="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.7 3.3l-1.13 1.13M4.43 11.57L3.3 12.7M12.7 12.7l-1.13-1.13M4.43 4.43L3.3 3.3"/><EllipseGeometry Center="8,8" RadiusX="2.6" RadiusY="2.6"/></GeometryGroup>
+
+  <SolidColorBrush x:Key="HeaderHoverBrush" Color="{StaticResource HeaderHoverColor}"/>
+
+  <FontFamily x:Key="AppFontFamilyMedium">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn Medium</FontFamily>
+  <FontFamily x:Key="AppFontFamilySemiBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn SemiBold</FontFamily>
+  <FontFamily x:Key="AppFontFamilyExtraBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn ExtraBold</FontFamily>
+
   <GeometryGroup x:Key="IconShield"><PathGeometry Figures="M8 1.5l5 2v4c0 3.5-2.2 5.9-5 7-2.8-1.1-5-3.5-5-7v-4l5-2z"/></GeometryGroup>
   <GeometryGroup x:Key="IconSearch"><EllipseGeometry Center="7,7" RadiusX="5.25" RadiusY="5.25"/><LineGeometry StartPoint="11,11" EndPoint="14.5,14.5"/></GeometryGroup>
   <GeometryGroup x:Key="IconBolt"><PathGeometry Figures="M8.8 1L3 9.2h3.6L6.4 15l6-8.6H8.8L8.8 1Z"/></GeometryGroup>
@@ -168,7 +262,7 @@
   </Style>
   <Style x:Key="DesignLinkButton" TargetType="Button">
     <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Cursor" Value="Hand"/>
-    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border Background="White" Padding="6"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Setter.Value></Setter>
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border Background="Transparent" CornerRadius="9" Padding="6"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Setter.Value></Setter>
   </Style>
   <Style x:Key="DesignInfoCard" TargetType="Border"><Setter Property="Background" Value="White"/><Setter Property="CornerRadius" Value="12"/><Setter Property="BorderBrush" Value="{StaticResource StatCardBorderBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
-</ResourceDictionary>
+<GeometryGroup x:Key="IconGear"><PathGeometry Figures="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z"/><EllipseGeometry Center="12,12" RadiusX="3" RadiusY="3"/></GeometryGroup><GeometryGroup x:Key="IconSwapServer"><PathGeometry Figures="M17 2.1l4 4-4 4"/><PathGeometry Figures="M3 12.6v-1.1a4 4 0 0 1 4-4h14"/><PathGeometry Figures="M7 21.9l-4-4 4-4"/><PathGeometry Figures="M21 11.4v1.1a4 4 0 0 1-4 4H3"/></GeometryGroup></ResourceDictionary>

@@ -1,12 +1,4 @@
-<UserControl x:Class="IRSpeedyVPN.UserControls.UCServerList"
-             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:local="clr-namespace:IRSpeedyVPN.Components.ServerListControl"
-             mc:Ignorable="d" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}"
-             Loaded="UserControl_Loaded"
-             IsVisibleChanged="UserControl_IsVisibleChanged">
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:IRSpeedyVPN.Components.ServerListControl" x:Class="IRSpeedyVPN.UserControls.UCServerList" mc:Ignorable="d" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" Loaded="UserControl_Loaded" IsVisibleChanged="UserControl_IsVisibleChanged">
 
     <!--
         DESIGN-SPEC §3 "Content area": the service/protocol pickers (removed —
@@ -22,23 +14,17 @@
         </Grid.RowDefinitions>
 
         <!-- Search field -->
-        <Border Grid.Row="0" Height="44" CornerRadius="12" Background="White"
-                BorderBrush="{StaticResource SearchBorderBrush}" BorderThickness="1">
+        <Border Grid.Row="0" Height="44" CornerRadius="12" Background="White" BorderBrush="{StaticResource SearchBorderBrush}" BorderThickness="1">
             <Border.Effect>
                 <DropShadowEffect Color="#101828" Opacity="0.03" BlurRadius="2" ShadowDepth="1" Direction="270"/>
             </Border.Effect>
-            <Grid Margin="14,0" FlowDirection="RightToLeft">
+            <Grid Margin="14,0" FlowDirection="LeftToRight">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="txtSearch" Grid.Column="1" Background="White" BorderThickness="0" FlowDirection="RightToLeft"
-                         FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeBody}"
-                         Foreground="{StaticResource TextBodyBrush}" VerticalContentAlignment="Center"
-                         HorizontalContentAlignment="Stretch" TextAlignment="Right" TextChanged="txtSearch_TextChanged"/>
-                <TextBlock Grid.Column="1" Text="جستجوی سرورها" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" HorizontalAlignment="Stretch"
-                           FontSize="{StaticResource FontSizeBody}" Foreground="{StaticResource TextSecondaryBrush}"
-                           TextAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False">
+                <TextBox x:Name="txtSearch" Grid.Column="0" Background="White" BorderThickness="0" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeBody}" Foreground="{StaticResource TextBodyBrush}" VerticalContentAlignment="Center" HorizontalContentAlignment="Stretch" TextAlignment="Right" TextChanged="txtSearch_TextChanged" Language="fa-IR"/>
+                <TextBlock Grid.Column="0" FontFamily="{StaticResource AppFontFamily}" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" FontSize="{StaticResource FontSizeBody}" Foreground="{StaticResource TextSecondaryBrush}" TextAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">
                             <Setter Property="Visibility" Value="Collapsed"/>
@@ -49,10 +35,8 @@
                             </Style.Triggers>
                         </Style>
                     </TextBlock.Style>
-                </TextBlock>
-                <Path Grid.Column="0" Data="{StaticResource IconSearch}" Stretch="Uniform"
-                      Width="16" Height="16" Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.5"
-                      VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <Run FlowDirection="RightToLeft" Text="جستجوی سرورها"/></TextBlock>
+                <Path Grid.Column="1" Data="{StaticResource IconSearch}" Stretch="Uniform" Width="16" Height="16" Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.5" VerticalAlignment="Center" Margin="8,0,0,0" FlowDirection="LeftToRight"/>
             </Grid>
         </Border>
 
@@ -60,12 +44,10 @@
         <local:ServerCountryPicker x:Name="countryPicker" Grid.Row="1" Margin="0,12,0,0"/>
 
         <!-- Connect button -->
-        <Button x:Name="btnConnect" Grid.Row="2" Height="56" Margin="0,12,0,0"
-                Click="btnConnect_Click" Cursor="Hand">
+        <Button x:Name="btnConnect" Grid.Row="2" Height="56" Margin="0,12,0,0" Click="btnConnect_Click" Cursor="Hand">
             <Button.Template>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="bd" CornerRadius="{StaticResource ConnectButtonCornerRadius}"
-                            Background="{StaticResource AccentGradientBrush}">
+                    <Border x:Name="bd" CornerRadius="{StaticResource ConnectButtonCornerRadius}" Background="{StaticResource AccentGradientBrush}">
                         <Border.Effect>
                             <DropShadowEffect Color="#1E3A8A" Opacity="0.5" BlurRadius="22" ShadowDepth="10" Direction="270"/>
                         </Border.Effect>
@@ -74,12 +56,8 @@
                                 <ColumnDefinition Width="*"/>
                                 <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBlock Grid.Column="0" Text="اتصال" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
-                                       FontSize="{StaticResource FontSizeTitle}" Foreground="White"
-                                       HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24,0,0,0"/>
-                            <Path Grid.Column="1" Data="{StaticResource IconArrowLeft}" Stretch="Uniform" FlowDirection="LeftToRight"
-                                  Width="16" Height="16" Stroke="White" StrokeThickness="1.8"
-                                  VerticalAlignment="Center" Margin="0,0,22,0"/>
+                            <TextBlock Grid.Column="0" Text="اتصال" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="{StaticResource FontSizeTitle}" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24,0,0,0"/>
+                            <Path Grid.Column="1" Data="{StaticResource IconArrowLeft}" Stretch="Uniform" FlowDirection="LeftToRight" Width="16" Height="16" Stroke="White" StrokeThickness="1.8" VerticalAlignment="Center" Margin="0,0,22,0"/>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>

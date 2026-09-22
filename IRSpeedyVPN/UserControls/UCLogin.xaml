@@ -11,10 +11,10 @@
   <Style x:Key="FieldText" TargetType="TextBox"><Setter Property="Background" Value="White"/><Setter Property="BorderThickness" Value="0"/><Setter Property="VerticalContentAlignment" Value="Center"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="{StaticResource TextBodyBrush}"/></Style>
  </UserControl.Resources>
  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-  <StackPanel Margin="32,12,32,28">
-   <Border Width="96" Height="96" CornerRadius="26" HorizontalAlignment="Center" Background="{StaticResource SmartLocationBackgroundBrush}"><Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="80" Height="80" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/></Border>
+  <StackPanel Margin="32,6,32,16">
+   <Border Width="200" Height="200" CornerRadius="52" HorizontalAlignment="Center" Background="{StaticResource SmartLocationBackgroundBrush}"><Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="100" Height="135" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/></Border>
    <TextBlock Text="IRSPEEDY" FlowDirection="LeftToRight" TextAlignment="Center" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontSize="20" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,12,0,0"/>
-   <TextBlock Text="دسترسی امن و پرسرعت به اینترنت" TextAlignment="Center" FontSize="13" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,22"/>
+   <TextBlock Text="دسترسی امن و پرسرعت به اینترنت" TextAlignment="Center" FontSize="13" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,14"/>
    <TextBlock Text="نام کاربری" FontSize="12.5" Foreground="{StaticResource FieldLabelBrush}" Margin="0,0,0,6"/>
    <Border Style="{StaticResource Field}"><Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -24,7 +24,7 @@
      <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding Text, ElementName=txtUsername}" Value=""><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
     </TextBlock>
    </Grid></Border>
-   <TextBlock Text="رمز عبور" FontSize="12.5" Foreground="{StaticResource FieldLabelBrush}" Margin="0,22,0,6"/>
+   <TextBlock Text="رمز عبور" FontSize="12.5" Foreground="{StaticResource FieldLabelBrush}" Margin="0,14,0,6"/>
    <Border Style="{StaticResource Field}"><Grid>
     <Grid.ColumnDefinitions><ColumnDefinition Width="24"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/></Grid.ColumnDefinitions>
     <Path Data="{StaticResource IconLock}" Stroke="{StaticResource IconStrokeBrush}" StrokeThickness="1.3" Width="16" Height="16" Stretch="Uniform"/>
@@ -37,14 +37,14 @@
      <Path Data="{StaticResource IconEye}" Stroke="{StaticResource IconStrokeBrush}" StrokeThickness="1.3" Width="17" Height="17" Stretch="Uniform"/>
     </Button>
    </Grid></Border>
-   <CheckBox x:Name="chkRemember" IsChecked="True" Content="مرا به خاطر بسپار" Foreground="{StaticResource FieldLabelBrush}" Margin="0,12,0,0"/>
+   <CheckBox x:Name="chkRemember" FontSize="11" IsChecked="True" Content="مرا به خاطر بسپار" Foreground="{StaticResource FieldLabelBrush}" Margin="0,6,0,0"/>
    <Border x:Name="boxRenew" Visibility="Collapsed" Background="{StaticResource SmartLocationBackgroundBrush}" CornerRadius="12" Padding="8" Margin="0,12,0,0">
     <StackPanel Orientation="Horizontal"><TextBlock Text="اعتبار حساب پایان یافته است" VerticalAlignment="Center"/><Button x:Name="btnRenew" Content="تمدید" Click="btnRenew_Click" Style="{StaticResource DesignLinkButton}" Margin="12,0,0,0"/></StackPanel>
    </Border>
-   <Button x:Name="btnLogin" Height="52" Margin="0,22,0,0" Style="{StaticResource DesignActionButton}" Click="btnLogin_Click" IsDefault="True">
+   <Button x:Name="btnLogin" Height="52" Margin="0,14,0,0" Style="{StaticResource DesignActionButton}" Click="btnLogin_Click" IsDefault="True">
     <StackPanel Orientation="Horizontal"><TextBlock Text="ورود"/><Path Data="{StaticResource IconArrowLeft}" FlowDirection="LeftToRight" Stroke="White" StrokeThickness="1.8" Stretch="Uniform" Width="16" Height="16" Margin="12,0,0,0"/></StackPanel>
    </Button>
-   <Grid Margin="0,22,0,16"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Height="1" Background="#E5E8EF"/><TextBlock Grid.Column="1" Text="یا" TextAlignment="Center" Foreground="{StaticResource DividerTextBrush}"/><Border Grid.Column="2" Height="1" Background="#E5E8EF"/></Grid>
+   <Grid Margin="0,14,0,8"><Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="40"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions><Border Height="1" Background="#E5E8EF"/><TextBlock Grid.Column="1" Text="یا" TextAlignment="Center" Foreground="{StaticResource DividerTextBrush}"/><Border Grid.Column="2" Height="1" Background="#E5E8EF"/></Grid>
    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center"><TextBlock Text="حساب کاربری ندارید؟" Foreground="{StaticResource MutedTextBrush}" VerticalAlignment="Center"/><Button x:Name="btnSignup" Content="ثبت‌نام" Style="{StaticResource DesignLinkButton}" Click="Signup_Click"/></StackPanel>
   </StackPanel>
  </ScrollViewer>

@@ -26,6 +26,11 @@ namespace IRSpeedyVPN.Windows
             LoadSettings();
         }
 
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
+        private void Header_DragMove(object sender, MouseButtonEventArgs e)
+        {
+            if (e.LeftButton == MouseButtonState.Pressed && !(e.OriginalSource is System.Windows.Controls.Button)) DragMove();
+        }
         private void btnClose_MouseDown(object sender, MouseButtonEventArgs e) => Close();
 
         private void btnOK_Click(object sender, RoutedEventArgs e)
@@ -56,7 +61,7 @@ namespace IRSpeedyVPN.Windows
                 SetChecked(GlobalProxy, RegHelper.GetSettingValue(KEY_GLOBAL_PROXY) == "1");
                 SetChecked(SystemProxy, RegHelper.GetSettingValue(KEY_SYSTEM_PROXY) == "1");
                 SetChecked(TelegramRouteProxy, RegHelper.GetSettingValue(KEY_TELEGRAM_PROXY) == "1");
-                SetChecked(VodService, RegHelper.GetSettingValue(KEY_VOD) == "1");
+                SetChecked(VodService, RegHelper.GetSettingValue(KEY_VOD) != "0");
                 SetChecked(GameMode, RegHelper.GetSettingValue(KEY_GAME) == "1");
             }
             finally
@@ -99,7 +104,7 @@ namespace IRSpeedyVPN.Windows
             SetEnabled(TelegramRouteProxy, enabled);
         }
 
-        private static void SetEnabled(ToggleSwitch.HorizontalToggleSwitch toggle, bool enabled)
+        private static void SetEnabled(IRSpeedyVPN.Controls.ServiceToggle toggle, bool enabled)
         {
             if (toggle == null) return;
             try { toggle.IsEnabled = enabled; } catch { }
@@ -156,7 +161,7 @@ namespace IRSpeedyVPN.Windows
             SetCheckedIfNot(keepOn, TelegramRouteProxy, false);
         }
 
-        private static void SetCheckedIfNot(object keepOn, ToggleSwitch.HorizontalToggleSwitch target, bool value)
+        private static void SetCheckedIfNot(object keepOn, IRSpeedyVPN.Controls.ServiceToggle target, bool value)
         {
             if (target == null) return;
             if (ReferenceEquals(keepOn, target)) return;
@@ -195,13 +200,13 @@ namespace IRSpeedyVPN.Windows
         // --------------------------
         // Helpers
         // --------------------------
-        private static bool IsOn(ToggleSwitch.HorizontalToggleSwitch toggle)
+        private static bool IsOn(IRSpeedyVPN.Controls.ServiceToggle toggle)
         {
             try { return toggle != null && toggle.IsChecked == true; }
             catch { return false; }
         }
 
-        private static void SetChecked(ToggleSwitch.HorizontalToggleSwitch toggle, bool value)
+        private static void SetChecked(IRSpeedyVPN.Controls.ServiceToggle toggle, bool value)
         {
             if (toggle == null) return;
             try { toggle.IsChecked = value; } catch { }

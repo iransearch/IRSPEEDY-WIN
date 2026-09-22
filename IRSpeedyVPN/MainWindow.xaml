@@ -11,7 +11,7 @@ xmlns:trans="clr-namespace:Transitionals;assembly=Transitionals"
 xmlns:transt="clr-namespace:Transitionals.Transitions;assembly=Transitionals"
 xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
         FontFamily="{StaticResource AppFontFamily}" Activated="Window_Activated"
-     TextElement.FontWeight="Bold"
+     TextElement.FontWeight="Normal"
      TextElement.FontSize="13"
       TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="ClearType" UseLayoutRounding="True" SnapsToDevicePixels="True"
       WindowStyle="None" WindowStartupLocation="CenterScreen"
@@ -50,8 +50,9 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
                      the rest of the header under the window's RTL flow direction. -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center"
                             FlowDirection="LeftToRight" MouseDown="Header_MouseDown">
+                    <StackPanel.ContextMenu><ContextMenu><MenuItem x:Name="accountMenu" Header="تغییر رمز عبور" Click="AccountMenu_Click"/></ContextMenu></StackPanel.ContextMenu>
                     <Image Source="pack://application:,,,/Resources/Irspeedy/Logo/logo-header.png"
-                           Width="32" Height="32" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                           Width="24" Height="32" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock Text="IRSPEEDY" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
                                FontSize="{StaticResource FontSizeTitle}" Foreground="{StaticResource TextPrimaryBrush}"
                                VerticalAlignment="Center" Margin="8,0,0,0"/>

@@ -538,6 +538,9 @@ namespace IRSpeedyVPN
         void ShowControl(object ctrl)
         {
             txtVersion.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
+            btnSettings.Visibility = Visibility.Collapsed;
+            accountMenu.IsEnabled = IsUserLogin;
+            panelHeaderIcons.Visibility = ReferenceEquals(ctrl, uCServerList) ? Visibility.Visible : Visibility.Collapsed;
 
             if (TransitionBox.Content == null || !TransitionBox.Content.Equals(ctrl))
             {
@@ -612,7 +615,12 @@ namespace IRSpeedyVPN
                 var label = new Label
                 {
                     Style = (Style)FindResource("LabelButton"),
-                    Content = icon.Icon,
+                    Content = string.IsNullOrEmpty(icon.Icon)
+                        ? (object)new System.Windows.Shapes.Path {
+                            Data = (Geometry)FindResource(icon.ToolTip.Contains("Shield") ? "IconShield" : "IconGear"),
+                            Stroke = (Brush)FindResource("IconStrokeBrush"), StrokeThickness = 1.7,
+                            Width = 18, Height = 18, Stretch = Stretch.Uniform, FlowDirection = FlowDirection.LeftToRight }
+                        : icon.Icon,
                     Background = null,
                     // Dark icons on the opaque light header.
                     Foreground = (Brush)FindResource("IconStrokeBrush"),
@@ -1110,6 +1118,8 @@ namespace IRSpeedyVPN
                 notify.Visible = true;
             }
         }
+
+        private void AccountMenu_Click(object sender, RoutedEventArgs e) { if (IsUserLogin) btnSettings_MouseDown(sender, null); }
 
         private void btnSettings_MouseDown(object sender, MouseButtonEventArgs e)
         {

@@ -43,7 +43,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (stale) text = "—";
             else if (latency == 0) text = "—";
             else if (latency == -1) text = "—";
-            else text = latency + " ms";
+            else text = IRSpeedyVPN.Common.PersianDigits.Format(latency.ToString()) + " میلی‌ثانیه";
         }
 
         public static void FromLatency(long latency, out string text)
@@ -70,6 +70,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
             { "FR", "france" },
             { "GB", "uk" },
             { "UK", "uk" },
+            { "US", "usa" }, { "CA", "canada" }, { "AE", "uae" },
+            { "SG", "singapore" }, { "JP", "japan" },
         };
 
         private static readonly Dictionary<string, ImageSource> Cache = new Dictionary<string, ImageSource>(StringComparer.OrdinalIgnoreCase);
