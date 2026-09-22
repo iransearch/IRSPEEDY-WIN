@@ -27,16 +27,16 @@
             <Border.Effect>
                 <DropShadowEffect Color="#101828" Opacity="0.03" BlurRadius="2" ShadowDepth="1" Direction="270"/>
             </Border.Effect>
-            <Grid Margin="14,0" FlowDirection="LeftToRight">
+            <Grid Margin="14,0" FlowDirection="RightToLeft">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="txtSearch" Grid.Column="0" Background="White" BorderThickness="0" FlowDirection="RightToLeft"
+                <TextBox x:Name="txtSearch" Grid.Column="1" Background="White" BorderThickness="0" FlowDirection="RightToLeft"
                          FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeBody}"
                          Foreground="{StaticResource TextBodyBrush}" VerticalContentAlignment="Center"
                          HorizontalContentAlignment="Stretch" TextAlignment="Right" TextChanged="txtSearch_TextChanged"/>
-                <TextBlock Grid.Column="0" Text="جستجوی سرورها" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" HorizontalAlignment="Stretch"
+                <TextBlock Grid.Column="1" Text="جستجوی سرورها" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" HorizontalAlignment="Stretch"
                            FontSize="{StaticResource FontSizeBody}" Foreground="{StaticResource TextSecondaryBrush}"
                            TextAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False">
                     <TextBlock.Style>
@@ -50,9 +50,9 @@
                         </Style>
                     </TextBlock.Style>
                 </TextBlock>
-                <Path Grid.Column="1" Data="{StaticResource IconSearch}" Stretch="Uniform"
+                <Path Grid.Column="0" Data="{StaticResource IconSearch}" Stretch="Uniform"
                       Width="16" Height="16" Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.5"
-                      VerticalAlignment="Center" Margin="8,0,0,0"/>
+                      VerticalAlignment="Center" Margin="0,0,8,0"/>
             </Grid>
         </Border>
 

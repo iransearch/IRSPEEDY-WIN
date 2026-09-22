@@ -9,9 +9,8 @@
         Inline server list per the DESIGN-SPEC handoff (§3 "Server list"):
         the Smart Location card is a fixed block on top, the country rows
         scroll underneath it. No dropdown/popup any more — both are always
-        visible inside the content column. FlowDirection follows the window
-        (RTL); this root stays LTR-neutral, individual text runs set their
-        own alignment.
+        visible inside the content column. Keep the grids and Persian text RTL
+        together; column zero is the rightmost column. Latency and flag artwork stay LTR.
     -->
     <Grid x:Name="root">
         <Grid.RowDefinitions>
@@ -25,20 +24,20 @@
                 Background="{StaticResource SmartLocationBackgroundBrush}"
                 BorderBrush="{StaticResource SmartLocationBorderBrush}"
                 Cursor="Hand" MouseLeftButtonUp="SmartCard_MouseLeftButtonUp">
-            <Grid Margin="12,0" FlowDirection="LeftToRight">
+            <Grid Margin="12,0" FlowDirection="RightToLeft">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="20"/>
-                    <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="20"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="2" Width="34" Height="34" CornerRadius="10"
+                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="10"
                         Background="{StaticResource AccentBrush}" VerticalAlignment="Center">
                     <Path Data="{StaticResource IconBolt}" Fill="White" Stretch="Uniform"
                           Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="10,0" >
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Stretch" FlowDirection="RightToLeft" Margin="10,0" >
                     <TextBlock Text="موقعیت هوشمند" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
                                FontSize="{StaticResource FontSizeCardTitle}" Foreground="{StaticResource SmartLocationTitleBrush}"
                                TextAlignment="Right" FlowDirection="RightToLeft" HorizontalAlignment="Stretch"/>
@@ -48,7 +47,7 @@
                 </StackPanel>
 
                 <!-- selection ring, same visual language as the row radio -->
-                <Grid Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
+                <Grid Grid.Column="2" Width="20" Height="20" VerticalAlignment="Center">
                     <Ellipse Width="20" Height="20" Stroke="{StaticResource RadioBorderBrush}" StrokeThickness="2"/>
                     <Ellipse x:Name="smartCheck" Width="11" Height="11" Fill="{StaticResource AccentBrush}" Visibility="Collapsed"/>
                 </Grid>
@@ -73,12 +72,12 @@
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
-                            <Grid FlowDirection="LeftToRight">
+                            <Grid FlowDirection="RightToLeft">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="20"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="38"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="20"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.Style>
                                     <Style TargetType="Grid">
@@ -93,7 +92,7 @@
 
                                 <!-- Flag: 38x38 circle, hairline ring, falls back to an initials
                                      badge when the country has no bundled flag asset. -->
-                                <Grid Grid.Column="3" Width="38" Height="38">
+                                <Grid Grid.Column="0" Width="38" Height="38" FlowDirection="LeftToRight">
                                     <Ellipse Width="38" Height="38" Stroke="#0F101827" StrokeThickness="1" Fill="#F3F5F9"/>
                                     <Ellipse Width="36" Height="36">
                                         <Ellipse.Fill>
@@ -127,19 +126,19 @@
                                 </Grid>
 
                                 <!-- Label -->
-                                <TextBlock Grid.Column="2" Text="{Binding CountryName}" FlowDirection="RightToLeft" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis"
+                                <TextBlock Grid.Column="1" Text="{Binding CountryName}" FlowDirection="RightToLeft" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis"
                                            FontFamily="{StaticResource AppFontFamilySemiBold}"
                                            FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}"
                                            TextAlignment="Right" VerticalAlignment="Center" Margin="14,0"/>
 
                                 <!-- Latency -->
-                                <TextBlock Grid.Column="1" Text="{Binding SignalText}" FlowDirection="LeftToRight"
+                                <TextBlock Grid.Column="2" Text="{Binding SignalText}" FlowDirection="LeftToRight"
                                            FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
                                            FontSize="13" Foreground="{StaticResource PingGoodBrush}"
                                            VerticalAlignment="Center" Margin="12,0,0,0"/>
 
                                 <!-- Selector -->
-                                <Grid Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
+                                <Grid Grid.Column="3" Width="20" Height="20" VerticalAlignment="Center">
                                     <Ellipse Width="20" Height="20" Stroke="{StaticResource RadioBorderBrush}" StrokeThickness="2"/>
                                     <Ellipse Width="11" Height="11" Fill="{StaticResource AccentBrush}">
                                         <Ellipse.Style>
