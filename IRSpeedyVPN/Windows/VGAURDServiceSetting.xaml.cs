@@ -29,7 +29,7 @@ namespace IRSpeedyVPN.Windows
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
         private void Header_DragMove(object sender, MouseButtonEventArgs e)
         {
-            if (e.LeftButton == MouseButtonState.Pressed && !(e.OriginalSource is System.Windows.Controls.Button)) DragMove();
+            IRSpeedyVPN.Common.WindowDrag.Begin(this, e);
         }
         private void btnClose_MouseDown(object sender, MouseButtonEventArgs e) => Close();
 

@@ -1099,7 +1099,7 @@ namespace IRSpeedyVPN
         }
         private void Header_MouseDown(object sender, MouseButtonEventArgs e)
         {
-            this.DragMove();
+            IRSpeedyVPN.Common.WindowDrag.Begin(this, e);
         }
 
         private void Minimize_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)

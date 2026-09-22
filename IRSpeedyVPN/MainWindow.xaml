@@ -43,13 +43,13 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
             </Grid.RowDefinitions>
 
             <!-- ══════════════════ Header (§2) ══════════════════ -->
-            <Grid Grid.Row="0" Margin="18,0,12,0" MouseDown="Header_MouseDown">
+            <Grid Grid.Row="0" Margin="18,0,12,0" Background="Transparent" MouseLeftButtonDown="Header_MouseDown">
 
                 <!-- Logo + title + version. Stays LTR internally so the wordmark and
                      version digits don't reverse; the group itself still mirrors with
                      the rest of the header under the window's RTL flow direction. -->
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center"
-                            FlowDirection="LeftToRight" MouseDown="Header_MouseDown">
+                            FlowDirection="LeftToRight">
                     <StackPanel.ContextMenu><ContextMenu><MenuItem x:Name="accountMenu" Header="تغییر رمز عبور" Click="AccountMenu_Click"/></ContextMenu></StackPanel.ContextMenu>
                     <Image Source="pack://application:,,,/Resources/Irspeedy/Logo/logo-header.png"
                            Width="24" Height="32" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
