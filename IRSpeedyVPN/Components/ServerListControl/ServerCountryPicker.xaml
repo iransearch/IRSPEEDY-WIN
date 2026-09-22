@@ -38,13 +38,13 @@
                           Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" FlowDirection="RightToLeft" Margin="10,0" >
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="10,0" >
                     <TextBlock Text="موقعیت هوشمند" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
                                FontSize="{StaticResource FontSizeCardTitle}" Foreground="{StaticResource SmartLocationTitleBrush}"
-                               TextAlignment="Right"/>
+                               TextAlignment="Right" FlowDirection="RightToLeft" HorizontalAlignment="Stretch"/>
                     <TextBlock Text="سریع‌ترین سرور، انتخاب خودکار" FontFamily="{StaticResource AppFontFamily}"
                                FontSize="{StaticResource FontSizeMuted}" Foreground="{StaticResource SmartLocationSubtitleBrush}"
-                               TextAlignment="Right" Margin="0,2,0,0"/>
+                               TextAlignment="Right" FlowDirection="RightToLeft" HorizontalAlignment="Stretch" Margin="0,2,0,0"/>
                 </StackPanel>
 
                 <!-- selection ring, same visual language as the row radio -->
@@ -127,7 +127,7 @@
                                 </Grid>
 
                                 <!-- Label -->
-                                <TextBlock Grid.Column="2" Text="{Binding CountryName}" FlowDirection="RightToLeft" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis"
+                                <TextBlock Grid.Column="2" Text="{Binding CountryName}" FlowDirection="RightToLeft" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis"
                                            FontFamily="{StaticResource AppFontFamilySemiBold}"
                                            FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}"
                                            TextAlignment="Right" VerticalAlignment="Center" Margin="14,0"/>

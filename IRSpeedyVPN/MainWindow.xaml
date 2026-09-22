@@ -13,7 +13,7 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
         FontFamily="{StaticResource AppFontFamily}" Activated="Window_Activated"
      TextElement.FontWeight="Bold"
      TextElement.FontSize="13"
-      TextOptions.TextFormattingMode="Display" UseLayoutRounding="True" SnapsToDevicePixels="True"
+      TextOptions.TextFormattingMode="Ideal" TextOptions.TextRenderingMode="ClearType" UseLayoutRounding="True" SnapsToDevicePixels="True"
       WindowStyle="None" WindowStartupLocation="CenterScreen"
       Width="{StaticResource WindowWidth}" Height="{StaticResource WindowHeight}"
       Background="{StaticResource WindowBackgroundFallbackBrush}" AllowsTransparency="False" Title="IRSPEEDY"
@@ -51,7 +51,7 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center"
                             FlowDirection="LeftToRight" MouseDown="Header_MouseDown">
                     <Image Source="pack://application:,,,/Resources/Irspeedy/Logo/logo-header.png"
-                           Width="24" Height="32" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
+                           Width="32" Height="32" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
                     <TextBlock Text="IRSPEEDY" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
                                FontSize="{StaticResource FontSizeTitle}" Foreground="{StaticResource TextPrimaryBrush}"
                                VerticalAlignment="Center" Margin="8,0,0,0"/>

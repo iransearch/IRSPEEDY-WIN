@@ -9,7 +9,7 @@
     <Grid Width="100" Height="100" HorizontalAlignment="Center">
      <Ellipse Fill="#DAF0E7" Stroke="#C5E8D9" StrokeThickness="1.5"/>
      <Ellipse Width="74" Height="74" Fill="#F5FFFA"/>
-     <Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="37" Height="50"/>
+     <Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="50" Height="50" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
      <Border Width="28" Height="28" Background="{StaticResource ConnectedGreenBrush}" BorderBrush="White" BorderThickness="3" CornerRadius="14" VerticalAlignment="Bottom">
       <Path Data="{StaticResource IconCheck}" Stroke="White" StrokeThickness="1.8" Stretch="Uniform" Width="12" Height="12"/>
      </Border>

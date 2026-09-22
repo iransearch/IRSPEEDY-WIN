@@ -12,7 +12,7 @@
  </UserControl.Resources>
  <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
   <StackPanel Margin="32,12,32,28">
-   <Border Width="96" Height="96" CornerRadius="26" HorizontalAlignment="Center" Background="{StaticResource SmartLocationBackgroundBrush}"><Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="56" Height="75" Stretch="Uniform"/></Border>
+   <Border Width="96" Height="96" CornerRadius="26" HorizontalAlignment="Center" Background="{StaticResource SmartLocationBackgroundBrush}"><Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="80" Height="80" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/></Border>
    <TextBlock Text="IRSPEEDY" FlowDirection="LeftToRight" TextAlignment="Center" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontSize="20" Foreground="{StaticResource TextPrimaryBrush}" Margin="0,12,0,0"/>
    <TextBlock Text="دسترسی امن و پرسرعت به اینترنت" TextAlignment="Center" FontSize="13" Foreground="{StaticResource MutedTextBrush}" Margin="0,4,0,22"/>
    <TextBlock Text="نام کاربری" FontSize="12.5" Foreground="{StaticResource FieldLabelBrush}" Margin="0,0,0,6"/>

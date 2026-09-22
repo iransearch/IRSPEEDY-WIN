@@ -35,8 +35,8 @@
                 <TextBox x:Name="txtSearch" Grid.Column="0" Background="White" BorderThickness="0" FlowDirection="RightToLeft"
                          FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeBody}"
                          Foreground="{StaticResource TextBodyBrush}" VerticalContentAlignment="Center"
-                         TextAlignment="Right" TextChanged="txtSearch_TextChanged"/>
-                <TextBlock Grid.Column="0" Text="جستجوی سرورها" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" HorizontalAlignment="Right"
+                         HorizontalContentAlignment="Stretch" TextAlignment="Right" TextChanged="txtSearch_TextChanged"/>
+                <TextBlock Grid.Column="0" Text="جستجوی سرورها" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" HorizontalAlignment="Stretch"
                            FontSize="{StaticResource FontSizeBody}" Foreground="{StaticResource TextSecondaryBrush}"
                            TextAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False">
                     <TextBlock.Style>
