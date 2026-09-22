@@ -137,6 +137,8 @@
 		<Resource Include="Resources\Irspeedy\Flags\turkey.png" />
 		<Resource Include="Resources\Irspeedy\Flags\france.png" />
 		<Resource Include="Resources\Irspeedy\Flags\uk.png" />
+		<Resource Include="Resources\Irspeedy\Flags\Iso\*.png" />
+		<Resource Include="Resources\Irspeedy\Flags\Iso\LICENSE.txt" />
 		<!-- Vazirmatn (OFL), bundled locally per DESIGN-SPEC §5 — no network font loading -->
 		<Resource Include="Fonts\Vazirmatn\Vazirmatn-Regular.ttf" />
 		<Resource Include="Fonts\Vazirmatn\Vazirmatn-Medium.ttf" />

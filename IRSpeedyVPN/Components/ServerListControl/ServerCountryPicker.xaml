@@ -3,7 +3,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             mc:Ignorable="d">
+             mc:Ignorable="d" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}">
 
     <!--
         Inline server list per the DESIGN-SPEC handoff (§3 "Server list"):
@@ -25,20 +25,20 @@
                 Background="{StaticResource SmartLocationBackgroundBrush}"
                 BorderBrush="{StaticResource SmartLocationBorderBrush}"
                 Cursor="Hand" MouseLeftButtonUp="SmartCard_MouseLeftButtonUp">
-            <Grid Margin="12,0">
+            <Grid Margin="12,0" FlowDirection="LeftToRight">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="20"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="34"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="0" Width="34" Height="34" CornerRadius="10"
+                <Border Grid.Column="2" Width="34" Height="34" CornerRadius="10"
                         Background="{StaticResource AccentBrush}" VerticalAlignment="Center">
                     <Path Data="{StaticResource IconBolt}" Fill="White" Stretch="Uniform"
                           Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
-                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0" >
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Right" FlowDirection="RightToLeft" Margin="10,0" >
                     <TextBlock Text="موقعیت هوشمند" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
                                FontSize="{StaticResource FontSizeCardTitle}" Foreground="{StaticResource SmartLocationTitleBrush}"
                                TextAlignment="Right"/>
@@ -48,7 +48,7 @@
                 </StackPanel>
 
                 <!-- selection ring, same visual language as the row radio -->
-                <Grid Grid.Column="2" Width="20" Height="20" VerticalAlignment="Center">
+                <Grid Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
                     <Ellipse Width="20" Height="20" Stroke="{StaticResource RadioBorderBrush}" StrokeThickness="2"/>
                     <Ellipse x:Name="smartCheck" Width="11" Height="11" Fill="{StaticResource AccentBrush}" Visibility="Collapsed"/>
                 </Grid>
@@ -73,12 +73,12 @@
                                     </Style.Triggers>
                                 </Style>
                             </Border.Style>
-                            <Grid>
+                            <Grid FlowDirection="LeftToRight">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="38"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="38"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.Style>
                                     <Style TargetType="Grid">
@@ -93,7 +93,7 @@
 
                                 <!-- Flag: 38x38 circle, hairline ring, falls back to an initials
                                      badge when the country has no bundled flag asset. -->
-                                <Grid Grid.Column="0" Width="38" Height="38">
+                                <Grid Grid.Column="3" Width="38" Height="38">
                                     <Ellipse Width="38" Height="38" Stroke="#0F101827" StrokeThickness="1" Fill="#F3F5F9"/>
                                     <Ellipse Width="36" Height="36">
                                         <Ellipse.Fill>
@@ -127,19 +127,19 @@
                                 </Grid>
 
                                 <!-- Label -->
-                                <TextBlock Grid.Column="1" Text="{Binding CountryName}"
+                                <TextBlock Grid.Column="2" Text="{Binding CountryName}" FlowDirection="RightToLeft" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis"
                                            FontFamily="{StaticResource AppFontFamilySemiBold}"
                                            FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}"
                                            TextAlignment="Right" VerticalAlignment="Center" Margin="14,0"/>
 
                                 <!-- Latency -->
-                                <TextBlock Grid.Column="2" Text="{Binding SignalText}"
+                                <TextBlock Grid.Column="1" Text="{Binding SignalText}" FlowDirection="LeftToRight"
                                            FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
                                            FontSize="13" Foreground="{StaticResource PingGoodBrush}"
-                                           VerticalAlignment="Center" Margin="0,0,14,0"/>
+                                           VerticalAlignment="Center" Margin="12,0,0,0"/>
 
                                 <!-- Selector -->
-                                <Grid Grid.Column="3" Width="20" Height="20" VerticalAlignment="Center">
+                                <Grid Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
                                     <Ellipse Width="20" Height="20" Stroke="{StaticResource RadioBorderBrush}" StrokeThickness="2"/>
                                     <Ellipse Width="11" Height="11" Fill="{StaticResource AccentBrush}">
                                         <Ellipse.Style>

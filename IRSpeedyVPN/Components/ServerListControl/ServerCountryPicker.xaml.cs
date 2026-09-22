@@ -57,10 +57,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
     /// <summary>
     /// Maps the ISO country codes returned by the backend (IVPNService.CountryCode,
     /// e.g. "DE"/"NL"/"TR"/"FR"/"GB") to the flat, geometric flag art shipped in the
-    /// DESIGN-SPEC handoff (assets/flags/*.png -> Resources/Irspeedy/Flags). Only the
-    /// five countries in the mockup are bundled; any other code falls back to an
-    /// initials badge (§3 doesn't specify one, but the app's server list is not
-    /// limited to those five countries).
+    /// design handoff, with a bundled ISO flag set for the other countries.
+    /// Unknown/non-country codes keep the existing initials fallback.
     /// </summary>
     internal static class FlagCatalog
     {
@@ -79,7 +77,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public static ImageSource TryGet(string countryCode)
         {
             if (string.IsNullOrWhiteSpace(countryCode)) return null;
-            if (!CodeToFile.TryGetValue(countryCode.Trim(), out var file)) return null;
+            var code = countryCode.Trim().ToUpperInvariant();
+            if (!CodeToFile.TryGetValue(code, out var file))
+            {
+                if (code.Length != 2 || code.Any(c => c < 'A' || c > 'Z')) return null;
+                file = "Iso/" + code.ToLowerInvariant();
+            }
 
             if (Cache.TryGetValue(file, out var cached)) return cached;
 
@@ -87,6 +90,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             {
                 var uri = new Uri($"pack://application:,,,/Resources/Irspeedy/Flags/{file}.png", UriKind.Absolute);
                 var img = new BitmapImage(uri);
+                img.Freeze();
                 Cache[file] = img;
                 return img;
             }

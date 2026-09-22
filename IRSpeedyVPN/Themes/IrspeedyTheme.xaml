@@ -79,16 +79,13 @@
 
   <!-- ===================== Typography ===================== -->
   <!--
-    Vazirmatn is bundled under Fonts/Vazirmatn/*.ttf (Resource build action).
-    The Regular/Bold static files share one internal family name ("Vazirmatn")
-    so FontWeight="Bold" picks the Bold face automatically; Medium/SemiBold/
-    ExtraBold register as their own family names in the font files, so each
-    needs its own FontFamily reference below.
+    The supplied BYekanPlus-Bold.ttf is embedded under Resources. All design
+    weight aliases intentionally use its internal family name, B Yekan+.
   -->
-  <FontFamily x:Key="AppFontFamily">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn</FontFamily>
-  <FontFamily x:Key="AppFontFamilyMedium">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn Medium</FontFamily>
-  <FontFamily x:Key="AppFontFamilySemiBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn SemiBold</FontFamily>
-  <FontFamily x:Key="AppFontFamilyExtraBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn ExtraBold</FontFamily>
+  <FontFamily x:Key="AppFontFamily">pack://application:,,,/Resources/#B Yekan+</FontFamily>
+  <FontFamily x:Key="AppFontFamilyMedium">pack://application:,,,/Resources/#B Yekan+</FontFamily>
+  <FontFamily x:Key="AppFontFamilySemiBold">pack://application:,,,/Resources/#B Yekan+</FontFamily>
+  <FontFamily x:Key="AppFontFamilyExtraBold">pack://application:,,,/Resources/#B Yekan+</FontFamily>
 
   <sys:Double x:Key="FontSizeVersion">11</sys:Double>
   <sys:Double x:Key="FontSizeMuted">12</sys:Double>

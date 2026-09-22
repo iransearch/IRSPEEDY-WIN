@@ -4,7 +4,7 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:local="clr-namespace:IRSpeedyVPN.Components.ServerListControl"
-             mc:Ignorable="d"
+             mc:Ignorable="d" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}"
              Loaded="UserControl_Loaded"
              IsVisibleChanged="UserControl_IsVisibleChanged">
 
@@ -27,16 +27,16 @@
             <Border.Effect>
                 <DropShadowEffect Color="#101828" Opacity="0.03" BlurRadius="2" ShadowDepth="1" Direction="270"/>
             </Border.Effect>
-            <Grid Margin="14,0">
+            <Grid Margin="14,0" FlowDirection="LeftToRight">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-                <TextBox x:Name="txtSearch" Grid.Column="0" Background="Transparent" BorderThickness="0"
+                <TextBox x:Name="txtSearch" Grid.Column="0" Background="White" BorderThickness="0" FlowDirection="RightToLeft"
                          FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeBody}"
                          Foreground="{StaticResource TextBodyBrush}" VerticalContentAlignment="Center"
                          TextAlignment="Right" TextChanged="txtSearch_TextChanged"/>
-                <TextBlock Grid.Column="0" Text="جستجوی سرورها" FontFamily="{StaticResource AppFontFamily}"
+                <TextBlock Grid.Column="0" Text="جستجوی سرورها" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" HorizontalAlignment="Right"
                            FontSize="{StaticResource FontSizeBody}" Foreground="{StaticResource TextSecondaryBrush}"
                            TextAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False">
                     <TextBlock.Style>
