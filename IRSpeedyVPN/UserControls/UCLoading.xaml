@@ -11,7 +11,7 @@
     <Border BorderBrush="Transparent"
              BorderThickness="1.5"
              CornerRadius="20"
-             Background="#99FFFFFF">
+             Background="{StaticResource WindowBackgroundFallbackBrush}">
         <StackPanel Background="Transparent" Orientation="Vertical" VerticalAlignment="Stretch" Margin="0 150 0 0">
             <loader:ProgressLoader x:Name="Loader"  HorizontalAlignment="Center" VerticalAlignment="Center" />
             <TextBlock  x:Name="lblMessage" Text="سلام بر تو ای زیبا رو" FontSize="16"  FontWeight="Bold" HorizontalAlignment="Center"  Foreground="black"  VerticalAlignment="Top"  />

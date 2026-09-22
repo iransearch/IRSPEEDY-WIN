@@ -16,9 +16,12 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
       TextOptions.TextFormattingMode="Display"
       WindowStyle="None" WindowStartupLocation="CenterScreen"
       Width="{StaticResource WindowWidth}" Height="{StaticResource WindowHeight}"
-      Background="Transparent" AllowsTransparency="True" Title="IRSPEEDY"
+      Background="{StaticResource WindowBackgroundFallbackBrush}" AllowsTransparency="False" Title="IRSPEEDY"
       Icon="pack://application:,,,/Resources/Irspeedy/Logo/irspeedy.ico" ResizeMode="NoResize"
       FlowDirection="RightToLeft">
+    <WindowChrome.WindowChrome>
+        <WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/>
+    </WindowChrome.WindowChrome>
     <Window.Resources>
         <ResourceDictionary>
 
@@ -26,15 +29,11 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
     </Window.Resources>
 
     <!--
-        DESIGN-SPEC §1 "Window": 420x700, corner radius 20, Mica-style
-        background (WindowBackgroundFallbackBrush is the non-Mica fallback —
-        see IrspeedyTheme.xaml), soft drop shadow.
+        Opaque 420x700 window. Native chrome provides rounded corners without
+        a layered transparent window or a Mica/Acrylic backdrop.
     -->
     <Border CornerRadius="{StaticResource WindowCornerRadius}"
             Background="{StaticResource WindowBackgroundFallbackBrush}">
-        <Border.Effect>
-            <DropShadowEffect Color="#172340" Opacity="0.35" BlurRadius="80" ShadowDepth="40" Direction="270"/>
-        </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
                 <!-- GridLength can't consume the HeaderHeight double resource directly —
@@ -157,7 +156,7 @@ xmlns:refl="clr-namespace:System.Reflection;assembly=mscorlib"
                 <Border Background="#1F2B57"
                         CornerRadius="12"
                         Padding="10,6"
-                        Opacity="0.95">
+                        Opacity="1">
                     <TextBlock x:Name="txtHintMessage"
                                Text=""
                                Foreground="White"

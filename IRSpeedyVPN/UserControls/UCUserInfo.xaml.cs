@@ -38,7 +38,7 @@ namespace IRSpeedyVPN.UserControls
         
         GlobalInfo globalInfo;
 
-        public string Title => "اطلاعات اتصال";
+        public string Title => "";
 
         public UCUserInfo()
         {            
@@ -50,7 +50,10 @@ namespace IRSpeedyVPN.UserControls
         {
             Dispatcher.Invoke((Action)(() =>
             {
-                txtConnectionTime.Text = (globalInfo.ConnectionTime - DateTime.Now).ToString(@"hh\:mm\:ss");
+                if (globalInfo == null || !IsVisible) return;
+                var elapsed = DateTime.Now - globalInfo.ConnectionTime;
+                if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
+                txtConnectionTime.Text = ((int)elapsed.TotalHours).ToString("00") + elapsed.ToString(@"\:mm\:ss");
             }));
         }
         private void btn_ChangeServer_Click(object sender, RoutedEventArgs e)
@@ -150,12 +153,19 @@ namespace IRSpeedyVPN.UserControls
             txtCountry.Text = isGlobalSmart
                 ? "سرور هوشمند"
                 : globalInfo.CurrentService.Country;
+            imgCountry.Source = IRSpeedyVPN.Components.ServerListControl.FlagCatalog.TryGet(globalInfo.CurrentService.CountryCode);
+            imgCountry.Visibility = imgCountry.Source == null ? Visibility.Hidden : Visibility.Visible;
+            var ping = globalInfo.CurrentService.UrlTestSpeed;
+            txtServerDetail.Text = (ping > 0 ? PersianDigits(ping.ToString()) + " میلی‌ثانیه" : "")
+                + (isGlobalSmart ? (ping > 0 ? " · " : "") + "موقعیت هوشمند" : "");
 
             txtServiceName.Text = globalInfo.CurrentService.Name + (proxifier.IsAttached() && proxifier.ProxyType.GetDescription().Length > 0 ? " / " + proxifier.ProxyType.GetDescription() : "");
             txtConnectionTime.Text = "00:00:00";
 
             txtExpireDate.Text = (globalInfo.ExpiryDate != null) ? globalInfo.ExpiryDate.Value.ToPresianDate() : "اولین اتصال";
             txtRemainedTime.Text = (globalInfo.ExpiryDate != null) ? globalInfo.ExpiryDate.Value.TotalDays() : "اولین اتصال";
+            txtExpireDate.Text = PersianDigits(txtExpireDate.Text);
+            txtRemainedTime.Text = PersianDigits(txtRemainedTime.Text);
 
             
         }
@@ -164,12 +174,19 @@ namespace IRSpeedyVPN.UserControls
         {
             if (!IsVisible)
             {
+                uiTimer?.Change(Timeout.Infinite, Timeout.Infinite);
                 ClearHeaderIcons();
             }
             else
             {
+                if (globalInfo != null) uiTimer?.Change(0, 1000);
                 RegisterHeaderIcons();
             }
+        }
+
+        private static string PersianDigits(string value)
+        {
+            return string.Concat((value ?? "").Select(c => c >= '0' && c <= '9' ? (char)('۰' + c - '0') : c));
         }
 
         private void RegisterHeaderIcons()

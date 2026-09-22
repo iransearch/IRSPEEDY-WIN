@@ -13,8 +13,8 @@
   <Color x:Key="AccentGradientTopColor">#FF2447A8</Color>
   <Color x:Key="AccentGradientBottomColor">#FF1E3A8A</Color>
 
-  <Color x:Key="WindowBgTopColor">#E0FFFFFF</Color>     <!-- rgba(255,255,255,0.88) -->
-  <Color x:Key="WindowBgBottomColor">#DBF8FAFC</Color>  <!-- rgba(248,250,252,0.86) -->
+  <Color x:Key="WindowBgTopColor">#FFFFFFFF</Color>     <!-- rgba(255,255,255,0.88) -->
+  <Color x:Key="WindowBgBottomColor">#FFF8FAFC</Color>  <!-- rgba(248,250,252,0.86) -->
 
   <Color x:Key="TextPrimaryColor">#FF141B33</Color>
   <Color x:Key="TextSecondaryColor">#FF9CA3B4</Color>
@@ -27,7 +27,7 @@
 
   <Color x:Key="SearchBorderColor">#FFE1E4EC</Color>
   <Color x:Key="DividerColor">#FFE1E4EC</Color>
-  <Color x:Key="HeaderHoverColor">#0F111827</Color> <!-- rgba(17,24,39,0.06) -->
+  <Color x:Key="HeaderHoverColor">#FFF1F2F4</Color> <!-- rgba(17,24,39,0.06) -->
 
   <Color x:Key="SmartLocationBorderColor">#FFC9DBFB</Color>
   <Color x:Key="SmartLocationBgTopColor">#FFEFF5FF</Color>
@@ -46,11 +46,7 @@
     <GradientStop Color="{StaticResource AccentGradientBottomColor}" Offset="1"/>
   </LinearGradientBrush>
 
-  <!--
-    Mica window background: on Windows 11 this is set natively via
-    MainWindow's WindowChrome/DWM backdrop where available; this gradient
-    is the fallback brush for older Windows builds.
-  -->
+  <!-- Opaque window surface on every supported Windows version. -->
   <LinearGradientBrush x:Key="WindowBackgroundFallbackBrush" StartPoint="0,0" EndPoint="0,1">
     <GradientStop Color="{StaticResource WindowBgTopColor}" Offset="0"/>
     <GradientStop Color="{StaticResource WindowBgBottomColor}" Offset="1"/>
@@ -117,13 +113,65 @@
   <CornerRadius x:Key="ConnectButtonCornerRadius">14</CornerRadius>
 
   <!-- ===================== Header icon geometry (16x16 viewBox) ===================== -->
-  <Geometry x:Key="IconGear">M8,5.4 C6.5,5.4 5.4,6.5 5.4,8 C5.4,9.5 6.5,10.6 8,10.6 C9.5,10.6 10.6,9.5 10.6,8 C10.6,6.5 9.5,5.4 8,5.4 Z M8,1.5 L8,3.1 M8,12.9 L8,14.5 M14.5,8 L12.9,8 M3.1,8 L1.5,8 M12.7,3.3 L11.57,4.43 M4.43,11.57 L3.3,12.7 M12.7,12.7 L11.57,11.57 M4.43,4.43 L3.3,3.3</Geometry>
-  <Geometry x:Key="IconShield">M8,1.5 L13,3.5 L13,7.5 C13,11 10.8,13.4 8,14.5 C5.2,13.4 3,11 3,7.5 L3,3.5 Z</Geometry>
-  <Geometry x:Key="IconSearch">M7.2,1.7 C10,1.7 12.2,3.9 12.2,6.7 C12.2,9.5 10,11.7 7.2,11.7 C4.4,11.7 2.2,9.5 2.2,6.7 C2.2,3.9 4.4,1.7 7.2,1.7 Z M11,10.5 L14.3,13.8</Geometry>
-  <Geometry x:Key="IconBolt">M8.6,1.3 L3.2,8.8 L7.4,8.8 L6.4,14.7 L13,7 L8.7,7 Z</Geometry>
-  <Geometry x:Key="IconMinimize">M2,8 L14,8</Geometry>
-  <Geometry x:Key="IconClose">M3,3 L13,13 M13,3 L3,13</Geometry>
-  <Geometry x:Key="IconArrowRight">M2,8 L14,8 M9,3 L14,8 L9,13</Geometry>
-  <Geometry x:Key="IconArrowLeft">M14,8 L2,8 M7,3 L2,8 L7,13</Geometry>
 
+  <Color x:Key="FieldBorderColor">#FFE1E4EC</Color>
+  <Color x:Key="FieldFocusBorderColor">#FF1E3A8A</Color>
+  <Color x:Key="FieldLabelColor">#FF5B6478</Color>
+  <Color x:Key="FieldPlaceholderIconColor">#FF9CA3B4</Color>
+  <Color x:Key="DividerTextColor">#FF9CA3B4</Color>
+  <Color x:Key="MutedTextColor">#FF6B7280</Color>
+  <Color x:Key="ConnectedGreenColor">#FF17A366</Color>
+  <Color x:Key="ConnectedGreenDarkColor">#FF0F7A4C</Color>
+  <Color x:Key="ConnectedGlowColor">#FFDAF0E7</Color>
+  <Color x:Key="ConnectedRingColor">#FFC5E8D9</Color>
+  <Color x:Key="DisconnectGradientTopColor">#FFDC2626</Color>
+  <Color x:Key="DisconnectGradientBottomColor">#FFB91C1C</Color>
+  <Color x:Key="StatCardBorderColor">#FFE1E4EC</Color>
+  <Color x:Key="StatCardDividerColor">#FFEEF0F4</Color>
+  <SolidColorBrush x:Key="FieldBorderBrush" Color="{StaticResource FieldBorderColor}"/>
+  <SolidColorBrush x:Key="FieldFocusBorderBrush" Color="{StaticResource FieldFocusBorderColor}"/>
+  <SolidColorBrush x:Key="FieldLabelBrush" Color="{StaticResource FieldLabelColor}"/>
+  <SolidColorBrush x:Key="FieldPlaceholderIconBrush" Color="{StaticResource FieldPlaceholderIconColor}"/>
+  <SolidColorBrush x:Key="DividerTextBrush" Color="{StaticResource DividerTextColor}"/>
+  <SolidColorBrush x:Key="MutedTextBrush" Color="{StaticResource MutedTextColor}"/>
+  <SolidColorBrush x:Key="ConnectedGreenBrush" Color="{StaticResource ConnectedGreenColor}"/>
+  <SolidColorBrush x:Key="ConnectedGreenDarkBrush" Color="{StaticResource ConnectedGreenDarkColor}"/>
+  <LinearGradientBrush x:Key="DisconnectGradientBrush" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="{StaticResource DisconnectGradientTopColor}" Offset="0"/>
+    <GradientStop Color="{StaticResource DisconnectGradientBottomColor}" Offset="1"/>
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="StatCardBorderBrush" Color="{StaticResource StatCardBorderColor}"/>
+  <SolidColorBrush x:Key="StatCardDividerBrush" Color="{StaticResource StatCardDividerColor}"/>
+  <GeometryGroup x:Key="IconGear"><PathGeometry Figures="M8 1.5v1.6M8 12.9v1.6M14.5 8h-1.6M3.1 8H1.5M12.7 3.3l-1.13 1.13M4.43 11.57L3.3 12.7M12.7 12.7l-1.13-1.13M4.43 4.43L3.3 3.3"/><EllipseGeometry Center="8,8" RadiusX="2.6" RadiusY="2.6"/></GeometryGroup>
+  <GeometryGroup x:Key="IconShield"><PathGeometry Figures="M8 1.5l5 2v4c0 3.5-2.2 5.9-5 7-2.8-1.1-5-3.5-5-7v-4l5-2z"/></GeometryGroup>
+  <GeometryGroup x:Key="IconSearch"><EllipseGeometry Center="7,7" RadiusX="5.25" RadiusY="5.25"/><LineGeometry StartPoint="11,11" EndPoint="14.5,14.5"/></GeometryGroup>
+  <GeometryGroup x:Key="IconBolt"><PathGeometry Figures="M8.8 1L3 9.2h3.6L6.4 15l6-8.6H8.8L8.8 1Z"/></GeometryGroup>
+  <GeometryGroup x:Key="IconMinimize"><LineGeometry StartPoint="1.5,9.5" EndPoint="10.5,9.5"/></GeometryGroup>
+  <GeometryGroup x:Key="IconClose"><LineGeometry StartPoint="1.5,1.5" EndPoint="10.5,10.5"/><LineGeometry StartPoint="10.5,1.5" EndPoint="1.5,10.5"/></GeometryGroup>
+  <GeometryGroup x:Key="IconArrowLeft"><PathGeometry Figures="M13 8H3M7 4L3 8l4 4"/></GeometryGroup>
+  <GeometryGroup x:Key="IconArrowRight"><PathGeometry Figures="M3 8h10M9 4l4 4-4 4"/></GeometryGroup>
+  <GeometryGroup x:Key="IconUser"><EllipseGeometry Center="8,5.1" RadiusX="2.6" RadiusY="2.6"/><PathGeometry Figures="M2.6 13.6c.7-2.9 2.9-4.4 5.4-4.4s4.7 1.5 5.4 4.4"/></GeometryGroup>
+  <GeometryGroup x:Key="IconLock"><RectangleGeometry Rect="3.2,7.2,9.6,6.8" RadiusX="1.8" RadiusY="1.8"/><PathGeometry Figures="M5.4 7.2V5a2.6 2.6 0 0 1 5.2 0v2.2"/></GeometryGroup>
+  <GeometryGroup x:Key="IconEye"><PathGeometry Figures="M1.8 8.5S4.4 3.8 8.5 3.8s6.7 4.7 6.7 4.7-2.6 4.7-6.7 4.7-6.7-4.7-6.7-4.7Z"/><EllipseGeometry Center="8.5,8.5" RadiusX="2" RadiusY="2"/></GeometryGroup>
+  <GeometryGroup x:Key="IconCalendar"><RectangleGeometry Rect="2.2,3.2,11.6,10.4" RadiusX="1.8" RadiusY="1.8"/><PathGeometry Figures="M2.2 6.4h11.6M5.2 1.8v2.4M10.8 1.8v2.4"/></GeometryGroup>
+  <GeometryGroup x:Key="IconClock"><EllipseGeometry Center="8,8" RadiusX="6" RadiusY="6"/><PathGeometry Figures="M8 4.6V8l2.4 1.4"/></GeometryGroup>
+  <GeometryGroup x:Key="IconDownload"><PathGeometry Figures="M7.5 1.8v8.4M4 6.7l3.5 3.5 3.5-3.5"/><PathGeometry Figures="M2.5 12.5h10"/></GeometryGroup>
+  <GeometryGroup x:Key="IconUpload"><PathGeometry Figures="M7.5 12.2V3.8M4 7.3l3.5-3.5 3.5 3.5"/><PathGeometry Figures="M2.5 12.5h10"/></GeometryGroup>
+  <GeometryGroup x:Key="IconCheck"><PathGeometry Figures="M2.2 6.3l2.6 2.6 5-5.4"/></GeometryGroup>
+  <GeometryGroup x:Key="IconPower"><PathGeometry Figures="M8 2v5.2"/><PathGeometry Figures="M4.6 4.2a5.2 5.2 0 1 0 6.8 0"/></GeometryGroup>
+  <Style x:Key="DesignActionButton" TargetType="Button">
+    <Setter Property="Effect"><Setter.Value><DropShadowEffect Color="#1E3A8A" BlurRadius="22" ShadowDepth="10" Direction="270" Opacity="0.5"/></Setter.Value></Setter>
+    <Setter Property="Background" Value="{StaticResource AccentGradientBrush}"/>
+    <Setter Property="Foreground" Value="White"/><Setter Property="FontSize" Value="15"/>
+    <Setter Property="FontWeight" Value="Bold"/><Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button">
+      <Border x:Name="Surface" CornerRadius="14" Background="{TemplateBinding Background}"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border>
+      <ControlTemplate.Triggers><Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="RenderTransform"><Setter.Value><TranslateTransform Y="-1"/></Setter.Value></Setter></Trigger><Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Background" Value="#7B849C"/></Trigger></ControlTemplate.Triggers>
+    </ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="DesignLinkButton" TargetType="Button">
+    <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/><Setter Property="FontWeight" Value="Bold"/><Setter Property="Cursor" Value="Hand"/>
+    <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="Button"><Border Background="White" Padding="6"><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Border></ControlTemplate></Setter.Value></Setter>
+  </Style>
+  <Style x:Key="DesignInfoCard" TargetType="Border"><Setter Property="Background" Value="White"/><Setter Property="CornerRadius" Value="12"/><Setter Property="BorderBrush" Value="{StaticResource StatCardBorderBrush}"/><Setter Property="BorderThickness" Value="1"/></Style>
 </ResourceDictionary>

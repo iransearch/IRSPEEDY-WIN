@@ -39,7 +39,7 @@ namespace IRSpeedyVPN.UserControls
         }
         public void HideRenewMessage()
         {            
-            boxRenew.Visibility = Visibility.Hidden;
+            boxRenew.Visibility = Visibility.Collapsed;
         }
         public void SetUserPassword(string username,string password)
         {
@@ -67,7 +67,6 @@ namespace IRSpeedyVPN.UserControls
             txtPasswordShow.Text = txtPassword.Password;
             txtPassword.Visibility = show ? Visibility.Hidden : Visibility.Visible;
             txtPasswordShow.Visibility = !show ? Visibility.Hidden : Visibility.Visible;
-            imgEye.Source = show ? (ImageSource)TryFindResource("eyeSlash") : (ImageSource)TryFindResource("eye");
             if (show)
                 txtPasswordShow.Focus();
             else
@@ -87,7 +86,34 @@ namespace IRSpeedyVPN.UserControls
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-   
+            ShowPassword(false);
+            UpdatePasswordPlaceholder();
+            btnSignup.IsEnabled = GetSignupUri() != null;
+            btnSignup.ToolTip = btnSignup.IsEnabled ? "ثبت‌نام" : "برای تهیه حساب با پشتیبانی تماس بگیرید";
+            ToolTipService.SetShowOnDisabled(btnSignup, true);
+        }
+        private static Uri GetSignupUri()
+        {
+            // Optional deployment setting; never invent a registration destination.
+            var path = System.IO.Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "signup-url.txt");
+            try
+            {
+                Uri uri;
+                if (System.IO.File.Exists(path) && Uri.TryCreate(System.IO.File.ReadAllText(path).Trim(), UriKind.Absolute, out uri)
+                    && (uri.Scheme == Uri.UriSchemeHttps || uri.Scheme == Uri.UriSchemeHttp)) return uri;
+            }
+            catch (System.IO.IOException) { }
+            catch (UnauthorizedAccessException) { }
+            return null;
+        }
+        private void Signup_Click(object sender, RoutedEventArgs e)
+        {
+            var uri = GetSignupUri();
+            if (uri != null) Process.Start(new ProcessStartInfo(uri.AbsoluteUri) { UseShellExecute = true });
+        }
+        private void TogglePassword_Click(object sender, RoutedEventArgs e)
+        {
+            ShowPassword(txtPassword.Visibility == Visibility.Visible);
         }
         public void ResetInput()
         {
@@ -116,8 +142,7 @@ namespace IRSpeedyVPN.UserControls
             if (lblPasswordPlaceholder == null)
                 return;
 
-            bool empty = string.IsNullOrEmpty(txtPassword.Password)
-                         && string.IsNullOrEmpty(txtPasswordShow.Text);
+            bool empty = string.IsNullOrEmpty(txtPassword.Password);
             lblPasswordPlaceholder.Visibility = empty ? Visibility.Visible : Visibility.Collapsed;
         }
 

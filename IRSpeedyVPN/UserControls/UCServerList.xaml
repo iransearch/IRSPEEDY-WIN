@@ -77,7 +77,7 @@
                             <TextBlock Grid.Column="0" Text="اتصال" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"
                                        FontSize="{StaticResource FontSizeTitle}" Foreground="White"
                                        HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24,0,0,0"/>
-                            <Path Grid.Column="1" Data="{StaticResource IconArrowLeft}" Stretch="Uniform"
+                            <Path Grid.Column="1" Data="{StaticResource IconArrowLeft}" Stretch="Uniform" FlowDirection="LeftToRight"
                                   Width="16" Height="16" Stroke="White" StrokeThickness="1.8"
                                   VerticalAlignment="Center" Margin="0,0,22,0"/>
                         </Grid>

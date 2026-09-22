@@ -421,7 +421,7 @@ namespace IRSpeedyVPN
 
         private void UCUserInfo_OnChangeServerRequest(object sender, EventArgs e)
         {
-            throw new NotImplementedException();
+            UCUserInfo_OnDisconnectRequest(sender, e);
         }
 
         private async void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service, string protocol)
@@ -537,6 +537,7 @@ namespace IRSpeedyVPN
         }
         void ShowControl(object ctrl)
         {
+            txtVersion.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
 
             if (TransitionBox.Content == null || !TransitionBox.Content.Equals(ctrl))
             {
@@ -613,8 +614,7 @@ namespace IRSpeedyVPN
                     Style = (Style)FindResource("LabelButton"),
                     Content = icon.Icon,
                     Background = null,
-                    // New header is a light Mica/gradient surface (DESIGN-SPEC §2), not
-                    // the old dark-blue banner -- icons need the dark stroke colour.
+                    // Dark icons on the opaque light header.
                     Foreground = (Brush)FindResource("IconStrokeBrush"),
                     FontFamily = (FontFamily)FindResource("fa_ProLight"),
                     FontSize = 16,
@@ -1184,4 +1184,3 @@ namespace IRSpeedyVPN
         }
     }
 }
-
