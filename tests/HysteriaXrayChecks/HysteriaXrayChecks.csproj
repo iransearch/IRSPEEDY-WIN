@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../IRSpeedyVPN/Services/Xray/*.cs" Link="Xray/%(Filename)%(Extension)" />
+    <Compile Include="../../IRSpeedyVPN/Services/GeoRoutingFallback.cs" Link="GeoRoutingFallback.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/SingBox/Samples.cs" Link="SingBox/Samples.cs" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
   </ItemGroup>

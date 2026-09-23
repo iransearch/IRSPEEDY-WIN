@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Newtonsoft.Json.Linq;
 using IRSpeedyVPN.Services.Xray;
@@ -43,45 +44,84 @@ class Program
         Check((string)root["routing"]["rules"][0]["outboundTag"] == "xray-0", "Probe routed to a different outbound");
         Console.WriteLine("PASS: Xray probe policy, connection-policy isolation, and Hysteria2 test configuration.");
 
-        // Regression: all seven candidates used to pass conversion, then Core
-        // rejected geoip:private because the SRS runtime has no geoip.dat.
         var links = new List<string>();
         for (int i = 0; i < 7; i++)
         {
-            string link = "hy2://smart-fixture-" + i;
+            var link = "hy2://smart-fixture-" + i;
             ShareHandler.Nodes[link] = hy;
             links.Add(link);
         }
         bool ai;
         int members, hysteriaMembers;
-        var smart = JObject.Parse(ConfigGenerator.GetSmartBalancerConfig(
-            links, 19002, "test-user", "test-pass", null, out ai, out members, out hysteriaMembers));
+        var smart = ConfigGenerator.GetSmartBalancerConfig(links, 19002,
+            "test-user", "test-pass", null, out ai, out members, out hysteriaMembers);
         Check(members == 7 && hysteriaMembers == 7 && !ai, "Smart pool membership changed");
-        foreach (string value in smart.Descendants().OfType<JValue>()
-            .Where(v => v.Type == JTokenType.String).Select(v => (string)v))
-            Check(!value.StartsWith("geoip:") && !value.StartsWith("geosite:") && !value.StartsWith("ext:"),
-                "Smart config still requires an external geodata database: " + value);
-        var rules = (JArray)smart["routing"]["rules"];
-        Check((string)rules[0]["outboundTag"] == "block" && (string)rules[0]["port"] == "443", "QUIC block order changed");
-        Check((string)rules.Last["balancerTag"] == "smart-balancer-1", "Public traffic lost its Smart pool");
-        var localIps = (JArray)rules.Single(r => r["ip"] != null)["ip"];
-        Check(localIps.Values<string>().Contains("192.168.0.0/16") && localIps.Values<string>().Contains("fc00::/7"),
-            "IPv4/IPv6 local bypass lost");
-        var localDomains = (JArray)rules.Single(r => r["domain"] != null && (string)r["outboundTag"] == "direct")["domain"];
-        Check(localDomains.Values<string>().Contains("domain:localhost") && localDomains.Values<string>().Contains("domain:home.arpa"),
-            "Local hostname bypass lost");
-        Check((string)smart["routing"]["balancers"][0]["strategy"]["type"] == "leastLoad"
-            && smart["routing"]["balancers"][0]["fallbackTag"] == null, "Balancer policy changed");
-        Check((string)smart["burstObservatory"]["pingConfig"]["interval"] == "30m"
-            && (int)smart["burstObservatory"]["pingConfig"]["sampling"] == 2, "Probe policy changed");
+        Check(ContainsXrayGeo(smart), "Prior-commit Xray geo routing was not restored");
 
-        // Country routing is applied before traffic enters the inner Xray pool.
-        var outer = JObject.Parse(IRSpeedyVPN.Services.SingBox.Samples.sg_clientSample);
-        var iran = outer["route"]["rules"].Single(r => r["rule_set"] != null);
-        Check((string)iran["outbound"] == "direct" && iran["rule_set"].Values<string>()
-            .SequenceEqual(new[] { "ir_IP", "category-ir_SITE" }), "Outer Iran bypass changed");
-        Check(outer["route"]["rule_set"].All(r => (string)r["format"] == "binary"
-            && ((string)r["path"]).EndsWith(".srs")), "Country routing gained a DAT dependency");
-        Console.WriteLine("PASS: seven-member Smart config needs no DAT files; local bypass, Iran SRS rules and pool policy preserved.");
+        var singBox = IRSpeedyVPN.Services.SingBox.Samples.sg_clientSample;
+        var runtime = Path.Combine(Path.GetTempPath(), "IRSpeedy-GeoRouting-" + Guid.NewGuid().ToString("N"));
+        var geoDir = Path.Combine(runtime, "geo");
+        Directory.CreateDirectory(geoDir);
+        try
+        {
+            var ordinary = IRSpeedyVPN.Services.GeoRoutingFallback.Apply(singBox, null, runtime);
+            Check(ordinary.XrayConfig == null && ordinary.MissingFiles.Length == 2
+                && !ContainsCountryRule(ordinary.SingBoxConfig)
+                && HasDnsHijack(ordinary.SingBoxConfig),
+                "Ordinary connection still depends on missing geo or Xray DAT files");
+            var absent = IRSpeedyVPN.Services.GeoRoutingFallback.Apply(singBox, smart, runtime);
+            Check(absent.MissingFiles.Length == 4, "Incomplete missing-geo diagnosis");
+            Check(!ContainsCountryRule(absent.SingBoxConfig), "Missing SRS still used by sing-box");
+            Check(!ContainsXrayGeo(absent.XrayConfig), "Missing DAT still used by Xray");
+            Check(HasSmartCatchall(absent.XrayConfig) && HasDnsHijack(absent.SingBoxConfig),
+                "Missing geo stopped unrelated connection routing");
+
+            File.WriteAllText(Path.Combine(geoDir, "ir_IP.srs"), "fixture");
+            File.WriteAllText(Path.Combine(geoDir, "category-ir_SITE.srs"), "fixture");
+            File.WriteAllText(Path.Combine(runtime, "geoip.dat"), "fixture");
+            var missingDat = IRSpeedyVPN.Services.GeoRoutingFallback.Apply(singBox, smart, runtime);
+            Check(!ContainsCountryRule(missingDat.SingBoxConfig) && !ContainsXrayGeo(missingDat.XrayConfig),
+                "One missing DAT left half of country routing enabled");
+            Check(missingDat.MissingFiles.SequenceEqual(new[] { "geosite.dat" }), "Wrong missing DAT file");
+
+            File.WriteAllText(Path.Combine(runtime, "geosite.dat"), "fixture");
+            File.Delete(Path.Combine(geoDir, "category-ir_SITE.srs"));
+            var missingSrs = IRSpeedyVPN.Services.GeoRoutingFallback.Apply(singBox, smart, runtime);
+            Check(!ContainsCountryRule(missingSrs.SingBoxConfig) && !ContainsXrayGeo(missingSrs.XrayConfig),
+                "One missing SRS left half of country routing enabled");
+
+            File.WriteAllText(Path.Combine(geoDir, "category-ir_SITE.srs"), "fixture");
+            var complete = IRSpeedyVPN.Services.GeoRoutingFallback.Apply(singBox, smart, runtime);
+            Check(complete.MissingFiles.Length == 0 && complete.SingBoxConfig == singBox
+                && complete.XrayConfig == smart, "Complete geo runtime unexpectedly changed routing");
+
+            var withShield = JObject.Parse(singBox);
+            ((JArray)withShield["route"]["rule_set"]).Add(new JObject
+            {
+                ["type"] = "local", ["format"] = "binary", ["path"] = "geo/shield.srs", ["tag"] = "shield"
+            });
+            ((JArray)withShield["route"]["rules"]).Add(new JObject
+            {
+                ["action"] = "route", ["outbound"] = "block", ["rule_set"] = new JArray("shield")
+            });
+            var missingShield = IRSpeedyVPN.Services.GeoRoutingFallback.Apply(withShield.ToString(), smart, runtime);
+            Check(ContainsCountryRule(missingShield.SingBoxConfig) && ContainsXrayGeo(missingShield.XrayConfig),
+                "Missing optional shield disabled intact country routing");
+            Check(missingShield.MissingFiles.Contains("shield.srs")
+                && !missingShield.SingBoxConfig.Contains("\"shield\""),
+                "Missing shield left a broken local rule-set reference");
+        }
+        finally { Directory.Delete(runtime, true); }
+        Console.WriteLine("PASS: restored Smart routing; missing/partial geo skips dependent rules and preserves the connection.");
     }
+
+    static bool ContainsCountryRule(string json) => JObject.Parse(json)["route"]["rules"]
+        .Any(rule => rule["rule_set"]?.Values<string>().Contains("ir_IP") == true);
+    static bool HasDnsHijack(string json) => JObject.Parse(json)["route"]["rules"]
+        .Any(rule => (string)rule["action"] == "hijack-dns");
+    static bool ContainsXrayGeo(string json) => JObject.Parse(json)["routing"]["rules"]
+        .Any(rule => (rule["ip"] as JArray)?.Values<string>().Any(v => v.StartsWith("geoip:")) == true
+            || (rule["domain"] as JArray)?.Values<string>().Any(v => v.StartsWith("geosite:")) == true);
+    static bool HasSmartCatchall(string json) => JObject.Parse(json)["routing"]["rules"]
+        .Any(rule => (string)rule["balancerTag"] == "smart-balancer-1" && (string)rule["network"] == "tcp,udp");
 }

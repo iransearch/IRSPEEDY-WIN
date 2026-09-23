@@ -456,7 +456,7 @@ namespace IRSpeedyVPN.Services.Xray
                 outbounds.Add(outbound);
             balancers.Add(SmartIpRouting.AiBalancer(aiFallbackTag));
 
-            // The AI rule runs ahead of the inline local rules and the catch-all so
+            // The AI rule runs ahead of the geoip/geosite checks and the catch-all so
             // its traffic never reaches the main balancer. The first rule is the
             // UDP/443 block, which must stay first.
             rules.Insert(rules.Count > 0 ? 1 : 0, SmartIpRouting.AiRule());

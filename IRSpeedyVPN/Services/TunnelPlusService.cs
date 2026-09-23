@@ -474,6 +474,17 @@ namespace IRSpeedyVPN.Services
             error = null;
             if (!PauseSharingBeforeCoreRestart())
             { error = "Hotspot cleanup was not confirmed."; return false; }
+            var runtimeCorePath = !string.IsNullOrWhiteSpace(corePath) && File.Exists(corePath)
+                ? corePath : ResolveCorePath();
+            if (string.IsNullOrWhiteSpace(runtimeCorePath))
+            { error = "Core executable not found in temp folder."; return false; }
+            var geoRouting = GeoRoutingFallback.Apply(configData, xrayConfig,
+                Path.GetDirectoryName(runtimeCorePath));
+            configData = geoRouting.SingBoxConfig;
+            xrayConfig = geoRouting.XrayConfig;
+            if (geoRouting.MissingFiles.Length > 0)
+                LogHelper.WriteExLog("Geo routing skipped because runtime files are missing: "
+                    + string.Join(", ", geoRouting.MissingFiles));
             Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData) + " needXray=" + needXray);
             EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
             ErrorResp startResp;
@@ -2078,7 +2089,5 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
-
-
 
 

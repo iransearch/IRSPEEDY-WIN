@@ -18,17 +18,16 @@ retry timing, connection timeout, or single-server routing is changed here.
 Before release, test both successful and failing Hysteria2 servers on Windows
 with the packaged Core, including mixed batches and a retry.
 
-The Smart regression also generates a seven-member Hysteria2 pool and checks
-that its routing has no `geoip:`, `geosite:` or `ext:` database selectors. Local
-IPv4/IPv6 and hostname bypass is inline; Iran routing remains in the outer
-sing-box `ir_IP` / `category-ir_SITE` SRS rules. It also checks the leastLoad
-strategy, absence of fallback, 30-minute interval and two probe samples.
+The Smart generator retains the routing template from commit `fdc8e27`: its
+leastLoad pool still uses the original `geoip:` / `geosite:` selectors when the
+runtime contains the DAT files. Before starting Core, `GeoRoutingFallback`
+checks the extracted `V-Guard` working directory. If any required country file
+(`geoip.dat`, `geosite.dat`, `geo/ir_IP.srs`, `geo/category-ir_SITE.srs`) is
+missing, it removes the country bypass from both the Xray and sing-box configs,
+leaving the Smart pool, DNS handling and default proxy route in place. Missing
+optional local SRS files only remove their dependent rules. The test exercises
+missing, partial and complete runtime payloads with the production fallback.
 
-This fixes the `failed to open geoip.dat` failure of the single-file runtime.
-No DAT download or external file next to the application is needed. The existing
-`V-Guard/geo/*.srs` runtime payload is still required by sing-box.
-
-Inline local-list sources (snapshot 2026-09-23):
-
-- https://github.com/v2fly/geoip/blob/master/plugin/special/private.go (blob `598c971199812e817869623f2f4a4ea78014e978`)
-- https://github.com/v2fly/domain-list-community/blob/master/data/private (blob `b8570db79fb0077aacfc10dbac646e57e7c47446`)
+This check runs before every Core start, including reconnects; missing filenames
+are logged once per attempted start. It does not validate corrupt geo data or
+replace a live Windows connection test. The embedded runtime remains single-file.
