@@ -35,8 +35,9 @@ for p in new_files:
     if root.tag == W+'Window':
         assert root.get('SizeToContent') == 'Manual', p
         assert root.get('FlowDirection') == 'RightToLeft', p
-        assert root.get('Width') == ('420' if p.stem in {'MainWindow','VGAURDServiceSetting','SettingsSplitTunnelApps'} else '381.6'), p
-        assert root.get('Height') == ('460' if p.stem == 'VGAURDServiceSetting' else '700' if p.stem in {'MainWindow','SettingsSplitTunnelApps'} else '415.3142857143' if p.stem == 'SettingsPassword' else '632'), p
+        assert root.get('Width') == '420', p
+        assert root.get('{clr-namespace:IRSpeedyVPN.Common}WindowUiScale.Factor') == '{StaticResource UiScale}', p
+        assert root.get('Height') == ('460' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '700'), p
         viewport = root.find(W+'Viewbox')
         assert viewport is not None and viewport.get('Stretch') == 'Uniform', p
         assert viewport[0].get('Width') == '420', p
@@ -102,7 +103,7 @@ assert {prefix+str(i) for prefix in ['Http','Socks'] for i in range(3)} <= proxy
 assert {'Ring'+str(i) for i in range(5)} <= proxy_names
 assert 'SettingsPadImage' not in (A/'Controls/ProxySharingMotion.xaml').read_text()
 assert (A/'Resources/Irspeedy/Reference/proxy-reference.png').read_bytes() == (R/'docs/design-handoff/latest/screenshots/SettingsShare_proxy_on.png').read_bytes()
-print('PASS: main window is 420x700 DIP (525x875 at 125%); separate proxy artwork preserved.')
+print('PASS: design canvas remains 420x700 DIP; shared window scale is applied before display; proxy artwork preserved.')
 
 # Connected's CSS content-box badge is 60 + 2*6, not a 60-DIP outer border.
 badge = next(e for e in connected.iter(W+'Border') if e.get(X+'Name') == 'ConnectedCheckBadge')
