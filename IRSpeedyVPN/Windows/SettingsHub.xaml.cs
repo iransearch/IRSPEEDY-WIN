@@ -1,5 +1,6 @@
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Resource;
+using IRSpeedyVPN.Services.SplitTunneling;
 using System;
 using System.Threading.Tasks;
 using System.Windows;
@@ -38,9 +39,18 @@ namespace IRSpeedyVPN.Windows
 
         private void Header_DragMove(object sender, MouseButtonEventArgs e) => Common.WindowDrag.Begin(this, e);
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
-        private void SavePreferences()
+        private bool SavePreferences()
         {
-            if (Connected) return;
+            if (Connected) return false;
+            if (GameMode.IsOn)
+            {
+                try
+                {
+                    var split = SplitTunnelStore.Load();
+                    if (split.Enabled) { split.Enabled = false; SplitTunnelStore.Save(split); }
+                }
+                catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); return false; }
+            }
             RegHelper.SetSettingValue("VGAURDVodService", VodService.IsOn ? "1" : "0");
             RegHelper.SetSettingValue("VGAURDGameMode", GameMode.IsOn ? "1" : "0");
             if (GameMode.IsOn)
@@ -50,17 +60,22 @@ namespace IRSpeedyVPN.Windows
                 RegHelper.SetSettingValue("VGAURDSystemProxy", "0");
                 RegHelper.SetSettingValue("ProxifierTelegramRoute", "0");
             }
+            return true;
         }
-        private void btnOK_Click(object sender, RoutedEventArgs e) { SavePreferences(); Close(); }
+        private void btnOK_Click(object sender, RoutedEventArgs e) { if (SavePreferences()) Close(); }
         private void Methods_Click(object sender, RoutedEventArgs e)
         {
             if (Connected) return;
             // Save hub switches before a child reads them, preventing a stale child save.
-            SavePreferences();
+            if (!SavePreferences()) return;
             Window page = Service?.SettingType == typeof(SSRServiceSetting)
                 ? (Window)new SSRServiceSetting() : new VGAURDServiceSetting();
             page.Owner = this;
             page.ShowDialog();
+            // A child can enable split tunneling and disable game mode. Do not
+            // overwrite that decision with the hub's older toggle values.
+            GameMode.IsOn = RegHelper.GetSettingValue("VGAURDGameMode") == "1";
+            VodService.IsOn = RegHelper.GetSettingValue("VGAURDVodService") != "0";
         }
         private void Shield_Click(object sender, RoutedEventArgs e)
         { if (!Connected) new SpeedyShieldSetting { Owner = this }.ShowDialog(); }

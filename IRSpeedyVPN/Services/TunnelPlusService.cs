@@ -485,6 +485,18 @@ namespace IRSpeedyVPN.Services
             if (geoRouting.MissingFiles.Length > 0)
                 LogHelper.WriteExLog("Geo routing skipped because runtime files are missing: "
                     + string.Join(", ", geoRouting.MissingFiles));
+            try
+            {
+                var split = lastVpnMode ? SplitTunneling.SplitTunnelStore.Load() : new SplitTunneling.SplitTunnelSettings();
+                configData = SplitTunneling.SplitTunnelPolicyBuilder.Apply(configData, split);
+                if (split.Enabled && lastVpnMode)
+                    Diagnostic("split-tunnel", "mode=" + split.Mode + " selected=" + split.Apps.Count);
+            }
+            catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is InvalidOperationException || ex is ArgumentException)
+            {
+                error = "تنظیمات تقسیم تونل معتبر نیست؛ تنظیمات برنامه‌ها را بررسی کنید.";
+                return false;
+            }
             Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData) + " needXray=" + needXray);
             EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
             ErrorResp startResp;

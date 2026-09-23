@@ -114,7 +114,7 @@
                     <Run Text="تقسیم تونل" FlowDirection="RightToLeft"/>
                   </TextBlock>
                   <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight">
-                    <Run Text="پیش‌نمایش انتخاب برنامه‌ها؛ مسیریابی اعمال نمی‌شود" FlowDirection="RightToLeft"/>
+                    <Run Text="انتخاب مسیر برنامه‌ها؛ فقط در حالت TUN" FlowDirection="RightToLeft"/>
                   </TextBlock>
                 </StackPanel>
                 <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1A0D9488">

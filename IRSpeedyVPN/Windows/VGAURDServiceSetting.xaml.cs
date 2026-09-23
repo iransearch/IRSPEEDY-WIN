@@ -1,4 +1,5 @@
 using IRSpeedyVPN.Resource;
+using IRSpeedyVPN.Services.SplitTunneling;
 using System;
 using System.Windows;
 using System.Windows.Input;
@@ -24,7 +25,13 @@ namespace IRSpeedyVPN.Windows
                 rowVpn.Visibility = Visibility.Collapsed;
 
             LoadSettings();
-            SplitTunnel.IsOn = RegHelper.GetSettingValue("SplitTunnelPreviewEnabled") == "1";
+            try { SplitTunnel.IsOn = SplitTunnelStore.Load().Enabled; }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); }
+            SplitTunnel.Checked += SplitTunnel_Checked;
+            VPNMode.Checked += (s, e) => UpdateSplitAvailability();
+            VPNMode.Unchecked += (s, e) => UpdateSplitAvailability();
+            UpdateSplitAvailability();
+            if (SplitTunnel.IsOn && IsOn(GameMode)) SetChecked(GameMode, false);
         }
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
@@ -47,13 +54,31 @@ namespace IRSpeedyVPN.Windows
             // Game Mode is independent, but forces VPN mode (persisted above as VPN=1).
             RegHelper.SetSettingValue(KEY_GAME, IsOn(GameMode) ? "1" : "0");
 
-            RegHelper.SetSettingValue("SplitTunnelPreviewEnabled", SplitTunnel.IsOn ? "1" : "0");
+            try
+            {
+                var split = SplitTunnelStore.Load();
+                split.Enabled = SplitTunnel.IsOn && IsOn(VPNMode);
+                SplitTunnelStore.Save(split);
+            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); return; }
             Close();
         }
 
         private void SplitApps_Click(object sender, RoutedEventArgs e)
         {
-            new SettingsSplitTunnelApps { Owner = this }.ShowDialog();
+            if (IsOn(VPNMode)) new SettingsSplitTunnelApps { Owner = this }.ShowDialog();
+        }
+
+        private void SplitTunnel_Checked(object sender, RoutedEventArgs e)
+        {
+            if (SplitTunnel.IsOn && !IsOn(VPNMode)) SplitTunnel.IsOn = false;
+            if (SplitTunnel.IsOn && IsOn(GameMode)) SetChecked(GameMode, false);
+        }
+        private void UpdateSplitAvailability()
+        {
+            if (SplitTunnel == null) return;
+            SplitTunnel.IsEnabled = IsOn(VPNMode);
+            if (!IsOn(VPNMode)) SplitTunnel.IsOn = false;
         }
 
         // --------------------------
@@ -196,6 +221,7 @@ namespace IRSpeedyVPN.Windows
         private void GameMode_Checked(object sender, RoutedEventArgs e)
         {
             if (_isUpdating) return;
+            SplitTunnel.IsOn = false;
             ApplyGameModeLock(true);
         }
         private void GameMode_Unchecked(object sender, RoutedEventArgs e)

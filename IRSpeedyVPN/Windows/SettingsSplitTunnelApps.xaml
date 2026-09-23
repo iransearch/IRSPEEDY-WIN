@@ -16,7 +16,7 @@
               <Run Text="برنامه‌های تقسیم تونل" FlowDirection="RightToLeft"/>
             </TextBlock>
             <TextBlock FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Center">
-              <Run Text="انتخاب برنامه‌ها برای عبور از تونل امن" FlowDirection="RightToLeft"/>
+              <Run Text="اعمال انتخاب‌ها در اتصال بعدی، فقط در حالت TUN" FlowDirection="RightToLeft"/>
             </TextBlock>
           </StackPanel>
           <Button Style="{StaticResource HandoffClose}" Click="Close_Click"/>
@@ -25,24 +25,42 @@
       <Grid Grid.Row="1" Margin="16,16">
         <Grid>
           <Grid.RowDefinitions>
+            <RowDefinition Height="92"/>
             <RowDefinition Height="46"/>
-            <RowDefinition Height="58"/>
+            <RowDefinition Height="40"/>
+            <RowDefinition Height="40"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
-          <Border CornerRadius="14" BorderBrush="#DFE4EF" BorderThickness="1" Background="White">
+          <StackPanel Grid.Row="0">
+            <ComboBox x:Name="ModeBox" Height="34" FontSize="12" FlowDirection="RightToLeft" SelectionChanged="Mode_Changed" AutomationProperties.Name="روش تقسیم تونل">
+              <ComboBoxItem Content="برنامه‌های انتخاب‌شده خارج از VPN"/>
+              <ComboBoxItem Content="فقط برنامه‌های انتخاب‌شده داخل VPN"/>
+            </ComboBox>
+            <TextBlock FontSize="10.5" Foreground="#64748B" TextAlignment="Right" FlowDirection="LeftToRight" TextWrapping="Wrap" Margin="0,6,0,0">
+              <Run x:Name="ModeHintText" FlowDirection="RightToLeft"/>
+            </TextBlock>
+          </StackPanel>
+          <Border Grid.Row="1" CornerRadius="14" BorderBrush="#DFE4EF" BorderThickness="1" Background="White">
             <TextBox x:Name="SearchBox" Margin="12,0" BorderThickness="0" Background="Transparent" TextAlignment="Right" FlowDirection="RightToLeft" VerticalContentAlignment="Center" FontSize="13" TextChanged="Search_Changed" ToolTip="جستجوی نام برنامه" AutomationProperties.Name="جستجوی برنامه‌ها"/>
           </Border>
-          <Grid Grid.Row="1">
+          <StackPanel Grid.Row="2" Orientation="Horizontal" FlowDirection="RightToLeft" VerticalAlignment="Center">
+            <Button Content="افزودن برنامه" Click="AddExecutable_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#2447A8" FontSize="11" Margin="0,0,12,0"/>
+            <Button Content="افزودن پوشه" Click="AddFolder_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#2447A8" FontSize="11" Margin="0,0,12,0"/>
+            <Button x:Name="RefreshButton" Content="تازه‌سازی" Click="Refresh_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#2447A8" FontSize="11"/>
+          </StackPanel>
+          <Grid Grid.Row="3">
             <Button Click="SelectAll_Click" Style="{StaticResource HandoffPlainButton}" Content="انتخاب همه" HorizontalAlignment="Left" Foreground="#2447A8" FontSize="11"/>
             <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
-              <TextBlock x:Name="SelectedCount" TextAlignment="Right" FontSize="11" Foreground="#64748B"/>
+              <TextBlock TextAlignment="Right" FlowDirection="LeftToRight" FontSize="11" Foreground="#64748B">
+                <Run x:Name="SelectedCountText" FlowDirection="RightToLeft"/>
+              </TextBlock>
               <TextBlock FontSize="10" Foreground="#9CA3B4" FlowDirection="LeftToRight">
-                <Run Text="پیش‌نمایش؛ مسیریابی برنامه‌ها هنوز اعمال نمی‌شود" FlowDirection="RightToLeft"/>
+                <Run Text="انتخاب پوشه شامل فایل‌های اجرایی زیرپوشه‌هاست" FlowDirection="RightToLeft"/>
               </TextBlock>
             </StackPanel>
           </Grid>
-          <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" x:Name="AppScroll">
-          <ItemsControl x:Name="AppList">
+          <ScrollViewer Grid.Row="4" FlowDirection="RightToLeft" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" x:Name="AppScroll">
+          <ItemsControl x:Name="AppList" FlowDirection="LeftToRight">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Border Height="48" Margin="0,0,0,6" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="12,0">
@@ -64,7 +82,7 @@
             </ItemsControl.ItemTemplate>
           </ItemsControl>
           </ScrollViewer>
-          <TextBlock Grid.Row="2" x:Name="EmptyText" Text="در حال خواندن برنامه‌های نصب‌شده…" FontSize="12" Foreground="#9CA3B4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <TextBlock Grid.Row="4" x:Name="EmptyText" TextWrapping="Wrap" TextAlignment="Center" IsHitTestVisible="False" Text="در حال خواندن برنامه‌های نصب‌شده…" FontSize="12" Foreground="#9CA3B4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
 
         </Grid>
       </Grid>

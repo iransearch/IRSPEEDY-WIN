@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <NoWarn>$(NoWarn);CA1416</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../IRSpeedyVPN/Services/SplitTunneling/*.cs" Link="SplitTunneling/%(Filename)%(Extension)" />
+    <Compile Include="../../IRSpeedyVPN/Services/SingBox/Samples.cs" Link="Samples.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/GeoRoutingFallback.cs" Link="GeoRoutingFallback.cs" />
+    <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />
+  </ItemGroup>
+</Project>
