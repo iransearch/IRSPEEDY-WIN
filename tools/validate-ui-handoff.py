@@ -50,7 +50,7 @@ print(f'PASS: parsed {len(files)} XAML files; checked {len(new_files)} handoff v
 print('Windows compilation, UI rendering, DPI and live network validation remain required.')
 
 manifest = E.parse(A / 'app.manifest').getroot()
-assert manifest.find('.//{http://schemas.microsoft.com/SMI/2016/WindowsSettings}dpiAwareness').text == 'PerMonitorV2, PerMonitor'
+assert manifest.find('.//{http://schemas.microsoft.com/SMI/2016/WindowsSettings}dpiAwareness').text == 'PerMonitorV2'
 connected = roots[A/'UserControls/UCUserInfo.xaml']
 for key in ['ConnectedGlowMotion','ConnectedRingMotion','ConnectedExhaustMotion']:
     board = next(el for el in connected.iter(W+'Storyboard') if el.get(X+'Key') == key)
@@ -61,3 +61,14 @@ names = {e.get(X+'Name') for e in connected.iter()}
 for el in connected.iter():
     if el.get('Storyboard.TargetName'): assert el.get('Storyboard.TargetName') in names
 print('PASS: explicit DIP/RTL window contract, active PMv2 manifest and Connected motion targets/durations.')
+
+# Regression: an invisible legacy warning must not widen the header Auto column.
+main = roots[A/'MainWindow.xaml']
+header = next(e for e in main.iter(W+'Grid') if e.get('MouseLeftButtonDown') == 'Header_MouseDown')
+warning = next(e for e in header if e.get(X+'Name') == 'txtGlobalMessage')
+assert warning.get('Visibility') == 'Collapsed'
+assert warning.get('Grid.ColumnSpan') == '3'
+assert header.find(W+'Grid.ColumnDefinitions')[1].get('MinWidth') == '150'
+project = E.parse(A/'IRSpeedyVPN.csproj').getroot()
+assert project.find('.//ApplicationManifest').text == 'app.manifest'
+print('PASS: header warning cannot reserve the controls column; executable uses the DPI manifest.')

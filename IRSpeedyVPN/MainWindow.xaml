@@ -23,7 +23,7 @@
       <Grid Grid.Row="0" Margin="12,0,18,0" Background="Transparent" MouseLeftButtonDown="Header_MouseDown" FlowDirection="LeftToRight">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto"/>
-          <ColumnDefinition Width="*"/>
+          <ColumnDefinition Width="*" MinWidth="150"/>
           <ColumnDefinition Width="24"/>
         </Grid.ColumnDefinitions>
         <!-- Logo + title + version. Stays LTR internally so the wordmark and
@@ -42,7 +42,7 @@
                      visible header per the new design. -->
         <TextBlock x:Name="txtUsername" Text="" Visibility="Collapsed"/>
         <TextBlock x:Name="lblPremium" Text="PREMIUM" Visibility="Collapsed"/>
-        <TextBlock x:Name="txtGlobalMessage" Text="برای عملکرد صحیح برنامه، نسخه دات نت را به 4.8 ارتقا دهید" Foreground="Salmon" Visibility="Hidden" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Bottom"/>
+        <!-- Collapsed is required: Hidden still measures this legacy message and widens the Auto controls column, clipping IRSPEEDY. --><TextBlock x:Name="txtGlobalMessage" Text="برای عملکرد صحیح برنامه، نسخه دات نت را به 4.8 ارتقا دهید" Foreground="Salmon" Visibility="Collapsed" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Bottom" Grid.ColumnSpan="3" TextWrapping="Wrap" MaxWidth="360"/>
         <!-- Contextual service icons + settings + divider + window controls. -->
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Grid.Column="0" FlowDirection="LeftToRight">
           <Border Width="30" Height="30" CornerRadius="8" Background="Transparent" Cursor="Hand" MouseDown="Exit_PreviewMouseDown" ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="خروج">
