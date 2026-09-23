@@ -1,178 +1,210 @@
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.ShareVPNSetting" Title="اشتراک‌گذاری اتصال" Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{StaticResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Loaded="Window_Loaded" SizeToContent="Manual">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.ShareVPNSetting" Title="اشتراک‌گذاری اتصال" Width="381.6" Height="632" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{StaticResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Loaded="Window_Loaded" SizeToContent="Manual">
   <WindowChrome.WindowChrome>
     <WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/>
   </WindowChrome.WindowChrome>
-  <Grid ClipToBounds="True">
-    <Grid.RowDefinitions>
-      <RowDefinition Height="62"/>
-      <RowDefinition Height="*"/>
-      <RowDefinition Height="0"/>
-    </Grid.RowDefinitions>
-    <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1">
-      <Grid Margin="16,0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
-        <StackPanel VerticalAlignment="Center">
-          <TextBlock Text="اشتراک‌گذاری اتصال" FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="ExtraBold" HorizontalAlignment="Center"/>
-          <TextBlock Text="اتصال VPN را با دستگاه‌های دیگر به اشتراک بگذارید" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" HorizontalAlignment="Center"/>
-        </StackPanel>
-        <Button Style="{StaticResource HandoffClose}" Click="Close_Click"/>
-      </Grid>
-    </Border>
-    <Grid Grid.Row="1" Margin="16,16">
-      <Grid>
-        <Grid.RowDefinitions>
-          <RowDefinition Height="41"/>
-          <RowDefinition Height="*"/>
-        </Grid.RowDefinitions>
-        <Border CornerRadius="12" Background="#EEF1F8" Padding="4">
-          <Grid>
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="*"/>
-              <ColumnDefinition Width="*"/>
-            </Grid.ColumnDefinitions>
-            <Button x:Name="DirectTab" Content="اشتراک مستقیم" Click="DirectTab_Click" Style="{StaticResource HandoffPlainButton}" HorizontalContentAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#9CA3B4" Grid.Column="1"/>
-            <Button x:Name="ProxyTab" Grid.Column="0" Content="اشتراک با پراکسی" Click="ProxyTab_Click" Style="{StaticResource HandoffPlainButton}" HorizontalContentAlignment="Center" FontSize="13" FontWeight="Bold" Background="White" Foreground="#141B33"/>
-          </Grid>
-        </Border>
-        <Grid x:Name="ProxyPanel" Grid.Row="1" Margin="0,16,0,0">
-          <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <RowDefinition Height="*"/>
-          </Grid.RowDefinitions>
-          <StackPanel>
-            <Border Height="120" CornerRadius="16" BorderBrush="#E1E6F3" BorderThickness="1" Background="White" Padding="14">
-              <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="۱  فعال‌سازی اشتراک" FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
-                <TextBlock Text="اشتراک‌گذاری VPN را روی این دستگاه فعال کنید. ۲  تنظیم پراکسی روی دستگاه دوم روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="RightToLeft" TextWrapping="Wrap" Margin="0,4,0,0"/>
-              </StackPanel>
-            </Border>
-            <Border Height="52" CornerRadius="15" Background="#F4F6FA" Margin="0,12,0,12" Padding="14,0">
-              <Grid>
-                <ToggleButton x:Name="btnStartStop" Click="btnStartStop_Click" Style="{StaticResource HandoffPill}" HorizontalAlignment="Left" AutomationProperties.Name="اشتراک‌گذاری پراکسی"/>
-                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
-                  <TextBlock Text="اشتراک‌گذاری پراکسی" FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
-                  <TextBlock Text="" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" x:Name="ProxyStatus"/>
-                </StackPanel>
-              </Grid>
-            </Border>
+  <Viewbox Stretch="Uniform" StretchDirection="Both" FlowDirection="LeftToRight" x:Name="DesignViewport">
+    <Grid ClipToBounds="True" FlowDirection="LeftToRight" Width="420" Height="700">
+      <Grid.RowDefinitions>
+        <RowDefinition Height="62"/>
+        <RowDefinition Height="*"/>
+        <RowDefinition Height="0"/>
+      </Grid.RowDefinitions>
+      <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1">
+        <Grid Margin="16,0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
+          <StackPanel VerticalAlignment="Center">
+            <TextBlock FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="ExtraBold" HorizontalAlignment="Center">
+              <Run Text="اشتراک‌گذاری اتصال" FlowDirection="RightToLeft"/>
+            </TextBlock>
+            <TextBlock FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Center">
+              <Run Text="اتصال VPN را با دستگاه‌های دیگر به اشتراک بگذارید" FlowDirection="RightToLeft"/>
+            </TextBlock>
           </StackPanel>
-          <Grid Grid.Row="1">
-            <StackPanel x:Name="pnlShowIP">
-              <Border Height="50" Margin="0,0,0,10" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="10,0">
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="56"/>
-                  </Grid.ColumnDefinitions>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Grid.Column="2">
-                    <Button Click="Qr_Click" Tag="HTTP" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کد QR HTTP" AutomationProperties.Name="کد QR HTTP">
-                      <Path Data="M1,1 L6,1 6,6 1,6 Z M10,1 L15,1 15,6 10,6 Z M1,10 L6,10 6,15 1,15 Z M10,10 L12,10 12,12 15,12 15,15 10,15 Z" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                    </Button>
-                    <Button Click="CopyProxy_Click" Tag="HTTP" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی HTTP" AutomationProperties.Name="کپی HTTP">
-                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                    </Button>
-                  </StackPanel>
-                  <TextBlock x:Name="HTTPAddress" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="#24365F" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                  <Border Grid.Column="0" Background="#1E3A8A" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
-                    <TextBlock Text="HTTP" FontSize="11" Foreground="White" FontWeight="ExtraBold"/>
-                  </Border>
-                </Grid>
-              </Border>
-              <Border Height="50" Margin="0,0,0,10" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="10,0">
-                <Grid>
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="Auto"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="56"/>
-                  </Grid.ColumnDefinitions>
-                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Grid.Column="2">
-                    <Button Click="Qr_Click" Tag="SOCKS5" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کد QR SOCKS5" AutomationProperties.Name="کد QR SOCKS5">
-                      <Path Data="M1,1 L6,1 6,6 1,6 Z M10,1 L15,1 15,6 10,6 Z M1,10 L6,10 6,15 1,15 Z M10,10 L12,10 12,12 15,12 15,15 10,15 Z" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                    </Button>
-                    <Button Click="CopyProxy_Click" Tag="SOCKS5" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی SOCKS5" AutomationProperties.Name="کپی SOCKS5">
-                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                    </Button>
-                  </StackPanel>
-                  <TextBlock x:Name="SOCKS5Address" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="#24365F" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                  <Border Grid.Column="0" Background="#0D9488" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
-                    <TextBlock Text="SOCKS5" FontSize="11" Foreground="White" FontWeight="ExtraBold"/>
-                  </Border>
-                </Grid>
-              </Border>
-            </StackPanel>
-            <controls:SharingMotion x:Name="ProxyMotion" VerticalAlignment="Bottom"/>
-            <Border x:Name="ProxyOffHint" Height="60" VerticalAlignment="Center" CornerRadius="16" BorderBrush="#D5DEEF" BorderThickness="1" Padding="16">
-              <TextBlock Text="برای مشاهده آدرس و پورت پراکسی، ابتدا اشتراک‌گذاری را فعال کنید." FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" TextWrapping="Wrap" VerticalAlignment="Center"/>
-            </Border>
-          </Grid>
+          <Button Style="{StaticResource HandoffClose}" Click="Close_Click"/>
         </Grid>
-        <Grid x:Name="DirectPanel" Grid.Row="1" Margin="0,16,0,0" Visibility="Collapsed">
+      </Border>
+      <Grid Grid.Row="1" Margin="16,16">
+        <Grid>
           <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="41"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
-          <StackPanel>
-            <Border Height="80" CornerRadius="16" BorderBrush="#E1E6F3" BorderThickness="1" Background="White" Padding="14">
-              <StackPanel VerticalAlignment="Center">
-                <TextBlock Text="۱  اتصال دستگاه‌های دیگر" FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
-                <TextBlock Text="این دستگاه به یک Wi-Fi مستقیم تبدیل می‌شود؛ به آن متصل شوید تا از VPN استفاده کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="RightToLeft" TextWrapping="Wrap" Margin="0,4,0,0"/>
-              </StackPanel>
-            </Border>
-            <Border Height="52" CornerRadius="15" Background="#F4F6FA" Margin="0,12,0,12" Padding="14,0">
-              <Grid>
-                <ToggleButton x:Name="hotspotToggle" Click="HotspotToggle_Click" Style="{StaticResource HandoffPill}" HorizontalAlignment="Left" AutomationProperties.Name="هات‌اسپات مستقیم"/>
-                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
-                  <TextBlock Text="هات‌اسپات مستقیم" FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
-                  <TextBlock Text="" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" x:Name="hotspotStateLabel"/>
-                </StackPanel>
-              </Grid>
-            </Border>
-            <Border x:Name="hotspotCredentials" CornerRadius="15" BorderBrush="#ECEEF3" BorderThickness="1" Background="White" Padding="12,6">
-              <StackPanel>
-                <TextBlock Text="اطلاعات هات‌اسپات" FontSize="11" Foreground="#31456F" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
-                <Grid Height="45">
-                  <Button HorizontalAlignment="Left" Click="HotspotCopyName_Click" Tag="hotspotName" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی" AutomationProperties.Name="کپی">
-                    <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                  </Button>
-                  <TextBlock x:Name="hotspotName" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#141B33" FlowDirection="LeftToRight"/>
-                </Grid>
-                <Grid Height="45">
-                  <Button HorizontalAlignment="Left" Click="HotspotCopyPassword_Click" Tag="hotspotPassword" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی" AutomationProperties.Name="کپی">
-                    <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                  </Button>
-                  <Button Click="HotspotEditPassword_Click" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" HorizontalAlignment="Left" Margin="32,0,0,0" ToolTip="تغییر رمز وای‌فای">
-                    <Path Data="M2,13 L3,9 12,0 16,4 7,13 Z M10,2 L14,6" Stroke="#5B6478" StrokeThickness="1.2" Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                  </Button>
-                  <TextBlock x:Name="hotspotPassword" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#141B33" FlowDirection="LeftToRight"/>
-                </Grid>
-              </StackPanel>
-            </Border>
-            <TextBlock Text="" FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="RightToLeft" x:Name="hotspotClients" Margin="0,6,0,0"/>
-            <TextBlock Text="" FontSize="11" Foreground="#64748B" TextAlignment="Right" FlowDirection="RightToLeft" x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,5,0,0"/>
-            <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#DC2626" FontSize="11" Height="28" Visibility="Collapsed"/>
-            <Grid x:Name="PasswordEditorPanel" Margin="0,10,0,0">
+          <Border CornerRadius="12" Background="#EEF1F8" Padding="4">
+            <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="85"/>
+                <ColumnDefinition Width="*"/>
               </Grid.ColumnDefinitions>
-              <Button x:Name="hotspotSavePassword" Content="ذخیره رمز" Click="HotspotSavePassword_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#2447A8" FontSize="11" Grid.Column="1"/>
-              <StackPanel Grid.Column="0">
-                <TextBlock Text="رمز جدید وای‌فای (۱۰ رقم انگلیسی)" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft"/>
-                <PasswordBox x:Name="hotspotPasswordEditor" Height="30" MaxLength="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" AutomationProperties.Name="رمز جدید وای‌فای" FlowDirection="LeftToRight"/>
-              </StackPanel>
+              <Button x:Name="DirectTab" Content="اشتراک مستقیم" Click="DirectTab_Click" Style="{StaticResource HandoffPlainButton}" HorizontalContentAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#9CA3B4" Grid.Column="0"/>
+              <Button x:Name="ProxyTab" Grid.Column="1" Content="اشتراک با پراکسی" Click="ProxyTab_Click" Style="{StaticResource HandoffPlainButton}" HorizontalContentAlignment="Center" FontSize="13" FontWeight="Bold" Background="White" Foreground="#141B33"/>
             </Grid>
-          </StackPanel>
-          <controls:SharingMotion x:Name="DirectMotion" Grid.Row="1" IsDirect="True" VerticalAlignment="Bottom"/>
-        </Grid>
-        <Popup x:Name="QrPopup" Placement="Center" StaysOpen="False" AllowsTransparency="True">
-          <Border Background="White" BorderBrush="#DDE2EF" BorderThickness="1" CornerRadius="16" Padding="16">
-            <StackPanel>
-              <Image x:Name="QrImage" Width="220" Height="220" FlowDirection="LeftToRight"/>
-              <TextBlock x:Name="QrLabel" FontSize="12" TextAlignment="Center" Margin="0,8,0,0"/>
-            </StackPanel>
           </Border>
-        </Popup>
+          <Grid x:Name="ProxyPanel" Grid.Row="1" Margin="0,16,0,0">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel>
+              <Border Height="120" CornerRadius="16" BorderBrush="#E1E6F3" BorderThickness="1" Background="White" Padding="14">
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                    <Run Text="۱  فعال‌سازی اشتراک" FlowDirection="RightToLeft"/>
+                  </TextBlock>
+                  <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="LeftToRight" TextWrapping="Wrap" Margin="0,4,0,0">
+                    <Run Text="اشتراک‌گذاری VPN را روی این دستگاه فعال کنید. ۲  تنظیم پراکسی روی دستگاه دوم روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید." FlowDirection="RightToLeft"/>
+                  </TextBlock>
+                </StackPanel>
+              </Border>
+              <Border Height="52" CornerRadius="15" Background="#F4F6FA" Margin="0,12,0,12" Padding="14,0">
+                <Grid>
+                  <ToggleButton x:Name="btnStartStop" Click="btnStartStop_Click" Style="{StaticResource HandoffPill}" HorizontalAlignment="Left" AutomationProperties.Name="اشتراک‌گذاری پراکسی" FlowDirection="LeftToRight"/>
+                  <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                      <Run Text="اشتراک‌گذاری پراکسی" FlowDirection="RightToLeft"/>
+                    </TextBlock>
+                    <TextBlock FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" x:Name="ProxyStatus">
+                      <Run Text="" FlowDirection="RightToLeft"/>
+                    </TextBlock>
+                  </StackPanel>
+                </Grid>
+              </Border>
+            </StackPanel>
+            <Grid Grid.Row="1">
+              <StackPanel x:Name="pnlShowIP">
+                <Border Height="50" Margin="0,0,0,10" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="10,0">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="56"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Grid.Column="0">
+                      <Button Click="CopyProxy_Click" Tag="HTTP" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی HTTP" AutomationProperties.Name="کپی HTTP">
+                        <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                      </Button>
+                      <Button Click="Qr_Click" Tag="HTTP" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کد QR HTTP" AutomationProperties.Name="کد QR HTTP">
+                        <Path Data="M1,1 L6,1 6,6 1,6 Z M10,1 L15,1 15,6 10,6 Z M1,10 L6,10 6,15 1,15 Z M10,10 L12,10 12,12 15,12 15,15 10,15 Z" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                      </Button>
+                    </StackPanel>
+                    <TextBlock x:Name="HTTPAddress" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="#24365F" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                    <Border Grid.Column="2" Background="#1E3A8A" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
+                      <TextBlock Text="HTTP" FontSize="11" Foreground="White" FontWeight="ExtraBold"/>
+                    </Border>
+                  </Grid>
+                </Border>
+                <Border Height="50" Margin="0,0,0,10" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="10,0">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="56"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Grid.Column="0">
+                      <Button Click="CopyProxy_Click" Tag="SOCKS5" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی SOCKS5" AutomationProperties.Name="کپی SOCKS5">
+                        <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                      </Button>
+                      <Button Click="Qr_Click" Tag="SOCKS5" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کد QR SOCKS5" AutomationProperties.Name="کد QR SOCKS5">
+                        <Path Data="M1,1 L6,1 6,6 1,6 Z M10,1 L15,1 15,6 10,6 Z M1,10 L6,10 6,15 1,15 Z M10,10 L12,10 12,12 15,12 15,15 10,15 Z" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                      </Button>
+                    </StackPanel>
+                    <TextBlock x:Name="SOCKS5Address" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="#24365F" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                    <Border Grid.Column="2" Background="#0D9488" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
+                      <TextBlock Text="SOCKS5" FontSize="11" Foreground="White" FontWeight="ExtraBold"/>
+                    </Border>
+                  </Grid>
+                </Border>
+              </StackPanel>
+              <controls:ProxySharingMotion x:Name="ProxyMotion" VerticalAlignment="Bottom" FlowDirection="LeftToRight"/>
+              <Border x:Name="ProxyOffHint" Height="60" VerticalAlignment="Center" CornerRadius="16" BorderBrush="#D5DEEF" BorderThickness="1" Padding="16">
+                <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" TextWrapping="Wrap" VerticalAlignment="Center">
+                  <Run Text="برای مشاهده آدرس و پورت پراکسی، ابتدا اشتراک‌گذاری را فعال کنید." FlowDirection="RightToLeft"/>
+                </TextBlock>
+              </Border>
+            </Grid>
+          </Grid>
+          <Grid x:Name="DirectPanel" Grid.Row="1" Margin="0,16,0,0" Visibility="Collapsed">
+            <Grid.RowDefinitions>
+              <RowDefinition Height="Auto"/>
+              <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+            <StackPanel>
+              <Border Height="80" CornerRadius="16" BorderBrush="#E1E6F3" BorderThickness="1" Background="White" Padding="14">
+                <StackPanel VerticalAlignment="Center">
+                  <TextBlock FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                    <Run Text="۱  اتصال دستگاه‌های دیگر" FlowDirection="RightToLeft"/>
+                  </TextBlock>
+                  <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="LeftToRight" TextWrapping="Wrap" Margin="0,4,0,0">
+                    <Run Text="این دستگاه به یک Wi-Fi مستقیم تبدیل می‌شود؛ به آن متصل شوید تا از VPN استفاده کنید." FlowDirection="RightToLeft"/>
+                  </TextBlock>
+                </StackPanel>
+              </Border>
+              <Border Height="52" CornerRadius="15" Background="#F4F6FA" Margin="0,12,0,12" Padding="14,0">
+                <Grid>
+                  <ToggleButton x:Name="hotspotToggle" Click="HotspotToggle_Click" Style="{StaticResource HandoffPill}" HorizontalAlignment="Left" AutomationProperties.Name="هات‌اسپات مستقیم" FlowDirection="LeftToRight"/>
+                  <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                      <Run Text="هات‌اسپات مستقیم" FlowDirection="RightToLeft"/>
+                    </TextBlock>
+                    <TextBlock FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" x:Name="hotspotStateLabel">
+                      <Run Text="" FlowDirection="RightToLeft"/>
+                    </TextBlock>
+                  </StackPanel>
+                </Grid>
+              </Border>
+              <Border x:Name="hotspotCredentials" CornerRadius="15" BorderBrush="#ECEEF3" BorderThickness="1" Background="White" Padding="12,6">
+                <StackPanel>
+                  <TextBlock FontSize="11" Foreground="#31456F" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                    <Run Text="اطلاعات هات‌اسپات" FlowDirection="RightToLeft"/>
+                  </TextBlock>
+                  <Grid Height="45">
+                    <Button HorizontalAlignment="Left" Click="HotspotCopyName_Click" Tag="hotspotName" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی" AutomationProperties.Name="کپی">
+                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                    </Button>
+                    <TextBlock x:Name="hotspotName" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#141B33" FlowDirection="LeftToRight"/>
+                  </Grid>
+                  <Grid Height="45">
+                    <Button HorizontalAlignment="Left" Click="HotspotCopyPassword_Click" Tag="hotspotPassword" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی" AutomationProperties.Name="کپی">
+                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                    </Button>
+                    <Button Click="HotspotEditPassword_Click" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" HorizontalAlignment="Left" Margin="32,0,0,0" ToolTip="تغییر رمز وای‌فای">
+                      <Path Data="M2,13 L3,9 12,0 16,4 7,13 Z M10,2 L14,6" Stroke="#5B6478" StrokeThickness="1.2" Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                    </Button>
+                    <TextBlock x:Name="hotspotPassword" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#141B33" FlowDirection="LeftToRight"/>
+                  </Grid>
+                </StackPanel>
+              </Border>
+              <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="LeftToRight" x:Name="hotspotClients" Margin="0,6,0,0">
+                <Run Text="" FlowDirection="RightToLeft"/>
+              </TextBlock>
+              <TextBlock FontSize="11" Foreground="#64748B" TextAlignment="Right" FlowDirection="LeftToRight" x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,5,0,0">
+                <Run Text="" FlowDirection="RightToLeft"/>
+              </TextBlock>
+              <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#DC2626" FontSize="11" Height="28" Visibility="Collapsed"/>
+              <Grid x:Name="PasswordEditorPanel" Margin="0,10,0,0">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="85"/>
+                  <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+                <Button x:Name="hotspotSavePassword" Content="ذخیره رمز" Click="HotspotSavePassword_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#2447A8" FontSize="11" Grid.Column="0"/>
+                <StackPanel Grid.Column="1">
+                  <TextBlock FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight">
+                    <Run Text="رمز جدید وای‌فای (۱۰ رقم انگلیسی)" FlowDirection="RightToLeft"/>
+                  </TextBlock>
+                  <PasswordBox x:Name="hotspotPasswordEditor" Height="30" MaxLength="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" AutomationProperties.Name="رمز جدید وای‌فای" FlowDirection="LeftToRight"/>
+                </StackPanel>
+              </Grid>
+            </StackPanel>
+            <controls:SharingMotion x:Name="DirectMotion" Grid.Row="1" IsDirect="True" VerticalAlignment="Bottom" FlowDirection="LeftToRight"/>
+          </Grid>
+          <Popup x:Name="QrPopup" Placement="Center" StaysOpen="False" AllowsTransparency="True">
+            <Border Background="White" BorderBrush="#DDE2EF" BorderThickness="1" CornerRadius="16" Padding="16">
+              <StackPanel>
+                <Image x:Name="QrImage" Width="220" Height="220" FlowDirection="LeftToRight"/>
+                <TextBlock x:Name="QrLabel" FontSize="12" TextAlignment="Center" Margin="0,8,0,0"/>
+              </StackPanel>
+            </Border>
+          </Popup>
+        </Grid>
       </Grid>
     </Grid>
-  </Grid>
+  </Viewbox>
 </Window>

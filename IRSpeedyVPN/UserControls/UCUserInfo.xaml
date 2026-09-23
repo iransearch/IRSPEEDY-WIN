@@ -14,7 +14,7 @@
     </Grid>
     <Grid><Border Height="50" CornerRadius="14" BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="1" Background="{StaticResource SmartLocationBackgroundBrush}" x:Name="ConnectedServerCard">
      <Grid Margin="12,0"><Grid.ColumnDefinitions><ColumnDefinition Width="30"/><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
-      <Image x:Name="imgCountry" Width="30" Height="30" Stretch="Uniform"/>
+      <Image x:Name="imgCountry" Width="30" Height="30" Stretch="UniformToFill"><Image.Clip><EllipseGeometry Center="15,15" RadiusX="15" RadiusY="15"/></Image.Clip></Image>
       <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
        <TextBlock x:Name="txtCountry" FontSize="14" FontWeight="Bold" Foreground="{StaticResource SmartLocationTitleBrush}" TextTrimming="CharacterEllipsis"/>
        <TextBlock x:Name="txtServerDetail" FontSize="12" Foreground="{StaticResource SmartLocationSubtitleBrush}" TextTrimming="CharacterEllipsis"/>

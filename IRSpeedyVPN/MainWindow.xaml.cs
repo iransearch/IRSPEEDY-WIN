@@ -542,7 +542,9 @@ namespace IRSpeedyVPN
             txtVersion.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
             btnSettings.Visibility = Visibility.Collapsed;
             accountMenu.IsEnabled = IsUserLogin;
-            panelHeaderIcons.Visibility = (ReferenceEquals(ctrl, uCServerList) || ReferenceEquals(ctrl, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
+            settingsMenu.IsEnabled = IsUserLogin;
+            panelHeaderIcons.Visibility = ReferenceEquals(ctrl, uCServerList) ? Visibility.Visible : Visibility.Collapsed;
+            HeaderDivider.Visibility = panelHeaderIcons.Visibility;
 
             if (TransitionBox.Content == null || !TransitionBox.Content.Equals(ctrl))
             {
@@ -1129,6 +1131,8 @@ namespace IRSpeedyVPN
                 notify.Visible = true;
             }
         }
+
+        private void SettingsMenu_Click(object sender, RoutedEventArgs e) { if (IsUserLogin) OpenSettings(gInfo.CurrentService); }
 
         private void AccountMenu_Click(object sender, RoutedEventArgs e) { if (IsUserLogin) btnSettings_MouseDown(sender, null); }
 

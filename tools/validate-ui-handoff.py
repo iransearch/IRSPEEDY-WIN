@@ -10,7 +10,7 @@ X = '{http://schemas.microsoft.com/winfx/2006/xaml}'
 files = list(A.rglob('*.xaml'))
 roots = {p: E.parse(p).getroot() for p in files}
 keys = {el.get(X+'Key') for root in roots.values() for el in root.iter() if el.get(X+'Key')}
-new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','MainWindow','IrspeedyTheme'}]
+new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ProxySharingMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','MainWindow','IrspeedyTheme'}]
 events = {'Click','Loaded','IsVisibleChanged','MouseLeftButtonDown','MouseLeftButtonUp','PreviewMouseDown','Checked','Unchecked','TextChanged','PasswordChanged','Unloaded','SizeChanged'}
 for p in new_files:
     root = roots[p]
@@ -26,8 +26,13 @@ for p in new_files:
     if root.tag == W+'Window':
         assert root.get('SizeToContent') == 'Manual', p
         assert root.get('FlowDirection') == 'RightToLeft', p
-        assert root.get('Width') == '420', p
-        assert root.get('Height') == ('460' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '700'), p
+        assert root.get('Width') == '381.6', p
+        assert root.get('Height') == ('415.3142857143' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '632'), p
+        viewport = root.find(W+'Viewbox')
+        assert viewport is not None and viewport.get('Stretch') == 'Uniform', p
+        assert viewport[0].get('Width') == '420', p
+        assert viewport[0].get('Height') == ('460' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '700'), p
+        if p.stem != 'MainWindow': assert viewport[0].get('FlowDirection') == 'LeftToRight', p
         assert not list(root.iter(W+'ScrollViewer')), p
         assert root.get('AllowsTransparency') == 'False', p
         assert 'WindowDrag.Begin(this, e)' in source, p
@@ -72,3 +77,19 @@ assert header.find(W+'Grid.ColumnDefinitions')[1].get('MinWidth') == '150'
 project = E.parse(A/'IRSpeedyVPN.csproj').getroot()
 assert project.find('.//ApplicationManifest').text == 'app.manifest'
 print('PASS: header warning cannot reserve the controls column; executable uses the DPI manifest.')
+
+# Approved output size at the user's 125% monitor scale.
+assert abs(381.6 * 1.25 - 477) < 0.001
+assert 632 * 1.25 == 790
+# Proxy diagram uses the original 384x175 coordinates and independent timing.
+proxy = roots[A/'Controls/ProxySharingMotion.xaml']
+assert proxy.get('FlowDirection') == 'LeftToRight'
+canvas = proxy.find(W+'Viewbox').find(W+'Canvas')
+assert (canvas.get('Width'), canvas.get('Height')) == ('384', '175')
+proxy_names = {el.get(X+'Name') for el in proxy.iter()}
+assert {'Tunnel','LockRing','SparkLeft','SparkRight','OnlineHalo'} <= proxy_names
+assert {prefix+str(i) for prefix in ['Http','Socks'] for i in range(3)} <= proxy_names
+assert {'Ring'+str(i) for i in range(5)} <= proxy_names
+assert 'SettingsPadImage' not in (A/'Controls/ProxySharingMotion.xaml').read_text()
+assert (A/'Resources/Irspeedy/Reference/proxy-reference.png').read_bytes() == (R/'docs/design-handoff/latest/screenshots/SettingsShare_proxy_on.png').read_bytes()
+print('PASS: approved 477x790 target at 125%, uniform design scaling and separate proxy artwork.')
