@@ -487,10 +487,11 @@ namespace IRSpeedyVPN.Services
                     + string.Join(", ", geoRouting.MissingFiles));
             try
             {
+                configData = SingBox.TunBrowserCompatibility.Apply(configData);
                 var split = lastVpnMode ? SplitTunneling.SplitTunnelStore.Load() : new SplitTunneling.SplitTunnelSettings();
                 configData = SplitTunneling.SplitTunnelPolicyBuilder.Apply(configData, split);
                 if (split.Enabled && lastVpnMode)
-                    Diagnostic("split-tunnel", "mode=" + split.Mode + " selected=" + split.Apps.Count);
+                    Diagnostic("split-tunnel", "policy=selected-only selected=" + split.Apps.Count + " sharedDns=vpn");
             }
             catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is InvalidOperationException || ex is ArgumentException)
             {
@@ -2101,5 +2102,4 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
-
 

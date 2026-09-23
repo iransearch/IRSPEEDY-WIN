@@ -12,7 +12,7 @@ namespace IRSpeedyVPN.Services.SplitTunneling
         public static string Apply(string json, SplitTunnelSettings settings)
         {
             if (settings == null || !settings.Enabled) return json;
-            if (!Enum.IsDefined(typeof(SplitTunnelMode), settings.Mode) || settings.Apps == null)
+            if (settings.Version != 2 || settings.Apps == null)
                 throw new InvalidOperationException("Invalid split tunnel policy.");
             var config = JObject.Parse(json);
             var tunTags = (config["inbounds"] as JArray)?.OfType<JObject>()
@@ -52,7 +52,7 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 && r["outbound"] != null && (string)r["outbound"] != "proxy")) prefix.Add(rule.DeepClone());
             prefix.Add(new JObject { ["inbound"] = new JArray(tunTags), ["port"] = 53, ["action"] = "hijack-dns" });
 
-            var matcher = DirectMatcher(settings.Mode, patterns);
+            var matcher = DirectMatcher(patterns);
             if (matcher != null)
             {
                 outbounds.Add(new JObject { ["tag"] = "split-direct", ["type"] = "direct",
@@ -68,9 +68,27 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 var dnsRule = ScopedMatcher(matcher, tunTags);
                 dnsRule["action"] = "route";
                 dnsRule["server"] = "split-dns-direct";
+                // Do not let a direct resolver answer populate the VPN DNS cache
+                // on older cores which share a cache between transports.
+                dnsRule["disable_cache"] = true;
                 var dnsRules = dns["rules"] as JArray ?? new JArray();
-                if (dns["rules"] == null) dns["rules"] = dnsRules;
-                dnsRules.Insert(0, dnsRule);
+                if (!((JArray)dns["servers"]).OfType<JObject>().Any(s => (string)s["tag"] == "dns-remote"))
+                    throw new InvalidOperationException("VPN DNS resolver is missing.");
+                var sharedDns = ScopedMatcher(new JObject
+                { ["process_name"] = new JArray("svchost.exe", "svchost") }, tunTags);
+                // Windows DNS Client resolves on behalf of selected AND unselected
+                // apps. Its process is known, but is not the calling browser.
+                // Only its DNS queries use VPN; ordinary svchost traffic stays direct.
+                sharedDns["action"] = "route";
+                sharedDns["server"] = "dns-remote";
+                var orderedDns = new JArray(dnsRules.OfType<JObject>()
+                    .Where(r => (string)r["action"] == "predefined").Select(r => r.DeepClone()));
+                orderedDns.Add(sharedDns);
+                orderedDns.Add(dnsRule);
+                foreach (var rule in dnsRules.OfType<JObject>().Where(r => (string)r["action"] != "predefined"))
+                    orderedDns.Add(rule.DeepClone());
+                dns["rules"] = orderedDns;
+                dns["final"] = "dns-remote";
             }
             foreach (var rule in rules) prefix.Add(rule.DeepClone());
             route["rules"] = prefix;
@@ -83,10 +101,8 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 new JObject { ["inbound"] = new JArray(tunTags) }, matcher.DeepClone()) };
         }
 
-        private static JObject DirectMatcher(SplitTunnelMode mode, string[] patterns)
+        private static JObject DirectMatcher(string[] patterns)
         {
-            if (mode == SplitTunnelMode.ExcludeSelectedApps)
-                return patterns.Length == 0 ? null : new JObject { ["process_path_regex"] = new JArray(patterns) };
             // Do not send hotspot/remote proxy clients or unknown processes direct
             // merely because Windows could not associate them with an executable.
             var knownProcess = new JObject { ["process_path_regex"] = new JArray(".+") };

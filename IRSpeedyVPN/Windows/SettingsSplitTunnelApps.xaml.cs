@@ -34,7 +34,6 @@ namespace IRSpeedyVPN.Windows
                 MessageBox.Show(this, ex.Message, "تقسیم تونل");
                 Close(); return;
             }
-            ModeBox.SelectedIndex = (int)settings.Mode;
             apps = settings.Apps.Select(a => new InstalledApplication { Rule = a, Selected = true }).ToList();
             foreach (var app in apps) app.PropertyChanged += SelectionChanged;
             await RefreshAppsAsync();
@@ -149,17 +148,9 @@ namespace IRSpeedyVPN.Windows
             SearchBox.Clear();
             RenderList();
         }
-        private void Mode_Changed(object sender, SelectionChangedEventArgs e)
-        {
-            if (ModeHintText == null) return;
-            ModeHintText.Text = ModeBox.SelectedIndex == 1
-                ? "برنامه‌های انتخاب‌شده از مسیر VPN استفاده می‌کنند؛ سایر برنامه‌های شناسایی‌شده مستقیم هستند."
-                : "برنامه‌های انتخاب‌شده مستقیم متصل می‌شوند؛ بقیه تابع قوانین VPN هستند.";
-        }
         private void btnOK_Click(object sender, RoutedEventArgs e)
         {
             if (!ready || Connected) return;
-            settings.Mode = (SplitTunnelMode)Math.Max(0, ModeBox.SelectedIndex);
             settings.Apps = apps.Where(a => a.Selected).Select(a => a.Rule).ToList();
             try { SplitTunnelStore.Save(settings); DialogResult = true; }
             catch (Exception ex) { MessageBox.Show(this, ex.Message, "ذخیره تقسیم تونل"); }

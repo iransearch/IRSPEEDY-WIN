@@ -25,19 +25,15 @@
       <Grid Grid.Row="1" Margin="16,16">
         <Grid>
           <Grid.RowDefinitions>
-            <RowDefinition Height="92"/>
+            <RowDefinition Height="48"/>
             <RowDefinition Height="46"/>
             <RowDefinition Height="40"/>
             <RowDefinition Height="40"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <StackPanel Grid.Row="0">
-            <ComboBox x:Name="ModeBox" Height="34" FontSize="12" FlowDirection="RightToLeft" SelectionChanged="Mode_Changed" AutomationProperties.Name="روش تقسیم تونل">
-              <ComboBoxItem Content="برنامه‌های انتخاب‌شده خارج از VPN"/>
-              <ComboBoxItem Content="فقط برنامه‌های انتخاب‌شده داخل VPN"/>
-            </ComboBox>
             <TextBlock FontSize="10.5" Foreground="#64748B" TextAlignment="Right" FlowDirection="LeftToRight" TextWrapping="Wrap" Margin="0,6,0,0">
-              <Run x:Name="ModeHintText" FlowDirection="RightToLeft"/>
+              <Run Text="فقط برنامه‌های انتخاب‌شده از VPN استفاده می‌کنند؛ سایر برنامه‌ها مستقیم متصل می‌شوند." FlowDirection="RightToLeft"/>
             </TextBlock>
           </StackPanel>
           <Border Grid.Row="1" CornerRadius="14" BorderBrush="#DFE4EF" BorderThickness="1" Background="White">

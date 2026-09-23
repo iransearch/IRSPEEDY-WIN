@@ -1,5 +1,6 @@
 using IRSpeedyVPN.Resource;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Linq;
 
@@ -13,7 +14,15 @@ namespace IRSpeedyVPN.Services.SplitTunneling
             var raw = RegHelper.GetSettingValue(Key);
             if (!string.IsNullOrWhiteSpace(raw))
             {
-                var settings = JsonConvert.DeserializeObject<SplitTunnelSettings>(raw);
+                var document = JObject.Parse(raw);
+                int version = (int?)document["Version"] ?? 1;
+                if (version != 1 && version != 2)
+                    throw new InvalidOperationException("نسخهٔ تنظیمات تقسیم تونل پشتیبانی نمی‌شود.");
+                // Both old modes now mean selected apps use VPN, as requested.
+                // Keep the list and enabled state, but never persist a mode switch.
+                document.Remove("Mode");
+                document["Version"] = 2;
+                var settings = document.ToObject<SplitTunnelSettings>();
                 Validate(settings);
                 return settings;
             }
@@ -38,7 +47,7 @@ namespace IRSpeedyVPN.Services.SplitTunneling
 
         private static void Validate(SplitTunnelSettings settings)
         {
-            if (settings == null || settings.Version != 1 || !Enum.IsDefined(typeof(SplitTunnelMode), settings.Mode)
+            if (settings == null || settings.Version != 2
                 || settings.Apps == null || settings.Apps.Count > 2048
                 || settings.Apps.Any(a => AppPathPattern.ForApp(a) == null))
                 throw new InvalidOperationException("تنظیمات تقسیم تونل معتبر نیست؛ فهرست برنامه‌ها را دوباره ذخیره کنید.");

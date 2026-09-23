@@ -4,7 +4,6 @@ using System.Collections.Generic;
 
 namespace IRSpeedyVPN.Services.SplitTunneling
 {
-    internal enum SplitTunnelMode { ExcludeSelectedApps, IncludeOnlySelectedApps }
     internal enum AppMatchKind { ExactPath, Versioned, Folder }
 
     internal sealed class SplitTunnelApp
@@ -22,9 +21,8 @@ namespace IRSpeedyVPN.Services.SplitTunneling
 
     internal sealed class SplitTunnelSettings
     {
-        public int Version { get; set; } = 1;
+        public int Version { get; set; } = 2;
         public bool Enabled { get; set; }
-        public SplitTunnelMode Mode { get; set; } = SplitTunnelMode.ExcludeSelectedApps;
         public List<SplitTunnelApp> Apps { get; set; } = new List<SplitTunnelApp>();
     }
 }
