@@ -1,6 +1,7 @@
 using System;
 using System.Windows;
 using System.Windows.Controls.Primitives;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
 
@@ -20,12 +21,16 @@ namespace IRSpeedyVPN.Controls
         private static readonly Duration SlideDuration = new Duration(TimeSpan.FromMilliseconds(150));
 
         private FrameworkElement _thumb;
+        private Border _track;
+        private Border _focusRing;
         private readonly TranslateTransform _shift = new TranslateTransform();
 
         public override void OnApplyTemplate()
         {
             base.OnApplyTemplate();
             _thumb = GetTemplateChild("PART_Thumb") as FrameworkElement;
+            _track = GetTemplateChild("Track") as Border;
+            _focusRing = GetTemplateChild("FocusRing") as Border;
             if (_thumb != null)
             {
                 _thumb.RenderTransform = _shift;
@@ -58,8 +63,13 @@ namespace IRSpeedyVPN.Controls
                 return;
             }
 
+            // WPF scales oversized corner radii on both axes; 999 makes an
+            // ellipse instead of a capsule. Use the actual half-height.
+            if (_track != null) _track.CornerRadius = new CornerRadius(ActualHeight / 2);
+            if (_focusRing != null) _focusRing.CornerRadius = new CornerRadius(ActualHeight / 2 + 3);
             double size = Math.Max(0, ActualHeight - 2 * TrackPadding);
             _thumb.Width = size;
+            _thumb.Height = size;
 
             double target = IsChecked == true
                 ? Math.Max(0, ActualWidth - 2 * TrackPadding - size)
