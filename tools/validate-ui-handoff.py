@@ -156,7 +156,9 @@ for step, number, title, detail, color in [
     badge = next(e for e in step if e.tag == W+'Border')
     assert badge.get('Style') == '{StaticResource HandoffRoundBadge}' and badge.get('Background') == color
     assert badge.find(W+'TextBlock').get('Text') == number
-    texts = [e.get('Text') for e in step.iter(W+'TextBlock')]
+    texts = [e.get('Text') if e.get('Text') is not None else
+             ''.join(run.get('Text', '') for run in e.iter(W+'Run'))
+             for e in step.iter(W+'TextBlock')]
     assert title in texts and detail in texts
 share_code = (A/'Windows/ShareVPNSetting.xaml.cs').read_text(encoding='utf-8')
 assert 'ProxyStepTwo.Opacity = active ? 1 : 0.45' in share_code
@@ -188,5 +190,5 @@ assert any(e.get(X+'Name') == 'hotspotClientCount' for e in clients.iter(W+'Text
 hotspot_code = (A/'Windows/ShareVPNSetting.Hotspot.cs').read_text(encoding='utf-8')
 assert 'hotspotClientCount.Text = IRSpeedyVPN.Common.PersianDigits.Format(view.Clients.ToString())' in hotspot_code
 assert 'فعال — دستگاه را به این وای‌فای متصل کنید.' not in hotspot_code
-assert 'hotspotStatus.Visibility = string.IsNullOrEmpty(hotspotStatus.Text) ? Visibility.Collapsed : Visibility.Visible' in hotspot_code
+assert 'hotspotStatus.Visibility = string.IsNullOrEmpty(hotspotStatusText.Text) ? Visibility.Collapsed : Visibility.Visible' in hotspot_code
 print('PASS: direct-tab guide badge, credential icons, outlined actions, client count and clean active state.')

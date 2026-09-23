@@ -56,8 +56,12 @@
                       <TextBlock Text="۱" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="2">
-                      <TextBlock Text="فعال‌سازی اشتراک" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right"/>
-                      <TextBlock Text="اشتراک‌گذاری VPN را روی این دستگاه فعال کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                      <TextBlock FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right" FlowDirection="LeftToRight">
+                        <Run Text="فعال‌سازی اشتراک" FlowDirection="RightToLeft"/>
+                      </TextBlock>
+                      <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0" FlowDirection="LeftToRight">
+                        <Run Text="اشتراک‌گذاری VPN را روی این دستگاه فعال کنید." FlowDirection="RightToLeft"/>
+                      </TextBlock>
                     </StackPanel>
                   </Grid>
                   <Grid x:Name="ProxyStepTwo" Margin="0,12,0,0" Opacity="0.45">
@@ -70,8 +74,12 @@
                       <TextBlock Text="۲" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="2">
-                      <TextBlock Text="تنظیم پراکسی روی دستگاه دوم" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right"/>
-                      <TextBlock Text="روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                      <TextBlock FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right" FlowDirection="LeftToRight">
+                        <Run Text="تنظیم پراکسی روی دستگاه دوم" FlowDirection="RightToLeft"/>
+                      </TextBlock>
+                      <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0" FlowDirection="LeftToRight">
+                        <Run Text="روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید." FlowDirection="RightToLeft"/>
+                      </TextBlock>
                     </StackPanel>
                   </Grid>
                 </StackPanel>
@@ -159,8 +167,12 @@
                     <TextBlock Text="۱" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                   </Border>
                   <StackPanel Grid.Column="2">
-                    <TextBlock Text="اتصال دستگاه‌های دیگر" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right"/>
-                    <TextBlock Text="این دستگاه به یک Wi-Fi مستقیم تبدیل می‌شود؛ به آن متصل شوید تا از VPN استفاده کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    <TextBlock FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right" FlowDirection="LeftToRight">
+                      <Run Text="اتصال دستگاه‌های دیگر" FlowDirection="RightToLeft"/>
+                    </TextBlock>
+                    <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0" FlowDirection="LeftToRight">
+                      <Run Text="این دستگاه به یک Wi-Fi مستقیم تبدیل می‌شود؛ به آن متصل شوید تا از VPN استفاده کنید." FlowDirection="RightToLeft"/>
+                    </TextBlock>
                   </StackPanel>
                 </Grid>
               </Border>
@@ -245,7 +257,7 @@
                 <TextBlock Text="دستگاه‌های متصل" FontSize="11" Foreground="#6B7280" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft"/>
               </Grid>
               <TextBlock FontSize="11" Foreground="#64748B" TextAlignment="Right" FlowDirection="LeftToRight" x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,5,0,0">
-                <Run Text="" FlowDirection="RightToLeft"/>
+                <Run x:Name="hotspotStatusText" Text="" FlowDirection="RightToLeft"/>
               </TextBlock>
               <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#DC2626" FontSize="11" Height="28" Visibility="Collapsed"/>
               <Grid x:Name="PasswordEditorPanel" Visibility="Collapsed" Margin="0,10,0,0">
