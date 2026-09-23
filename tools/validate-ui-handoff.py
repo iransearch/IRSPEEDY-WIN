@@ -9,6 +9,15 @@ W = '{http://schemas.microsoft.com/winfx/2006/xaml/presentation}'
 X = '{http://schemas.microsoft.com/winfx/2006/xaml}'
 files = list(A.rglob('*.xaml'))
 roots = {p: E.parse(p).getroot() for p in files}
+# XML parsing accepts this ordering, but WPF's XAML compiler rejects a Style
+# whose property element (Style.Triggers) splits its collection of Setters.
+for path, root in roots.items():
+    for style in root.iter(W+'Style'):
+        children = list(style)
+        for index, child in enumerate(children):
+            if child.tag == W+'Style.Triggers':
+                assert not any(later.tag == W+'Setter' for later in children[index + 1:]), (
+                    f'{path}: Style.Triggers must follow all Setter children (MC3088)')
 keys = {el.get(X+'Key') for root in roots.values() for el in root.iter() if el.get(X+'Key')}
 new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ProxySharingMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','MainWindow','IrspeedyTheme'}]
 events = {'Click','Loaded','IsVisibleChanged','MouseLeftButtonDown','MouseLeftButtonUp','PreviewMouseDown','Checked','Unchecked','TextChanged','PasswordChanged','Unloaded','SizeChanged'}
