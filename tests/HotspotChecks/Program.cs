@@ -389,6 +389,37 @@ internal static class Program
             await new Session(b, j).Stop();
             Check(j.Value is null && !b.IsOn && !b.ClientsEnabled);
         });
+        await Test("stale unshared Wi-Fi Direct interface permits recovery without takeover", async () =>
+        {
+            foreach (Guid? recorded in new Guid?[] { null, Private })
+            {
+                var (s, b, j) = New(); b.Kind = "wifi-direct";
+                j.Value = new Journal(3, Tun, recorded, true, null, "wifi-direct");
+                b.Set(Private, a => a with { Up = true });
+                await s.Stop();
+                Check(j.Value is null && b.Stops == 1 && b.Adapters.All(a => a.SharingRole is null));
+                await Reject("hotspot-adapter-not-ready", () => s.Start(Tun, "Test", "12345678", true));
+                Check(b.BindCalls == 0 && j.Value is null); // never adopt the stale adapter
+            }
+        });
+        await Test("active ICS on Wi-Fi Direct still retains recovery journal", async () =>
+        {
+            var (s, b, j) = New(); b.Kind = "wifi-direct";
+            j.Value = new Journal(3, Tun, Private, true, null, "wifi-direct");
+            b.Set(Private, a => a with { Up = true, SharingRole = 1 });
+            b.Set(Tun, a => a with { SharingRole = 0 });
+            await Reject("wifi-direct-recovery-adapter-still-active", () => s.Stop());
+            Check(j.Value is not null && b.Stops == 0 && b.Adapters.Any(a => a.SharingRole == 1));
+        });
+        await Test("foreign ICS with unrecorded active adapter blocks recovery", async () =>
+        {
+            var (s, b, j) = New(); b.Kind = "wifi-direct";
+            j.Value = new Journal(3, Tun, null, true, null, "wifi-direct");
+            b.Set(Private, a => a with { Up = true });
+            b.Set(Physical, a => a with { SharingRole = 0 });
+            await Reject("wifi-direct-recovery-adapter-still-active", () => s.Stop());
+            Check(j.Value is not null && b.Stops == 0 && b.Adapters.Single(a => a.Id == Physical).SharingRole == 0);
+        });
         await Test("ICS subscriber failure succeeds on third attempt", () =>
         {
             var (_, b, _) = New(); b.Set(Private, a => a with { Up = true });
@@ -701,6 +732,9 @@ internal static class Program
         public Task Stop()
         {
             if (FailStop) throw new HotspotException("stop-failed");
+            if (Kind == "wifi-direct" && !IsOn && Safety.BlocksWifiDirectRecovery(
+                ReadAdapters(), journal.Value?.PrivateId))
+                throw new HotspotException("wifi-direct-recovery-adapter-still-active");
             Stops++; IsOn = false; ClientsEnabled = false; return Task.CompletedTask;
         }
         public void Bind(Guid publicId, Guid privateId)

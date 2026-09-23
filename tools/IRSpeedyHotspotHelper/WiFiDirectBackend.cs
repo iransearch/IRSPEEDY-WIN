@@ -18,6 +18,8 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
     private string status = "NotStarted";
     private string publisherError = "None";
     private string? connectionError;
+    private bool? recoveryIcsEnabled;
+    private bool? recoveryAdapterActive;
     private AdapterEvidence[] preflight = [];
     public string Kind => "wifi-direct";
     public bool AutomaticSharing => false;
@@ -26,6 +28,7 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
     public uint ClientCount { get { lock (sync) return (uint)clients.Count; } }
     public object Diagnostics { get { lock (sync) return new { mode = Kind, publisherStatus = status,
         publisherError, connectionError, pendingConnections = pending, preflight,
+        recoveryIcsEnabled, recoveryAdapterActive,
         publisherCreated = publisher is not null,
         ics = sharing.Diagnostics }; } }
 
@@ -179,9 +182,14 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
             if (publisher is null)
             {
                 // A publisher from another process cannot be stopped by this instance.
-                // Refuse takeover if the recorded adapter is still active after a crash.
-                if (ReadAdapters().Any(a => a.Up && (recoveryPrivateId is Guid id ? a.Id == id :
-                    a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase))))
+                // An unshared interface can remain Up with no live publisher. Only
+                // an active ICS role together with an Up Wi-Fi Direct interface
+                // prevents recovery; never take over an active shared adapter.
+                var adapters = ReadAdapters();
+                recoveryIcsEnabled = adapters.Any(a => a.SharingRole.HasValue);
+                recoveryAdapterActive = adapters.Any(a => a.Up && (recoveryPrivateId is Guid id ?
+                    a.Id == id : a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)));
+                if (Safety.BlocksWifiDirectRecovery(adapters, recoveryPrivateId))
                     throw Failure("wifi-direct-recovery-adapter-still-active", "wfd.recover");
                 return;
             }

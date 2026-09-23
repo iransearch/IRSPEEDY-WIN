@@ -158,6 +158,16 @@ public static class Safety
             throw new HotspotException("existing-ics-conflict");
     }
 
+    public static bool BlocksWifiDirectRecovery(IReadOnlyList<Adapter> adapters, Guid? recordedPrivateId)
+    {
+        // Windows can leave the virtual interface Up after its publisher exits.
+        // No ICS roles means no Internet sharing to preserve. The next Start
+        // still requires a fresh adapter activation before it can bind ICS.
+        if (!adapters.Any(a => a.SharingRole.HasValue)) return false;
+        return adapters.Any(a => a.Up && (recordedPrivateId is Guid id ? a.Id == id :
+            a.Description.Contains("Wi-Fi Direct", StringComparison.OrdinalIgnoreCase)));
+    }
+
     public static Guid SelectPrivate(IReadOnlyList<Adapter> before, IReadOnlyList<Adapter> after, Guid publicId,
         bool requireActivation = false)
     {

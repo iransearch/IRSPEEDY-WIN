@@ -338,7 +338,8 @@ namespace IRSpeedyVPN.Services.Hotspot
                 if (backend != null)
                 {
                     LogFields("publisher", backend, "mode", "publisherStatus", "publisherError",
-                        "publisherCreated", "connectionError", "pendingConnections");
+                        "publisherCreated", "connectionError", "pendingConnections",
+                        "recoveryIcsEnabled", "recoveryAdapterActive");
                     LogAdapters("wfd-preflight", backend["preflight"]);
                     var ics = backend["ics"] as JObject ?? backend;
                     var attempts = ics["enableAttempts"] as JArray;

@@ -12,7 +12,8 @@ without a Wi-Fi Direct app. It does not call StartTetheringAsync or select an
 Internet connection profile. Windows Mobile Hotspot must remain off.
 
 AP creation and Internet sharing are separate:
-1. Require active irspeedy-tun, no existing ICS and no active Wi-Fi Direct adapter.
+1. Require active irspeedy-tun and no existing ICS. An unshared Wi-Fi Direct adapter
+   may already be Up, but cannot be adopted for a new sharing pair.
 2. Persist a version 3 recovery journal before creating the publisher.
 3. Create a fresh legacy AP, register status and incoming connection callbacks,
    and wait up to 10 seconds for Started (abort/timeout are errors).
@@ -95,6 +96,9 @@ it does not restart services. A transient cause is not yet established on the te
 
 Startup mode is wifi-direct. Errors expose separate wfd.* or ics.* stages.
 Wi-Fi backend reports publisherStatus, publisherError and sanitized connectionError.
+Recovery also reports two booleans, recoveryIcsEnabled and recoveryAdapterActive,
+without adapter identifiers, so a still-shared adapter can be distinguished from
+an idle virtual interface that Windows left Up.
 ICS observations record wfd-adapter-ready, before-bind, bind-verify and failure state.
 A Started publisher is not Internet access. ICS pair verification is not an exit-IP test.
 Client count tracks retained WiFiDirectDevice associations, not traffic activity.
@@ -116,11 +120,13 @@ Mobile Hotspot backend only for recovery, then the process exits; relaunch for v
 ```
 
 Use the actual published path in an elevated shell. A new process cannot stop
-another process's Wi-Fi Direct publisher. If the recorded private adapter is still
-up after a hard crash, recovery refuses takeover and retains the journal. If the
-crash happened before recording the adapter, any active Wi-Fi Direct adapter blocks
-recovery. Stop its owning app/network first, then recover again. Do not blindly
-delete the journal or disable unrelated sharing.
+another process's Wi-Fi Direct publisher. An interface may remain Up after its
+publisher exits; recovery now clears the old journal only when the ICS snapshot
+has no enabled sharing roles, and startup still requires a newly activated adapter
+before binding ICS. If sharing is enabled while an Up recorded/private Wi-Fi Direct
+adapter exists, recovery refuses takeover and retains the journal. Stop its owning
+app/network first, then recover again. Do not blindly delete the journal or disable
+unrelated sharing.
 
 Pending client requests completed after stop are disposed and not admitted.
 Requests are bounded to 16 pending/retained client handles. Publisher status alone
@@ -131,7 +137,8 @@ persistent packet-level protection and real Windows acceptance testing.
 
 ## Verification and sources
 
-69 pure-C# simulated-backend checks pass, including detailed health verdicts and read failures, private-only reset ordering,
+95 pure-C# simulated-backend checks pass, including stale unshared adapter recovery,
+retaining journals for active/foreign ICS, detailed health verdicts and read failures, private-only reset ordering,
 complete-pair preservation, reset verification/conflict checks, bounded HRESULT-specific retries,
 partial native success, foreign sharing during retries, TUN loss, immediate Wi-Fi Direct binding,
 delayed/missing adapters, no client admission on ICS failure and backend-specific
