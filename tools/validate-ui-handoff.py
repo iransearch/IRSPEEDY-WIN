@@ -93,3 +93,14 @@ assert {'Ring'+str(i) for i in range(5)} <= proxy_names
 assert 'SettingsPadImage' not in (A/'Controls/ProxySharingMotion.xaml').read_text()
 assert (A/'Resources/Irspeedy/Reference/proxy-reference.png').read_bytes() == (R/'docs/design-handoff/latest/screenshots/SettingsShare_proxy_on.png').read_bytes()
 print('PASS: approved 477x790 target at 125%, uniform design scaling and separate proxy artwork.')
+
+# Connected's CSS content-box badge is 60 + 2*6, not a 60-DIP outer border.
+badge = next(e for e in connected.iter(W+'Border') if e.get(X+'Name') == 'ConnectedCheckBadge')
+assert (badge.get('Width'), badge.get('Height'), badge.get('BorderThickness')) == ('72', '72', '6')
+assert badge.find(W+'Viewbox').find(W+'Canvas').get('Width') == '12'
+server = next(e for e in connected.iter(W+'Border') if e.get(X+'Name') == 'ConnectedServerCard')
+assert server.get('Height') == '52'
+account = next(e for e in connected.iter(W+'Border') if e.get(X+'Name') == 'ConnectedAccountCard')
+assert account.get('Margin') == '0,16,0,0'
+assert len(list(account.iter(W+'Viewbox'))) == 3
+print('PASS: Connected box-model sizes, account spacing and SVG coordinate systems.')

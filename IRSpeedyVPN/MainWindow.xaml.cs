@@ -80,7 +80,7 @@ namespace IRSpeedyVPN
             InitializeComponent();
             mainTimer = new Timer(mainTimerCallback, null, int.MaxValue, int.MaxValue);
             SetupNotify();
-            txtVersion.Text = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            txtVersion.Text = "v" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             /* double netVersion = 0;                       
             try

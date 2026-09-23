@@ -68,7 +68,7 @@ namespace IRSpeedyVPN.UserControls
             // WPF dash lengths/offsets use stroke-width units. One exact perimeter
             // per 1.6s keeps speed constant through straight sections and arcs.
             double perimeter = 2 * (width + height - 4 * radius) + 2 * Math.PI * radius;
-            double brightLength = Math.Min(24, perimeter / 4);
+            double brightLength = perimeter * 0.14; // reference pathLength=100, dasharray=14 86
             ServerCardShine.StrokeDashArray = new DoubleCollection { brightLength / thickness, (perimeter - brightLength) / thickness };
             var animation = new DoubleAnimation(0, -perimeter / thickness, TimeSpan.FromSeconds(1.6));
             Storyboard.SetTargetName(animation, nameof(ServerCardShine));
