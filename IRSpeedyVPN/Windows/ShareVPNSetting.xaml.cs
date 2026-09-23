@@ -43,10 +43,12 @@ namespace IRSpeedyVPN.Windows
         {
             DirectPanel.Visibility = direct ? Visibility.Visible : Visibility.Collapsed;
             ProxyPanel.Visibility = direct ? Visibility.Collapsed : Visibility.Visible;
+            DirectTab.Tag = direct ? "Selected" : null;
+            ProxyTab.Tag = direct ? null : "Selected";
             DirectTab.Background = direct ? Brushes.White : Brushes.Transparent;
             ProxyTab.Background = direct ? Brushes.Transparent : Brushes.White;
-            DirectTab.Foreground = direct ? new SolidColorBrush(Color.FromRgb(20, 27, 51)) : Brushes.Gray;
-            ProxyTab.Foreground = direct ? Brushes.Gray : new SolidColorBrush(Color.FromRgb(20, 27, 51));
+            DirectTab.Foreground = direct ? new SolidColorBrush(Color.FromRgb(20, 27, 51)) : new SolidColorBrush(Color.FromRgb(156, 163, 180));
+            ProxyTab.Foreground = direct ? new SolidColorBrush(Color.FromRgb(156, 163, 180)) : new SolidColorBrush(Color.FromRgb(20, 27, 51));
             QrPopup.IsOpen = false;
             proxyIp = GetInternetInterfaceIp();
             RefreshProxyUi();
