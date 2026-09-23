@@ -35,7 +35,7 @@
       </DoubleAnimation>
     </Storyboard>
     <Storyboard x:Key="ConnectedExhaustMotion" RepeatBehavior="Forever">
-      <DoubleAnimation Storyboard.TargetName="ExhaustLight" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" From="854" To="488" Duration="0:0:0.42"/>
+      <DoubleAnimation Storyboard.TargetName="ExhaustLight" Storyboard.TargetProperty="(Shape.Fill).(Brush.Transform).(TranslateTransform.Y)" From="0" To="-2516.8" Duration="0:0:0.42"/>
     </Storyboard>
   </UserControl.Resources>
   <Grid Margin="22,4,22,18">
@@ -79,29 +79,43 @@
             <DropShadowEffect Color="#17A366" BlurRadius="32" ShadowDepth="15" Direction="270" Opacity="0.35"/>
           </Ellipse.Effect>
         </Ellipse>
+        <!-- All supplied layers share the original 720 x 968 transparent canvas. -->
         <Viewbox Width="136" Height="183" Stretch="Uniform" IsHitTestVisible="False">
-          <Canvas Width="720" Height="968">
-            <Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="720" Height="968" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
-            <Canvas Width="720" Height="968">
-              <Canvas.Clip>
-                <PathGeometry Figures="M335,584 L385,584 C385,650 413,746 360,854 C307,746 335,650 335,584 Z"/>
-              </Canvas.Clip>
-              <Rectangle x:Name="ExhaustLight" Width="90" Height="96" Canvas.Left="315" Opacity="0.65">
-                <Rectangle.RenderTransform>
-                  <TranslateTransform Y="854"/>
-                </Rectangle.RenderTransform>
-                <Rectangle.Fill>
-                  <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#00FFFDF0" Offset="0"/>
-                    <GradientStop Color="#CCFDE68A" Offset=".35"/>
-                    <GradientStop Color="#FFFFFDF0" Offset=".5"/>
-                    <GradientStop Color="#CCFB923C" Offset=".7"/>
-                    <GradientStop Color="#00FB923C" Offset="1"/>
-                  </LinearGradientBrush>
-                </Rectangle.Fill>
-              </Rectangle>
+          <Grid Width="720" Height="968" x:Name="ConnectedRocketArtwork" RenderOptions.BitmapScalingMode="HighQuality">
+            <Image Source="/Resources/Irspeedy/Logo/RocketLayers/01-shield-heart-background.png" Stretch="Uniform"/>
+            <!-- 30 design units, centered at (50%, 58%); static engine glow. -->
+            <Canvas>
+              <Ellipse Width="158.824" Height="158.689" Canvas.Left="280.588" Canvas.Top="482.096" Opacity="0.85">
+                <Ellipse.Fill>
+                  <RadialGradientBrush>
+                    <GradientStop Color="#CCFFD678" Offset="0"/>
+                    <GradientStop Color="#00F97316" Offset="0.7"/>
+                  </RadialGradientBrush>
+                </Ellipse.Fill>
+              </Ellipse>
             </Canvas>
-          </Canvas>
+            <Image Source="/Resources/Irspeedy/Logo/RocketLayers/02-exhaust-flame-shape.png" Stretch="Uniform"/>
+            <!-- Keep the mask stationary; animate only the repeating light brush. -->
+            <Rectangle x:Name="ExhaustLight" Opacity="0.65">
+              <Rectangle.OpacityMask>
+                <ImageBrush ImageSource="/Resources/Irspeedy/Logo/RocketLayers/02-exhaust-flame-shape.png" Stretch="Uniform"/>
+              </Rectangle.OpacityMask>
+              <Rectangle.Fill>
+                <LinearGradientBrush MappingMode="Absolute" StartPoint="0,0" EndPoint="0,2516.8" SpreadMethod="Repeat">
+                  <LinearGradientBrush.Transform><TranslateTransform Y="0"/></LinearGradientBrush.Transform>
+                  <GradientStop Color="#FFFDF0" Offset="0"/>
+                  <GradientStop Color="#FFFDF0" Offset="0.08"/>
+                  <GradientStop Color="#FDE68A" Offset="0.22"/>
+                  <GradientStop Color="#FB923C" Offset="0.42"/>
+                  <GradientStop Color="#F97316" Offset="0.58"/>
+                  <GradientStop Color="#FB923C" Offset="0.76"/>
+                  <GradientStop Color="#FFFDF0" Offset="0.92"/>
+                  <GradientStop Color="#FFFDF0" Offset="1"/>
+                </LinearGradientBrush>
+              </Rectangle.Fill>
+            </Rectangle>
+            <Image Source="/Resources/Irspeedy/Logo/RocketLayers/03-rocket-foreground.png" Stretch="Uniform"/>
+          </Grid>
         </Viewbox>
         <Border Width="72" Height="72" Background="{StaticResource ConnectedGreenBrush}" BorderBrush="White" BorderThickness="6" CornerRadius="36" VerticalAlignment="Bottom" Margin="0,0,0,4" x:Name="ConnectedCheckBadge">
           <Viewbox Width="26" Height="26" FlowDirection="LeftToRight"><Canvas Width="12" Height="12"><Path Data="M2.2,6.3 L4.8,8.9 L9.8,3.5" Stroke="White" StrokeThickness="1.8" FlowDirection="LeftToRight" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>

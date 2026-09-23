@@ -104,3 +104,17 @@ account = next(e for e in connected.iter(W+'Border') if e.get(X+'Name') == 'Conn
 assert account.get('Margin') == '0,16,0,0'
 assert len(list(account.iter(W+'Viewbox'))) == 3
 print('PASS: Connected box-model sizes, account spacing and SVG coordinate systems.')
+
+# Original flame alpha must remain stationary while only its light brush moves.
+rocket = next(e for e in connected.iter() if e.get('{http://schemas.microsoft.com/winfx/2006/xaml}Name') == 'ConnectedRocketArtwork') if 'connected' in globals() else None
+import xml.etree.ElementTree as _ET
+_cr = _ET.parse('IRSpeedyVPN/UserControls/UCUserInfo.xaml').getroot()
+_ns = {'w': 'http://schemas.microsoft.com/winfx/2006/xaml/presentation'}
+_name = '{http://schemas.microsoft.com/winfx/2006/xaml}Name'
+_art = next(e for e in _cr.iter() if e.get(_name) == 'ConnectedRocketArtwork')
+assert [e.get('Source', '').split('/')[-1] for e in _art if e.tag.endswith('}Image')] == ['01-shield-heart-background.png', '02-exhaust-flame-shape.png', '03-rocket-foreground.png']
+_light = next(e for e in _art if e.get(_name) == 'ExhaustLight')
+assert _light.find('w:Rectangle.OpacityMask/w:ImageBrush', _ns).get('ImageSource').endswith('/02-exhaust-flame-shape.png')
+assert _light.find('w:Rectangle.RenderTransform', _ns) is None
+assert not _art.findall('.//w:PathGeometry', _ns)
+print('PASS: original rocket layer order and stationary PNG alpha mask; no approximate flame geometry.')
