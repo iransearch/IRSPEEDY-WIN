@@ -1,4 +1,4 @@
-<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker" mc:Ignorable="d" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}">
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker" mc:Ignorable="d" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}">
   <UserControl.Resources>
     <!-- Scoped to the server list: a transparent rail and a rounded 5-DIP thumb. -->
     <Style x:Key="ServerScrollPage" TargetType="RepeatButton">
@@ -32,7 +32,12 @@
       </Setter>
     </Style>
     <Style x:Key="ServerScrollBar" TargetType="ScrollBar">
-      <Setter Property="Width" Value="10"/>
+      <Setter Property="Width" Value="6"/>
+      <Setter Property="Opacity" Value="0"/>
+      <Style.Triggers>
+        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Value="True"><Setter Property="Opacity" Value="1"/></DataTrigger>
+        <DataTrigger Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=ScrollViewer}}" Value="True"><Setter Property="Opacity" Value="1"/></DataTrigger>
+      </Style.Triggers>
       <Setter Property="Orientation" Value="Vertical"/>
       <Setter Property="Focusable" Value="False"/>
       <Setter Property="Template">
@@ -64,10 +69,10 @@
             <Grid ClipToBounds="True">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="0"/>
               </Grid.ColumnDefinitions>
               <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="0" FlowDirection="RightToLeft" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" CanContentScroll="{TemplateBinding CanContentScroll}" Margin="{TemplateBinding Padding}"/>
-              <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="1" Style="{StaticResource ServerScrollBar}" Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" Value="{TemplateBinding VerticalOffset}" ViewportSize="{TemplateBinding ViewportHeight}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+              <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="0" HorizontalAlignment="Left" Style="{StaticResource ServerScrollBar}" Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" Value="{TemplateBinding VerticalOffset}" ViewportSize="{TemplateBinding ViewportHeight}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
             </Grid>
           </ControlTemplate>
         </Setter.Value>
@@ -81,7 +86,7 @@
       <RowDefinition Height="*"/>
     </Grid.RowDefinitions>
     <!-- ═══ Smart Location card ═══ -->
-    <Border x:Name="smartCard" Grid.Row="0" Height="66" CornerRadius="14" BorderThickness="1" Margin="0,0,0,12" Background="{StaticResource SmartLocationBackgroundBrush}" BorderBrush="{StaticResource SmartLocationBorderBrush}" Cursor="Hand" MouseLeftButtonUp="SmartCard_MouseLeftButtonUp">
+    <Border x:Name="smartCard" Grid.Row="0" Height="68" CornerRadius="14" BorderThickness="1" Margin="0,0,0,12" Background="{StaticResource SmartLocationBackgroundBrush}" BorderBrush="{StaticResource SmartLocationBorderBrush}" Cursor="Hand" MouseLeftButtonUp="SmartCard_MouseLeftButtonUp">
       <Grid Margin="12,0">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="20"/>
@@ -89,29 +94,30 @@
           <ColumnDefinition Width="24"/>
         </Grid.ColumnDefinitions>
         <Border Grid.Column="2" Width="24" Height="34" CornerRadius="10" Background="Transparent" VerticalAlignment="Center">
-          <Path Data="{StaticResource IconBolt}" Fill="#FFB800" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          <Path Data="{StaticResource IconBolt}" Fill="#F5B301" Stretch="Uniform" Width="20" Height="26" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
         <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="10,0">
-          <TextBlock FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="{StaticResource FontSizeCardTitle}" Foreground="{StaticResource SmartLocationTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Stretch">
-            <Run FlowDirection="RightToLeft" Text="انتخاب هوشمند"/>
-          </TextBlock>
-          <TextBlock FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeMuted}" Foreground="{StaticResource SmartLocationSubtitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" Margin="0,2,0,0">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" FlowDirection="LeftToRight">
+            <StackPanel Orientation="Horizontal" Margin="0,0,4,0" VerticalAlignment="Center" ToolTip="انتخاب خودکار سرور"><Ellipse Width="16" Height="16" Margin="0,0,3,0"><Ellipse.Fill><ImageBrush ImageSource="/Resources/Irspeedy/Flags/Iso/ir.png" Stretch="UniformToFill"/></Ellipse.Fill></Ellipse><Ellipse Width="16" Height="16" Margin="0,0,3,0"><Ellipse.Fill><ImageBrush ImageSource="/Resources/Irspeedy/Flags/Iso/tr.png" Stretch="UniformToFill"/></Ellipse.Fill></Ellipse><Ellipse Width="16" Height="16" Margin="0,0,3,0"><Ellipse.Fill><ImageBrush ImageSource="/Resources/Irspeedy/Flags/Iso/de.png" Stretch="UniformToFill"/></Ellipse.Fill></Ellipse><Ellipse Width="16" Height="16" Margin="0,0,3,0"><Ellipse.Fill><ImageBrush ImageSource="/Resources/Irspeedy/Flags/Iso/nl.png" Stretch="UniformToFill"/></Ellipse.Fill></Ellipse></StackPanel>
+            <TextBlock FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource SmartLocationTitleBrush}" FlowDirection="LeftToRight"><Run FlowDirection="RightToLeft" Text="انتخاب هوشمند"/></TextBlock>
+          </StackPanel>
+          <TextBlock FontFamily="{StaticResource AppFontFamily}" FontSize="11" Foreground="{StaticResource SmartLocationSubtitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" Margin="0,2,0,0">
             <Run FlowDirection="RightToLeft" Text="بهترین سرور بر اساس موقعیت شما"/>
           </TextBlock>
         </StackPanel>
         <!-- selection ring, same visual language as the row radio -->
         <Grid Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
           <Ellipse Width="20" Height="20" Stroke="{StaticResource RadioBorderBrush}" StrokeThickness="2"/>
-          <Ellipse x:Name="smartCheck" Width="11" Height="11" Fill="{StaticResource AccentBrush}" Visibility="Collapsed"/>
+          <Ellipse x:Name="smartCheck" Width="18" Height="18" Fill="{StaticResource AccentBrush}" Visibility="Collapsed"/>
         </Grid>
       </Grid>
     </Border>
     <!-- ═══ Country rows (scrollable) ═══ -->
-    <ScrollViewer Grid.Row="1" Style="{StaticResource ServerScrollViewer}" Padding="0,0,2,0">
+    <ScrollViewer Grid.Row="1" Style="{StaticResource ServerScrollViewer}" Padding="0">
       <ItemsControl x:Name="icCountries" Focusable="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Border Tag="{Binding}" CornerRadius="{StaticResource RowCornerRadius}" Margin="0" Padding="8,7" Cursor="{Binding RowCursor}" MouseLeftButtonUp="Row_MouseLeftButtonUp">
+            <Border Tag="{Binding}" CornerRadius="{StaticResource RowCornerRadius}" Margin="0" Height="51" Padding="8,9" BorderBrush="#EEF0F4" BorderThickness="0,0,0,1" Cursor="{Binding RowCursor}" MouseLeftButtonUp="Row_MouseLeftButtonUp">
               <Border.Style>
                 <Style TargetType="Border">
                   <Setter Property="Background" Value="Transparent"/>
@@ -125,7 +131,7 @@
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="28"/>
-                  <ColumnDefinition Width="38"/>
+                  <ColumnDefinition Width="32"/>
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
@@ -141,9 +147,9 @@
                 </Grid.Style>
                 <!-- Flag: 38x38 circle, hairline ring, falls back to an initials
                                      badge when the country has no bundled flag asset. -->
-                <Grid Grid.Column="1" Width="38" Height="38" FlowDirection="LeftToRight">
-                  <Ellipse Width="38" Height="38" Stroke="#0F101827" StrokeThickness="1" Fill="#F3F5F9"/>
-                  <Ellipse Width="36" Height="36">
+                <Grid Grid.Column="1" Width="32" Height="32" FlowDirection="LeftToRight">
+                  <Ellipse Width="32" Height="32" Stroke="#0F101827" StrokeThickness="1" Fill="#F3F5F9"/>
+                  <Ellipse Width="32" Height="32">
                     <Ellipse.Fill>
                       <ImageBrush ImageSource="{Binding FlagSource}" Stretch="UniformToFill"/>
                     </Ellipse.Fill>
@@ -172,11 +178,11 @@
                   </TextBlock>
                 </Grid>
                 <!-- Label -->
-                <TextBlock Grid.Column="2" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}" TextAlignment="Right" VerticalAlignment="Center" Margin="14,0">
+                <TextBlock Grid.Column="2" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamily}" FontWeight="SemiBold" FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}" TextAlignment="Right" VerticalAlignment="Center" Margin="10,0">
                   <Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/>
                 </TextBlock>
                 <!-- Latency -->
-                <TextBlock Grid.Column="3" Text="{Binding SignalText}" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="12" Foreground="{Binding SignalBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Grid.Column="3" Text="{Binding SignalText}" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="13" Foreground="{Binding SignalBrush}" VerticalAlignment="Center" Margin="0"/>
                 <!-- Selector -->
                 <Grid Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
                   <Ellipse Width="20" Height="20" Stroke="{StaticResource RadioBorderBrush}" StrokeThickness="2"/>
