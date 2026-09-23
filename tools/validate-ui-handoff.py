@@ -19,7 +19,7 @@ for path, root in roots.items():
                 assert not any(later.tag == W+'Setter' for later in children[index + 1:]), (
                     f'{path}: Style.Triggers must follow all Setter children (MC3088)')
 keys = {el.get(X+'Key') for root in roots.values() for el in root.iter() if el.get(X+'Key')}
-new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ProxySharingMotion','HotspotBroadcastMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','MainWindow','IrspeedyTheme'}]
+new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ProxySharingMotion','HotspotBroadcastMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','UCServerList','MainWindow','IrspeedyTheme','ServerListFlags'}]
 events = {'Click','Loaded','IsVisibleChanged','MouseLeftButtonDown','MouseLeftButtonUp','PreviewMouseDown','Checked','Unchecked','TextChanged','PasswordChanged','Unloaded','SizeChanged'}
 for p in new_files:
     root = roots[p]
@@ -35,8 +35,8 @@ for p in new_files:
     if root.tag == W+'Window':
         assert root.get('SizeToContent') == 'Manual', p
         assert root.get('FlowDirection') == 'RightToLeft', p
-        assert root.get('Width') == '381.6', p
-        assert root.get('Height') == ('415.3142857143' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '632'), p
+        assert root.get('Width') == ('420' if p.stem == 'MainWindow' else '381.6'), p
+        assert root.get('Height') == ('700' if p.stem == 'MainWindow' else '415.3142857143' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '632'), p
         viewport = root.find(W+'Viewbox')
         assert viewport is not None and viewport.get('Stretch') == 'Uniform', p
         assert viewport[0].get('Width') == '420', p
@@ -88,9 +88,9 @@ project = E.parse(A/'IRSpeedyVPN.csproj').getroot()
 assert project.find('.//ApplicationManifest').text == 'app.manifest'
 print('PASS: header warning cannot reserve the controls column; executable uses the DPI manifest.')
 
-# Approved output size at the user's 125% monitor scale.
-assert abs(381.6 * 1.25 - 477) < 0.001
-assert 632 * 1.25 == 790
+# Latest server-list handoff specifies logical DIPs, not physical screenshot pixels.
+assert float(main.get('Width')) * 1.25 == 525
+assert float(main.get('Height')) * 1.25 == 875
 # Proxy diagram uses the original 384x175 coordinates and independent timing.
 proxy = roots[A/'Controls/ProxySharingMotion.xaml']
 assert proxy.get('FlowDirection') == 'LeftToRight'
@@ -102,7 +102,7 @@ assert {prefix+str(i) for prefix in ['Http','Socks'] for i in range(3)} <= proxy
 assert {'Ring'+str(i) for i in range(5)} <= proxy_names
 assert 'SettingsPadImage' not in (A/'Controls/ProxySharingMotion.xaml').read_text()
 assert (A/'Resources/Irspeedy/Reference/proxy-reference.png').read_bytes() == (R/'docs/design-handoff/latest/screenshots/SettingsShare_proxy_on.png').read_bytes()
-print('PASS: approved 477x790 target at 125%, uniform design scaling and separate proxy artwork.')
+print('PASS: main window is 420x700 DIP (525x875 at 125%); separate proxy artwork preserved.')
 
 # Connected's CSS content-box badge is 60 + 2*6, not a 60-DIP outer border.
 badge = next(e for e in connected.iter(W+'Border') if e.get(X+'Name') == 'ConnectedCheckBadge')

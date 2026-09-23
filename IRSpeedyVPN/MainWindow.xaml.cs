@@ -618,14 +618,15 @@ namespace IRSpeedyVPN
             {
                 var label = new Button
                 {
-                    Style = (Style)FindResource("HandoffPlainButton"),
-                    Content = string.IsNullOrEmpty(icon.Icon)
+                    Style = (Style)FindResource("HeaderIconButton"),
+                    Margin = new Thickness(0, 0, 10, 0),
+                    Content = string.IsNullOrEmpty(icon.Icon) || icon.Icon == "\uf2f5"
                         ? (object)new System.Windows.Shapes.Path {
-                            Data = (Geometry)FindResource(icon.ToolTip.Contains("Shield") ? "IconShield" : "IconGear"),
+                            Data = (Geometry)FindResource(icon.Icon == "\uf2f5" ? "ServerListLogoutIcon" : icon.ToolTip.Contains("Shield") ? "IconShield" : "IconGear"),
                             Stroke = (Brush)FindResource("IconStrokeBrush"), StrokeThickness = 1.7,
-                            Width = 18, Height = 18, Stretch = Stretch.Uniform, FlowDirection = FlowDirection.LeftToRight }
+                            Width = 17, Height = 17, Stretch = Stretch.Uniform, FlowDirection = FlowDirection.LeftToRight,
+                            StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round }
                         : icon.Icon,
-                    Background = null,
                     // Dark icons on the opaque light header.
                     Foreground = (Brush)FindResource("IconStrokeBrush"),
                     FontFamily = (FontFamily)FindResource("fa_ProLight"),
@@ -636,6 +637,7 @@ namespace IRSpeedyVPN
                     VerticalContentAlignment = VerticalAlignment.Center,
                     ToolTip = icon.ToolTip,
                 };
+                System.Windows.Automation.AutomationProperties.SetName(label, icon.ToolTip ?? "");
                 ToolTipService.SetInitialShowDelay(label, 400);
                 ToolTipService.SetShowDuration(label, 2000);
                 ToolTipService.SetBetweenShowDelay(label, 10000);

@@ -133,6 +133,7 @@
 		<Resource Include="Resources\Irspeedy\Logo\icon-128.png" />
 		<Resource Include="Resources\Irspeedy\Logo\icon-256.png" />
 		<Resource Include="Resources\Irspeedy\Logo\logo-header.png" />
+        <Resource Include="Resources\Irspeedy\Logo\logo-server-list.png" />
         <Resource Include="Resources\Irspeedy\Logo\RocketLayers\*.png" />
 		<Resource Include="Resources\Irspeedy\Logo\irspeedy.ico" />
 		<Resource Include="Resources\Irspeedy\Flags\germany.png" />

@@ -102,6 +102,14 @@ namespace IRSpeedyVPN.Components.ServerListControl
             }
         }
 
+        public static ImageSource TryGetListFlag(string countryCode)
+        {
+            var code = (countryCode ?? "").Trim().ToUpperInvariant();
+            if (code == "UK") code = "GB";
+            return Application.Current?.TryFindResource("ServerListFlag_" + code) as ImageSource
+                ?? TryGet(countryCode);
+        }
+
         public static string Initials(string countryName)
         {
             if (string.IsNullOrWhiteSpace(countryName)) return "?";
@@ -151,7 +159,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         public void ResolveFlag()
         {
-            FlagSource = FlagCatalog.TryGet(CountryCode);
+            FlagSource = FlagCatalog.TryGetListFlag(CountryCode);
             Initials = FlagCatalog.Initials(CountryName);
             On(nameof(FlagSource));
             On(nameof(HasFlag));
@@ -336,7 +344,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 .ToList();
 
             _smart = _urlTest ? new SmartItem() : null;
-            smartCard.Visibility = _urlTest ? Visibility.Visible : Visibility.Collapsed;
+            SmartCardHost.Visibility = _urlTest ? Visibility.Visible : Visibility.Collapsed;
 
             ApplyFilter();
 
@@ -371,6 +379,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             _filter = text ?? "";
             ApplyFilter();
+            ServerScroller.ScrollToTop();
         }
 
         private void ApplyFilter()
@@ -381,6 +390,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                     g.CountryName.IndexOf(_filter.Trim(), StringComparison.CurrentCultureIgnoreCase) >= 0).ToList();
 
             icCountries.ItemsSource = _groups;
+            EmptyResults.Visibility = _groups.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
         }
 
         /// <summary>Display progress in place without changing ordering or selection.</summary>
@@ -472,14 +482,14 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         #region Click routing
 
-        private void SmartCard_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void SmartCard_Click(object sender, RoutedEventArgs e)
         {
             if (_smart == null) return;
             Apply(null, null, SelectionKind.Smart);
             ServerSelected?.Invoke(null);
         }
 
-        private void Row_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private void Row_Click(object sender, RoutedEventArgs e)
         {
             if (!(sender is FrameworkElement fe) || !(fe.DataContext is GroupItem group))
                 return;

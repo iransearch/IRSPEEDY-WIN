@@ -1,0 +1,333 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <DrawingImage x:Key="ServerListFlag_DE">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#141414">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,12.7" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#D0021B">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,12.7,38,12.7" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#F5C518">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,25.4,38,12.6" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_NL">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#C8102E">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,12.7" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,12.7,38,12.7" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#21468B">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,25.4,38,12.6" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_TR">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#E30A17">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <EllipseGeometry Center="16.5,19" RadiusX="8" RadiusY="8" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#E30A17">
+          <GeometryDrawing.Geometry>
+            <EllipseGeometry Center="19,19" RadiusX="6.6" RadiusY="6.6" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <PathGeometry Figures="M24,13.5 25.3,17.2 29.2,17.3 26.1,19.6 27.2,23.3 24,21.1 20.8,23.3 21.9,19.6 18.8,17.3 22.7,17.2 Z" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_FR">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#0055A4">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,12.7,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="12.7,0,12.7,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#EF4135">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="25.4,0,12.6,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_GB">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#0A17A7">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing>
+          <GeometryDrawing.Pen>
+            <Pen Brush="#FFFFFF" Thickness="7" />
+          </GeometryDrawing.Pen>
+          <GeometryDrawing.Geometry>
+            <PathGeometry Figures="M0 0L38 38M38 0L0 38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing>
+          <GeometryDrawing.Pen>
+            <Pen Brush="#C8102E" Thickness="2.6" />
+          </GeometryDrawing.Pen>
+          <GeometryDrawing.Geometry>
+            <PathGeometry Figures="M0 0L38 38M38 0L0 38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing>
+          <GeometryDrawing.Pen>
+            <Pen Brush="#FFFFFF" Thickness="11" />
+          </GeometryDrawing.Pen>
+          <GeometryDrawing.Geometry>
+            <PathGeometry Figures="M19 0V38M0 19H38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing>
+          <GeometryDrawing.Pen>
+            <Pen Brush="#C8102E" Thickness="6.5" />
+          </GeometryDrawing.Pen>
+          <GeometryDrawing.Geometry>
+            <PathGeometry Figures="M19 0V38M0 19H38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_US">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#B22234">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,2.9" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#B22234">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,5.85,38,2.9" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#B22234">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,11.7,38,2.9" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#B22234">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,17.55,38,2.9" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#B22234">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,23.4,38,2.9" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#B22234">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,29.25,38,2.9" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#B22234">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,35.1,38,2.9" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#3C3B6E">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,19,20.5" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_CA">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#D80621">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,9.5,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#D80621">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="28.5,0,9.5,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#D80621">
+          <GeometryDrawing.Geometry>
+            <PathGeometry Figures="M19,9 21,16 27,14.5 23.5,19.5 27,20.5 22,22 23,28 19,24.5 15,28 16,22 11,20.5 14.5,19.5 11,14.5 17,16 Z" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_JP">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#BC002D">
+          <GeometryDrawing.Geometry>
+            <EllipseGeometry Center="19,19" RadiusX="10.5" RadiusY="10.5" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_AE">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#00732F">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,12.7" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,12.7,38,12.6" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#000000">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,25.3,38,12.7" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FF0000">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,11,38" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_SG">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#EF3340">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,19" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,19,38,19" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <EllipseGeometry Center="11,9.5" RadiusX="5.4" RadiusY="5.4" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#EF3340">
+          <GeometryDrawing.Geometry>
+            <EllipseGeometry Center="13,9.5" RadiusX="4.4" RadiusY="4.4" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+  <DrawingImage x:Key="ServerListFlag_IR">
+    <DrawingImage.Drawing>
+      <DrawingGroup>
+        <DrawingGroup.ClipGeometry>
+          <EllipseGeometry Center="19,19" RadiusX="19" RadiusY="19" />
+        </DrawingGroup.ClipGeometry>
+        <GeometryDrawing Brush="#239F40">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,0,38,12.7" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#FFFFFF">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,12.7,38,12.7" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+        <GeometryDrawing Brush="#DA0000">
+          <GeometryDrawing.Geometry>
+            <RectangleGeometry Rect="0,25.4,38,12.6" />
+          </GeometryDrawing.Geometry>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
+</ResourceDictionary>
