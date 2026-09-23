@@ -205,8 +205,8 @@
       </Border>
       <TextBlock x:Name="txtServiceName" Visibility="Collapsed"/>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
-        <TextBlock Text="آی‌پی جدید شما: " FontSize="11.5" FontFamily="{StaticResource AppFontFamilyMedium}" FontWeight="Normal" Foreground="#5B6478"/>
-        <TextBlock Text="—" FlowDirection="LeftToRight" FontSize="11.5" Foreground="#5B6478" ToolTip="آی‌پی عمومی در دسترس نیست" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"/>
+        <TextBlock Text="آی‌پی دریافتی کاربر: " FontSize="11.5" FontFamily="{StaticResource AppFontFamilyMedium}" FontWeight="Normal" Foreground="#5B6478"/>
+        <TextBlock x:Name="txtReceivedIp" Text="—" FlowDirection="LeftToRight" FontSize="11.5" Foreground="#5B6478" ToolTip="آی‌پی عمومی در دسترس نیست" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"/>
       </StackPanel>
     </StackPanel>
     <Button x:Name="btnDisConnect" Grid.Row="1" Height="46" Margin="0,8,0,0" Background="{StaticResource DisconnectGradientBrush}" Style="{StaticResource DesignActionButton}" IsCancel="True" Click="btnDisConnect_Click" FontSize="15" FontWeight="Bold">

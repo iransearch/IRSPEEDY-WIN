@@ -7,6 +7,8 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Windows;
@@ -35,6 +37,7 @@ namespace IRSpeedyVPN.UserControls
         public event EventHandler OnChangeServerRequest;
         Timer uiTimer;
         int timerTick;
+        CancellationTokenSource publicIpRequest;
         
         GlobalInfo globalInfo;
 
@@ -64,6 +67,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void btnDisConnect_Click(object sender, RoutedEventArgs e)
         {
+            CancelPublicIpRequest();
             uiTimer.Change(int.MaxValue, int.MaxValue);
             if (OnDisconnectRequest != null)
                 OnDisconnectRequest.Invoke(sender, e);
@@ -168,6 +172,7 @@ namespace IRSpeedyVPN.UserControls
             txtRemainedTime.Text = (globalInfo.ExpiryDate != null) ? globalInfo.ExpiryDate.Value.TotalDays() : "اولین اتصال";
             txtExpireDate.Text = PersianDigits(txtExpireDate.Text);
             txtRemainedTime.Text = PersianDigits(txtRemainedTime.Text);
+            RefreshPublicIp();
 
             
         }
@@ -178,12 +183,77 @@ namespace IRSpeedyVPN.UserControls
             if (!IsVisible)
             {
                 uiTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                CancelPublicIpRequest();
                 ClearHeaderIcons();
             }
             else
             {
                 if (globalInfo != null) uiTimer?.Change(0, 1000);
                 RegisterHeaderIcons();
+                if (IsLoaded) RefreshPublicIp();
+            }
+        }
+
+        private void CancelPublicIpRequest()
+        {
+            var request = publicIpRequest;
+            publicIpRequest = null;
+            request?.Cancel(); // The owning async operation disposes it in finally.
+            if (txtReceivedIp != null)
+            {
+                txtReceivedIp.Text = "—";
+                txtReceivedIp.ToolTip = "آی‌پی عمومی در دسترس نیست";
+            }
+        }
+
+        private async void RefreshPublicIp()
+        {
+            CancelPublicIpRequest();
+            var service = globalInfo?.CurrentService;
+            var port = service?.HttpPort;
+            if (!IsLoaded || !IsVisible || !port.HasValue || port.Value < 1 || port.Value > 65535) return;
+            var connectedAt = globalInfo.ConnectionTime;
+            var request = new CancellationTokenSource();
+            publicIpRequest = request;
+            txtReceivedIp.ToolTip = "در حال دریافت آی‌پی خروجی اتصال";
+            try
+            {
+                // Always query through this connection's listener. Never fall back to
+                // direct/system proxy, which could display the ISP address as VPN IP.
+                using (var handler = new HttpClientHandler
+                {
+                    Proxy = new WebProxy("http://127.0.0.1:" + port.Value),
+                    UseProxy = true,
+                    AllowAutoRedirect = false,
+                    UseCookies = false
+                })
+                using (var client = new HttpClient(handler)
+                {
+                    Timeout = TimeSpan.FromSeconds(8),
+                    MaxResponseContentBufferSize = 128
+                })
+                using (var response = await client.GetAsync("https://api.ipify.org", request.Token))
+                {
+                    response.EnsureSuccessStatusCode();
+                    var text = (await response.Content.ReadAsStringAsync()).Trim();
+                    IPAddress address;
+                    if (!IPAddress.TryParse(text, out address)) return;
+                    if (request.IsCancellationRequested || publicIpRequest != request || !IsVisible
+                        || globalInfo.CurrentService != service || globalInfo.ConnectionTime != connectedAt) return;
+                    txtReceivedIp.Text = address.ToString();
+                    txtReceivedIp.ToolTip = "آی‌پی خروجی مشاهده‌شده برای این اتصال";
+                }
+            }
+            catch (OperationCanceledException) { }
+            catch (HttpRequestException) { }
+            finally
+            {
+                if (publicIpRequest == request)
+                {
+                    publicIpRequest = null;
+                    if (txtReceivedIp.Text == "—") txtReceivedIp.ToolTip = "دریافت آی‌پی ممکن نشد؛ اتصال شما قطع نشده است";
+                }
+                request.Dispose();
             }
         }
 

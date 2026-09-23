@@ -68,11 +68,11 @@
             <!-- Explicit physical columns keep the rail on the left in RTL. -->
             <Grid ClipToBounds="True" FlowDirection="LeftToRight">
               <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
                 <ColumnDefinition Width="*"/>
-                <ColumnDefinition Width="0"/>
               </Grid.ColumnDefinitions>
-              <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="0" FlowDirection="RightToLeft" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" CanContentScroll="{TemplateBinding CanContentScroll}" Margin="{TemplateBinding Padding}"/>
-              <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="0" HorizontalAlignment="Left" Style="{StaticResource ServerScrollBar}" Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" Value="{TemplateBinding VerticalOffset}" ViewportSize="{TemplateBinding ViewportHeight}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+              <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="1" FlowDirection="RightToLeft" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" CanContentScroll="{TemplateBinding CanContentScroll}" Margin="{TemplateBinding Padding}"/>
+              <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="0" Margin="0,0,6,0" HorizontalAlignment="Left" Style="{StaticResource ServerScrollBar}" Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" Value="{TemplateBinding VerticalOffset}" ViewportSize="{TemplateBinding ViewportHeight}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
             </Grid>
           </ControlTemplate>
         </Setter.Value>

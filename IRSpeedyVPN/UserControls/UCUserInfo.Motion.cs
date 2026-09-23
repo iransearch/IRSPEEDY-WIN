@@ -35,7 +35,11 @@ namespace IRSpeedyVPN.UserControls
             glowMotion = ringMotion = exhaustMotion = cardMotion = null;
         }
 
-        private void Connected_Unloaded(object sender, RoutedEventArgs e) => StopConnectedMotion();
+        private void Connected_Unloaded(object sender, RoutedEventArgs e)
+        {
+            CancelPublicIpRequest();
+            StopConnectedMotion();
+        }
         private void ServerCard_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateCardMotion();
 
         private void UpdateCardMotion()
