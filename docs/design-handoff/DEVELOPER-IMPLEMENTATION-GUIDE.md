@@ -175,39 +175,29 @@ Register it as a resource (`<local:PersianDigitConverter x:Key="PersianDigits"/>
 
 ### 1.5 Toggle switch (Settings screen)
 
-This is a **custom two-state control**, not a stock `CheckBox`/`ToggleButton` retemplate-only job — it needs the pill-with-colored-segment-and-thumb layout. Implement as a `UserControl`:
+The approved design is now a **plain modern pill switch** — a colored track plus a sliding white circular thumb, no text or chevron inside it (an earlier ON/OFF-label pill design was superseded — don't build that version). It's still a custom `UserControl` since WPF's `ToggleButton` doesn't give you a smoothly-colored track + independent thumb without a full retemplate anyway, and a small control is easier to reason about than a giant `ControlTemplate`:
 
 ```xml
 <!-- Controls/ToggleSwitch.xaml -->
 <UserControl x:Class="Irspeedy.Controls.ToggleSwitch"
-             Width="86" Height="32">
-  <Grid Cursor="Hand" MouseLeftButtonUp="Root_Click">
-    <Border CornerRadius="16" Background="{StaticResource ToggleTrackBrush}" Padding="3">
-      <Grid x:Name="TrackGrid">
-        <Grid.ColumnDefinitions>
-          <ColumnDefinition Width="*"/>
-          <ColumnDefinition Width="26"/>
-        </Grid.ColumnDefinitions>
-        <Border x:Name="ColorSegment" Grid.ColumnSpan="2" CornerRadius="13"
-                Background="{StaticResource ToggleOnBrush}">
-          <TextBlock x:Name="StateLabel" Text="ON" Foreground="White"
-                     FontSize="11" FontWeight="Bold" HorizontalAlignment="Center"
-                     VerticalAlignment="Center" Margin="0,0,14,0"/>
-        </Border>
-        <Border x:Name="Thumb" Grid.Column="1" Width="26" Height="26"
-                CornerRadius="13" Background="White" HorizontalAlignment="Right">
-          <Path x:Name="ThumbGlyph" Data="M7.2,1.8 3,5.5 7.2,9.2"
-                Stroke="#5B6478" StrokeThickness="1.6"
-                StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                Width="11" Height="11" Stretch="Uniform"/>
-        </Border>
-      </Grid>
+             Width="46" Height="26">
+  <Border x:Name="Track" CornerRadius="13" Padding="3"
+          Background="{StaticResource ToggleOffBrush}"
+          Cursor="Hand" MouseLeftButtonUp="Root_Click">
+    <Border x:Name="Thumb" Width="20" Height="20" CornerRadius="10"
+            Background="White" HorizontalAlignment="Left">
+      <Border.Effect>
+        <DropShadowEffect BlurRadius="4" ShadowDepth="2" Opacity="0.25" Color="#101828"/>
+      </Border.Effect>
+      <Border.RenderTransform>
+        <TranslateTransform x:Name="ThumbTransform" X="0"/>
+      </Border.RenderTransform>
     </Border>
-  </Grid>
+  </Border>
 </UserControl>
 ```
 
-Code-behind — a bindable `IsOn` dependency property that flips the segment color, label text, thumb side, and chevron direction:
+Code-behind — a bindable `IsOn` dependency property that swaps the track brush and slides the thumb (animate the `TranslateTransform.X` with a short `DoubleAnimation` for a native feel — a plain `Render()` swap like below works too if you'd rather skip the animation for v1):
 
 ```csharp
 public partial class ToggleSwitch : UserControl {
@@ -221,32 +211,24 @@ public partial class ToggleSwitch : UserControl {
         set => SetValue(IsOnProperty, value);
     }
 
+    private const double ThumbTravel = 20; // track width 46 - padding 3*2 - thumb 20 = 20
+
     public ToggleSwitch() { InitializeComponent(); Render(); }
 
     private static void OnIsOnChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         => ((ToggleSwitch)d).Render();
 
     private void Render() {
-        if (IsOn) {
-            ColorSegment.Background = (Brush)FindResource("ToggleOnBrush");
-            StateLabel.Text = "ON";
-            Thumb.HorizontalAlignment = HorizontalAlignment.Right;
-            StateLabel.Margin = new Thickness(0, 0, 14, 0);
-            ThumbGlyph.Data = Geometry.Parse("M7.2,1.8 3,5.5 7.2,9.2"); // ‹
-        } else {
-            ColorSegment.Background = (Brush)FindResource("ToggleOffBrush");
-            StateLabel.Text = "OFF";
-            Thumb.HorizontalAlignment = HorizontalAlignment.Left;
-            StateLabel.Margin = new Thickness(14, 0, 0, 0);
-            ThumbGlyph.Data = Geometry.Parse("M3.8,1.8 8,5.5 3.8,9.2"); // ›
-        }
+        Track.Background = (Brush)FindResource(IsOn ? "ToggleOnBrush" : "ToggleOffBrush");
+        ThumbTransform.BeginAnimation(TranslateTransform.XProperty,
+            new DoubleAnimation(IsOn ? ThumbTravel : 0, TimeSpan.FromMilliseconds(120)));
     }
 
     private void Root_Click(object sender, MouseButtonEventArgs e) => IsOn = !IsOn;
 }
 ```
 
-Usage in Settings: `<controls:ToggleSwitch IsOn="{Binding IsVpnEnabled, Mode=TwoWay}"/>`.
+Usage in Settings: `<controls:ToggleSwitch IsOn="{Binding IsVpnEnabled, Mode=TwoWay}"/>`. `ToggleOnBrush`/`ToggleOffBrush` are in `IrspeedyTheme.xaml`.
 
 ---
 
@@ -267,6 +249,8 @@ Layout, top to bottom, inside a `Grid`/`StackPanel` with `Margin="18,4,18,18"` (
    }
    ```
    Seed data — **10 servers**, in this order (see `DESIGN-SPEC.md` §2 for the full table): Germany, Netherlands, Turkey, France, UK, USA, Canada, UAE, Singapore, Japan. Row `DataTemplate`: flag `Image` (38×38, `Ellipse` clip or pre-circular PNG) → `TextBlock` label → ping `TextBlock` (bound through `PersianDigitConverter`, green) → empty radio circle (`Ellipse`, stroke only, becomes filled on selection — wire this to your actual VPN-connect state, not just UI chrome).
+
+   **Row spacing — match the preview exactly**: set `Padding="8,12"` on each row's root container (8 DIP left/right, 12 DIP top/bottom) and leave the `ItemsControl`'s item container `Margin` at **0**. The 12px top/bottom padding on each row is what produces the visible gap between rows (two stacked rows end up with 24px of combined breathing room) — if you additionally add a `Margin` between items in the `ItemsPanel`, the spacing will end up roughly double what's in the approved design and drift from the preview. This was flagged explicitly because an earlier build had visibly tighter server-row spacing than the design canvas — the padding-only approach above is the one to follow.
 5. Connect `Button` pinned to the bottom (`VerticalAlignment="Bottom"` or `Grid.Row` last row with `Height="56"`) — **on click, this should navigate/transition to `ConnectedWindow`** (see §4 for the recommended navigation approach).
 
 ---
@@ -311,13 +295,18 @@ var settings = new SettingsWindow { Owner = this };
 settings.ShowDialog();
 ```
 
-- Header (64px): centered `TextBlock` "تنظیمات سرویس" + a circular red close button (`Ellipse`/`Border` 30×30, `close-circle.svg` glyph) anchored to the **leading edge** in RTL (which renders on the visual right — verify against the mock, don't assume). No logo, no minimize (it's a modal, not a top-level window).
-- 6 rows, each `Height="68"`, `CornerRadius="16"`, white card, in a `StackPanel`/`Grid` with `VerticalAlignment` distribution — the approved layout uses `justify-content: space-between` in the web mock, i.e. in WPF terms: put the 6 rows in a `Grid` with 6 equal `RowDefinition Height="*"` (not `Auto`) inside the scrollable content area, so they spread evenly across the available height instead of clumping at the top with dead space before the confirm button.
-- Each row: label `TextBlock` (trailing side) + `ToggleSwitch` (leading side, from §1.5).
-- Bind each toggle to a real setting (VPN kill-switch, system proxy, proxifier, messaging-app proxy, VOD/AI routing, game mode) — **persist these**, don't leave them as UI-only state; confirm the settings storage mechanism already used elsewhere in the app (registry, local config file, etc.) and reuse it.
-- Confirm button: full width, 50px, **neutral gray** (`#EDEFF3` fill, `#DCDFE6` border) — deliberately not accent-colored, this is intentional per the approved mock, don't "fix" it to blue.
+**Hard requirement: this screen must never need to scroll.** All 6 rows are fixed, known content — size them to fit inside the 700px window on every run, not just at design time. Set the content host's `VerticalScrollBarVisibility="Disabled"` (or don't wrap it in a `ScrollViewer` at all) rather than relying on the rows happening to fit. If you ever add a 7th toggle later, shrink the row height/gap to compensate — don't let a `ScrollViewer` silently appear.
 
-Rows and defaults — see `DESIGN-SPEC.md` §5 for the exact 6 labels and ON/OFF defaults; don't invent different wording, this is the approved Persian copy.
+- Header (62px, bottom border `#ECEEF3`): a centered 2-line `StackPanel` — "تنظیمات سرویس" (16px/800) with a small muted subtitle "شخصی‌سازی رفتار اتصال" (10.5px/500, `#9CA3B4`) right under it — + a circular red close button (`Border` 30×30, `close-circle.svg` glyph, red gradient) anchored to the **leading edge** in RTL (which renders on the visual right — verify against the mock, don't assume). No logo, no minimize (it's a modal, not a top-level window).
+- Content: `Padding="16"`, row `Grid`/`StackPanel` with 10px gaps, and — same technique as the Server List's `space-between` — 6 rows in a `Grid` with 6 equal `RowDefinition Height="*"` so they spread evenly across the available height (no dead space above the confirm button, and no scrollbar).
+- **Each row is 3 parts** (a bigger redesign than a plain label+toggle list — see `DESIGN-SPEC.md` §5 for the full rationale and the exact 6-row table with icon/color/subtitle per row):
+  1. **Icon badge**: 42×42 `Border`, `CornerRadius="13"`, `Background` = that row's category color at ~10% alpha (e.g. `#1A1E3A8A` for the accent-blue VPN row — WPF ARGB hex puts alpha first, don't append it like a web `#RRGGBBAA` string), containing a 21×21 icon in the full category color (`Assets/Icons/settings-globe.svg` etc. — convert per §1.3).
+  2. **Label + subtitle** stack: label 14.5px/700 `#1B2033`, subtitle 11px `#9CA3B4` underneath — this subtitle is new, don't skip it, it's what makes the screen read as a finished settings page rather than a bare toggle list.
+  3. **`ToggleSwitch`** (§1.5) bound `TwoWay` to the real setting.
+- Bind each toggle to a real setting (VPN kill-switch, system proxy, proxifier, messaging-app proxy, VOD/AI routing, game mode) — **persist these**, don't leave them as UI-only state; confirm the settings storage mechanism already used elsewhere in the app (registry, local config file, etc.) and reuse it.
+- Confirm button: full width, 50px, **accent gradient** (same `AccentGradientBrush` as the Connect/Login buttons) — this was revised from an earlier flat-gray "secondary" look to a primary-styled button; text is now "تایید و ذخیره".
+
+Rows, icons, colors, and defaults — see `DESIGN-SPEC.md` §5 for the exact 6-row table; don't invent different wording, icons, or colors, this is the approved Persian copy and palette.
 
 ---
 
@@ -330,7 +319,10 @@ Rows and defaults — see `DESIGN-SPEC.md` §5 for the exact 6 labels and ON/OFF
 - [ ] Connected screen has **no** gear/shield icons in its header (regression risk — they were removed late in the design process).
 - [ ] Connect button (Server List) and Disconnect button (Connected) sit the same 18px distance from the window's bottom edge.
 - [ ] Login and Connected logos are the enlarged sizes (100×135 in a 200×200 badge; 124×168 in a 248×248 circle) — not the original small 56×75 size from an early draft.
-- [ ] Settings toggle rows fill the available vertical space evenly (no dead gap above the "تایید" button).
+- [ ] Server List row spacing matches the preview: 12px top/bottom padding **on the row itself**, no additional `Margin` between rows (see §2) — a common regression is doubling this spacing by adding both.
+- [ ] Settings screen: **all 6 rows are visible with no scrollbar**, ever, at the app's default DPI/font settings — this is a hard requirement, not a nice-to-have.
+- [ ] Settings rows use the icon-badge + label + subtitle + plain toggle-switch layout (§5) — not the earlier flat single-color list or the ON/OFF-text pill toggle from an early draft.
+- [ ] Settings confirm button is accent-colored ("تایید و ذخیره"), not the earlier flat gray "تایید".
 - [ ] `PasswordBox` masking + eye-toggle actually works (common WPF gotcha — verify it isn't bound in a way that silently breaks the security restriction).
 - [ ] Vazirmatn is bundled and loads from `pack://application:,,,/Fonts/#Vazirmatn` — not from a network Google Fonts URL (that was only ever for the browser mockup).
 - [ ] Window dragging works via the custom header (no native titlebar to fall back on).

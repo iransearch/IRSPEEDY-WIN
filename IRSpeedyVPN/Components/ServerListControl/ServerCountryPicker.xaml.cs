@@ -43,7 +43,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (stale) text = "—";
             else if (latency == 0) text = "—";
             else if (latency == -1) text = "—";
-            else text = IRSpeedyVPN.Common.PersianDigits.Format(latency.ToString()) + " میلی‌ثانیه";
+            else text = latency.ToString(CultureInfo.InvariantCulture) + " ms";
         }
 
         public static void FromLatency(long latency, out string text)
@@ -175,6 +175,16 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private string _signalText = "—";
         public string SignalText { get => _signalText; private set { _signalText = value; On(); } }
 
+        private Brush _signalBrush = Brushes.Gray;
+        public Brush SignalBrush { get => _signalBrush; private set { _signalBrush = value; On(); } }
+        private void SetSignalColor(long latency)
+        {
+            var color = latency <= 0 ? "#9CA3B4" : latency <= 45 ? "#17A366" : latency <= 75 ? "#F59E0B" : "#DC2626";
+            var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(color);
+            brush.Freeze();
+            SignalBrush = brush;
+        }
+
         // Best (lowest) positive latency in this row, used to order the list from
         // fastest to slowest. Rows with no positive result sink to the bottom.
         public long SortKey { get; private set; } = long.MaxValue;
@@ -185,6 +195,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             IsSelectable = true;
             Sig.FromLatency(latency, out var text);
             SignalText = text;
+            SetSignalColor(latency);
             // SortKey remains the last completed result until RefreshSignals().
         }
 
@@ -222,6 +233,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 SortKey = best;
                 Sig.FromLatency(best, out var text);
                 SignalText = text;
+                SetSignalColor(best);
                 return;
             }
 
@@ -235,6 +247,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             // selected.
             Sig.FromLatency(allFresh ? -1 : 0, out var emptyText);
             SignalText = emptyText;
+            SetSignalColor(0);
         }
     }
 

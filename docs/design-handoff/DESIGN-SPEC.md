@@ -35,8 +35,9 @@ This package replaces any earlier handoff export — it reflects the final, appr
 | Ping / success green | `#17A366` | Ping values, "اعتبار باقی‌مانده", connected badge |
 | Connected dark green | `#0F7A4C` | — |
 | Disconnect red | gradient `#DC2626 → #B91C1C` | Disconnect button, Settings close button (`#EF4444 → #DC2626`) |
-| Toggle ON green | gradient `#22B37A → #159A63` | Settings toggles |
-| Toggle OFF red | gradient `#F04A4A → #DC2626` | Settings toggles |
+| Toggle ON green | gradient `#22B37A → #159A63` | Settings toggle track (on) |
+| Toggle OFF gray | `#DEE1E8` (flat) | Settings toggle track (off) |
+| Settings icon colors | `#1E3A8A` / `#7C3AED` / `#F59E0B` / `#0EA5E9` / `#EC4899` / `#6366F1` | Per-row icon badges, §5 |
 | Text primary | `#141B33` | Titles |
 | Text row title | `#1B2033` | Server names, settings labels |
 | Text muted | `#9CA3B4` / `#8A8FA3` | Secondary text, version tag |
@@ -61,7 +62,11 @@ Content (padding `4px 18px 18px`, `gap: 12px`):
 
 1. **Search field** — 44px height, radius 12, border `#E1E4EC`, placeholder "جستجوی سرورها", search icon left of text (RTL: icon appears on the right of the input visually).
 2. **Smart Location card** — 60px height, radius 14, border `#C9DBFB`, background gradient `#EFF5FF → #E6F0FE`. 34×34 accent-colored icon tile (lightning-bolt glyph) + title "موقعیت هوشمند" (14px/700, `#142057`) + subtitle "سریع‌ترین سرور، انتخاب خودکار" (12px, `#5B6BA8`).
-3. **Server list** — scrollable, flex-grow, row height auto (~62px incl. padding), radius 12 per row, hover `#F3F5F9`. Each row: 38px circular flag → label (14.5px/600) → ping value (13px/700, green) → 20px empty radio circle (border `#D5D9E3`, 2px).
+3. **Server list** — scrollable (`overflow-y: auto`; with 10 rows this list is intentionally taller than the visible area and scrolls — this is by design, unlike the Settings screen which must never scroll, see §5). Container has **no extra row-to-row gap property** — spacing between rows comes entirely from each row's own vertical padding stacking against its neighbor's:
+   - Row padding: **`12px 8px`** (12px top/bottom, 8px left/right) — this is the exact, load-bearing spacing value; two adjacent rows end up with 24px of combined breathing room between their content, which is what reads as "row spacing" in the mockup. **Do not add a separate `Margin` between `ItemsControl` rows in WPF on top of this padding** — that would double the spacing and drift from the approved preview. Implement the 12px/8px as the row `Padding` and leave inter-row `Margin` at 0.
+   - Row corner radius: 12px. Hover fill: `#F3F5F9`.
+   - Row content, left-to-right in visual (right-to-left in DOM/reading) order: 38×38 circular flag (`gap: 14px` to the next element) → label (14.5px/600, `#1B2033`, flex-grow) → ping value (13px/700, `#17A366`) → 20px empty radio circle (`border: 2px solid #D5D9E3`).
+   - Resulting row height ≈ 62px (12 + 12 padding + ~38px of tallest content, the flag).
 
 **10 servers, in order** (flag / label / ping):
 
@@ -130,23 +135,27 @@ Content (padding `4px 22px 18px`, `gap: 8px`) — bottom padding **18px**, match
 
 ## 5. Screen 4 — Settings (`Settings.dc.html`)
 
-A **modal-style screen**, not the standard app chrome:
+A **modal-style screen**, not the standard app chrome. **This screen must never scroll** — all 6 rows are fixed content and are sized/spaced to fit exactly within the 700px window height; do not let the content area overflow (`overflow: hidden` on the content container, not `auto`).
 
-- Header (64px): centered title "تنظیمات سرویس" (16.5px/800), **no logo, no minimize** — just a circular red close (X) button anchored to the trailing edge (30px diameter, red gradient `#EF4444 → #DC2626`).
-- Content: 6 toggle rows, laid out with `justify-content: space-between` so they spread evenly across the full content height (no dead space above the confirm button). Row: 68px height, radius 16, white card, border `#E8EAF0`. Label on the trailing side (15px/700), a **pill toggle** on the leading side.
-- **Toggle widget** (86×32 pill): a light-gray track containing a colored segment (green "ON" / red "OFF", flex-grow) and a white circular thumb (26px) with a chevron icon (‹ when ON, › when OFF). This is a custom two-state control, not a stock WPF `ToggleButton` — build it as a `UserControl` with a bound `bool IsOn` property; see `assets/icons/toggle-on.svg` / `toggle-off.svg` for the thumb glyphs.
-- **Rows and default state**:
+- Header (62px): centered two-line title block — "تنظیمات سرویس" (16px/800, `#141B33`) with a small muted subtitle "شخصی‌سازی رفتار اتصال" (10.5px/500, `#9CA3B4`) directly beneath it. **No logo, no minimize** — just a circular red close (X) button anchored to the trailing edge (30px diameter, red gradient `#EF4444 → #DC2626`), bottom border `#EEF0F4` separating header from content.
+- Content padding `16px 16px`, `gap: 10px`, `justify-content: space-between` (the 6 rows spread evenly across the available height — this is what removes dead space above the confirm button, and is also what keeps the screen from needing to scroll: row height + gap × 6 is sized to sum to less than the available content height at every step).
+- **Each row** (min-height 72px, radius 18, white card, border `#ECEEF3`, subtle shadow `0 1px 3px rgba(16,24,40,0.03)`, hover lifts slightly with a stronger shadow) is composed of three parts, in visual right-to-left order:
+  1. **Icon badge** — 42×42, radius 13, background = the row's category color at ~10% opacity (`color + "1A"` hex alpha), containing a 21×21 outline-style icon in the full category color. Each setting has its own icon and color — this is a deliberate visual upgrade from a flat, single-color list (see table below).
+  2. **Label + subtitle** — label 14.5px/700 `#1B2033`; a new one-line muted subtitle underneath (11px, `#9CA3B4`) explaining what the toggle does, e.g. "اتصال کل ترافیک سیستم به VPN" under "وی پی ان سراسری". This is new — don't drop it, it's what makes the screen read as a real settings page instead of a raw toggle list.
+  3. **Toggle switch** — a **standard modern pill switch**, 46×26, NOT the earlier pill-with-ON/OFF-text-label design. Track: green gradient `#22B37A → #159A63` when on, flat `#DEE1E8` when off. Thumb: plain white 21px circle, `box-shadow: 0 2px 4px rgba(16,24,40,0.25)`, slides to the trailing side when on. Build this exactly like a native iOS/Windows toggle — simpler and more professional than the earlier chevron-and-text pill.
 
-| Label | Default |
-|---|---|
-| وی پی ان سراسری | ON |
-| پروکسی سیستمی | OFF |
-| پروکسی‌فایر | OFF |
-| پروکسی تلگرام، واتساپ | OFF |
-| VOD/AI | ON |
-| Game Mode | OFF |
+**Rows, icon, color, and default state** (in this exact order):
 
-- **Confirm button** — full width, 50px height, radius 14, light-gray fill `#EDEFF3`, border `#DCDFE6`, text "تایید" (`#3A4054`, 14.5px/700). Not accent-colored — visually secondary/neutral, matching the reference mock.
+| # | Label | Subtitle | Icon | Color | Default |
+|---|---|---|---|---|---|
+| 1 | وی پی ان سراسری | اتصال کل ترافیک سیستم به VPN | globe | `#1E3A8A` (accent blue) | ON |
+| 2 | پروکسی سیستمی | اعمال روی تنظیمات شبکه ویندوز | stacked bars (system) | `#7C3AED` (violet) | OFF |
+| 3 | پروکسی‌فایر | مسیریابی هوشمند برنامه‌های خاص | route/shuffle | `#F59E0B` (amber) | OFF |
+| 4 | پروکسی تلگرام، واتساپ | دور زدن فیلترینگ پیام‌رسان‌ها | chat bubble | `#0EA5E9` (sky) | OFF |
+| 5 | VOD/AI | دسترسی به سرویس‌های ویدیو و هوش مصنوعی | play + spark | `#EC4899` (pink) | ON |
+| 6 | Game Mode | کاهش تاخیر برای بازی‌های آنلاین | gamepad | `#6366F1` (indigo) | OFF |
+
+- **Confirm button** — full width, 50px height, radius 14, **accent gradient** `#2447A8 → #1E3A8A` (this was revised from an earlier flat-gray version — the confirm action is now visually primary, matching the Connect/Login buttons), white text "تایید و ذخیره" (14.5px/700), shadow `0 10px 20px -8px rgba(30,58,138,0.45)`.
 
 ---
 
@@ -168,8 +177,9 @@ assets/
     window-minimize.svg, window-close.svg, close-circle.svg,
     user.svg, lock.svg, eye.svg, arrow-left.svg, arrow-right.svg,
     swap-server.svg, clock.svg, calendar.svg, check.svg,
-    power-disconnect.svg, toggle-on.svg, toggle-off.svg,
-    download.svg, upload.svg
+    power-disconnect.svg, download.svg, upload.svg,
+    settings-globe.svg, settings-stack.svg, settings-route.svg,
+    settings-chat.svg, settings-spark.svg, settings-pad.svg
 wpf/
   IrspeedyTheme.xaml       ResourceDictionary: colors, brushes, font sizes,
                             layout constants for all 4 screens
@@ -177,6 +187,8 @@ wpf/
 
 Notes:
 - `gear.svg` and `swap-server.svg` are the final, approved icon shapes (the earlier spoke-style gear icon in a prior export is superseded — do not reuse it).
+- The `settings-*.svg` icons are the 6 category icons for the Settings screen (§5) — each ships pre-colored to its final category color (don't recolor at runtime); if you need a single-color variant for theming, strip the `stroke`/`fill` attributes and set `currentColor` instead.
+- The Settings toggle no longer has `toggle-on.svg`/`toggle-off.svg` glyph files — the redesigned switch is a plain colored track + white circular thumb with no icon inside it (see §5 and the developer guide's `ToggleSwitch` control).
 - All flag PNGs are pre-masked to circles; if you'd rather clip at render time in WPF, use an `EllipseGeometry` clip and the rectangular flag proportions noted in each SVG (viewBox `0 0 38 38`).
 
 ---

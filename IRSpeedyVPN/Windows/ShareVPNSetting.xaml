@@ -1,741 +1,176 @@
-<Window x:Class="IRSpeedyVPN.Windows.ShareVPNSetting"
-        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d"
-        Title="اشتراک گذاری اتصال VPN"
-        Width="380"
-        SizeToContent="Height"
-        MinHeight="320"
-        Background="Transparent"
-        WindowStyle="None"
-        AllowsTransparency="True"
-        WindowStartupLocation="CenterOwner"
-        ShowInTaskbar="False"
-        FlowDirection="RightToLeft"
-        Loaded="Window_Loaded"
-        FontFamily="{StaticResource BKoodak}">
-
-    <Window.Resources>
-
-        <!-- Outer rounded card -->
-        <Style x:Key="OuterCard" TargetType="Border">
-            <Setter Property="CornerRadius" Value="26"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="BorderBrush" Value="#FF393F78"/>
-            <Setter Property="Background" Value="#FAFFFFFF"/>
-            <Setter Property="SnapsToDevicePixels" Value="True"/>
-            <Setter Property="Effect">
-                <Setter.Value>
-                    <DropShadowEffect BlurRadius="18" ShadowDepth="0" Opacity="0.18"/>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Header -->
-        <Style x:Key="HeaderBar" TargetType="Border">
-            <Setter Property="CornerRadius" Value="24,24,0,0"/>
-            <Setter Property="Background" Value="#E9ECF7"/>
-            <Setter Property="BorderBrush" Value="#FF393F78"/>
-            <Setter Property="BorderThickness" Value="0,0,0,1.5"/>
-        </Style>
-
-        <!-- Row card -->
-        <Style x:Key="SettingRowBorder" TargetType="Border">
-            <Setter Property="CornerRadius" Value="12"/>
-            <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="BorderBrush" Value="#FF393F78"/>
-            <Setter Property="Background" Value="White"/>
-            <Setter Property="Padding" Value="10,8"/>
-            <Setter Property="Margin" Value="14,10,14,0"/>
-        </Style>
-
-        <!-- Section index badge (١ / ٢) -->
-        <Style x:Key="SectionBadge" TargetType="Border">
-            <Setter Property="Width" Value="19"/>
-            <Setter Property="Height" Value="19"/>
-            <Setter Property="CornerRadius" Value="10"/>
-            <Setter Property="Background" Value="#1F2B57"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-        </Style>
-
-        <!-- Small badge (HTTP / SOCKS5 / SSID / رمز) -->
-        <Style x:Key="ProtoBadge" TargetType="Border">
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Background" Value="#1F2B57"/>
-            <Setter Property="Padding" Value="10,4"/>
-            <Setter Property="Margin" Value="0,0,8,0"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <!-- Value box (IP/Port/SSID/password) -->
-        <Style x:Key="ValueBox" TargetType="Border">
-            <Setter Property="CornerRadius" Value="8"/>
-            <Setter Property="Background" Value="#F2F3F8"/>
-            <Setter Property="BorderBrush" Value="#D0D4EA"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding" Value="8,5"/>
-            <Setter Property="Margin" Value="0,0,6,0"/>
-            <Setter Property="VerticalAlignment" Value="Center"/>
-        </Style>
-
-        <!-- Icon label (QR / Copy) -->
-        <Style x:Key="IconLabel" TargetType="Label">
-            <Setter Property="Width" Value="30"/>
-            <Setter Property="Height" Value="30"/>
-            <Setter Property="Margin" Value="6,0,0,0"/>
-            <Setter Property="Background" Value="#EEF0FA"/>
-            <Setter Property="BorderBrush" Value="#C9CFEA"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="HorizontalContentAlignment" Value="Center"/>
-            <Setter Property="VerticalContentAlignment" Value="Center"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="FontSize" Value="14"/>
-            <Setter Property="Foreground" Value="#1F2B57"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Label">
-                        <Border CornerRadius="10"
-                                Background="{TemplateBinding Background}"
-                                BorderBrush="{TemplateBinding BorderBrush}"
-                                BorderThickness="{TemplateBinding BorderThickness}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.45"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Compact borderless icon button (copy icons that must raise Click,
-             e.g. the hotspot SSID/password rows whose handlers take
-             RoutedEventArgs, unlike the proxy rows' TextBlock MouseLeftButtonUp icons) -->
-        <Style x:Key="CompactIconButton" TargetType="Button">
-            <Setter Property="Background" Value="#EEF0FA"/>
-            <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding" Value="7,5"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Foreground" Value="#1F2B57"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border Background="{TemplateBinding Background}"
-                                CornerRadius="8"
-                                Padding="{TemplateBinding Padding}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Opacity" Value="0.8"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.4"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Big Start/Stop toggle button (proxy section) -->
-        <Style x:Key="StartStopToggleStyle" TargetType="ToggleButton">
-            <Setter Property="Height" Value="46"/>
-            <Setter Property="Margin" Value="14,12,14,0"/>
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="ToggleButton">
-                        <Border x:Name="bd"
-                                CornerRadius="12"
-                                BorderBrush="#18234A"
-                                BorderThickness="1">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                    <GradientStop Color="#24325E" Offset="0"/>
-                                    <GradientStop Color="#131A36" Offset="1"/>
-                                </LinearGradientBrush>
-                            </Border.Background>
-
-                            <ContentPresenter HorizontalAlignment="Center"
-                                              VerticalAlignment="Center"/>
-                        </Border>
-
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.95"/>
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.9"/>
-                            </Trigger>
-
-                            <!-- Content depending on IsChecked -->
-                            <Trigger Property="IsChecked" Value="True">
-                                <Setter Property="Content" Value="غیر فعال سازی اشتراک"/>
-                            </Trigger>
-                            <Trigger Property="IsChecked" Value="False">
-                                <Setter Property="Content" Value="فعال سازی اشتراک"/>
-                            </Trigger>
-
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter TargetName="bd" Property="Opacity" Value="0.6"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Big action button (hotspot section) — same gradient/rounding as
-             StartStopToggleStyle so the two sections read as one visual
-             system, but a plain Button (hotspotToggle's Content text is
-             driven from code, so it stays a Button rather than a ToggleButton). -->
-        <Style x:Key="BigActionButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="46"/>
-            <Setter Property="FontSize" Value="16"/>
-            <Setter Property="FontWeight" Value="Bold"/>
-            <Setter Property="Foreground" Value="White"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border CornerRadius="12"
-                                BorderBrush="#18234A"
-                                BorderThickness="1">
-                            <Border.Background>
-                                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                    <GradientStop Color="#24325E" Offset="0"/>
-                                    <GradientStop Color="#131A36" Offset="1"/>
-                                </LinearGradientBrush>
-                            </Border.Background>
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Opacity" Value="0.95"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.55"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Secondary/lighter button (retry stop, save password) -->
-        <Style x:Key="SecondaryButtonStyle" TargetType="Button">
-            <Setter Property="Height" Value="36"/>
-            <Setter Property="FontSize" Value="13"/>
-            <Setter Property="Foreground" Value="#1F2B57"/>
-            <Setter Property="Cursor" Value="Hand"/>
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border CornerRadius="10"
-                                Background="#F2F3F8"
-                                BorderBrush="#D0D4EA"
-                                BorderThickness="1">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter Property="Opacity" Value="0.85"/>
-                            </Trigger>
-                            <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
-        </Style>
-
-        <!-- Spinner storyboard (dots) -->
-        <Storyboard x:Key="SpinnerStoryboard" RepeatBehavior="Forever">
-            <DoubleAnimation Storyboard.TargetName="Dot1" Storyboard.TargetProperty="Opacity"
-                             From="0.2" To="1" Duration="0:0:0.45" AutoReverse="True"/>
-            <DoubleAnimation Storyboard.TargetName="Dot2" Storyboard.TargetProperty="Opacity"
-                             From="0.2" To="1" Duration="0:0:0.45" BeginTime="0:0:0.15" AutoReverse="True"/>
-            <DoubleAnimation Storyboard.TargetName="Dot3" Storyboard.TargetProperty="Opacity"
-                             From="0.2" To="1" Duration="0:0:0.45" BeginTime="0:0:0.30" AutoReverse="True"/>
-        </Storyboard>
-
-    </Window.Resources>
-
-    <Border Style="{StaticResource OuterCard}">
-        <Grid>
-            <Grid.RowDefinitions>
-                <RowDefinition Height="48"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
-
-            <!-- HEADER -->
-            <Border Grid.Row="0"
-                    CornerRadius="24,24,0,0"
-                    Background="#E9ECF7"
-                    BorderBrush="#FF393F78"
-                    FlowDirection="LeftToRight"
-                    BorderThickness="0,0,0,1.5">
-                <Grid Margin="10,0">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="44"/>
-                        <ColumnDefinition Width="*"/>
-                        <ColumnDefinition Width="34"/>
-                    </Grid.ColumnDefinitions>
-
-                    <TextBlock Grid.Column="1"
-                               FlowDirection="RightToLeft"
-                               Text="اشتراک گذاری اتصال VPN"
-                               FontSize="17"
-                               FontWeight="Bold"
-                               Foreground="#FF393F78"
-                               VerticalAlignment="Center"
-                               HorizontalAlignment="Center"/>
-
-                    <!-- Close -->
-                    <Border Grid.Column="2"
-                            Width="26"
-                            Height="26"
-                            CornerRadius="13"
-                            Background="#F6DADA"
-                            BorderBrush="#C94B4B"
-                            BorderThickness="1"
-                            VerticalAlignment="Center"
-                            HorizontalAlignment="Right"
-                            Cursor="Hand"
-                            MouseDown="Close_MouseDown">
-                        <TextBlock Text="&#xF00D;"
-                                   FontFamily="{StaticResource fa_ProLight}"
-                                   Foreground="#C01616"
-                                   FontSize="14"
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"/>
-                    </Border>
-                </Grid>
-            </Border>
-
-            <!-- CONTENT: single continuous page (no tabs). Section 1 = direct
-                 Wi-Fi Direct hotspot, Section 2 = HTTP/SOCKS5 proxy sharing.
-                 Every x:Name/event handler used by ShareVPNSetting.xaml.cs and
-                 ShareVPNSetting.Hotspot.cs is unchanged from before this pass -
-                 only the visual layout/spacing/skin around them changed. -->
-            <StackPanel Grid.Row="1" Margin="0,4,0,6">
-
-                <!-- ===================== SECTION 1: DIRECT HOTSPOT ===================== -->
-                <Border Style="{StaticResource SettingRowBorder}" Margin="14,8,14,0">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal">
-                            <Border Style="{StaticResource SectionBadge}">
-                                <TextBlock Text="۱" Foreground="White" FontWeight="Bold" FontSize="10"
-                                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <TextBlock Text="هات‌اسپات مستقیم VPN" FontSize="15" FontWeight="Bold"
-                                       Foreground="#1F2B57" VerticalAlignment="Center"/>
-                        </StackPanel>
-                        <TextBlock Text="گوشی یا تلویزیون را بدون تنظیم پراکسی، طبق مسیریابی فعلی VPN وصل کنید (فقط با TUN فعال)."
-                                   TextWrapping="Wrap" Margin="0,4,0,0" FontSize="12.5" Foreground="#555"/>
-
-                        <Button x:Name="hotspotToggle" Content="فعال‌سازی اشتراک‌گذاری مستقیم"
-                                Click="HotspotToggle_Click" Style="{StaticResource BigActionButtonStyle}"
-                                Margin="0,10,0,0"/>
-                        <TextBlock x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,6,0,0" FontSize="12.5" Foreground="#1F2B57"/>
-                        <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click"
-                                Style="{StaticResource SecondaryButtonStyle}" Visibility="Collapsed" Margin="0,6,0,0"/>
-
-                        <StackPanel x:Name="hotspotCredentials" Visibility="Collapsed" Margin="0,8,0,0">
-
-                            <!-- SSID row: badge + value + copy, one row -->
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Style="{StaticResource ProtoBadge}">
-                                    <TextBlock Text="SSID" FontSize="12" FontWeight="Bold" Foreground="White"/>
-                                </Border>
-                                <Border Grid.Column="1" Style="{StaticResource ValueBox}">
-                                    <TextBox x:Name="hotspotName" IsReadOnly="True" BorderThickness="0"
-                                             Background="Transparent" FlowDirection="LeftToRight" FontSize="13"
-                                             VerticalAlignment="Center" Padding="0" IsReadOnlyCaretVisible="False"/>
-                                </Border>
-                                <Button Grid.Column="2" Style="{StaticResource CompactIconButton}" Click="HotspotCopyName_Click">
-                                    <TextBlock Text="&#xF0C5;" FontFamily="{StaticResource fa_ProLight}" FontSize="15"/>
-                                </Button>
-                            </Grid>
-
-                            <!-- Password row: badge + value + copy, one row -->
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <Border Grid.Column="0" Style="{StaticResource ProtoBadge}">
-                                    <TextBlock Text="رمز" FontSize="12" FontWeight="Bold" Foreground="White"/>
-                                </Border>
-                                <Border Grid.Column="1" Style="{StaticResource ValueBox}">
-                                    <TextBox x:Name="hotspotPassword" IsReadOnly="True" BorderThickness="0"
-                                             Background="Transparent" FlowDirection="LeftToRight" FontSize="14"
-                                             VerticalAlignment="Center" Padding="0" IsReadOnlyCaretVisible="False"/>
-                                </Border>
-                                <Button Grid.Column="2" Style="{StaticResource CompactIconButton}" Click="HotspotCopyPassword_Click">
-                                    <TextBlock Text="&#xF0C5;" FontFamily="{StaticResource fa_ProLight}" FontSize="15"/>
-                                </Button>
-                            </Grid>
-
-                            <TextBlock x:Name="hotspotClients" FontSize="12" Foreground="#666"/>
-                        </StackPanel>
-
-                        <Expander Header="تغییر رمز وای‌فای" Margin="0,10,0,0" FontSize="13">
-                            <StackPanel Margin="0,8,0,0">
-                                <TextBlock Text="رمز اولیه خودکار ساخته می‌شود. برای تغییر، هنگام خاموش‌بودن هات‌اسپات دقیقاً ۱۰ رقم انگلیسی وارد کنید."
-                                           TextWrapping="Wrap" FontSize="12" Foreground="#555"/>
-                                <TextBox x:Name="hotspotPasswordEditor" MaxLength="10" FlowDirection="LeftToRight"
-                                         Margin="0,6,0,0" FontSize="14" Padding="6,4"/>
-                                <Button x:Name="hotspotSavePassword" Content="ذخیره رمز جدید" Click="HotspotSavePassword_Click"
-                                        Style="{StaticResource SecondaryButtonStyle}" Margin="0,6,0,0"/>
-                            </StackPanel>
-                        </Expander>
-                    </StackPanel>
-                </Border>
-
-                <!-- ===================== SECTION 2: HTTP/SOCKS5 PROXY ===================== -->
-                <Grid x:Name="ContentGrid" Margin="0,8,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto"/>
-                        <RowDefinition Height="Auto"/>
-                        <!-- IMPORTANT (Option A): Auto so window grows when pnlShowIP becomes Visible -->
-                        <RowDefinition Height="Auto"/>
-                    </Grid.RowDefinitions>
-
-                    <!-- Instructions box -->
-                    <Border Style="{StaticResource SettingRowBorder}" Margin="14,0,14,0">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal">
-                                <Border Style="{StaticResource SectionBadge}">
-                                    <TextBlock Text="۲" Foreground="White" FontWeight="Bold" FontSize="10"
-                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                                </Border>
-                                <TextBlock Text="اشتراک‌گذاری با پراکسی" FontSize="15" FontWeight="Bold"
-                                           Foreground="#1F2B57" VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <TextBlock Text="روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید."
-                                       Margin="0,4,0,0"
-                                       FontSize="12.5"
-                                       Foreground="#555"
-                                       TextAlignment="Left"
-                                       TextWrapping="Wrap"/>
-                        </StackPanel>
-                    </Border>
-
-                    <!-- Start/Stop + Spinner -->
-                    <Grid Grid.Row="1" Margin="0,4,0,0">
-
-                        <!-- connectionId=3 -->
-                        <ToggleButton x:Name="btnStartStop"
-                                      Style="{StaticResource StartStopToggleStyle}"
-                                      Click="btnStartStop_Click"/>
-
-                        <!-- connectionId=4,5,6,7 -->
-                        <Grid x:Name="LoadingSpinner"
-                              HorizontalAlignment="Center"
-                              VerticalAlignment="Center"
-                              Visibility="Collapsed"
-                              IsHitTestVisible="False"
-                              Margin="0,12,0,0" >
-                            <Border Background="#66000000"
-                                    Padding="30,8"
-
-                                    CornerRadius="14">
-                                <StackPanel Orientation="Horizontal">
-                                    <Ellipse x:Name="Dot1" Width="10" Height="10" Fill="White" Opacity="0.2" Margin="4,0"/>
-                                    <Ellipse x:Name="Dot2" Width="10" Height="10" Fill="White" Opacity="0.2" Margin="4,0"/>
-                                    <Ellipse x:Name="Dot3" Width="10" Height="10" Fill="White" Opacity="0.2" Margin="4,0"/>
-                                </StackPanel>
-                            </Border>
-                        </Grid>
-
-                    </Grid>
-
-                    <!-- Proxy rows (hidden until share active) -->
-                    <!-- connectionId=9 -->
-                    <StackPanel Grid.Row="2" x:Name="pnlShowIP" Visibility="Visible" Margin="0,2,0,8">
-
-                        <!-- HTTP row.
-                             Badge/IP/Port/spacer/QR/Copy columns are Auto (+ one "*" spacer)
-                             so this row always stays on ONE row regardless of the fixed
-                             380px window width; the previous fixed 80/110/72 px columns
-                             could overflow the card on real builds and pushed the copy
-                             icon out of view. -->
-                       <Border  Style="{StaticResource SettingRowBorder}" Margin="14,6,14,0">
-                            <Grid  FlowDirection="LeftToRight" VerticalAlignment="Center"  TextElement.FontFamily="Arial">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0"
-                                        CornerRadius="5"
-                                        Height="24"
-                                        Padding="9,0"
-                                        Margin="0,0,3,0"
-                                        VerticalAlignment="Center">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#2B3A73" Offset="0"/>
-                                            <GradientStop Color="#151C3D" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <TextBlock  Text="HTTP"
-                                               FontSize="12"
-                                               FontWeight="Bold"
-                                               Foreground="White"
-                                               TextAlignment="Center"
-                                               VerticalAlignment="Center"/>
-                                </Border>
-
-                                <Border Grid.Column="1"
-                                        CornerRadius="5"
-                                        Height="24"
-                                        Padding="9,0"
-                                        Margin="0,0,3,0"
-                                        VerticalAlignment="Center">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#2B3A73" Offset="0"/>
-                                            <GradientStop Color="#151C3D" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <TextBlock   x:Name="txtIp0"
-                                               FlowDirection="LeftToRight"
-                                               Text="192.168.3.190"
-                                               FontSize="12"
-                                               Foreground="White"
-                                               TextAlignment="Center"
-                                               VerticalAlignment="Center"/>
-                                </Border>
-
-                                <Border Grid.Column="2"
-                                        CornerRadius="5"
-                                        Height="24"
-                                        Padding="9,0"
-                                        Margin="0,0,6,0"
-                                        MinWidth="52"
-                                        VerticalAlignment="Center">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#2B3A73" Offset="0"/>
-                                            <GradientStop Color="#151C3D" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <TextBlock x:Name="txtPortHttp"
-                                               FlowDirection="LeftToRight"
-                                               Text="10808"
-                                               FontSize="12"
-                                               Foreground="White"
-                                               VerticalAlignment="Center"
-                                               HorizontalAlignment="Center"/>
-                                </Border>
-
-                                <TextBlock Grid.Column="4"
-                                           Text="&#xF029;"
-                                           FontFamily="{StaticResource fa_ProLight}"
-                                           FontSize="18"
-                                           Foreground="#1F2B57"
-                                           Cursor="Hand"
-                                           VerticalAlignment="Center"
-                                           Padding="8,0"
-                                           MouseLeftButtonUp="lblHttpQR_MouseLeftButtonUp"/>
-
-                                <TextBlock Grid.Column="5"
-                                           Text="&#xF0C5;"
-                                           FontFamily="{StaticResource fa_ProLight}"
-                                           FontSize="18"
-                                           Foreground="#1F2B57"
-                                           Cursor="Hand"
-                                           VerticalAlignment="Center"
-                                           MouseLeftButtonUp="lblHttpCopy_MouseLeftButtonUp"/>
-                            </Grid>
-                        </Border>
-
-
-                        <!-- SOCKS5 row (same Auto/spacer column fix as the HTTP row above) -->
-                        <Border Style="{StaticResource SettingRowBorder}" Margin="14,6,14,0">
-                            <Grid FlowDirection="LeftToRight" VerticalAlignment="Center"  TextElement.FontFamily="Arial">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-
-                                <Border Grid.Column="0"
-                                        CornerRadius="5"
-                                        Height="24"
-                                        Padding="9,0"
-                                        Margin="0,0,3,0"
-                                        VerticalAlignment="Center">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#2B3A73" Offset="0"/>
-                                            <GradientStop Color="#151C3D" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <TextBlock Text="SOCKS5"
-                                               FontSize="12"
-                                               FontWeight="Bold"
-                                               Foreground="White"
-                                               VerticalAlignment="Center"/>
-                                </Border>
-
-                                <Border Grid.Column="1"
-                                        CornerRadius="5"
-                                        Height="24"
-                                        Padding="9,0"
-                                        Margin="0,0,3,0"
-                                        VerticalAlignment="Center">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#2B3A73" Offset="0"/>
-                                            <GradientStop Color="#151C3D" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <TextBlock x:Name="txtIp1"
-                                               FlowDirection="LeftToRight"
-                                               Text="192.168.3.190"
-                                               FontSize="12"
-                                               Foreground="White"
-                                               TextAlignment="Center"
-                                               VerticalAlignment="Center"/>
-                                </Border>
-
-                                <Border Grid.Column="2"
-                                        CornerRadius="5"
-                                        Height="24"
-                                        Padding="9,0"
-                                        Margin="0,0,6,0"
-                                        MinWidth="52"
-                                        VerticalAlignment="Center">
-                                    <Border.Background>
-                                        <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                                            <GradientStop Color="#2B3A73" Offset="0"/>
-                                            <GradientStop Color="#151C3D" Offset="1"/>
-                                        </LinearGradientBrush>
-                                    </Border.Background>
-                                    <TextBlock x:Name="txtPortSocks"
-                                               FlowDirection="LeftToRight"
-                                               Text="10808"
-                                               FontSize="12"
-                                               Foreground="White"
-                                               VerticalAlignment="Center"
-                                               HorizontalAlignment="Center"/>
-                                </Border>
-
-                                <TextBlock Grid.Column="4"
-                                           Text="&#xF029;"
-                                           FontFamily="{StaticResource fa_ProLight}"
-                                           FontSize="18"
-                                           Foreground="#1F2B57"
-                                           Cursor="Hand"
-                                           VerticalAlignment="Center"
-                                           Padding="8,0"
-                                           MouseLeftButtonUp="lblSocksQR_MouseLeftButtonUp"/>
-
-                                <TextBlock Grid.Column="5"
-                                           Text="&#xF0C5;"
-                                           FontFamily="{StaticResource fa_ProLight}"
-                                           FontSize="18"
-                                           Foreground="#1F2B57"
-                                           Cursor="Hand"
-                                           VerticalAlignment="Center"
-                                           MouseLeftButtonUp="lblSocksCopy_MouseLeftButtonUp"/>
-                            </Grid>
-                        </Border>
-
-                        <!-- HTTP QR Popup -->
-                        <Popup x:Name="popHttpQR"
-                               Placement="MousePoint"
-                               StaysOpen="False"
-                               AllowsTransparency="True"
-                               Opened="popHttpQR_Opened"
-                               Closed="popHttpQR_Closed">
-                            <Border x:Name="bdHttpPopupHost"
-                                    Background="White"
-                                    BorderBrush="#FF393F78"
-                                    BorderThickness="1.5"
-                                    CornerRadius="16"
-                                    Padding="6"
-                                    Focusable="True">
-                                <StackPanel>
-
-                                    <Image x:Name="imgHttpQR"
-                                           Width="160"
-                                           Height="160"
-                                           Margin="0,10,0,0"
-                                           Stretch="Uniform"/>
-                                </StackPanel>
-                            </Border>
-                        </Popup>
-
-                        <!-- SOCKS QR Popup -->
-                        <Popup x:Name="popSocksQR"
-                               Placement="MousePoint"
-                               StaysOpen="False"
-                               AllowsTransparency="True"
-                               Opened="popSocksQR_Opened"
-                               Closed="popSocksQR_Closed">
-                            <Border x:Name="bdSocksPopupHost"
-                                    Background="White"
-                                    BorderBrush="#FF393F78"
-                                    BorderThickness="1.5"
-                                    CornerRadius="16"
-                                    Padding="6"
-                                    Focusable="True">
-                                <StackPanel>
-
-                                    <Image x:Name="imgSocksQR"
-                                           Width="160"
-                                           Height="160"
-                                           Margin="0,10,0,0"
-                                           Stretch="Uniform"/>
-                                </StackPanel>
-                            </Border>
-                        </Popup>
-
-                        <!-- Copied Popup -->
-                        <Popup x:Name="popCopied"
-                               Placement="Bottom"
-                               StaysOpen="False"
-                               AllowsTransparency="True">
-                            <Border Background="#1F2B57"
-                                    CornerRadius="12"
-                                    Padding="10,6"
-                                    Opacity="0.95">
-                                <TextBlock Text="کپی شد"
-                                           Foreground="White"
-                                           FontSize="13"
-                                           FontWeight="Bold"/>
-                            </Border>
-                        </Popup>
-
-                    </StackPanel>
-                </Grid>
-            </StackPanel>
-        </Grid>
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.ShareVPNSetting" Title="اشتراک‌گذاری اتصال" Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{StaticResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="LeftToRight" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Loaded="Window_Loaded">
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/>
+  </WindowChrome.WindowChrome>
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="62"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="0"/>
+    </Grid.RowDefinitions>
+    <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1">
+      <Grid Margin="16,0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="اشتراک‌گذاری اتصال" FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="ExtraBold" HorizontalAlignment="Center"/>
+          <TextBlock Text="اتصال VPN را با دستگاه‌های دیگر به اشتراک بگذارید" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" HorizontalAlignment="Center"/>
+        </StackPanel>
+        <Button Style="{StaticResource HandoffClose}" Click="Close_Click"/>
+      </Grid>
     </Border>
+    <Grid Grid.Row="1" Margin="16,16">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="41"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Border CornerRadius="12" Background="#EEF1F8" Padding="4">
+          <Grid>
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="*"/>
+            </Grid.ColumnDefinitions>
+            <Button x:Name="DirectTab" Content="اشتراک مستقیم" Click="DirectTab_Click" Style="{StaticResource HandoffPlainButton}" HorizontalContentAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#9CA3B4"/>
+            <Button x:Name="ProxyTab" Grid.Column="1" Content="اشتراک با پراکسی" Click="ProxyTab_Click" Style="{StaticResource HandoffPlainButton}" HorizontalContentAlignment="Center" FontSize="13" FontWeight="Bold" Background="White" Foreground="#141B33"/>
+          </Grid>
+        </Border>
+        <Grid x:Name="ProxyPanel" Grid.Row="1" Margin="0,16,0,0">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <StackPanel>
+            <Border Height="120" CornerRadius="16" BorderBrush="#E1E6F3" BorderThickness="1" Background="White" Padding="14">
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="۱  فعال‌سازی اشتراک" FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                <TextBlock Text="اشتراک‌گذاری VPN را روی این دستگاه فعال کنید. ۲  تنظیم پراکسی روی دستگاه دوم روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="RightToLeft" TextWrapping="Wrap" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Border>
+            <Border Height="52" CornerRadius="15" Background="#F4F6FA" Margin="0,12,0,12" Padding="14,0">
+              <Grid>
+                <ToggleButton x:Name="btnStartStop" Click="btnStartStop_Click" Style="{StaticResource HandoffPill}" HorizontalAlignment="Left" AutomationProperties.Name="اشتراک‌گذاری پراکسی"/>
+                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                  <TextBlock Text="اشتراک‌گذاری پراکسی" FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                  <TextBlock Text="" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" x:Name="ProxyStatus"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </StackPanel>
+          <Grid Grid.Row="1">
+            <StackPanel x:Name="pnlShowIP">
+              <Border Height="50" Margin="0,0,0,10" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="10,0">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="56"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Click="CopyProxy_Click" Tag="HTTP" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی HTTP" AutomationProperties.Name="کپی HTTP">
+                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center"/>
+                    </Button>
+                    <Button Click="Qr_Click" Tag="HTTP" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کد QR HTTP" AutomationProperties.Name="کد QR HTTP">
+                      <Path Data="M1,1 L6,1 6,6 1,6 Z M10,1 L15,1 15,6 10,6 Z M1,10 L6,10 6,15 1,15 Z M10,10 L12,10 12,12 15,12 15,15 10,15 Z" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center"/>
+                    </Button>
+                  </StackPanel>
+                  <TextBlock x:Name="HTTPAddress" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="#24365F" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                  <Border Grid.Column="2" Background="#1E3A8A" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
+                    <TextBlock Text="HTTP" FontSize="11" Foreground="White" FontWeight="ExtraBold"/>
+                  </Border>
+                </Grid>
+              </Border>
+              <Border Height="50" Margin="0,0,0,10" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="10,0">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="56"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                  </Grid.ColumnDefinitions>
+                  <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Click="CopyProxy_Click" Tag="SOCKS5" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی SOCKS5" AutomationProperties.Name="کپی SOCKS5">
+                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center"/>
+                    </Button>
+                    <Button Click="Qr_Click" Tag="SOCKS5" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کد QR SOCKS5" AutomationProperties.Name="کد QR SOCKS5">
+                      <Path Data="M1,1 L6,1 6,6 1,6 Z M10,1 L15,1 15,6 10,6 Z M1,10 L6,10 6,15 1,15 Z M10,10 L12,10 12,12 15,12 15,15 10,15 Z" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center"/>
+                    </Button>
+                  </StackPanel>
+                  <TextBlock x:Name="SOCKS5Address" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="#24365F" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+                  <Border Grid.Column="2" Background="#0D9488" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
+                    <TextBlock Text="SOCKS5" FontSize="11" Foreground="White" FontWeight="ExtraBold"/>
+                  </Border>
+                </Grid>
+              </Border>
+            </StackPanel>
+            <controls:SharingMotion x:Name="ProxyMotion" VerticalAlignment="Bottom"/>
+            <Border x:Name="ProxyOffHint" Height="60" VerticalAlignment="Center" CornerRadius="16" BorderBrush="#D5DEEF" BorderThickness="1" Padding="16">
+              <TextBlock Text="برای مشاهده آدرس و پورت پراکسی، ابتدا اشتراک‌گذاری را فعال کنید." FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" TextWrapping="Wrap" VerticalAlignment="Center"/>
+            </Border>
+          </Grid>
+        </Grid>
+        <Grid x:Name="DirectPanel" Grid.Row="1" Margin="0,16,0,0" Visibility="Collapsed">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+          </Grid.RowDefinitions>
+          <StackPanel>
+            <Border Height="80" CornerRadius="16" BorderBrush="#E1E6F3" BorderThickness="1" Background="White" Padding="14">
+              <StackPanel VerticalAlignment="Center">
+                <TextBlock Text="۱  اتصال دستگاه‌های دیگر" FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                <TextBlock Text="این دستگاه به یک Wi-Fi مستقیم تبدیل می‌شود؛ به آن متصل شوید تا از VPN استفاده کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="RightToLeft" TextWrapping="Wrap" Margin="0,4,0,0"/>
+              </StackPanel>
+            </Border>
+            <Border Height="52" CornerRadius="15" Background="#F4F6FA" Margin="0,12,0,12" Padding="14,0">
+              <Grid>
+                <ToggleButton x:Name="hotspotToggle" Click="HotspotToggle_Click" Style="{StaticResource HandoffPill}" HorizontalAlignment="Left" AutomationProperties.Name="هات‌اسپات مستقیم"/>
+                <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+                  <TextBlock Text="هات‌اسپات مستقیم" FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                  <TextBlock Text="" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" x:Name="hotspotStateLabel"/>
+                </StackPanel>
+              </Grid>
+            </Border>
+            <Border x:Name="hotspotCredentials" CornerRadius="15" BorderBrush="#ECEEF3" BorderThickness="1" Background="White" Padding="12,6">
+              <StackPanel>
+                <TextBlock Text="اطلاعات هات‌اسپات" FontSize="11" Foreground="#31456F" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                <Grid Height="45">
+                  <Button HorizontalAlignment="Left" Click="HotspotCopyName_Click" Tag="hotspotName" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی" AutomationProperties.Name="کپی">
+                    <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center"/>
+                  </Button>
+                  <TextBlock x:Name="hotspotName" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#141B33"/>
+                </Grid>
+                <Grid Height="45">
+                  <Button HorizontalAlignment="Left" Click="HotspotCopyPassword_Click" Tag="hotspotPassword" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی" AutomationProperties.Name="کپی">
+                    <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center"/>
+                  </Button>
+                  <Button Click="HotspotEditPassword_Click" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" HorizontalAlignment="Left" Margin="32,0,0,0" ToolTip="تغییر رمز وای‌فای"><Path Data="M2,13 L3,9 12,0 16,4 7,13 Z M10,2 L14,6" Stroke="#5B6478" StrokeThickness="1.2" Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Center"/></Button>
+                  <TextBlock x:Name="hotspotPassword" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#141B33"/>
+                </Grid>
+              </StackPanel>
+            </Border>
+            <TextBlock Text="" FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="RightToLeft" x:Name="hotspotClients" Margin="0,6,0,0"/>
+            <TextBlock Text="" FontSize="11" Foreground="#64748B" TextAlignment="Right" FlowDirection="RightToLeft" x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,5,0,0"/>
+            <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#DC2626" FontSize="11" Height="28" Visibility="Collapsed"/>
+            <Grid x:Name="PasswordEditorPanel" Margin="0,10,0,0">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="85"/>
+                <ColumnDefinition Width="*"/>
+              </Grid.ColumnDefinitions>
+              <Button x:Name="hotspotSavePassword" Content="ذخیره رمز" Click="HotspotSavePassword_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#2447A8" FontSize="11"/>
+              <StackPanel Grid.Column="1">
+                <TextBlock Text="رمز جدید وای‌فای (۱۰ رقم انگلیسی)" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft"/>
+                <PasswordBox x:Name="hotspotPasswordEditor" Height="30" MaxLength="10" VerticalContentAlignment="Center" HorizontalContentAlignment="Right" AutomationProperties.Name="رمز جدید وای‌فای"/>
+              </StackPanel>
+            </Grid>
+          </StackPanel>
+          <controls:SharingMotion x:Name="DirectMotion" Grid.Row="1" IsDirect="True" VerticalAlignment="Bottom"/>
+        </Grid>
+        <Popup x:Name="QrPopup" Placement="Center" StaysOpen="False" AllowsTransparency="True">
+          <Border Background="White" BorderBrush="#DDE2EF" BorderThickness="1" CornerRadius="16" Padding="16">
+            <StackPanel>
+              <Image x:Name="QrImage" Width="220" Height="220"/>
+              <TextBlock x:Name="QrLabel" FontSize="12" TextAlignment="Center" Margin="0,8,0,0"/>
+            </StackPanel>
+          </Border>
+        </Popup>
+      </Grid>
+    </Grid>
+  </Grid>
 </Window>

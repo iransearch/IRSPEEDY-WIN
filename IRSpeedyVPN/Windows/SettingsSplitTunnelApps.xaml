@@ -1,0 +1,69 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.SettingsSplitTunnelApps" Title="برنامه‌های تقسیم تونل" Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{StaticResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="LeftToRight" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Loaded="Window_Loaded">
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/>
+  </WindowChrome.WindowChrome>
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="62"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="68"/>
+    </Grid.RowDefinitions>
+    <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1">
+      <Grid Margin="16,0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="برنامه‌های تقسیم تونل" FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="ExtraBold" HorizontalAlignment="Center"/>
+          <TextBlock Text="انتخاب برنامه‌ها برای عبور از تونل امن" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" HorizontalAlignment="Center"/>
+        </StackPanel>
+        <Button Style="{StaticResource HandoffClose}" Click="Close_Click"/>
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1" Margin="16,16">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="46"/>
+          <RowDefinition Height="58"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="32"/>
+        </Grid.RowDefinitions>
+        <Border CornerRadius="14" BorderBrush="#DFE4EF" BorderThickness="1" Background="White">
+          <TextBox x:Name="SearchBox" Margin="12,0" BorderThickness="0" Background="Transparent" TextAlignment="Right" FlowDirection="RightToLeft" VerticalContentAlignment="Center" FontSize="13" TextChanged="Search_Changed" ToolTip="جستجوی نام برنامه" AutomationProperties.Name="جستجوی برنامه‌ها"/>
+        </Border>
+        <Grid Grid.Row="1">
+          <Button Click="SelectAll_Click" Style="{StaticResource HandoffPlainButton}" Content="انتخاب همه" HorizontalAlignment="Left" Foreground="#2447A8" FontSize="11"/>
+          <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center">
+            <TextBlock x:Name="SelectedCount" TextAlignment="Right" FontSize="11" Foreground="#64748B"/>
+            <TextBlock Text="پیش‌نمایش؛ مسیریابی برنامه‌ها هنوز اعمال نمی‌شود" FontSize="10" Foreground="#9CA3B4" FlowDirection="RightToLeft"/>
+          </StackPanel>
+        </Grid>
+        <ItemsControl Grid.Row="2" x:Name="AppList">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <Border Height="48" Margin="0,0,0,6" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="12,0">
+                <Grid>
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="46"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="34"/>
+                  </Grid.ColumnDefinitions>
+                  <controls:ServiceToggle IsOn="{Binding Selected, Mode=TwoWay}" AutomationProperties.Name="{Binding Name}"/>
+                  <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
+                    <TextBlock Text="{Binding Name}" TextAlignment="Right" FontWeight="Bold" FontSize="12" TextTrimming="CharacterEllipsis"/>
+                    <TextBlock Text="{Binding ExecutableName}" TextAlignment="Right" FontSize="10" Foreground="#9CA3B4" TextTrimming="CharacterEllipsis" ToolTip="{Binding Path}"/>
+                  </StackPanel>
+                  <Image Grid.Column="2" Source="{Binding Icon}" Width="28" Height="28" RenderOptions.BitmapScalingMode="HighQuality"/>
+                </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <TextBlock Grid.Row="2" x:Name="EmptyText" Text="در حال خواندن برنامه‌های نصب‌شده…" FontSize="12" Foreground="#9CA3B4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        <Grid Grid.Row="3">
+          <Button x:Name="PreviousButton" HorizontalAlignment="Left" Content="قبلی" Click="Previous_Click" Style="{StaticResource HandoffPlainButton}"/>
+          <TextBlock x:Name="PageText" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#9CA3B4" FontSize="10"/>
+          <Button x:Name="NextButton" HorizontalAlignment="Right" Content="بعدی" Click="Next_Click" Style="{StaticResource HandoffPlainButton}"/>
+        </Grid>
+      </Grid>
+    </Grid>
+    <Button Grid.Row="2" Margin="16,0,16,18" Height="50" Style="{StaticResource DesignActionButton}" Content="تایید و ذخیره" Click="btnOK_Click"/>
+  </Grid>
+</Window>

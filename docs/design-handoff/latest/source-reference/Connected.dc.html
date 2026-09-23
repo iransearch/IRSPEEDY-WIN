@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>آی‌آر اسپیدی — وضعیت اتصال</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+  body { margin: 0; font-family: 'Vazirmatn', system-ui, sans-serif; }
+  .irs-btn:hover { background: rgba(17,24,39,0.06); }
+  .irs-disconnect:hover { box-shadow: 0 14px 28px -8px rgba(185,28,28,0.5); transform: translateY(-1px); }
+  .irs-change:hover { background: rgba(30,58,138,0.16); }
+
+  /* rocket + shield stay perfectly still — only the flame behind them moves */
+  .irs-glow-pulse { animation: irsGlowPulse 2.6s ease-in-out infinite; }
+  @keyframes irsGlowPulse {
+    0%, 100% { opacity: 0.55; transform: scale(0.94); }
+    50%      { opacity: 1; transform: scale(1.08); }
+  }
+  .irs-ring-pulse { animation: irsRingPulse 2.6s ease-in-out infinite; }
+  @keyframes irsRingPulse {
+    0%, 100% { transform: scale(1); opacity: 0.55; }
+    50%      { transform: scale(1.035); opacity: 0.95; }
+  }
+
+  .irs-engine-glow { opacity: 0.85; }
+
+  /* real exhaust artwork (separate PSD layer) stays put — a streaking light races through it to read as speed, not a pulse */
+  .irs-exhaust-streak {
+    background: linear-gradient(180deg, #FFFDF0 0%, #FFFDF0 8%, #FDE68A 22%, #FB923C 42%, #F97316 58%, #FB923C 76%, #FFFDF0 92%, #FFFDF0 100%);
+    background-size: 100% 260%;
+    mix-blend-mode: screen;
+    animation: irsFlameSpeed 0.42s linear infinite;
+  }
+  @keyframes irsFlameSpeed {
+    0%   { background-position: 0 -160%; }
+    100% { background-position: 0 100%; }
+  }
+
+  /* a bright light travels the server card's actual border perimeter at constant speed, once per lap */
+  .irs-shine-dash { animation: irsShineDash 1.6s linear infinite; }
+  @keyframes irsShineDash {
+    to { stroke-dashoffset: -100; }
+  }
+</style>
+</helmet>
+
+<div dir="rtl" style="width: 1280px; height: 860px; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: center; background: radial-gradient(1100px 700px at 78% 12%, #EAF1FB 0%, #DCE6F5 38%, #CBD8ED 100%); overflow: hidden; font-family: 'Vazirmatn', sans-serif;">
+
+  <!-- soft desktop taskbar hint, for context only -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: rgba(255,255,255,0.35); backdrop-filter: blur(6px); border-top: 1px solid rgba(255,255,255,0.5);"></div>
+
+  <!-- floating window -->
+  <div dir="rtl" style="width: 420px; height: 700px; box-sizing: border-box; border-radius: 20px; background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%); box-shadow: 0 40px 80px -24px rgba(23,35,64,0.35), 0 0 0 1px rgba(255,255,255,0.6) inset; display: flex; flex-direction: column; overflow: hidden;">
+
+    <!-- header -->
+    <div style="height: 56px; flex-shrink: 0; display: flex; align-items: center; padding: 0 18px 0 12px; gap: 10px;">
+      <img src="/_blob/2f27cbfce3e251e295dfdedc3f5db28c" alt="نشان آی‌آر اسپیدی، سپر و موشک" style="width: 24px; height: 32px; object-fit: contain; flex-shrink: 0;">
+      <div dir="ltr" style="display: flex; align-items: baseline; gap: 8px; flex-grow: 1; min-width: 0;">
+        <span style="font-size: 15px; font-weight: 700; color: #141B33; letter-spacing: 0.2px;">IRSPEEDY</span>
+        <span style="font-size: 11px; font-weight: 500; color: #9CA3B4;">v1.4.5.8</span>
+      </div>
+      <button aria-label="کوچک کردن پنجره" class="irs-btn" style="width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1.5" y1="9.5" x2="10.5" y2="9.5" stroke="#5B6478" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+      <button aria-label="بستن پنجره" class="irs-btn" style="width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="#5B6478" stroke-width="1.4" stroke-linecap="round"/><line x1="10.5" y1="1.5" x2="1.5" y2="10.5" stroke="#5B6478" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <!-- content -->
+    <div style="flex-grow: 1; min-height: 0; display: flex; flex-direction: column; padding: 4px 22px 18px; gap: 8px;">
+
+      <!-- connection hero -->
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 2px 0 0;">
+        <div style="position: relative; width: 336px; height: 336px; display: flex; align-items: center; justify-content: center;">
+          <div class="irs-glow-pulse" style="position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle, rgba(23,163,102,0.16) 0%, rgba(23,163,102,0) 70%);"></div>
+          <div class="irs-ring-pulse" style="position: absolute; inset: 26px; border-radius: 50%; border: 2px solid rgba(23,163,102,0.25);"></div>
+
+          <div style="width: 248px; height: 248px; border-radius: 50%; background: linear-gradient(180deg, #FFFFFF 0%, #F3FBF7 100%); box-shadow: 0 22px 46px -14px rgba(23,163,102,0.35), 0 0 0 1px rgba(23,163,102,0.18) inset; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+
+            <!-- artwork layers from the source PSD, precisely aligned and kept in original stacking order:
+                 shield + heart (static) → engine glow → real exhaust flame (animated) → rocket body + fins (static, on top) -->
+            <div style="position: relative; width: 136px; height: 183px;">
+              <img src="/_blob/46c5396c9948407f8f7f1cf511d84b28" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 1;">
+              <div class="irs-engine-glow" style="position: absolute; left: 50%; top: 58%; margin-left: -15px; margin-top: -15px; width: 30px; height: 30px; border-radius: 50%; background: radial-gradient(circle, rgba(255,214,120,0.8) 0%, rgba(249,115,22,0) 70%); z-index: 2;"></div>
+              <img src="/_blob/19f4ed608662e3c512a059ae786fe816" alt="" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 3;">
+              <div class="irs-exhaust-streak" style="position: absolute; inset: 0; -webkit-mask-image: url('/_blob/19f4ed608662e3c512a059ae786fe816'); mask-image: url('/_blob/19f4ed608662e3c512a059ae786fe816'); -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center; z-index: 3;"></div>
+              <img src="/_blob/d9a4a6dcf96ee026e367e7437bdd63e2" alt="نشان آی‌آر اسپیدی، سپر، قلب و موشک" style="position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; z-index: 4;">
+            </div>
+          </div>
+          <div style="position: absolute; bottom: 4px; left: 50%; transform: translateX(-50%); width: 60px; height: 60px; border-radius: 50%; background: #17A366; border: 6px solid #FFFFFF; display: flex; align-items: center; justify-content: center;">
+            <svg width="26" height="26" viewBox="0 0 12 12" fill="none"><path d="M2.2 6.3l2.6 2.6 5-5.4" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- server card, with a light that travels the actual perimeter at constant speed (so it visits the short left/right edges too) -->
+      <div style="position: relative; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; gap: 12px; height: 50px; padding: 0 14px; border-radius: 14px; border: 1px solid #C9DBFB; background: linear-gradient(180deg, #EFF5FF 0%, #E6F0FE 100%);">
+          <div style="width: 30px; height: 30px; border-radius: 50%; flex-shrink: 0; overflow: hidden; box-shadow: 0 0 0 1px rgba(16,24,40,0.06);">
+            <svg width="30" height="30" viewBox="0 0 38 38"><rect width="38" height="12.7" y="0" fill="#141414"/><rect width="38" height="12.7" y="12.7" fill="#D0021B"/><rect width="38" height="12.6" y="25.4" fill="#F5C518"/></svg>
+          </div>
+          <div style="display: flex; flex-direction: column; gap: 1px; flex-grow: 1; min-width: 0;">
+            <span style="font-size: 14px; font-weight: 700; color: #142057;">فرانکفورت - آلمان</span>
+            <span style="font-size: 12px; color: #5B6BA8;">۳۸ میلی‌ثانیه · موقعیت هوشمند</span>
+          </div>
+          <button aria-label="تغییر سرور" class="irs-change" style="width: 32px; height: 32px; flex-shrink: 0; border: none; border-radius: 9px; background: rgba(30,58,138,0.08); display: flex; align-items: center; justify-content: center; cursor: pointer;">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none"><path d="M17 2.1l4 4-4 4" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 12.6v-1.1a4 4 0 0 1 4-4h14" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 21.9l-4-4 4-4" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M21 11.4v1.1a4 4 0 0 1-4 4H3" stroke="#1E3A8A" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </button>
+        </div>
+        <svg width="376" height="52" viewBox="0 0 376 52" style="position: absolute; inset: -1px; pointer-events: none; overflow: visible;">
+          <defs>
+            <linearGradient id="irsShineGrad" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%" stop-color="#60A5FA" stop-opacity="0"/>
+              <stop offset="50%" stop-color="#FFFFFF" stop-opacity="1"/>
+              <stop offset="100%" stop-color="#2563EB" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <rect x="1" y="1" width="374" height="50" rx="14" ry="14" fill="none" stroke="url(#irsShineGrad)" stroke-width="2" stroke-linecap="round" pathLength="100" stroke-dasharray="14 86" class="irs-shine-dash"/>
+        </svg>
+      </div>
+
+      <!-- data usage -->
+      <div style="display: flex; gap: 10px; flex-shrink: 0;"></div>
+
+      <!-- account / subscription info -->
+      <div style="display: flex; flex-direction: column; border-radius: 12px; border: 1px solid #E1E4EC; background: #FFFFFF; flex-shrink: 0;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 14px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="#9CA3B4" stroke-width="1.3"/><path d="M8 4.6V8l2.4 1.4" stroke="#9CA3B4" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            <span style="font-size: 12px; color: #5B6478; font-weight: 600;">مدت زمان اتصال</span>
+          </div>
+          <span dir="ltr" style="font-size: 12.5px; color: #1B2033; font-weight: 700;">۰۰:۱۲:۴۷</span>
+        </div>
+        <div style="height: 1px; background: #EEF0F4; margin: 0 14px;"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 14px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><rect x="2.2" y="3.2" width="11.6" height="10.4" rx="1.8" stroke="#9CA3B4" stroke-width="1.3"/><path d="M2.2 6.4h11.6M5.2 1.8v2.4M10.8 1.8v2.4" stroke="#9CA3B4" stroke-width="1.3" stroke-linecap="round"/></svg>
+            <span style="font-size: 12px; color: #5B6478; font-weight: 600;">تاریخ انقضا</span>
+          </div>
+          <span dir="ltr" style="font-size: 12.5px; color: #1B2033; font-weight: 700;">۱۴۰۴/۱۰/۱۵</span>
+        </div>
+        <div style="height: 1px; background: #EEF0F4; margin: 0 14px;"></div>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 14px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 1.5l5 2v4c0 3.5-2.2 5.9-5 7-2.8-1.1-5-3.5-5-7v-4l5-2z" stroke="#17A366" stroke-width="1.3" stroke-linejoin="round"/></svg>
+            <span style="font-size: 12px; color: #5B6478; font-weight: 600;">اعتبار باقی‌مانده</span>
+          </div>
+          <span style="font-size: 12.5px; color: #17A366; font-weight: 700;">۱۸ روز</span>
+        </div>
+      </div>
+
+      <!-- ip row -->
+      <div style="display: flex; align-items: center; justify-content: center; gap: 6px; flex-shrink: 0;">
+        <span style="font-size: 11.5px; color: #9CA3B4;">آی‌پی جدید شما:</span>
+        <span dir="ltr" style="font-size: 11.5px; color: #5B6478; font-weight: 600;">185.23.44.109</span>
+      </div>
+
+      <!-- disconnect -->
+      <button class="irs-disconnect" style="height: 46px; flex-shrink: 0; border: none; border-radius: 14px; background: linear-gradient(180deg, #DC2626 0%, #B91C1C 100%); color: #FFFFFF; font-size: 15px; font-weight: 700; font-family: inherit; display: flex; align-items: center; justify-content: center; gap: 10px; cursor: pointer; box-shadow: 0 10px 22px -8px rgba(185,28,28,0.45); transition: transform 0.15s ease, box-shadow 0.15s ease; margin-top: auto;">
+        قطع اتصال
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 2v5.2" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/><path d="M4.6 4.2a5.2 5.2 0 1 0 6.8 0" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1E3A8A","options":["#1E3A8A","#1D4ED8","#0F2E6B","#1E293B"]},"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      accent: this.props.accent ?? '#1E3A8A',
+    };
+  }
+}
+</script>
+</body>
+</html>

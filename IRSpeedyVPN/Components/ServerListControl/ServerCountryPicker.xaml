@@ -24,10 +24,7 @@
             <Setter Property="Orientation" Value="Vertical"/>
             <Setter Property="Focusable" Value="False"/>
             <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="ScrollBar">
-                <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"
-                       Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
-                       Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
-                       ViewportSize="{TemplateBinding ViewportSize}">
+                <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True" Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}" Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}" ViewportSize="{TemplateBinding ViewportSize}">
                     <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource ServerScrollPage}"/></Track.DecreaseRepeatButton>
                     <Track.Thumb><Thumb Style="{StaticResource ServerScrollThumb}"/></Track.Thumb>
                     <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource ServerScrollPage}"/></Track.IncreaseRepeatButton>
@@ -42,12 +39,8 @@
                 <!-- Explicit physical columns keep the rail on the left in RTL. -->
                 <Grid FlowDirection="LeftToRight" ClipToBounds="True">
                     <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                    <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="1" FlowDirection="RightToLeft"
-                        Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}"
-                        CanContentScroll="{TemplateBinding CanContentScroll}" Margin="{TemplateBinding Padding}"/>
-                    <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="0" Style="{StaticResource ServerScrollBar}"
-                        Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" Value="{TemplateBinding VerticalOffset}"
-                        ViewportSize="{TemplateBinding ViewportHeight}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
+                    <ScrollContentPresenter x:Name="PART_ScrollContentPresenter" Grid.Column="1" FlowDirection="RightToLeft" Content="{TemplateBinding Content}" ContentTemplate="{TemplateBinding ContentTemplate}" CanContentScroll="{TemplateBinding CanContentScroll}" Margin="{TemplateBinding Padding}"/>
+                    <ScrollBar x:Name="PART_VerticalScrollBar" Grid.Column="0" Style="{StaticResource ServerScrollBar}" Minimum="0" Maximum="{TemplateBinding ScrollableHeight}" Value="{TemplateBinding VerticalOffset}" ViewportSize="{TemplateBinding ViewportHeight}" Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"/>
                 </Grid>
             </ControlTemplate></Setter.Value></Setter>
         </Style>
@@ -63,25 +56,25 @@
         </Grid.RowDefinitions>
 
         <!-- ═══ Smart Location card ═══ -->
-        <Border x:Name="smartCard" Grid.Row="0" Height="60" CornerRadius="14" BorderThickness="1" Margin="0,0,0,12" Background="{StaticResource SmartLocationBackgroundBrush}" BorderBrush="{StaticResource SmartLocationBorderBrush}" Cursor="Hand" MouseLeftButtonUp="SmartCard_MouseLeftButtonUp">
+        <Border x:Name="smartCard" Grid.Row="0" Height="66" CornerRadius="14" BorderThickness="1" Margin="0,0,0,12" Background="{StaticResource SmartLocationBackgroundBrush}" BorderBrush="{StaticResource SmartLocationBorderBrush}" Cursor="Hand" MouseLeftButtonUp="SmartCard_MouseLeftButtonUp">
             <Grid Margin="12,0" FlowDirection="LeftToRight">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="24"/>
                     <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="34"/>
+                    <ColumnDefinition Width="20"/>
                 </Grid.ColumnDefinitions>
 
-                <Border Grid.Column="2" Width="34" Height="34" CornerRadius="10" Background="{StaticResource AccentBrush}" VerticalAlignment="Center">
-                    <Path Data="{StaticResource IconBolt}" Fill="White" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                <Border Grid.Column="0" Width="24" Height="34" CornerRadius="10" Background="Transparent" VerticalAlignment="Center">
+                    <Path Data="{StaticResource IconBolt}" Fill="#FFB800" Stretch="Uniform" Width="16" Height="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Stretch" FlowDirection="LeftToRight" Margin="10,0">
-                    <TextBlock FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="{StaticResource FontSizeCardTitle}" Foreground="{StaticResource SmartLocationTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Stretch"><Run FlowDirection="RightToLeft" Text="موقعیت هوشمند"/></TextBlock>
-                    <TextBlock FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeMuted}" Foreground="{StaticResource SmartLocationSubtitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" Margin="0,2,0,0"><Run FlowDirection="RightToLeft" Text="سریع‌ترین سرور، انتخاب خودکار"/></TextBlock>
+                    <TextBlock FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="{StaticResource FontSizeCardTitle}" Foreground="{StaticResource SmartLocationTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Stretch"><Run FlowDirection="RightToLeft" Text="انتخاب هوشمند"/></TextBlock>
+                    <TextBlock FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeMuted}" Foreground="{StaticResource SmartLocationSubtitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" Margin="0,2,0,0"><Run FlowDirection="RightToLeft" Text="بهترین سرور بر اساس موقعیت شما"/></TextBlock>
                 </StackPanel>
 
                 <!-- selection ring, same visual language as the row radio -->
-                <Grid Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
+                <Grid Grid.Column="2" Width="20" Height="20" VerticalAlignment="Center">
                     <Ellipse Width="20" Height="20" Stroke="{StaticResource RadioBorderBrush}" StrokeThickness="2"/>
                     <Ellipse x:Name="smartCheck" Width="11" Height="11" Fill="{StaticResource AccentBrush}" Visibility="Collapsed"/>
                 </Grid>
@@ -93,7 +86,7 @@
             <ItemsControl x:Name="icCountries" Focusable="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Border Tag="{Binding}" CornerRadius="{StaticResource RowCornerRadius}" Margin="0,0,0,4" Padding="8,12" Cursor="{Binding RowCursor}" MouseLeftButtonUp="Row_MouseLeftButtonUp">
+                        <Border Tag="{Binding}" CornerRadius="{StaticResource RowCornerRadius}" Margin="0" Padding="8,7" Cursor="{Binding RowCursor}" MouseLeftButtonUp="Row_MouseLeftButtonUp">
                             <Border.Style>
                                 <Style TargetType="Border">
                                     <Setter Property="Background" Value="Transparent"/>
@@ -106,10 +99,10 @@
                             </Border.Style>
                             <Grid FlowDirection="LeftToRight">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="20"/>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                     <ColumnDefinition Width="38"/>
+                                    <ColumnDefinition Width="28"/>
                                 </Grid.ColumnDefinitions>
                                 <Grid.Style>
                                     <Style TargetType="Grid">
@@ -124,7 +117,7 @@
 
                                 <!-- Flag: 38x38 circle, hairline ring, falls back to an initials
                                      badge when the country has no bundled flag asset. -->
-                                <Grid Grid.Column="3" Width="38" Height="38" FlowDirection="LeftToRight">
+                                <Grid Grid.Column="2" Width="38" Height="38" FlowDirection="LeftToRight">
                                     <Ellipse Width="38" Height="38" Stroke="#0F101827" StrokeThickness="1" Fill="#F3F5F9"/>
                                     <Ellipse Width="36" Height="36">
                                         <Ellipse.Fill>
@@ -156,13 +149,13 @@
                                 </Grid>
 
                                 <!-- Label -->
-                                <TextBlock Grid.Column="2" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}" TextAlignment="Right" VerticalAlignment="Center" Margin="14,0"><Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/></TextBlock>
+                                <TextBlock Grid.Column="1" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}" TextAlignment="Right" VerticalAlignment="Center" Margin="14,0"><Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/></TextBlock>
 
                                 <!-- Latency -->
-                                <TextBlock Grid.Column="1" Text="{Binding SignalText}" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="13" Foreground="{StaticResource PingGoodBrush}" VerticalAlignment="Center" Margin="12,0,0,0"/>
+                                <TextBlock Grid.Column="0" Text="{Binding SignalText}" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="12" Foreground="{Binding SignalBrush}" VerticalAlignment="Center" Margin="0,0,8,0"/>
 
                                 <!-- Selector -->
-                                <Grid Grid.Column="0" Width="20" Height="20" VerticalAlignment="Center">
+                                <Grid Grid.Column="3" Width="20" Height="20" VerticalAlignment="Center">
                                     <Ellipse Width="20" Height="20" Stroke="{StaticResource RadioBorderBrush}" StrokeThickness="2"/>
                                     <Ellipse Width="11" Height="11" Fill="{StaticResource AccentBrush}">
                                         <Ellipse.Style>

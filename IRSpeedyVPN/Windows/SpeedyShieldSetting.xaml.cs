@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Resource;
+using IRSpeedyVPN.Resource;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -61,6 +61,9 @@ namespace IRSpeedyVPN.Windows
             PhishingToggle.IsChecked = selected.Contains(K_PHISHING);
             MalwareToggle.IsChecked = selected.Contains(K_MALWARE);
         }
+
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
+        private void Header_DragMove(object sender, MouseButtonEventArgs e) => IRSpeedyVPN.Common.WindowDrag.Begin(this, e);
 
         private void btnClose_MouseDown(object sender, MouseButtonEventArgs e) => Close();
 

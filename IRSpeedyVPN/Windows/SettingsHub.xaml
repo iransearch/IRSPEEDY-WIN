@@ -1,0 +1,164 @@
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.SettingsHub" Title="تنظیمات سرویس" Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{StaticResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="LeftToRight" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+  <WindowChrome.WindowChrome>
+    <WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/>
+  </WindowChrome.WindowChrome>
+  <Grid>
+    <Grid.RowDefinitions>
+      <RowDefinition Height="62"/>
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="68"/>
+    </Grid.RowDefinitions>
+    <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1">
+      <Grid Margin="16,0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
+        <StackPanel VerticalAlignment="Center">
+          <TextBlock Text="تنظیمات سرویس" FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="ExtraBold" HorizontalAlignment="Center"/>
+          <TextBlock Text="شخصی‌سازی رفتار اتصال" FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft" HorizontalAlignment="Center"/>
+        </StackPanel>
+        <Button Style="{StaticResource HandoffClose}" Click="Close_Click"/>
+      </Grid>
+    </Border>
+    <Grid Grid.Row="1" Margin="16,16">
+      <Grid>
+        <Grid.RowDefinitions>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="*"/>
+          <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0">
+          <Button Style="{StaticResource HandoffPlainButton}" Click="Methods_Click">
+            <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="42"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="26" Height="26" CornerRadius="13" Background="#F5F6F9">
+                  <Path Data="M15,6 L9,12 L15,18" Stroke="#B7BCC9" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform"/>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
+                  <TextBlock Text="روش‌های اتصال" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                  <TextBlock Text="وی‌پی‌ان سراسری، پروکسی سیستمی، پروکسی‌فایر" FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft"/>
+                </StackPanel>
+                <Border Grid.Column="2" Width="42" Height="42" CornerRadius="13" Background="#1A2563EB">
+                  <Image Source="{StaticResource HandoffMethodsImage}" Width="21" Height="21"/>
+                </Border>
+              </Grid>
+            </Border>
+          </Button>
+        </Grid>
+        <Grid Grid.Row="1">
+          <Button Style="{StaticResource HandoffPlainButton}" Click="Shield_Click">
+            <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="42"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="26" Height="26" CornerRadius="13" Background="#F5F6F9">
+                  <Path Data="M15,6 L9,12 L15,18" Stroke="#B7BCC9" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform"/>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
+                  <TextBlock Text="شیلد" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                  <TextBlock Text="محافظت در برابر تبلیغات و تهدیدهای آنلاین" FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft"/>
+                </StackPanel>
+                <Border Grid.Column="2" Width="42" Height="42" CornerRadius="13" Background="#1A16A34A">
+                  <Image Source="{StaticResource HandoffShieldImage}" Width="21" Height="21"/>
+                </Border>
+              </Grid>
+            </Border>
+          </Button>
+        </Grid>
+        <Grid Grid.Row="2">
+          <Button Style="{StaticResource HandoffPlainButton}" Click="Share_Click">
+            <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="42"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="26" Height="26" CornerRadius="13" Background="#F5F6F9">
+                  <Path Data="M15,6 L9,12 L15,18" Stroke="#B7BCC9" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform"/>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
+                  <TextBlock Text="اشتراک‌گذاری اتصال" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                  <TextBlock Text="تبدیل این دستگاه به نقطه اتصال VPN" FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft"/>
+                </StackPanel>
+                <Border Grid.Column="2" Width="42" Height="42" CornerRadius="13" Background="#1A0891B2">
+                  <Image Source="{StaticResource HandoffShareImage}" Width="21" Height="21"/>
+                </Border>
+              </Grid>
+            </Border>
+          </Button>
+        </Grid>
+        <Grid Grid.Row="3">
+          <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="42"/>
+              </Grid.ColumnDefinitions>
+              <controls:ServiceToggle x:Name="GameMode" AutomationProperties.Name="GameMode"/>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
+                <TextBlock Text="حالت بازی" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                <TextBlock Text="کاهش تاخیر برای بازی‌های آنلاین" FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft"/>
+              </StackPanel>
+              <Border Grid.Column="2" Width="42" Height="42" CornerRadius="13" Background="#1A6366F1">
+                <Image Source="{StaticResource HandoffPadImage}" Width="21" Height="21"/>
+              </Border>
+            </Grid>
+          </Border>
+        </Grid>
+        <Grid Grid.Row="4">
+          <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="42"/>
+              </Grid.ColumnDefinitions>
+              <controls:ServiceToggle x:Name="VodService" AutomationProperties.Name="VodService"/>
+              <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
+                <TextBlock Text="هوش مصنوعی" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                <TextBlock Text="IP ثابت جهت دسترسی به سرویس هوش مصنوعی" FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft"/>
+              </StackPanel>
+              <Border Grid.Column="2" Width="42" Height="42" CornerRadius="13" Background="#1AEC4899">
+                <Image Source="{StaticResource HandoffSparkImage}" Width="21" Height="21"/>
+              </Border>
+            </Grid>
+          </Border>
+        </Grid>
+        <Grid Grid.Row="5">
+          <Button Style="{StaticResource HandoffPlainButton}" Click="Password_Click">
+            <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <ColumnDefinition Width="42"/>
+                </Grid.ColumnDefinitions>
+                <Border Width="26" Height="26" CornerRadius="13" Background="#F5F6F9">
+                  <Path Data="M15,6 L9,12 L15,18" Stroke="#B7BCC9" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform"/>
+                </Border>
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
+                  <TextBlock Text="تغییر رمز عبور" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
+                  <TextBlock Text="به‌روزرسانی رمز عبور حساب کاربری" FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="RightToLeft"/>
+                </StackPanel>
+                <Border Grid.Column="2" Width="42" Height="42" CornerRadius="13" Background="#1A64748B">
+                  <Image Source="{StaticResource HandoffPasswordImage}" Width="21" Height="21"/>
+                </Border>
+              </Grid>
+            </Border>
+          </Button>
+        </Grid>
+      </Grid>
+    </Grid>
+    <Button Grid.Row="2" Margin="16,0,16,18" Height="50" Style="{StaticResource DesignActionButton}" Content="تایید و ذخیره" Click="btnOK_Click"/>
+  </Grid>
+</Window>

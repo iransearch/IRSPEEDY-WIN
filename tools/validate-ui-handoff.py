@@ -1,0 +1,48 @@
+#!/usr/bin/env python3
+"""Static WPF handoff checks. This does not replace a Windows build or render test."""
+from pathlib import Path
+import re
+import xml.etree.ElementTree as E
+R = Path(__file__).resolve().parents[1]
+A = R / 'IRSpeedyVPN'
+W = '{http://schemas.microsoft.com/winfx/2006/xaml/presentation}'
+X = '{http://schemas.microsoft.com/winfx/2006/xaml}'
+files = list(A.rglob('*.xaml'))
+roots = {p: E.parse(p).getroot() for p in files}
+keys = {el.get(X+'Key') for root in roots.values() for el in root.iter() if el.get(X+'Key')}
+new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','MainWindow','IrspeedyTheme'}]
+events = {'Click','Loaded','IsVisibleChanged','MouseLeftButtonDown','MouseLeftButtonUp','PreviewMouseDown','Checked','Unchecked','TextChanged','PasswordChanged'}
+for p in new_files:
+    root = roots[p]
+    names = [el.get(X+'Name') for el in root.iter() if el.get(X+'Name')]
+    assert len(names) == len(set(names)), f'{p}: duplicate names'
+    source = '\n'.join(f.read_text(encoding='utf-8-sig') for f in p.parent.glob(p.stem+'*.cs'))
+    for el in root.iter():
+        for attr, value in el.attrib.items():
+            for key in re.findall(r'\{StaticResource ([^}]+)\}',value):
+                assert key in keys, f'{p}: missing resource {key}'
+            if attr in events and not value.startswith('{'):
+                assert re.search(r'\b'+re.escape(value)+r'\s*\(',source), f'{p}: missing handler {value}'
+    if root.tag == W+'Window' and p.stem not in {'MainWindow'}:
+        assert root.get('Width') == '420', p
+        assert root.get('Height') == ('460' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '700'), p
+        assert not list(root.iter(W+'ScrollViewer')), p
+        assert root.get('AllowsTransparency') == 'False', p
+        assert 'WindowDrag.Begin(this, e)' in source, p
+for name in ['UCLogin','UCUserInfo']:
+    assert not list(roots[A/'UserControls'/f'{name}.xaml'].iter(W+'ScrollViewer'))
+# All drawing resources are unique and only depend on earlier declared keys.
+theme=roots[A/'Themes/IrspeedyTheme.xaml'];seen=set()
+for element in theme:
+    key=element.get(X+'Key')
+    if key:
+        assert key not in seen, f'duplicate theme key: {key}'
+        for el in element.iter():
+            for value in el.attrib.values():
+                for ref in re.findall(r'\{StaticResource ([^}]+)\}',value):
+                    assert ref in seen, f'{key}: forward theme reference {ref}'
+        seen.add(key)
+# Fixed-height app pagination must fit the available body height.
+assert 7 * (48 + 6) <= 700 - 62 - 68 - 32 - 46 - 58 - 32
+print(f'PASS: parsed {len(files)} XAML files; checked {len(new_files)} handoff views, resources, handlers, sizes and app-list capacity.')
+print('Windows compilation, UI rendering, DPI and live network validation remain required.')

@@ -368,10 +368,8 @@ namespace IRSpeedyVPN.UserControls
 
             if (!string.IsNullOrWhiteSpace(TunnelPlusService.selectedChain))
                 icons.Add(new HeaderIconRegistration("", "حذف سرویس پایه", RemoveBaseService));
-            if (sService?.SettingType != null)
-                icons.Add(new HeaderIconRegistration("", "تنظیمات سرویس", OpenServiceSettings));
-            if (sService?.ShowSpeedyShieldSetting == true)
-                icons.Add(new HeaderIconRegistration("", "تنظیمات Speedy Shield", OpenSpeedyShieldSetting));
+            icons.Add(new HeaderIconRegistration("\uf2f5", "خروج از حساب", () => host.LogoutFromSettings()));
+            icons.Add(new HeaderIconRegistration("", "تنظیمات سرویس", OpenServiceSettings));
 
             host.SetHeaderIcons(this, icons);
         }
@@ -380,19 +378,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void OpenServiceSettings()
         {
-            var sService = selectedService ?? GetFallbackService();
-            if (sService?.SettingType == null) return;
-
-            Window setting;
-            if (sService.SettingType == typeof(VGAURDServiceSetting))
-                setting = new VGAURDServiceSetting();
-            else if (sService.SettingType == typeof(SSRServiceSetting))
-                setting = new SSRServiceSetting();
-            else
-                return;
-
-            setting.Owner = Window.GetWindow(this);
-            setting.ShowDialog();
+            GetMainWindow()?.OpenSettings(selectedService ?? GetFallbackService());
         }
 
         private void OpenSpeedyShieldSetting()

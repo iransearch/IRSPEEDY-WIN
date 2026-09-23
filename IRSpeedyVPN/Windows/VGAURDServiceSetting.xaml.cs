@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Resource;
+using IRSpeedyVPN.Resource;
 using System;
 using System.Windows;
 using System.Windows.Input;
@@ -24,6 +24,7 @@ namespace IRSpeedyVPN.Windows
                 rowVpn.Visibility = Visibility.Collapsed;
 
             LoadSettings();
+            SplitTunnel.IsOn = RegHelper.GetSettingValue("SplitTunnelPreviewEnabled") == "1";
         }
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
@@ -46,7 +47,13 @@ namespace IRSpeedyVPN.Windows
             // Game Mode is independent, but forces VPN mode (persisted above as VPN=1).
             RegHelper.SetSettingValue(KEY_GAME, IsOn(GameMode) ? "1" : "0");
 
+            RegHelper.SetSettingValue("SplitTunnelPreviewEnabled", SplitTunnel.IsOn ? "1" : "0");
             Close();
+        }
+
+        private void SplitApps_Click(object sender, RoutedEventArgs e)
+        {
+            new SettingsSplitTunnelApps { Owner = this }.ShowDialog();
         }
 
         // --------------------------

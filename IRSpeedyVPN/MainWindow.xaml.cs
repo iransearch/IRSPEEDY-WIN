@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.WebServices;
+using IRSpeedyVPN.WebServices;
 using IRSpeedyVPN.UserControls;
 using IRSpeedyVPN.Windows;
 using System;
@@ -188,6 +188,7 @@ namespace IRSpeedyVPN
                 uCUserInfo.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;
                 uCUserInfo.OnLoadingRequest += OnLoadingRequest;
                 uCLoading.OnCancelRequest += UCLoading_OnCancelRequest;
+                uCConnecting.CancelRequested += UCLoading_OnCancelRequest;
                 uCChangePassword.OnResult += UCChangePassword_OnResult;                
                 ShowControl(uCLogin);
                 proxifier.onResult += Proxifier_onResult;
@@ -260,7 +261,7 @@ namespace IRSpeedyVPN
             if (Show)
                 ShowLoading(Message);
             else
-                HideLoading();
+                Dispatcher.Invoke(() => { if (!uCConnecting.IsVisible) HideLoading(); });
 
         }
 
@@ -281,7 +282,7 @@ namespace IRSpeedyVPN
                 {
                     ShowMessage("رمز عبور فعلی را وارد کنید");
                 }
-                else if (newpassword.Length < 3)
+                else if (newpassword.Length < 8 || !newpassword.Any(char.IsLetter) || !newpassword.Any(char.IsDigit))
                 {
                     ShowMessage("طول رمز عبور جدید کوتاه است ");
                 }
@@ -436,7 +437,7 @@ namespace IRSpeedyVPN
             UnRegiserVpnService();
             // Acknowledge Connect immediately, including time spent waiting for cleanup.
             // The same loading view remains visible until this request completes or is cancelled.
-            ShowLoading("در حال اتصال به سرویس");
+            ShowLoading("در حال اتصال به سرویس", true);
             await ApplyConnectionRequestAsync(service, protocol, version);
         }
 
@@ -516,6 +517,7 @@ namespace IRSpeedyVPN
         }
         void ProcessConnectionResult(bool connected,string Message)
         {
+            HideLoading();
             if (connected)
             {
                 ShowMessage("");
@@ -530,8 +532,8 @@ namespace IRSpeedyVPN
                 UnRegiserVpnService();
                 if (IsUserLogin)
                 {
-                    ShowMessage(Message);
                     ShowControl(uCServerList);
+                    ShowMessage(Message);
                 }
             }
         }
@@ -540,7 +542,7 @@ namespace IRSpeedyVPN
             txtVersion.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
             btnSettings.Visibility = Visibility.Collapsed;
             accountMenu.IsEnabled = IsUserLogin;
-            panelHeaderIcons.Visibility = ReferenceEquals(ctrl, uCServerList) ? Visibility.Visible : Visibility.Collapsed;
+            panelHeaderIcons.Visibility = (ReferenceEquals(ctrl, uCServerList) || ReferenceEquals(ctrl, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
 
             if (TransitionBox.Content == null || !TransitionBox.Content.Equals(ctrl))
             {
@@ -612,9 +614,9 @@ namespace IRSpeedyVPN
 
             foreach (var icon in icons)
             {
-                var label = new Label
+                var label = new Button
                 {
-                    Style = (Style)FindResource("LabelButton"),
+                    Style = (Style)FindResource("HandoffPlainButton"),
                     Content = string.IsNullOrEmpty(icon.Icon)
                         ? (object)new System.Windows.Shapes.Path {
                             Data = (Geometry)FindResource(icon.ToolTip.Contains("Shield") ? "IconShield" : "IconGear"),
@@ -639,7 +641,7 @@ namespace IRSpeedyVPN
                 var handler = icon.OnClick;
                 if (handler != null)
                 {
-                    label.PreviewMouseDown += (s, e) => handler();
+                    label.Click += (s, e) => handler();
                 }
 
                 panelHeaderIcons.Children.Add(label);
@@ -1055,11 +1057,19 @@ namespace IRSpeedyVPN
 
         }
        
-        private void ShowLoading(string Messgae)
+        private void ShowLoading(string Messgae, bool connecting = false)
         {
             Dispatcher.Invoke((Action)(() =>
             {
                 ShowMessage("");
+                if (connecting)
+                {
+                    uCLoading.Visibility = Visibility.Hidden;
+                    uCConnecting.Visibility = Visibility.Visible;
+                    panelHeaderIcons.Visibility = Visibility.Collapsed;
+                    return;
+                }
+                if (uCConnecting.IsVisible) return;
                 uCLoading.SetMessage(Messgae);
                 uCLoading.Visibility = Visibility.Visible;
 
@@ -1071,6 +1081,7 @@ namespace IRSpeedyVPN
             this.Dispatcher.Invoke((Action)(() =>
             {
                 uCLoading.Visibility = Visibility.Hidden;
+                uCConnecting.Visibility = Visibility.Collapsed;
                 var uiStopwatch = loginUiStopwatch;
                 if (uiStopwatch == null)
                     return;
@@ -1083,7 +1094,7 @@ namespace IRSpeedyVPN
                         if (!ReferenceEquals(loginUiStopwatch, uiStopwatch))
                             return;
                         if (ReferenceEquals(TransitionBox.Content, uCServerList)
-                            && uCServerList.IsVisible && !uCLoading.IsVisible)
+                            && uCServerList.IsVisible && !uCLoading.IsVisible && !uCConnecting.IsVisible)
                         {
                             LogHelper.WriteExLog("[LoginPerformance] stage=list-ui-ready elapsedMs="
                                 + uiStopwatch.ElapsedMilliseconds);
@@ -1124,10 +1135,39 @@ namespace IRSpeedyVPN
         private void btnSettings_MouseDown(object sender, MouseButtonEventArgs e)
         {
 
-            uCChangePassword.ResetInput();
-            //                  TransitionBox.Transition = new Transitionals.Transitions.TranslateTransition();
-            ShowControl(uCChangePassword);
-            
+            OpenPassword(this);
+        }
+
+        public void OpenSettings(IVPNService service)
+        {
+            new SettingsHub { Owner = this, Service = service,
+                ChangePasswordAsync = ChangeAccountPasswordAsync }.ShowDialog();
+        }
+
+        public void LogoutFromSettings() => Logout("");
+
+        private void OpenPassword(Window owner)
+        {
+            new SettingsPassword { Owner = owner, ChangePasswordAsync = ChangeAccountPasswordAsync }.ShowDialog();
+        }
+
+        private async Task<string> ChangeAccountPasswordAsync(string oldPassword, string newPassword)
+        {
+            if (!IsUserLogin) return "ابتدا وارد حساب کاربری شوید.";
+            if (oldPassword != gInfo.Password) return "رمز فعلی صحیح نیست.";
+            string username = gInfo.Username;
+            var response = await Task.Run(() => serviceController.ChangePassword(username, oldPassword, newPassword));
+            if (response.StatusCode != System.Net.HttpStatusCode.OK || response.ResponseData == null)
+                return "خطا در فراخوانی سرویس";
+            if (!response.ResponseData.IsSuccess)
+                return string.IsNullOrWhiteSpace(response.ResponseData.ErrorMessage) ? "تغییر رمز انجام نشد." : response.ResponseData.ErrorMessage;
+            if (IsUserLogin && gInfo.Username == username)
+            {
+                gInfo.Password = newPassword;
+                if (IsRememberChecked) localResource.SaveConfig(localResource.GetConfig(), newPassword);
+            }
+            ShowHintPopup("تغییر رمز با موفقیت انجام شد");
+            return null;
         }
 
         private void Logout_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -1140,6 +1180,7 @@ namespace IRSpeedyVPN
             Interlocked.Increment(ref connectionRequestVersion);
             UnRegiserVpnService();
             IsUserLogin = false;
+            HideLoading();
             mainTimer.Change(int.MaxValue,int.MaxValue);
             if (gInfo?.CurrentService != null)
                 gInfo.CurrentService.Disconnect();

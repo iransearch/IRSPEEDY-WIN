@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Services;
@@ -200,7 +200,7 @@ namespace IRSpeedyVPN.UserControls
             if (host == null) return;
 
 
-            host.ClearHeaderIcons(this);
+            host.SetHeaderIcons(this, new[] { new HeaderIconRegistration("", "تنظیمات سرویس", () => host.OpenSettings(globalInfo?.CurrentService)) });
         }
 
         private void ClearHeaderIcons()

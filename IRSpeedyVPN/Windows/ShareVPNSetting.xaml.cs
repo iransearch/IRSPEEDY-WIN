@@ -1,183 +1,128 @@
-﻿using IRSpeedyVPN.Interfaces;
+using IRSpeedyVPN.Interfaces;
+using IRSpeedyVPN.Services;
+using QRCoder;
 using System;
-using System.Collections.Generic;
-using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
-using System.Text;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
-using QRCoder;
-using System.Windows.Shapes;
 
 namespace IRSpeedyVPN.Windows
 {
-    /// <summary>
-    /// Interaction logic for ShareVpnSetting.xaml
-    /// </summary>
     public partial class ShareVPNSetting : Window
     {
         public IVPNService Service { get; set; }
-
-        public ShareVPNSetting()
-        {
-            InitializeComponent();
-        }
-
+        private bool proxyBusy;
+        private string proxyIp;
+        private string proxyError;
+        public ShareVPNSetting() { InitializeComponent(); }
+        private void Header_DragMove(object sender, MouseButtonEventArgs e) => Common.WindowDrag.Begin(this, e);
+        private void Close_Click(object sender, RoutedEventArgs e) => Close();
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
+            proxyIp = GetInternetInterfaceIp();
             InitializeHotspotUi();
-            btnStartStop.IsChecked = Service?.IsShareActive ?? false;
-            pnlShowIP.Visibility = (Service?.IsShareActive ?? false) ? Visibility.Visible : Visibility.Collapsed;
-            UpdatePortTexts();
-            if (Service?.IsShareActive ?? false)
+            RefreshProxyUi();
+        }
+        protected override void OnClosing(System.ComponentModel.CancelEventArgs e)
+        {
+            if (proxyBusy || hotspotBusy) e.Cancel = true;
+            if (!e.Cancel) QrPopup.IsOpen = false;
+            base.OnClosing(e);
+        }
+        private void ProxyTab_Click(object sender, RoutedEventArgs e) => SelectTab(false);
+        private void DirectTab_Click(object sender, RoutedEventArgs e) => SelectTab(true);
+        private void SelectTab(bool direct)
+        {
+            DirectPanel.Visibility = direct ? Visibility.Visible : Visibility.Collapsed;
+            ProxyPanel.Visibility = direct ? Visibility.Collapsed : Visibility.Visible;
+            DirectTab.Background = direct ? Brushes.White : Brushes.Transparent;
+            ProxyTab.Background = direct ? Brushes.Transparent : Brushes.White;
+            DirectTab.Foreground = direct ? new SolidColorBrush(Color.FromRgb(20, 27, 51)) : Brushes.Gray;
+            ProxyTab.Foreground = direct ? Brushes.Gray : new SolidColorBrush(Color.FromRgb(20, 27, 51));
+            QrPopup.IsOpen = false;
+            proxyIp = GetInternetInterfaceIp();
+            RefreshProxyUi();
+        }
+        private bool ProxyAvailable => Service is TunnelPlusService tunnel && tunnel.IsTunnelConnected
+            && ReferenceEquals(AppServices.GlobalInfo?.CurrentService, Service);
+        private bool ProxyListening()
+        {
+            if (!ProxyAvailable || Service.IsShareActive != true || string.IsNullOrEmpty(proxyIp)) return false;
+            int port = Service.HttpPort ?? 0;
+            if (port <= 0) return false;
+            try
             {
-                UpdateIpTexts();
+                return IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(p => p.Port == port
+                    && (IPAddress.Any.Equals(p.Address) || IPAddress.IPv6Any.Equals(p.Address) || p.Address.ToString() == proxyIp));
             }
+            catch (NetworkInformationException) { return false; }
         }
-
-        private void Close_MouseDown(object sender, MouseButtonEventArgs e)
+        private void RefreshProxyUi()
         {
-            Close();
+            if (!IsLoaded || proxyBusy) return;
+            bool active = ProxyListening();
+            btnStartStop.IsChecked = ProxyAvailable && Service.IsShareActive;
+            btnStartStop.IsEnabled = ProxyAvailable && !hotspotBusy;
+            pnlShowIP.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+            ProxyMotion.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+            ProxyOffHint.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
+            HTTPAddress.Text = active ? proxyIp + ":" + Service.HttpPort : "";
+            SOCKS5Address.Text = active ? proxyIp + ":" + Service.SocksPort : "";
+            ProxyStatus.Text = !ProxyAvailable ? "ابتدا به سرویس سازگار متصل شوید" : proxyError ??
+                (active ? "فعال" : Service.IsShareActive ? "آدرس شبکه یا پراکسی فعال تأیید نشد" : "غیرفعال");
+            ProxyStatus.Foreground = active ? new SolidColorBrush(Color.FromRgb(23, 171, 119)) : Brushes.Gray;
         }
-
-        private void btnStartStop_Click(object sender, RoutedEventArgs e)
+        private async void btnStartStop_Click(object sender, RoutedEventArgs e)
         {
-            btnStartStop_Checked(sender, e);
-        }
-
-        private void lblHttpQR_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (!popHttpQR.IsOpen)
+            if (proxyBusy || hotspotBusy || !ProxyAvailable) { RefreshProxyUi(); return; }
+            bool requested = btnStartStop.IsChecked == true;
+            proxyBusy = true;
+            proxyError = null;
+            btnStartStop.IsEnabled = false;
+            pnlShowIP.Visibility = ProxyMotion.Visibility = Visibility.Collapsed;
+            ProxyStatus.Text = "در حال اعمال…";
+            RefreshHotspotUi();
+            try
             {
-                var uri = BuildHttpUri();
-                imgHttpQR.Source = CreateQr(uri);
-                popHttpQR.IsOpen = true;
+                Service.IsShareActive = requested;
+                await Task.Run(() => Service.ApplyShareSetting());
+                proxyIp = GetInternetInterfaceIp();
             }
+            catch { proxyError = "اعمال تنظیم انجام نشد؛ دوباره تلاش کنید."; }
+            finally { proxyBusy = false; RefreshProxyUi(); RefreshHotspotUi(); }
         }
-
-        private void lblHttpCopy_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+        private string ProxyUri(string type) => type == "HTTP" ? "http://" + HTTPAddress.Text : "socks5://" + SOCKS5Address.Text;
+        private void CopyProxy_Click(object sender, RoutedEventArgs e)
         {
-            Clipboard.SetText(BuildHttpUri());
-            ShowCopiedPopup((UIElement)sender);
+            if (!ProxyListening()) return;
+            try { Clipboard.SetText(ProxyUri((string)((Button)sender).Tag)); ProxyStatus.Text = "کپی شد"; }
+            catch { ProxyStatus.Text = "کپی انجام نشد؛ دوباره تلاش کنید."; }
         }
-
-        private void popHttpQR_Opened(object sender, EventArgs e)
+        private void Qr_Click(object sender, RoutedEventArgs e)
         {
-            Dispatcher.BeginInvoke(new Action(() => bdHttpPopupHost.Focus()));
-        }
-
-        private void popHttpQR_Closed(object sender, EventArgs e)
-        {
-            Task.Delay(250).ContinueWith(_ =>
+            if (!ProxyListening()) return;
+            var uri = ProxyUri((string)((Button)sender).Tag);
+            using (var generator = new QRCodeGenerator())
+            using (var data = generator.CreateQrCode(uri, QRCodeGenerator.ECCLevel.Q))
+            using (var code = new BitmapByteQRCode(data))
+            using (var stream = new MemoryStream(code.GetGraphic(8)))
             {
-                Dispatcher.Invoke(() => { });
-            });
-        }
-
-        private void lblSocksQR_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            if (!popSocksQR.IsOpen)
-            {
-                var uri = BuildSocksUri();
-                imgSocksQR.Source = CreateQr(uri);
-                popSocksQR.IsOpen = true;
+                var image = new BitmapImage();
+                image.BeginInit(); image.CacheOption = BitmapCacheOption.OnLoad; image.StreamSource = stream; image.EndInit(); image.Freeze();
+                QrImage.Source = image;
             }
+            QrLabel.Text = uri;
+            QrPopup.PlacementTarget = this;
+            QrPopup.IsOpen = true;
         }
-
-        private void lblSocksCopy_MouseLeftButtonUp(object sender, MouseButtonEventArgs e)
-        {
-            Clipboard.SetText(BuildSocksUri());
-            ShowCopiedPopup((UIElement)sender);
-        }
-
-        private void popSocksQR_Opened(object sender, EventArgs e)
-        {
-            Dispatcher.BeginInvoke(new Action(() => bdSocksPopupHost.Focus()));
-        }
-
-        private void popSocksQR_Closed(object sender, EventArgs e)
-        {
-            Task.Delay(250).ContinueWith(_ =>
-            {
-                Dispatcher.Invoke(() => { });
-            });
-        }
-
-        private void btnStartStop_Checked(object sender, RoutedEventArgs e)
-        {
-            ShowButtonSpinner(true);
-            if (Service == null)
-            {
-                ShowButtonSpinner(false);
-                return;
-            }
-
-            Service.IsShareActive = btnStartStop.IsChecked.GetValueOrDefault();
-            Task.Factory.StartNew(() =>
-            {
-                try
-                {
-                    if (Service.IsShareActive)
-                    {
-                        Dispatcher.Invoke(UpdateIpTexts);
-                    }
-                    Service.ApplyShareSetting();
-                    if (Service.IsShareActive)
-                    {
-                        // Read the ports only after ApplyShareSetting has actually resolved
-                        // the listen port (lastListenPort), so the popup never shows a
-                        // stale/default value on first activation.
-                        Dispatcher.Invoke(UpdatePortTexts);
-                    }
-                    Dispatcher.Invoke(() =>
-                    {
-                        pnlShowIP.Visibility = Service.IsShareActive ? Visibility.Visible : Visibility.Collapsed;
-                    });
-                }
-                finally
-                {
-                    Dispatcher.Invoke(() => ShowButtonSpinner(false));
-                }
-            });
-        }
-
-        private string BuildHttpUri()
-        {
-            return $"http://{txtIp0.Text}:{txtPortHttp.Text}";
-        }
-
-        private string BuildSocksUri()
-        {
-            return $"socks5://{txtIp1.Text}:{txtPortSocks.Text}";
-        }
-
-        private void UpdatePortTexts()
-        {
-            var httpPort = Service?.HttpPort;
-            var socksPort = Service?.SocksPort;
-            txtPortHttp.Text = httpPort.HasValue ? httpPort.Value.ToString() : "10808";
-            txtPortSocks.Text = socksPort.HasValue ? socksPort.Value.ToString() : "10808";
-        }
-
-        private void UpdateIpTexts()
-        {
-            var ip = GetInternetInterfaceIp();
-            txtIp0.Text = ip;
-            txtIp1.Text = ip;
-        }
-
-
-
 private static string GetInternetInterfaceIp()
     {
         try
@@ -213,7 +158,7 @@ private static string GetInternetInterfaceIp()
         }
         catch { }
 
-        return "127.0.0.1";
+        return null;
     }
 
         private static bool IsVirtualAdapter(NetworkInterface nic)
@@ -237,61 +182,5 @@ private static string GetInternetInterfaceIp()
         }
 
 
-    private void ShowButtonSpinner(bool show)
-        {
-            var storyboard = FindResource("SpinnerStoryboard") as System.Windows.Media.Animation.Storyboard;
-            if (show)
-            {
-                LoadingSpinner.Visibility = Visibility.Visible;
-                storyboard?.Begin(LoadingSpinner, true);
-                btnStartStop.IsEnabled = false;
-                btnStartStop.Content = "";
-            }
-            else
-            {
-                try
-                {
-                    storyboard?.Stop(LoadingSpinner);
-                }
-                catch
-                {
-                }
-                LoadingSpinner.Visibility = Visibility.Collapsed;
-                btnStartStop.IsEnabled = true;
-                btnStartStop.ClearValue(ContentProperty);
-            }
-        }
-
-        private void ShowCopiedPopup(UIElement target)
-        {
-            popCopied.PlacementTarget = target;
-            popCopied.IsOpen = true;
-            Task.Delay(2000).ContinueWith(_ =>
-            {
-                Dispatcher.Invoke(() => popCopied.IsOpen = false);
-            });
-        }
-
-        private ImageSource CreateQr(string text)
-        {
-            using (var generator = new QRCodeGenerator())
-            {
-                var data = generator.CreateQrCode(text ?? string.Empty, QRCodeGenerator.ECCLevel.Q);
-                var qrCode = new BitmapByteQRCode(data);
-                byte[] qrBytes = qrCode.GetGraphic(8);
-
-                var image = new BitmapImage();
-                using (var ms = new MemoryStream(qrBytes))
-                {
-                    image.BeginInit();
-                    image.CacheOption = BitmapCacheOption.OnLoad;
-                    image.StreamSource = ms;
-                    image.EndInit();
-                    image.Freeze();
-                }
-                return image;
-            }
-        }
     }
 }
-

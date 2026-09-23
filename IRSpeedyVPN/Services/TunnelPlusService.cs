@@ -63,6 +63,7 @@ namespace IRSpeedyVPN.Services
         public string SelectedUrl => selectedUrl ?? server.urls.FirstOrDefault()?.url;
         string[] _smartFastUrls;
         bool IsConnected=false;
+        public bool IsTunnelConnected => IsConnected;
         volatile bool userCancelRequested;
         private readonly object connectionLifecycleGate = new object();
         private long connectionGeneration;

@@ -1,0 +1,419 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>آی‌آر اسپیدی — اشتراک‌گذاری اتصال</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+  body { margin: 0; font-family: 'Vazirmatn', system-ui, sans-serif; }
+  .irs-close:hover { transform: scale(1.06); }
+  .irs-tab:hover { color: #1B2033; }
+  .irs-toggle-btn:hover { box-shadow: 0 12px 24px -8px rgba(30,58,138,0.5); transform: translateY(-1px); }
+  .irs-copy:hover, .irs-qr:hover, .irs-edit:hover { background: rgba(17,24,39,0.06); }
+
+  @keyframes irsPulseRing {
+    0% { transform: scale(0.7); opacity: 0.55; }
+    100% { transform: scale(2.15); opacity: 0; }
+  }
+  .irs-pulse-ring { animation: irsPulseRing 2s ease-out infinite; }
+  .irs-pulse-ring.d2 { animation-delay: 0.65s; }
+  .irs-pulse-ring.d3 { animation-delay: 1.3s; }
+
+  @keyframes irsOnlineDot {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(34,179,122,0.5); }
+    50% { box-shadow: 0 0 0 4px rgba(34,179,122,0); }
+  }
+  .irs-online-dot { animation: irsOnlineDot 1.8s ease-in-out infinite; }
+
+  @keyframes irsRotate { to { transform: rotate(360deg); } }
+  .irs-rotate-ring { animation: irsRotate 4s linear infinite; transform-origin: center; }
+
+  @keyframes irsTunnelPulse {
+    0%, 100% { stroke-opacity: 0.35; }
+    50% { stroke-opacity: 0.95; }
+  }
+  .irs-tunnel-pulse { animation: irsTunnelPulse 1.3s ease-in-out infinite; }
+
+  @keyframes irsSpark {
+    0% { transform: scale(0.3); opacity: 0.9; }
+    70% { opacity: 0; }
+    100% { transform: scale(2.3); opacity: 0; }
+  }
+  .irs-spark { animation: irsSpark 1.3s ease-out infinite; }
+</style>
+</helmet>
+
+<div dir="rtl" style="width: 1280px; height: 860px; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: center; background: radial-gradient(1100px 700px at 78% 12%, #EAF1FB 0%, #DCE6F5 38%, #CBD8ED 100%); overflow: hidden; font-family: 'Vazirmatn', sans-serif;">
+
+  <!-- soft desktop taskbar hint, for context only -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: rgba(255,255,255,0.35); backdrop-filter: blur(6px); border-top: 1px solid rgba(255,255,255,0.5);"></div>
+
+  <!-- floating window — standard connection-page size, no scroll -->
+  <div dir="rtl" style="width: 420px; height: 700px; box-sizing: border-box; border-radius: 20px; background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%); box-shadow: 0 40px 80px -24px rgba(23,35,64,0.35), 0 0 0 1px rgba(255,255,255,0.6) inset; display: flex; flex-direction: column; overflow: hidden;">
+
+    <!-- header -->
+    <div style="height: 62px; flex-shrink: 0; position: relative; display: flex; align-items: center; justify-content: center; padding: 0 18px; border-bottom: 1px solid #EEF0F4;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 1px;">
+        <span style="font-size: 16px; font-weight: 800; color: #141B33; letter-spacing: 0.2px;">اشتراک‌گذاری اتصال</span>
+        <span style="font-size: 10.5px; font-weight: 500; color: #9CA3B4;">اتصال VPN را با دستگاه‌های دیگر به اشتراک بگذارید</span>
+      </div>
+      <button aria-label="بستن" class="irs-close" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); width: 30px; height: 30px; border-radius: 50%; border: none; background: linear-gradient(180deg, #EF4444 0%, #DC2626 100%); display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 6px 14px -4px rgba(220,38,38,0.5); transition: transform 0.15s ease;">
+        <svg width="12" height="12" viewBox="0 0 13 13" fill="none"><line x1="1.5" y1="1.5" x2="11.5" y2="11.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/><line x1="11.5" y1="1.5" x2="1.5" y2="11.5" stroke="#FFFFFF" stroke-width="1.8" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <!-- segmented tabs -->
+    <div style="flex-shrink: 0; padding: 14px 18px 0;">
+      <div style="display: flex; padding: 4px; border-radius: 12px; background: #EEF1F8; gap: 4px;">
+        <button onClick="{{selectProxyTab}}" style="flex: 1; text-align: center; padding: 9px 0; border-radius: 9px; border: none; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 700; background: {{proxyTabBg}}; color: {{proxyTabColor}}; box-shadow: {{proxyTabShadow}};">اشتراک با پراکسی</button>
+        <button onClick="{{selectDirectTab}}" style="flex: 1; text-align: center; padding: 9px 0; border-radius: 9px; border: none; cursor: pointer; font-family: inherit; font-size: 12.5px; font-weight: 700; background: {{directTabBg}}; color: {{directTabColor}}; box-shadow: {{directTabShadow}};">اشتراک مستقیم</button>
+      </div>
+    </div>
+
+    <!-- content -->
+    <div style="box-sizing: border-box; flex-grow: 1; min-height: 0; display: flex; flex-direction: column; padding: 16px 18px 18px; overflow: hidden;">
+
+      <!-- ===== PROXY TAB ===== -->
+      <sc-if value="{{isProxyTab}}" hint-placeholder-val="{{true}}">
+        <div style="display: flex; flex-direction: column; gap: 12px; height: 100%;">
+
+          <!-- instruction card -->
+          <div style="box-sizing: border-box; border-radius: 16px; border: 1px solid #E7EAF2; background: #FFFFFF; padding: 12px 16px; display: flex; flex-direction: column; gap: 12px; flex-shrink: 0;">
+            <div style="display: flex; gap: 10px; align-items: flex-start;">
+              <span style="flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: {{accent}}; color: #FFFFFF; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">۱</span>
+              <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                <span style="font-size: 12.5px; font-weight: 700; color: #1B2033;">فعال‌سازی اشتراک</span>
+                <span style="font-size: 11px; color: #8A93A6; line-height: 1.5;">اشتراک‌گذاری VPN را روی این دستگاه فعال کنید.</span>
+              </div>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: flex-start; opacity: {{step2Opacity}};">
+              <span style="flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: #C7CCD8; color: #FFFFFF; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">۲</span>
+              <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+                <span style="font-size: 12.5px; font-weight: 700; color: #1B2033;">تنظیم پراکسی روی دستگاه دوم</span>
+                <span style="font-size: 11px; color: #8A93A6; line-height: 1.5;">روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید.</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- activation toggle -->
+          <div style="box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 14px; background: #F5F7FB; flex-shrink: 0;">
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <span style="font-size: 13px; font-weight: 700; color: #1B2033;">اشتراک‌گذاری پراکسی</span>
+              <span style="font-size: 10.5px; color: {{proxyStatusColor}};">{{proxyStatusLabel}}</span>
+            </div>
+            <button aria-label="فعال یا غیرفعال کردن اشتراک‌گذاری پراکسی" onClick="{{toggleProxy}}" dir="ltr" style="width: 46px; height: 26px; border-radius: 999px; flex-shrink: 0; box-sizing: border-box; padding: 3px; border: none; cursor: pointer; display: flex; background: {{proxyTrackBg}};">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 4px rgba(16,24,40,0.25); margin-inline-start: {{proxyThumbOffset}}; transition: margin-inline-start 0.15s ease;"></div>
+            </button>
+          </div>
+
+          <!-- proxy rows: shown only when active -->
+          <sc-if value="{{proxyOn}}" hint-placeholder-val="{{true}}">
+            <div style="display: flex; flex-direction: column; gap: 10px; flex-grow: 1; min-height: 0;">
+
+              <div style="box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-radius: 13px; border: 1px solid #ECEEF3; background: #FFFFFF; box-shadow: 0 1px 3px rgba(16,24,40,0.03);">
+                <span style="flex-shrink: 0; padding: 5px 9px; border-radius: 8px; background: {{accent}}; color: #FFFFFF; font-size: 11px; font-weight: 800;">HTTP</span>
+                <span dir="ltr" style="font-size: 12px; font-weight: 700; color: #1F2433; flex-grow: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">172.21.138.62 : 10808</span>
+                <button aria-label="کد QR" class="irs-qr" style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 7px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="5" height="5" rx="1" stroke="#5B6478" stroke-width="1.3"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" stroke="#5B6478" stroke-width="1.3"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" stroke="#5B6478" stroke-width="1.3"/><rect x="10" y="10" width="1.6" height="1.6" fill="#5B6478"/><rect x="13" y="10" width="1.6" height="1.6" fill="#5B6478"/><rect x="10" y="13" width="1.6" height="1.6" fill="#5B6478"/><rect x="13" y="13" width="1.6" height="1.6" fill="#5B6478"/></svg>
+                </button>
+                <button aria-label="کپی" class="irs-copy" style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 7px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="5.5" y="5.5" width="9" height="9" rx="1.8" stroke="#5B6478" stroke-width="1.3"/><path d="M3 10.2V3.8A1.8 1.8 0 0 1 4.8 2h6.4" stroke="#5B6478" stroke-width="1.3" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+
+              <div style="box-sizing: border-box; display: flex; align-items: center; gap: 8px; padding: 11px 12px; border-radius: 13px; border: 1px solid #ECEEF3; background: #FFFFFF; box-shadow: 0 1px 3px rgba(16,24,40,0.03);">
+                <span style="flex-shrink: 0; padding: 5px 9px; border-radius: 8px; background: #0D9488; color: #FFFFFF; font-size: 11px; font-weight: 800;">SOCKS5</span>
+                <span dir="ltr" style="font-size: 12px; font-weight: 700; color: #1F2433; flex-grow: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">172.21.138.62 : 10808</span>
+                <button aria-label="کد QR" class="irs-qr" style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 7px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="1.5" y="1.5" width="5" height="5" rx="1" stroke="#5B6478" stroke-width="1.3"/><rect x="9.5" y="1.5" width="5" height="5" rx="1" stroke="#5B6478" stroke-width="1.3"/><rect x="1.5" y="9.5" width="5" height="5" rx="1" stroke="#5B6478" stroke-width="1.3"/><rect x="10" y="10" width="1.6" height="1.6" fill="#5B6478"/><rect x="13" y="10" width="1.6" height="1.6" fill="#5B6478"/><rect x="10" y="13" width="1.6" height="1.6" fill="#5B6478"/><rect x="13" y="13" width="1.6" height="1.6" fill="#5B6478"/></svg>
+                </button>
+                <button aria-label="کپی" class="irs-copy" style="flex-shrink: 0; width: 26px; height: 26px; border-radius: 7px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                  <svg width="15" height="15" viewBox="0 0 16 16" fill="none"><rect x="5.5" y="5.5" width="9" height="9" rx="1.8" stroke="#5B6478" stroke-width="1.3"/><path d="M3 10.2V3.8A1.8 1.8 0 0 1 4.8 2h6.4" stroke="#5B6478" stroke-width="1.3" stroke-linecap="round"/></svg>
+                </button>
+              </div>
+
+              <!-- spacer: pushes the motion widget lower within the available space -->
+              <div style="flex-grow: 1; min-height: 0;"></div>
+
+              <!-- proxy relay motion: this device -> pulsing encrypted tunnel -> second device (25% larger) -->
+              <div style="flex-shrink: 0;">
+                <div style="position: relative; width: 100%; height: 175px; border-radius: 16px; background: radial-gradient(420px 220px at 50% 50%, #F3F7FE 0%, #FAFBFD 60%, #FAFBFD 100%); overflow: hidden;">
+
+                  <svg width="384" height="175" viewBox="0 0 384 175" style="position: absolute; inset: 0; overflow: visible;">
+                    <defs>
+                      <filter id="irsDotGlow2" x="-200%" y="-200%" width="500%" height="500%">
+                        <feGaussianBlur stdDeviation="2.6" result="blur"/>
+                        <feMerge>
+                          <feMergeNode in="blur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+
+                    <!-- tunnel glow halo -->
+                    <rect x="103" y="66" width="190" height="44" rx="21" fill="none" stroke="{{accent}}" stroke-width="9" opacity="0.14" filter="url(#irsDotGlow2)"/>
+                    <!-- tunnel body, pulsing -->
+                    <rect x="111" y="71" width="174" height="33" rx="16.5" fill="{{accent}}14" stroke="{{accent}}66" stroke-width="1.8" class="irs-tunnel-pulse"/>
+                    <path id="irsTunnelPath" d="M119 88 L277 88" fill="none" stroke="none"/>
+
+                    <!-- HTTP packet, comet trail -->
+                    <circle r="3.8" fill="{{accent}}" opacity="0.2"><animateMotion dur="1.3s" begin="0.14s" repeatCount="indefinite"><mpath href="#irsTunnelPath"/></animateMotion></circle>
+                    <circle r="4.8" fill="{{accent}}" opacity="0.5"><animateMotion dur="1.3s" begin="0.07s" repeatCount="indefinite"><mpath href="#irsTunnelPath"/></animateMotion></circle>
+                    <circle r="5.8" fill="{{accent}}" filter="url(#irsDotGlow2)"><animateMotion dur="1.3s" begin="0s" repeatCount="indefinite"><mpath href="#irsTunnelPath"/></animateMotion></circle>
+
+                    <!-- SOCKS5 packet, comet trail -->
+                    <circle r="3.8" fill="#0D9488" opacity="0.2"><animateMotion dur="1.3s" begin="0.79s" repeatCount="indefinite"><mpath href="#irsTunnelPath"/></animateMotion></circle>
+                    <circle r="4.8" fill="#0D9488" opacity="0.5"><animateMotion dur="1.3s" begin="0.72s" repeatCount="indefinite"><mpath href="#irsTunnelPath"/></animateMotion></circle>
+                    <circle r="5.8" fill="#0D9488" filter="url(#irsDotGlow2)"><animateMotion dur="1.3s" begin="0.65s" repeatCount="indefinite"><mpath href="#irsTunnelPath"/></animateMotion></circle>
+                  </svg>
+
+                  <!-- arrival spark pings at each tunnel mouth -->
+                  <span class="irs-spark" style="position: absolute; left: 113px; top: 80px; width: 16px; height: 16px; border-radius: 50%; background: {{accent}};"></span>
+                  <span class="irs-spark" style="position: absolute; left: 266px; top: 80px; width: 16px; height: 16px; border-radius: 50%; background: #0D9488; animation-delay: 0.65s;"></span>
+
+                  <!-- broadcast pulse rings behind "this device" -->
+                  <div class="irs-pulse-ring" style="position: absolute; left: 30px; top: 48px; width: 81px; height: 81px; border-radius: 50%; border: 2px solid {{accent}};"></div>
+                  <div class="irs-pulse-ring d2" style="position: absolute; left: 30px; top: 48px; width: 81px; height: 81px; border-radius: 50%; border: 2px solid {{accent}};"></div>
+                  <div class="irs-pulse-ring d3" style="position: absolute; left: 30px; top: 48px; width: 81px; height: 81px; border-radius: 50%; border: 2px solid {{accent}};"></div>
+
+                  <!-- this device (VPN source) — IRSPEEDY mark -->
+                  <div style="position: absolute; left: 30px; top: 48px; width: 81px; height: 81px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 12px 24px -8px rgba(30,58,138,0.4), 0 0 0 2px {{accent}}33; display: flex; align-items: center; justify-content: center;">
+                    <img src="/_blob/2f27cbfce3e251e295dfdedc3f5db28c" alt="نشان آی‌آر اسپیدی" style="width: 42px; height: 57px; object-fit: contain;">
+                  </div>
+
+                  <!-- rotating encryption ring around the lock badge -->
+                  <svg width="53" height="53" viewBox="0 0 53 53" class="irs-rotate-ring" style="position: absolute; left: 168px; top: 24px;">
+                    <circle cx="26.5" cy="26.5" r="22" fill="none" stroke="{{accent}}" stroke-width="2" stroke-dasharray="9 8" opacity="0.55"/>
+                  </svg>
+
+                  <!-- encrypted-tunnel lock badge -->
+                  <div style="position: absolute; left: 177px; top: 33px; width: 35px; height: 35px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 4px 10px rgba(16,24,40,0.1), 0 0 0 1px #ECEEF3; display: flex; align-items: center; justify-content: center;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2.6" stroke="{{accent}}" stroke-width="1.9"/><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7" stroke="{{accent}}" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="15.6" r="1.4" fill="{{accent}}"/></svg>
+                  </div>
+
+                  <!-- pulse rings behind second device -->
+                  <div class="irs-pulse-ring" style="position: absolute; left: 285px; top: 54px; width: 69px; height: 69px; border-radius: 50%; border: 2px solid #9AA2B4; animation-delay: 0.4s;"></div>
+                  <div class="irs-pulse-ring" style="position: absolute; left: 285px; top: 54px; width: 69px; height: 69px; border-radius: 50%; border: 2px solid #9AA2B4; animation-delay: 1.05s;"></div>
+
+                  <!-- second device (proxy client) -->
+                  <div style="position: absolute; left: 285px; top: 54px; width: 69px; height: 69px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 5px 12px rgba(16,24,40,0.08), 0 0 0 1px #ECEEF3; display: flex; align-items: center; justify-content: center; overflow: hidden;">
+                    <img src="/_blob/06491074c9b93a8f4dd697fe7a6b8c87" alt="کاربر دستگاه دوم" style="width: 47px; height: 47px; object-fit: contain;">
+                    <span class="irs-online-dot" style="position: absolute; left: -2px; top: -2px; width: 12px; height: 12px; border-radius: 50%; background: #22B37A; border: 2px solid #FFFFFF;"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- placeholder: shown only when inactive -->
+          <sc-if value="{{proxyOff}}" hint-placeholder-val="{{false}}">
+            <div style="flex-grow: 1; min-height: 0; display: flex; align-items: center; justify-content: center;">
+              <div style="box-sizing: border-box; width: 100%; border: 1.5px dashed #D7DCE6; border-radius: 14px; padding: 20px; text-align: center;">
+                <span style="font-size: 11.5px; color: #9CA3B4; line-height: 1.6;">برای مشاهده آدرس و پورت پراکسی، ابتدا اشتراک‌گذاری را فعال کنید</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+      <!-- ===== DIRECT TAB ===== -->
+      <sc-if value="{{isDirectTab}}" hint-placeholder-val="{{false}}">
+        <div style="display: flex; flex-direction: column; gap: 12px; height: 100%;">
+
+          <!-- instruction card -->
+          <div style="box-sizing: border-box; border-radius: 16px; border: 1px solid #E7EAF2; background: #FFFFFF; padding: 14px 16px; display: flex; gap: 10px; align-items: flex-start; flex-shrink: 0;">
+            <span style="flex-shrink: 0; width: 20px; height: 20px; border-radius: 50%; background: {{accent}}; color: #FFFFFF; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">۱</span>
+            <div style="display: flex; flex-direction: column; gap: 2px; min-width: 0;">
+              <span style="font-size: 12.5px; font-weight: 700; color: #1B2033;">اتصال دستگاه‌های دیگر</span>
+              <span style="font-size: 11px; color: #8A93A6; line-height: 1.5;">این دستگاه به یک Wi-Fi مستقیم تبدیل می‌شود؛ به آن متصل شوید تا از VPN استفاده کنید.</span>
+            </div>
+          </div>
+
+          <!-- activation toggle -->
+          <div style="box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; padding: 12px 14px; border-radius: 14px; background: #F5F7FB; flex-shrink: 0;">
+            <div style="display: flex; flex-direction: column; gap: 1px;">
+              <span style="font-size: 13px; font-weight: 700; color: #1B2033;">هات‌اسپات مستقیم</span>
+              <span style="font-size: 10.5px; color: {{directStatusColor}};">{{directStatusLabel}}</span>
+            </div>
+            <button aria-label="فعال یا غیرفعال کردن هات‌اسپات مستقیم" onClick="{{toggleDirect}}" dir="ltr" style="width: 46px; height: 26px; border-radius: 999px; flex-shrink: 0; box-sizing: border-box; padding: 3px; border: none; cursor: pointer; display: flex; background: {{directTrackBg}};">
+              <div style="width: 20px; height: 20px; border-radius: 50%; background: #FFFFFF; box-shadow: 0 2px 4px rgba(16,24,40,0.25); margin-inline-start: {{directThumbOffset}}; transition: margin-inline-start 0.15s ease;"></div>
+            </button>
+          </div>
+
+          <!-- wifi credentials + connections: shown only when active -->
+          <sc-if value="{{directOn}}" hint-placeholder-val="{{true}}">
+            <div style="display: flex; flex-direction: column; gap: 8px; flex-grow: 1; min-height: 0;">
+
+              <!-- credentials card: SSID + password, single-line rows under one heading -->
+              <div style="box-sizing: border-box; border-radius: 14px; border: 1px solid #ECEEF3; background: #FFFFFF; box-shadow: 0 1px 3px rgba(16,24,40,0.03); flex-shrink: 0; overflow: hidden;">
+                <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 14px; background: linear-gradient(180deg, #F7FAFF 0%, #FFFFFF 100%); border-bottom: 1px solid #EEF0F4;">
+                  <span style="font-size: 11px; font-weight: 700; color: #3C4457;">اطلاعات هات‌اسپات</span>
+                  <span style="font-size: 9px; color: #B9C0CE;">برای اتصال دستگاه‌ها</span>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px;">
+                  <span style="flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; background: {{accent}}1A; display: flex; align-items: center; justify-content: center;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M4 9.5c4.4-4 11.6-4 16 0" stroke="{{accent}}" stroke-width="1.9" stroke-linecap="round"/><path d="M7 13.2c2.8-2.4 7.2-2.4 10 0" stroke="{{accent}}" stroke-width="1.9" stroke-linecap="round"/><path d="M10 16.8c1.2-1 2.8-1 4 0" stroke="{{accent}}" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="19.4" r="1.4" fill="{{accent}}"/></svg>
+                  </span>
+                  <span dir="ltr" style="font-size: 13.5px; font-weight: 800; color: #1F2433; flex-grow: 1; min-width: 0; text-align: right; letter-spacing: 0.2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">IRSPEEDY-Share-A42</span>
+                  <button aria-label="کپی" class="irs-copy" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: 1px solid #ECEEF3; background: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5.5" y="5.5" width="9" height="9" rx="1.8" stroke="#5B6478" stroke-width="1.3"/><path d="M3 10.2V3.8A1.8 1.8 0 0 1 4.8 2h6.4" stroke="#5B6478" stroke-width="1.3" stroke-linecap="round"/></svg>
+                  </button>
+                </div>
+                <div style="height: 1px; background: #EEF0F4; margin: 0 14px;"></div>
+                <div style="display: flex; align-items: center; gap: 10px; padding: 11px 14px;">
+                  <span style="flex-shrink: 0; width: 30px; height: 30px; border-radius: 50%; background: #FDF3E2; display: flex; align-items: center; justify-content: center;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><rect x="4.5" y="10.5" width="15" height="10.5" rx="2.6" stroke="#B7791F" stroke-width="1.9"/><path d="M8 10.5V7.8a4 4 0 0 1 8 0v2.7" stroke="#B7791F" stroke-width="1.9" stroke-linecap="round"/><circle cx="12" cy="15.6" r="1.5" fill="#B7791F"/></svg>
+                  </span>
+                  <span dir="ltr" style="font-size: 13.5px; font-weight: 800; color: #1F2433; flex-grow: 1; min-width: 0; text-align: right; letter-spacing: 0.5px;">Xk7-Sp94Qz</span>
+                  <button aria-label="کپی رمز" class="irs-copy" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: 1px solid #ECEEF3; background: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="5.5" y="5.5" width="9" height="9" rx="1.8" stroke="#5B6478" stroke-width="1.3"/><path d="M3 10.2V3.8A1.8 1.8 0 0 1 4.8 2h6.4" stroke="#5B6478" stroke-width="1.3" stroke-linecap="round"/></svg>
+                  </button>
+                  <button aria-label="تغییر رمز" class="irs-edit" style="flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: 1px solid #ECEEF3; background: #FFFFFF; display: flex; align-items: center; justify-content: center; cursor: pointer;">
+                    <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M11.3 2.3a1.6 1.6 0 0 1 2.3 2.3l-7.7 7.7-3 .7.7-3 7.7-7.7Z" stroke="#5B6478" stroke-width="1.3" stroke-linejoin="round"/></svg>
+                  </button>
+                </div>
+              </div>
+
+              <!-- connected devices, slim -->
+              <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 3px; flex-shrink: 0;">
+                <span style="font-size: 11px; color: #6B7280;">دستگاه‌های متصل</span>
+                <span style="flex-shrink: 0; min-width: 22px; height: 22px; padding: 0 7px; border-radius: 999px; background: {{accent}}; color: #FFFFFF; font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center;">۳</span>
+              </div>
+
+              <!-- hotspot motion: this device (left) broadcasting live data to TV, PS5, phone (right) -->
+              <div style="flex-shrink: 0;">
+                <div style="position: relative; width: 100%; height: 180px; flex-shrink: 0; border-radius: 16px; background: radial-gradient(420px 200px at 22% 50%, #F3F7FE 0%, #FAFBFD 55%, #FAFBFD 100%); overflow: hidden;">
+
+                  <svg width="384" height="180" viewBox="0 0 384 180" style="position: absolute; inset: 0; overflow: visible;">
+                    <defs>
+                      <filter id="irsDotGlow" x="-200%" y="-200%" width="500%" height="500%">
+                        <feGaussianBlur stdDeviation="2.4" result="blur"/>
+                        <feMerge>
+                          <feMergeNode in="blur"/>
+                          <feMergeNode in="SourceGraphic"/>
+                        </feMerge>
+                      </filter>
+                    </defs>
+
+                    <!-- guide curves -->
+                    <path id="irsPathTV" d="M70 90 C 150 45 230 20 314 31" fill="none" stroke="#E1E7F3" stroke-width="1.6"/>
+                    <path id="irsPathPS" d="M70 90 C 150 95 230 92 314 90" fill="none" stroke="#E1E7F3" stroke-width="1.6"/>
+                    <path id="irsPathPH" d="M70 90 C 150 135 230 160 314 150" fill="none" stroke="#E1E7F3" stroke-width="1.6"/>
+
+                    <!-- traveling data packets -->
+                    <circle r="3.6" fill="{{accent}}" filter="url(#irsDotGlow)">
+                      <animateMotion dur="1.7s" begin="0s" repeatCount="indefinite"><mpath href="#irsPathTV"/></animateMotion>
+                    </circle>
+                    <circle r="3.6" fill="#7C3AED" filter="url(#irsDotGlow)">
+                      <animateMotion dur="1.9s" begin="0.35s" repeatCount="indefinite"><mpath href="#irsPathPS"/></animateMotion>
+                    </circle>
+                    <circle r="3.6" fill="#0D9488" filter="url(#irsDotGlow)">
+                      <animateMotion dur="1.5s" begin="0.7s" repeatCount="indefinite"><mpath href="#irsPathPH"/></animateMotion>
+                    </circle>
+                  </svg>
+
+                  <!-- broadcast pulse rings behind the hub -->
+                  <div class="irs-pulse-ring" style="position: absolute; left: 38px; top: 58px; width: 65px; height: 65px; border-radius: 50%; border: 2px solid {{accent}};"></div>
+                  <div class="irs-pulse-ring d2" style="position: absolute; left: 38px; top: 58px; width: 65px; height: 65px; border-radius: 50%; border: 2px solid {{accent}};"></div>
+                  <div class="irs-pulse-ring d3" style="position: absolute; left: 38px; top: 58px; width: 65px; height: 65px; border-radius: 50%; border: 2px solid {{accent}};"></div>
+
+                  <!-- this device (PC) hub -->
+                  <div style="position: absolute; left: 38px; top: 58px; width: 65px; height: 65px; border-radius: 20px; background: linear-gradient(180deg, #2F5BC4 0%, {{accent}} 100%); box-shadow: 0 12px 24px -6px rgba(30,58,138,0.55); display: flex; align-items: center; justify-content: center;">
+                    <svg width="31" height="31" viewBox="0 0 24 24" fill="none"><rect x="3" y="4.5" width="18" height="12" rx="2" stroke="#FFFFFF" stroke-width="1.6"/><path d="M9 20h6M12 16.5V20" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/></svg>
+                  </div>
+
+                  <!-- TV -->
+                  <div style="position: absolute; left: 292px; top: 9px; width: 45px; height: 45px; border-radius: 14px; background: #FFFFFF; box-shadow: 0 5px 12px rgba(16,24,40,0.08), 0 0 0 1px {{accent}}26; display: flex; align-items: center; justify-content: center;">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="5" width="19" height="12" rx="2" stroke="{{accent}}" stroke-width="1.6"/><path d="M9 20.5h6M12 17v3.5" stroke="{{accent}}" stroke-width="1.6" stroke-linecap="round"/></svg>
+                    <span class="irs-online-dot" style="position: absolute; left: -2px; top: -2px; width: 10px; height: 10px; border-radius: 50%; background: #22B37A; border: 2px solid #FFFFFF;"></span>
+                  </div>
+
+                  <!-- PS5 controller -->
+                  <div style="position: absolute; left: 292px; top: 68px; width: 45px; height: 45px; border-radius: 14px; background: #FFFFFF; box-shadow: 0 5px 12px rgba(16,24,40,0.08), 0 0 0 1px rgba(124,58,237,0.15); display: flex; align-items: center; justify-content: center;">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><rect x="2.5" y="8" width="19" height="9" rx="4.5" stroke="#7C3AED" stroke-width="1.6"/><path d="M7 10.3v4.4M5 12.5h4" stroke="#7C3AED" stroke-width="1.4" stroke-linecap="round"/><circle cx="16" cy="11" r="1" fill="#7C3AED"/><circle cx="18.2" cy="13.2" r="1" fill="#7C3AED"/></svg>
+                    <span class="irs-online-dot" style="position: absolute; left: -2px; top: -2px; width: 10px; height: 10px; border-radius: 50%; background: #22B37A; border: 2px solid #FFFFFF; animation-delay: 0.4s;"></span>
+                  </div>
+
+                  <!-- phone -->
+                  <div style="position: absolute; left: 292px; top: 127px; width: 45px; height: 45px; border-radius: 14px; background: #FFFFFF; box-shadow: 0 5px 12px rgba(16,24,40,0.08), 0 0 0 1px rgba(13,148,136,0.18); display: flex; align-items: center; justify-content: center;">
+                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><rect x="6" y="2.5" width="12" height="19" rx="2.6" stroke="#0D9488" stroke-width="1.7"/><path d="M10.5 18.3h3" stroke="#0D9488" stroke-width="1.7" stroke-linecap="round"/></svg>
+                    <span class="irs-online-dot" style="position: absolute; left: -2px; top: -2px; width: 10px; height: 10px; border-radius: 50%; background: #22B37A; border: 2px solid #FFFFFF; animation-delay: 0.8s;"></span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <!-- placeholder: shown only when inactive -->
+          <sc-if value="{{directOff}}" hint-placeholder-val="{{false}}">
+            <div style="flex-grow: 1; min-height: 0; display: flex; align-items: center; justify-content: center;">
+              <div style="box-sizing: border-box; width: 100%; border: 1.5px dashed #D7DCE6; border-radius: 14px; padding: 20px; text-align: center;">
+                <span style="font-size: 11.5px; color: #9CA3B4; line-height: 1.6;">برای مشاهده نام و رمز Wi-Fi، ابتدا اشتراک‌گذاری مستقیم را فعال کنید</span>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+      </sc-if>
+
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1E3A8A","options":["#1E3A8A","#1D4ED8","#0F2E6B","#1E293B"]},"activeTab":{"editor":"enum","default":"proxy","options":["proxy","direct"],"section":"State"},"proxyOn":{"editor":"boolean","default":true,"section":"State"},"directOn":{"editor":"boolean","default":true,"section":"State"},"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { activeTab: null, proxyOn: null, directOn: null };
+  }
+  renderVals() {
+    const accent = this.props.accent ?? '#1E3A8A';
+    const activeTab = this.state.activeTab ?? this.props.activeTab ?? 'proxy';
+    const proxyOn = this.state.proxyOn ?? this.props.proxyOn ?? true;
+    const directOn = this.state.directOn ?? this.props.directOn ?? true;
+    const isProxyTab = activeTab === 'proxy';
+    const isDirectTab = activeTab === 'direct';
+
+    const activePillShadow = '0 2px 6px rgba(16,24,40,0.08)';
+    return {
+      accent,
+      selectProxyTab: () => this.setState({ activeTab: 'proxy' }),
+      selectDirectTab: () => this.setState({ activeTab: 'direct' }),
+      toggleProxy: () => this.setState({ proxyOn: !proxyOn }),
+      toggleDirect: () => this.setState({ directOn: !directOn }),
+      isProxyTab,
+      isDirectTab,
+      proxyOn,
+      proxyOff: !proxyOn,
+      directOn,
+      directOff: !directOn,
+      step2Opacity: proxyOn ? '1' : '0.45',
+      proxyTabBg: isProxyTab ? '#FFFFFF' : 'transparent',
+      proxyTabColor: isProxyTab ? '#141B33' : '#8A93A6',
+      proxyTabShadow: isProxyTab ? activePillShadow : 'none',
+      directTabBg: isDirectTab ? '#FFFFFF' : 'transparent',
+      directTabColor: isDirectTab ? '#141B33' : '#8A93A6',
+      directTabShadow: isDirectTab ? activePillShadow : 'none',
+      proxyStatusLabel: proxyOn ? 'فعال' : 'غیرفعال',
+      proxyStatusColor: proxyOn ? '#159A63' : '#9CA3B4',
+      proxyTrackBg: proxyOn
+        ? 'linear-gradient(180deg, #22B37A 0%, #159A63 100%)'
+        : '#DEE1E8',
+      proxyThumbOffset: proxyOn ? '20px' : '0px',
+      directStatusLabel: directOn ? 'فعال' : 'غیرفعال',
+      directStatusColor: directOn ? '#159A63' : '#9CA3B4',
+      directTrackBg: directOn
+        ? 'linear-gradient(180deg, #22B37A 0%, #159A63 100%)'
+        : '#DEE1E8',
+      directThumbOffset: directOn ? '20px' : '0px',
+    };
+  }
+}
+</script>
+</body>
+</html>
