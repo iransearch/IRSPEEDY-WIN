@@ -74,8 +74,9 @@ namespace IRSpeedyVPN.Windows
             pnlShowIP.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
             ProxyMotion.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
             ProxyOffHint.Visibility = active ? Visibility.Collapsed : Visibility.Visible;
-            HTTPAddress.Text = active ? proxyIp + ":" + Service.HttpPort : "";
-            SOCKS5Address.Text = active ? proxyIp + ":" + Service.SocksPort : "";
+            ProxyStepTwo.Opacity = active ? 1 : 0.45;
+            HTTPAddress.Text = active ? proxyIp + " : " + Service.HttpPort : "";
+            SOCKS5Address.Text = active ? proxyIp + " : " + Service.SocksPort : "";
             ProxyStatus.Text = !ProxyAvailable ? "ابتدا به سرویس سازگار متصل شوید" : proxyError ??
                 (active ? "فعال" : Service.IsShareActive ? "آدرس شبکه یا پراکسی فعال تأیید نشد" : "غیرفعال");
             ProxyStatus.Foreground = active ? new SolidColorBrush(Color.FromRgb(23, 171, 119)) : Brushes.Gray;
@@ -99,7 +100,9 @@ namespace IRSpeedyVPN.Windows
             catch { proxyError = "اعمال تنظیم انجام نشد؛ دوباره تلاش کنید."; }
             finally { proxyBusy = false; RefreshProxyUi(); RefreshHotspotUi(); }
         }
-        private string ProxyUri(string type) => type == "HTTP" ? "http://" + HTTPAddress.Text : "socks5://" + SOCKS5Address.Text;
+        private string ProxyUri(string type) => type == "HTTP"
+            ? "http://" + proxyIp + ":" + Service.HttpPort
+            : "socks5://" + proxyIp + ":" + Service.SocksPort;
         private void CopyProxy_Click(object sender, RoutedEventArgs e)
         {
             if (!ProxyListening()) return;

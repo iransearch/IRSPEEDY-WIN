@@ -138,3 +138,27 @@ assert hotspot.get('Unloaded') == 'Motion_Unloaded'
 assert len([e for e in hotspot.iter(W+'Path') if (e.get(X+'Name') or '').startswith('Route')]) == 3
 assert (A/'Resources/Irspeedy/Reference/user-second-device.png').exists()
 print('PASS: left scrollbar coordinate frame, continuous app list, direct motion lifecycle and receiver asset.')
+
+# Both proxy instructions remain separate, with the original 20-DIP numbered circles.
+share = roots[A/'Windows/ShareVPNSetting.xaml']
+step_two = next(e for e in share.iter(W+'Grid') if e.get(X+'Name') == 'ProxyStepTwo')
+steps = [e for e in share.iter(W+'Grid') if any(
+    child.tag == W+'Border' and child.get('Width') == '20' and child.get('Height') == '20'
+    for child in e)]
+assert len(steps) == 2 and steps[1] is step_two
+for step, number, title, detail, color in [
+    (steps[0], '۱', 'فعال‌سازی اشتراک', 'اشتراک‌گذاری VPN را روی این دستگاه فعال کنید.', '#1E3A8A'),
+    (steps[1], '۲', 'تنظیم پراکسی روی دستگاه دوم', 'روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید.', '#C7CCD8'),
+]:
+    badge = next(e for e in step if e.tag == W+'Border')
+    assert badge.get('CornerRadius') == '10' and badge.get('Background') == color
+    assert badge.find(W+'TextBlock').get('Text') == number
+    texts = [e.get('Text') for e in step.iter(W+'TextBlock')]
+    assert title in texts and detail in texts
+share_code = (A/'Windows/ShareVPNSetting.xaml.cs').read_text(encoding='utf-8')
+assert 'ProxyStepTwo.Opacity = active ? 1 : 0.45' in share_code
+assert 'proxyIp + " : " + Service.HttpPort' in share_code
+assert 'proxyIp + " : " + Service.SocksPort' in share_code
+assert '"http://" + proxyIp + ":" + Service.HttpPort' in share_code
+assert '"socks5://" + proxyIp + ":" + Service.SocksPort' in share_code
+print('PASS: two proxy guide steps, numbered badges, conditional fade, displayed addresses and machine-readable URIs.')

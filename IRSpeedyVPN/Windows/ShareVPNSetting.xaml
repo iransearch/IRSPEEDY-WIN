@@ -44,14 +44,36 @@
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <StackPanel>
-              <Border Height="120" CornerRadius="16" BorderBrush="#E1E6F3" BorderThickness="1" Background="White" Padding="14">
-                <StackPanel VerticalAlignment="Center">
-                  <TextBlock FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
-                    <Run Text="۱  فعال‌سازی اشتراک" FlowDirection="RightToLeft"/>
-                  </TextBlock>
-                  <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="LeftToRight" TextWrapping="Wrap" Margin="0,4,0,0">
-                    <Run Text="اشتراک‌گذاری VPN را روی این دستگاه فعال کنید. ۲  تنظیم پراکسی روی دستگاه دوم روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید." FlowDirection="RightToLeft"/>
-                  </TextBlock>
+              <Border CornerRadius="16" BorderBrush="#E7EAF2" BorderThickness="1" Background="White" Padding="16,12">
+                <StackPanel FlowDirection="RightToLeft">
+                  <Grid>
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="20"/>
+                      <ColumnDefinition Width="10"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Top" CornerRadius="10" Background="#1E3A8A">
+                      <TextBlock Text="۱" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="2">
+                      <TextBlock Text="فعال‌سازی اشتراک" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamilyBold}" FontWeight="Normal" TextAlignment="Right"/>
+                      <TextBlock Text="اشتراک‌گذاری VPN را روی این دستگاه فعال کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                  </Grid>
+                  <Grid x:Name="ProxyStepTwo" Margin="0,12,0,0" Opacity="0.45">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="20"/>
+                      <ColumnDefinition Width="10"/>
+                      <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Top" CornerRadius="10" Background="#C7CCD8">
+                      <TextBlock Text="۲" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel Grid.Column="2">
+                      <TextBlock Text="تنظیم پراکسی روی دستگاه دوم" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamilyBold}" FontWeight="Normal" TextAlignment="Right"/>
+                      <TextBlock Text="روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                    </StackPanel>
+                  </Grid>
                 </StackPanel>
               </Border>
               <Border Height="52" CornerRadius="15" Background="#F4F6FA" Margin="0,12,0,12" Padding="14,0">
