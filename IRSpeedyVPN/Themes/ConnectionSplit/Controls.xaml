@@ -1,0 +1,415 @@
+<!--
+  IRSPEEDY — control styles shared by ConnectionMethods and SplitTunnel.
+  This dictionary merges Colors / Typography / Icons itself, and is merged locally by the two windows.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:ctl="clr-namespace:IRSpeedyVPN.Controls">
+
+  <ResourceDictionary.MergedDictionaries>
+    <ResourceDictionary Source="/IRSpeedyVPN;component/Themes/ConnectionSplit/Colors.xaml" />
+    <ResourceDictionary Source="/IRSpeedyVPN;component/Themes/ConnectionSplit/Typography.xaml" />
+    <ResourceDictionary Source="/IRSpeedyVPN;component/Themes/ConnectionSplit/Icons.xaml" />
+  </ResourceDictionary.MergedDictionaries>
+
+  <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+  <!-- ============================================================
+       Window chrome (borderless, rounded, RTL)
+       ============================================================ -->
+  <Style x:Key="IrsWindowStyle" TargetType="Window">
+    <Setter Property="WindowStyle" Value="None" />
+    <Setter Property="AllowsTransparency" Value="False" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="ResizeMode" Value="NoResize" />
+    <Setter Property="SizeToContent" Value="Manual" />
+    <Setter Property="FlowDirection" Value="RightToLeft" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+    <Setter Property="UseLayoutRounding" Value="True" />
+    <Setter Property="SnapsToDevicePixels" Value="True" />
+    <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+    <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+  </Style>
+
+  <!-- Plain <Control Template="{StaticResource Icon.X}"/> used as an icon must never take keyboard focus -->
+  <Style TargetType="Control">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="IsTabStop" Value="False" />
+  </Style>
+
+  <!-- Icon chosen from the item's IconKey (string). Used by both lists. -->
+  <Style x:Key="DataIconStyle" TargetType="Control">
+    <Setter Property="Focusable" Value="False" />
+    <Setter Property="IsTabStop" Value="False" />
+    <Setter Property="Template" Value="{StaticResource Icon.Globe}" />
+    <Style.Triggers>
+      <DataTrigger Binding="{Binding IconKey}" Value="Globe"><Setter Property="Template" Value="{StaticResource Icon.Globe}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="Stack"><Setter Property="Template" Value="{StaticResource Icon.Stack}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="Route"><Setter Property="Template" Value="{StaticResource Icon.Route}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="Split"><Setter Property="Template" Value="{StaticResource Icon.Split}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="Chat"><Setter Property="Template" Value="{StaticResource Icon.Chat}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="Game"><Setter Property="Template" Value="{StaticResource Icon.Game}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="Music"><Setter Property="Template" Value="{StaticResource Icon.Music}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="Mail"><Setter Property="Template" Value="{StaticResource Icon.Mail}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="Video"><Setter Property="Template" Value="{StaticResource Icon.Video}" /></DataTrigger>
+      <DataTrigger Binding="{Binding IconKey}" Value="File"><Setter Property="Template" Value="{StaticResource Icon.File}" /></DataTrigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- ============================================================
+       Red round close button (header, physical LEFT side)
+       ============================================================ -->
+  <Style x:Key="CloseButtonStyle" TargetType="Button">
+    <Setter Property="Width" Value="30" />
+    <Setter Property="Height" Value="30" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid x:Name="Root" RenderTransformOrigin="0.5,0.5" Background="Transparent">
+            <Ellipse x:Name="Disc" Fill="{StaticResource Brush.CloseGradient}">
+              <Ellipse.Effect>
+                <DropShadowEffect BlurRadius="12" ShadowDepth="4" Direction="270" Opacity="0.45" Color="#DC2626" />
+              </Ellipse.Effect>
+            </Ellipse>
+            <Control Template="{StaticResource Icon.Close}" Foreground="White" Width="12" Height="12" />
+            <Ellipse x:Name="FocusRing" Margin="-3" Stroke="{StaticResource Brush.Accent}" StrokeThickness="2" Visibility="Collapsed" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Root" Property="RenderTransform">
+                <Setter.Value><ScaleTransform ScaleX="1.06" ScaleY="1.06" /></Setter.Value>
+              </Setter>
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ============================================================
+       Primary button — "تایید و ذخیره"
+       ============================================================ -->
+  <Style x:Key="PrimaryButtonStyle" TargetType="Button">
+    <Setter Property="Foreground" Value="White" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="FontSize" Value="14.5" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid x:Name="Root">
+            <Border x:Name="Body" CornerRadius="14" Background="{StaticResource Brush.PrimaryGradient}">
+              <Border.Effect>
+                <DropShadowEffect BlurRadius="18" ShadowDepth="6" Direction="270" Opacity="0.35" Color="#1E3A8A" />
+              </Border.Effect>
+            </Border>
+            <Border x:Name="FocusRing" CornerRadius="16" Margin="-3" BorderBrush="{StaticResource Brush.Accent}" BorderThickness="2" Opacity="0.5" Visibility="Collapsed" />
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Root" Property="RenderTransform">
+                <Setter.Value><TranslateTransform Y="-1" /></Setter.Value>
+              </Setter>
+              <Setter TargetName="Body" Property="Effect">
+                <Setter.Value>
+                  <DropShadowEffect BlurRadius="22" ShadowDepth="7" Direction="270" Opacity="0.45" Color="#1E3A8A" />
+                </Setter.Value>
+              </Setter>
+            </Trigger>
+            <Trigger Property="IsPressed" Value="True">
+              <Setter TargetName="Root" Property="Opacity" Value="0.92" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ============================================================
+       Text-only link button — "انتخاب همه"
+       ============================================================ -->
+  <Style x:Key="LinkButtonStyle" TargetType="Button">
+    <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
+    <Setter Property="FontWeight" Value="Bold" />
+    <Setter Property="FontSize" Value="11.5" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="Padding" Value="2" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Body" Background="Transparent" Padding="{TemplateBinding Padding}">
+            <ContentPresenter />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Body" Property="Opacity" Value="0.75" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ============================================================
+       Small round icon button — trash on manually-added apps (28px)
+       ============================================================ -->
+  <Style x:Key="RoundIconButtonStyle" TargetType="Button">
+    <Setter Property="Width" Value="28" />
+    <Setter Property="Height" Value="28" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border x:Name="Body" CornerRadius="14" Background="White" BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Body" Property="Background" Value="{StaticResource Brush.RemoveHoverBg}" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Body" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ============================================================
+       Dashed "افزودن برنامه" button (44px)
+       WPF Border cannot be dashed, so the outline is a Rectangle with StrokeDashArray.
+       ============================================================ -->
+  <Style x:Key="AddButtonStyle" TargetType="Button">
+    <Setter Property="Height" Value="44" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <Rectangle x:Name="Outline" RadiusX="12" RadiusY="12"
+                       Fill="{StaticResource Brush.AddBg}"
+                       Stroke="{StaticResource Brush.AddBorder}" StrokeThickness="1.5"
+                       StrokeDashArray="4 3" />
+            <ContentPresenter Margin="14,0" VerticalAlignment="Center"
+                              HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+              <Setter TargetName="Outline" Property="Fill" Value="{StaticResource Brush.AddBgHover}" />
+              <Setter TargetName="Outline" Property="Stroke" Value="{StaticResource Brush.AddBorderHover}" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="Outline" Property="Stroke" Value="{StaticResource Brush.Accent}" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ============================================================
+       Search box (44px) with placeholder in Tag
+       Usage: <TextBox Style="{StaticResource SearchBoxStyle}" Tag="جستجوی برنامه" .../>
+       ============================================================ -->
+  <Style x:Key="SearchBoxStyle" TargetType="TextBox">
+    <Setter Property="Height" Value="44" />
+    <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
+    <Setter Property="FontSize" Value="14" />
+    <Setter Property="Foreground" Value="{StaticResource Brush.TextInput}" />
+    <Setter Property="CaretBrush" Value="{StaticResource Brush.Accent}" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="TextBox">
+          <Border x:Name="Frame" CornerRadius="12" Background="White"
+                  BorderBrush="{StaticResource Brush.FieldBorder}" BorderThickness="1" Padding="14,0">
+            <Grid>
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="16" />   <!-- icon: first column = physical RIGHT in RTL -->
+                <ColumnDefinition Width="10" />
+                <ColumnDefinition Width="*" />
+              </Grid.ColumnDefinitions>
+              <Control Grid.Column="0" Template="{StaticResource Icon.Search}" Foreground="{StaticResource Brush.TextMuted}"
+                       Width="16" Height="16" VerticalAlignment="Center" />
+              <TextBlock x:Name="Placeholder" Grid.Column="2" Text="{TemplateBinding Tag}"
+                         Foreground="{StaticResource Brush.TextMuted}" VerticalAlignment="Center"
+                         IsHitTestVisible="False" Visibility="Collapsed" />
+              <ScrollViewer x:Name="PART_ContentHost" Grid.Column="2" VerticalAlignment="Center"
+                            Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
+            </Grid>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="Text" Value="">
+              <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocusWithin" Value="True">
+              <Setter TargetName="Frame" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+              <Setter TargetName="Frame" Property="Effect">
+                <Setter.Value>
+                  <!-- ≈ CSS box-shadow: 0 0 0 3px rgba(30,58,138,0.12) -->
+                  <DropShadowEffect BlurRadius="6" ShadowDepth="0" Opacity="0.3" Color="#1E3A8A" />
+                </Setter.Value>
+              </Setter>
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ============================================================
+       Toggle switch (control class: Controls/ToggleSwitch.cs)
+       Size comes from Width/Height at the usage site:
+         connection-method rows 42x24 · activation row 46x26 · app rows 40x23
+       Always LeftToRight: ON = thumb on the physical right, same as the design.
+       ============================================================ -->
+  <Style TargetType="{x:Type ctl:SettingsToggleSwitch}">
+    <Setter Property="FlowDirection" Value="LeftToRight" />
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="VerticalAlignment" Value="Center" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="{x:Type ctl:SettingsToggleSwitch}">
+          <Grid>
+            <Border x:Name="FocusRing" Margin="-3" CornerRadius="999" BorderThickness="2"
+                    BorderBrush="{StaticResource Brush.Accent}" Opacity="0.5" Visibility="Collapsed" />
+            <Border x:Name="Track" CornerRadius="999" Background="{StaticResource Brush.ToggleOff}" Padding="3">
+              <!-- Width and X position of the thumb are set in ToggleSwitch.cs -->
+              <Ellipse x:Name="PART_Thumb" Fill="White" HorizontalAlignment="Left" VerticalAlignment="Stretch">
+                <Ellipse.Effect>
+                  <DropShadowEffect BlurRadius="4" ShadowDepth="2" Direction="270" Opacity="0.25" Color="#101828" />
+                </Ellipse.Effect>
+              </Ellipse>
+            </Border>
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsChecked" Value="True">
+              <Setter TargetName="Track" Property="Background" Value="{StaticResource Brush.ToggleOn}" />
+            </Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+  <!-- ============================================================
+       Thin scrollbar (6px, no arrows) — apply inside a ScrollViewer:
+       <ScrollViewer.Resources><Style TargetType="ScrollBar" BasedOn="{StaticResource ThinScrollBar}"/></ScrollViewer.Resources>
+       ============================================================ -->
+  <Style x:Key="ThinScrollBar" TargetType="ScrollBar">
+    <Setter Property="Width" Value="6" />
+    <Setter Property="MinWidth" Value="6" />
+    <Setter Property="Background" Value="Transparent" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="ScrollBar">
+          <Track x:Name="PART_Track" IsDirectionReversed="True">
+            <Track.Thumb>
+              <Thumb>
+                <Thumb.Template>
+                  <ControlTemplate TargetType="Thumb">
+                    <Border CornerRadius="3" Background="{StaticResource Brush.ScrollThumb}" />
+                  </ControlTemplate>
+                </Thumb.Template>
+              </Thumb>
+            </Track.Thumb>
+          </Track>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="Orientation" Value="Horizontal">
+        <Setter Property="Visibility" Value="Collapsed" />
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- ============================================================
+       Card (list row) — white, 1px #ECEEF3, soft shadow, hover border #D8DCE6
+       ============================================================ -->
+  <Style x:Key="ListCardStyle" TargetType="Border">
+    <Setter Property="Background" Value="{StaticResource Brush.CardBg}" />
+    <Setter Property="BorderBrush" Value="{StaticResource Brush.CardBorder}" />
+    <Setter Property="BorderThickness" Value="1" />
+    <Setter Property="Effect">
+      <Setter.Value>
+        <DropShadowEffect BlurRadius="3" ShadowDepth="1" Direction="270" Opacity="0.05" Color="#101828" />
+      </Setter.Value>
+    </Setter>
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="BorderBrush" Value="{StaticResource Brush.CardBorderHover}" />
+        <Setter Property="Effect">
+          <Setter.Value>
+            <DropShadowEffect BlurRadius="12" ShadowDepth="4" Direction="270" Opacity="0.08" Color="#101828" />
+          </Setter.Value>
+        </Setter>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- Connection-method card: 16px corners, 60px min height, lifts 1px on hover -->
+  <Style x:Key="MethodCardStyle" TargetType="Border" BasedOn="{StaticResource ListCardStyle}">
+    <Setter Property="CornerRadius" Value="16" />
+    <Setter Property="MinHeight" Value="60" />
+    <Setter Property="Padding" Value="14,10" />
+    <Style.Triggers>
+      <Trigger Property="IsMouseOver" Value="True">
+        <Setter Property="RenderTransform">
+          <Setter.Value><TranslateTransform Y="-1" /></Setter.Value>
+        </Setter>
+      </Trigger>
+    </Style.Triggers>
+  </Style>
+
+  <!-- App card: 14px corners -->
+  <Style x:Key="AppCardStyle" TargetType="Border" BasedOn="{StaticResource ListCardStyle}">
+    <Setter Property="CornerRadius" Value="14" />
+    <Setter Property="Padding" Value="12,9" />
+  </Style>
+
+  <!-- A whole card that is clickable (the split-tunnel row). Content = the card. -->
+  <Style x:Key="CardButtonStyle" TargetType="Button">
+    <Setter Property="Cursor" Value="Hand" />
+    <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Grid>
+            <ContentPresenter HorizontalAlignment="Stretch" />
+            <Border x:Name="FocusRing" CornerRadius="18" Margin="-2" BorderThickness="2"
+                    BorderBrush="{StaticResource Brush.Accent}" Opacity="0.5" Visibility="Collapsed" IsHitTestVisible="False" />
+          </Grid>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsKeyboardFocused" Value="True">
+              <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
+            </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+
+</ResourceDictionary>

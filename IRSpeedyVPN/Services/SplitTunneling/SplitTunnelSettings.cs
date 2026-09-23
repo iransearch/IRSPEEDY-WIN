@@ -23,6 +23,9 @@ namespace IRSpeedyVPN.Services.SplitTunneling
     {
         public int Version { get; set; } = 2;
         public bool Enabled { get; set; }
+        // Apps is the selected routing policy. CustomApps is the editable manual
+        // catalog, including unchecked entries, and must never drive routing itself.
         public List<SplitTunnelApp> Apps { get; set; } = new List<SplitTunnelApp>();
+        public List<SplitTunnelApp> CustomApps { get; set; } = new List<SplitTunnelApp>();
     }
 }

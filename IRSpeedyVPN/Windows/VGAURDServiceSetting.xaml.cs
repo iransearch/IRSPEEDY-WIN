@@ -25,13 +25,7 @@ namespace IRSpeedyVPN.Windows
                 rowVpn.Visibility = Visibility.Collapsed;
 
             LoadSettings();
-            try { SplitTunnel.IsOn = SplitTunnelStore.Load().Enabled; }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); }
-            SplitTunnel.Checked += SplitTunnel_Checked;
-            VPNMode.Checked += (s, e) => UpdateSplitAvailability();
-            VPNMode.Unchecked += (s, e) => UpdateSplitAvailability();
-            UpdateSplitAvailability();
-            if (SplitTunnel.IsOn && IsOn(GameMode)) SetChecked(GameMode, false);
+            RefreshSplitTunnelStatus();
         }
 
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
@@ -54,31 +48,26 @@ namespace IRSpeedyVPN.Windows
             // Game Mode is independent, but forces VPN mode (persisted above as VPN=1).
             RegHelper.SetSettingValue(KEY_GAME, IsOn(GameMode) ? "1" : "0");
 
-            try
-            {
-                var split = SplitTunnelStore.Load();
-                split.Enabled = SplitTunnel.IsOn && IsOn(VPNMode);
-                SplitTunnelStore.Save(split);
-            }
-            catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); return; }
+            // Split tunnel owns its own save/cancel lifecycle. Do not overwrite it here.
             Close();
         }
 
         private void SplitApps_Click(object sender, RoutedEventArgs e)
         {
-            if (IsOn(VPNMode)) new SettingsSplitTunnelApps { Owner = this }.ShowDialog();
+            new SettingsSplitTunnelApps { Owner = this }.ShowDialog();
+            RefreshSplitTunnelStatus();
         }
 
-        private void SplitTunnel_Checked(object sender, RoutedEventArgs e)
+        private void RefreshSplitTunnelStatus()
         {
-            if (SplitTunnel.IsOn && !IsOn(VPNMode)) SplitTunnel.IsOn = false;
-            if (SplitTunnel.IsOn && IsOn(GameMode)) SetChecked(GameMode, false);
-        }
-        private void UpdateSplitAvailability()
-        {
-            if (SplitTunnel == null) return;
-            SplitTunnel.IsEnabled = IsOn(VPNMode);
-            if (!IsOn(VPNMode)) SplitTunnel.IsOn = false;
+            try
+            {
+                bool enabled = SplitTunnelStore.Load().Enabled;
+                SplitTunnelStatus.Text = enabled ? "فعال" : "غیرفعال";
+                SplitTunnelStatus.Foreground = (System.Windows.Media.Brush)FindResource(enabled ? "Brush.StatusOn" : "Brush.TextMuted");
+                if (enabled && IsOn(GameMode)) SetChecked(GameMode, false);
+            }
+            catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); }
         }
 
         // --------------------------
@@ -136,7 +125,7 @@ namespace IRSpeedyVPN.Windows
             SetEnabled(TelegramRouteProxy, enabled);
         }
 
-        private static void SetEnabled(IRSpeedyVPN.Controls.ServiceToggle toggle, bool enabled)
+        private static void SetEnabled(IRSpeedyVPN.Controls.SettingsToggleSwitch toggle, bool enabled)
         {
             if (toggle == null) return;
             try { toggle.IsEnabled = enabled; } catch { }
@@ -193,7 +182,7 @@ namespace IRSpeedyVPN.Windows
             SetCheckedIfNot(keepOn, TelegramRouteProxy, false);
         }
 
-        private static void SetCheckedIfNot(object keepOn, IRSpeedyVPN.Controls.ServiceToggle target, bool value)
+        private static void SetCheckedIfNot(object keepOn, IRSpeedyVPN.Controls.SettingsToggleSwitch target, bool value)
         {
             if (target == null) return;
             if (ReferenceEquals(keepOn, target)) return;
@@ -221,7 +210,6 @@ namespace IRSpeedyVPN.Windows
         private void GameMode_Checked(object sender, RoutedEventArgs e)
         {
             if (_isUpdating) return;
-            SplitTunnel.IsOn = false;
             ApplyGameModeLock(true);
         }
         private void GameMode_Unchecked(object sender, RoutedEventArgs e)
@@ -233,13 +221,13 @@ namespace IRSpeedyVPN.Windows
         // --------------------------
         // Helpers
         // --------------------------
-        private static bool IsOn(IRSpeedyVPN.Controls.ServiceToggle toggle)
+        private static bool IsOn(IRSpeedyVPN.Controls.SettingsToggleSwitch toggle)
         {
             try { return toggle != null && toggle.IsChecked == true; }
             catch { return false; }
         }
 
-        private static void SetChecked(IRSpeedyVPN.Controls.ServiceToggle toggle, bool value)
+        private static void SetChecked(IRSpeedyVPN.Controls.SettingsToggleSwitch toggle, bool value)
         {
             if (toggle == null) return;
             try { toggle.IsChecked = value; } catch { }

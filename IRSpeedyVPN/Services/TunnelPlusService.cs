@@ -488,10 +488,12 @@ namespace IRSpeedyVPN.Services
             try
             {
                 configData = SingBox.TunBrowserCompatibility.Apply(configData);
-                var split = lastVpnMode ? SplitTunneling.SplitTunnelStore.Load() : new SplitTunneling.SplitTunnelSettings();
-                configData = SplitTunneling.SplitTunnelPolicyBuilder.Apply(configData, split);
-                if (split.Enabled && lastVpnMode)
-                    Diagnostic("split-tunnel", "policy=selected-only selected=" + split.Apps.Count + " sharedDns=vpn");
+                var split = SplitTunneling.SplitTunnelStore.Load();
+                configData = SplitTunneling.SplitTunnelPolicyBuilder.Apply(configData, split, System.Windows.Forms.Application.ExecutablePath);
+                if (split.Enabled)
+                    Diagnostic("split-tunnel", "policy=selected-only selected=" + split.Apps.Count
+                        + " mode=" + (lastVpnMode ? "TUN+local-proxy" : "local-proxy")
+                        + " sharedDns=" + (lastVpnMode ? "vpn" : "system"));
             }
             catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is InvalidOperationException || ex is ArgumentException)
             {

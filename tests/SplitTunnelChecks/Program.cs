@@ -42,17 +42,20 @@ class Program
     }
     // Evaluate a small subset independently to verify effective route precedence,
     // including logical AND/invert, unknown processes and non-TUN callers.
-    static bool Match(JObject rule, string process, string inbound, string network, int port, string domain = "www.youtube.com")
+    static bool Match(JObject rule, string process, string inbound, string network, int port, string domain = "www.youtube.com", string sourceIp = "127.0.0.1")
     {
         bool ok;
         if ((string)rule["type"] == "logical")
         {
             if (rule["inbound"] != null) throw new Exception("invalid logical rule schema");
-            ok = ((JArray)rule["rules"]).OfType<JObject>().All(r => Match(r, process, inbound, network, port, domain));
+            var matches = ((JArray)rule["rules"]).OfType<JObject>().Select(r => Match(r, process, inbound, network, port, domain, sourceIp));
+            ok = (string)rule["mode"] == "or" ? matches.Any(v => v) : matches.All(v => v);
         }
         else
         {
             ok = rule["inbound"] == null || ((JArray)rule["inbound"]).Values<string>().Contains(inbound);
+            if (rule["source_ip_cidr"] != null)
+                ok &= ((JArray)rule["source_ip_cidr"]).Values<string>().Any(cidr => InSubnet(sourceIp, cidr));
             if (rule["process_path_regex"] != null)
                 ok &= process != null && ((JArray)rule["process_path_regex"]).Values<string>().Any(p => Regex.IsMatch(process, p));
             if (rule["process_name"] != null)
@@ -67,11 +70,25 @@ class Program
         }
         return (bool?)rule["invert"] == true ? !ok : ok;
     }
-    static string Route(JObject c, string process, string inbound = "tun-in", string network = "tcp", int port = 443)
+    static bool InSubnet(string address, string cidr)
+    {
+        var parts = cidr.Split('/');
+        var value = System.Net.IPAddress.Parse(address).GetAddressBytes();
+        var prefix = System.Net.IPAddress.Parse(parts[0]).GetAddressBytes();
+        if (value.Length != prefix.Length) return false;
+        int bits = int.Parse(parts[1]);
+        for (int i = 0; i < value.Length && bits > 0; i++, bits -= 8)
+        {
+            int mask = 255 << (8 - Math.Min(bits, 8)) & 255;
+            if ((value[i] & mask) != (prefix[i] & mask)) return false;
+        }
+        return true;
+    }
+    static string Route(JObject c, string process, string inbound = "tun-in", string network = "tcp", int port = 443, string sourceIp = "127.0.0.1")
     {
         foreach (var r in ((JArray)c["route"]["rules"]).OfType<JObject>())
         {
-            if (!Match(r, process, inbound, network, port)) continue;
+            if (!Match(r, process, inbound, network, port, sourceIp: sourceIp)) continue;
             string action = (string)r["action"];
             if (action == "sniff") continue;
             return (string)r["outbound"] ?? action;
@@ -80,10 +97,10 @@ class Program
     }
     static JObject Build(string json, SplitTunnelSettings settings) =>
         JObject.Parse(SplitTunnelPolicyBuilder.Apply(TunBrowserCompatibility.Apply(json), settings));
-    static string DnsRoute(JObject config, string process, string inbound = "tun-in", string domain = "www.youtube.com")
+    static string DnsRoute(JObject config, string process, string inbound = "tun-in", string domain = "www.youtube.com", string sourceIp = "127.0.0.1")
     {
         foreach (var rule in config["dns"]["rules"].OfType<JObject>())
-            if (Match(rule, process, inbound, "udp", 53, domain))
+            if (Match(rule, process, inbound, "udp", 53, domain, sourceIp))
                 return (string)rule["server"] ?? (string)rule["action"];
         return (string)config["dns"]["final"] ?? (string)config["dns"]["servers"][0]["tag"];
     }
@@ -103,7 +120,7 @@ class Program
     {
         string original = Base();
         Check(SplitTunnelPolicyBuilder.Apply(original, new SplitTunnelSettings()) == original, "split disabled byte-identical");
-        Check(SplitTunnelPolicyBuilder.Apply(Base(false), Settings()) == Base(false), "proxy untouched");
+        Check(SplitTunnelPolicyBuilder.Apply(Base(false), new SplitTunnelSettings()) == Base(false), "disabled proxy byte-identical");
         Check(TunBrowserCompatibility.Apply(Base(false)) == Base(false), "browser fix does not change proxy-only mode");
         var normal = JObject.Parse(TunBrowserCompatibility.Apply(original));
         Check(!FastQuicReject(JObject.Parse(original), Browser), "reproduce old post-sniff QUIC rejection");
@@ -116,8 +133,8 @@ class Program
         Check(Route(inc, Other, network: "udp") == "split-direct", "unselected QUIC direct");
         Check(FastQuicReject(inc, Browser), "selected browser HTTP3 falls back before sniff");
         Check(Route(inc, null) == "proxy", "unknown and forwarded hotspot stays VPN");
-        Check(Route(inc, Other, "mixed-in") == "proxy", "mixed inlet remains VPN");
-        Check(Route(inc, Other, "mixed-in", "udp") == "proxy", "QUIC guard is TUN only");
+        Check(Route(inc, Other, "mixed-in") == "split-direct", "local proxy honors app choices alongside TUN");
+        Check(Route(inc, Other, "mixed-in", "udp") == "split-direct", "local SOCKS UDP honors app choices");
         Check(Route(inc, @"C:\Runtime\throne.exe") == "direct", "core loop protection");
         Check(Route(inc, Other, port: 53) == "hijack-dns", "DNS capture precedes app bypass");
         Check((bool)inc["route"]["auto_detect_interface"], "physical interface detection retained");
@@ -131,7 +148,7 @@ class Program
         }
         Check(Route(inc, @"C:\Windows\System32\svchost.exe") == "split-direct", "only DNS service queries are special, not all svchost traffic");
         Check(DnsRoute(inc, null) == "dns-remote", "unattributed DNS keeps VPN resolver");
-        Check(DnsRoute(inc, Other, "mixed-in") == "dns-remote", "shared proxy DNS unaffected");
+        Check(DnsRoute(inc, Other, "mixed-in", sourceIp: "192.168.137.2") == "dns-remote", "shared proxy DNS unaffected");
         Check(DnsRoute(inc, Other, domain: "localhost") == "predefined", "localhost before process DNS rules");
         Check((bool)inc["dns"]["rules"].First(r => (string)r["server"] == "split-dns-direct")["disable_cache"], "direct DNS cannot pollute VPN cache");
         Check(inc["inbounds"].Children().First(i => (string)i["type"] == "tun")["address"].Values<string>().Any(a => a.Contains(":")), "IPv6 captured");
@@ -142,6 +159,29 @@ class Program
         var noGeo = IRSpeedyVPN.Services.GeoRoutingFallback.Apply(original, null, System.IO.Path.GetTempPath());
         Check(Route(Build(noGeo.SingBoxConfig, Settings()), Browser) == "proxy", "missing geo preserves selected VPN");
         Check(Route(Build(noGeo.SingBoxConfig, Settings()), Other) == "split-direct", "missing geo preserves unselected direct");
+
+        const string clientPath = @"C:\Program Files\IRSPEEDY\Client.exe";
+        foreach (var type in new[] { "mixed", "http", "socks" })
+        {
+            var input = JObject.Parse(Base(false));
+            input["inbounds"][0]["type"] = type;
+            // The proxy-only generator does not emit the TUN QUIC policy.
+            foreach (var rule in ((JArray)input["route"]["rules"]).OfType<JObject>().Where(r => (string)r["action"] == "reject").ToArray()) rule.Remove();
+            var proxy = JObject.Parse(SplitTunnelPolicyBuilder.Apply(input.ToString(), Settings(), clientPath));
+            Check(Route(proxy, Browser, "mixed-in") == "proxy", type + " selected VPN");
+            Check(Route(proxy, Other, "mixed-in") == "split-direct", type + " unselected direct");
+            Check(Route(proxy, Other, "mixed-in", sourceIp: "::1") == "split-direct", type + " IPv6 loopback");
+            Check(Route(proxy, Browser, "mixed-in", sourceIp: "::1") == "proxy", type + " selected IPv6 loopback");
+            Check(Route(proxy, Other, "mixed-in", sourceIp: "192.168.137.2") == "proxy", type + " remote sharing isolated");
+            Check(Route(proxy, Other, "mixed-in", sourceIp: "fd00::2") == "proxy", type + " remote IPv6 isolated");
+            Check(Route(proxy, null, "mixed-in") == "proxy", type + " unknown owner preserves VPN policy");
+            Check(Route(proxy, clientPath, "mixed-in") == "proxy", type + " client egress probe stays VPN");
+            Check(Route(proxy, clientPath + ".other.exe", "mixed-in") == "split-direct", type + " probe exemption is exact");
+            Check(DnsRoute(proxy, Other, "mixed-in") == "split-dns-direct", type + " direct resolver");
+            Check(DnsRoute(proxy, Browser, "mixed-in") == "dns-remote", type + " VPN resolver");
+            Check(!proxy["inbounds"].Any(i => (string)i["type"] == "tun"), type + " does not force TUN");
+            Check(Route(JObject.Parse(SplitTunnelPolicyBuilder.Apply(input.ToString(), empty)), Other, "mixed-in") == "split-direct", type + " empty selection stays direct");
+        }
 
         string exact = AppPathPattern.ForApp(new SplitTunnelApp { Path = Browser });
         Check(Regex.IsMatch(Browser.ToUpperInvariant(), exact), "case-insensitive path");
@@ -174,6 +214,18 @@ class Program
             Check(Route(Build(original, upgraded), Browser) == "proxy", "old mode now selected-only: " + oldMode);
             Check(Route(Build(original, upgraded), Other) == "split-direct", "old mode now unselected direct: " + oldMode);
         }
+        var manual = new SplitTunnelApp { Name = "Manual.exe", Path = @"C:\Apps\Manual.exe", Source = "Manual" };
+        var catalog = Settings(); catalog.CustomApps.Add(manual);
+        SplitTunnelStore.Save(catalog);
+        var catalogLoaded = SplitTunnelStore.Load();
+        Check(catalogLoaded.CustomApps.Count == 1 && catalogLoaded.Apps.Count == 1, "unchecked manual entry survives reopen");
+        Check(Route(Build(original, catalogLoaded), manual.Path) == "split-direct", "manual catalog is not a routing selection");
+        catalogLoaded.CustomApps.Clear(); SplitTunnelStore.Save(catalogLoaded);
+        Check(SplitTunnelStore.Load().CustomApps.Count == 0, "manual deletion persists");
+        var legacyManual = JObject.FromObject(Settings());
+        legacyManual.Remove("CustomApps"); ((JArray)legacyManual["Apps"]).Add(JObject.FromObject(manual));
+        IRSpeedyVPN.Resource.RegHelper.Values["SplitTunnelSettingsV1"] = legacyManual.ToString();
+        Check(SplitTunnelStore.Load().CustomApps.Count == 1, "old selected manual entries migrate to catalog");
         IRSpeedyVPN.Resource.RegHelper.Values["SplitTunnelSettingsV1"] = "{\"Version\":999}";
         Reject(() => SplitTunnelStore.Load(), "unknown schema version");
         if (args.Length == 1)
@@ -189,6 +241,9 @@ class Program
             outs.Add(new JObject { ["type"] = "direct", ["tag"] = "direct" });
             System.IO.File.WriteAllText(System.IO.Path.Combine(args[0], "SelectedOnly.json"), Build(fixture.ToString(), Settings()).ToString());
             System.IO.File.WriteAllText(System.IO.Path.Combine(args[0], "NormalTun.json"), TunBrowserCompatibility.Apply(fixture.ToString()));
+            ((JArray)fixture["inbounds"]).RemoveAt(1);
+            foreach (var rule in ((JArray)fixture["route"]["rules"]).OfType<JObject>().Where(r => (string)r["action"] == "reject").ToArray()) rule.Remove();
+            System.IO.File.WriteAllText(System.IO.Path.Combine(args[0], "ProxySelectedOnly.json"), SplitTunnelPolicyBuilder.Apply(fixture.ToString(), Settings(), clientPath));
         }
         Console.WriteLine("PASS: " + checks + " split-tunnel path, routing, DNS, IPv6, migration and persistence checks.");
     }

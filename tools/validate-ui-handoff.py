@@ -35,13 +35,13 @@ for p in new_files:
     if root.tag == W+'Window':
         assert root.get('SizeToContent') == 'Manual', p
         assert root.get('FlowDirection') == 'RightToLeft', p
-        assert root.get('Width') == ('420' if p.stem == 'MainWindow' else '381.6'), p
-        assert root.get('Height') == ('700' if p.stem == 'MainWindow' else '415.3142857143' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '632'), p
+        assert root.get('Width') == ('420' if p.stem in {'MainWindow','VGAURDServiceSetting','SettingsSplitTunnelApps'} else '381.6'), p
+        assert root.get('Height') == ('460' if p.stem == 'VGAURDServiceSetting' else '700' if p.stem in {'MainWindow','SettingsSplitTunnelApps'} else '415.3142857143' if p.stem == 'SettingsPassword' else '632'), p
         viewport = root.find(W+'Viewbox')
         assert viewport is not None and viewport.get('Stretch') == 'Uniform', p
         assert viewport[0].get('Width') == '420', p
         assert viewport[0].get('Height') == ('460' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '700'), p
-        if p.stem != 'MainWindow': assert viewport[0].get('FlowDirection') == 'LeftToRight', p
+        if p.stem not in {'MainWindow','VGAURDServiceSetting','SettingsSplitTunnelApps'}: assert viewport[0].get('FlowDirection') == 'LeftToRight', p
         if p.stem != 'SettingsSplitTunnelApps': assert not list(root.iter(W+'ScrollViewer')), p
         assert root.get('AllowsTransparency') == 'False', p
         assert 'WindowDrag.Begin(this, e)' in source, p

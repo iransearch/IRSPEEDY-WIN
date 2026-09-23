@@ -1,0 +1,67 @@
+<!--
+  IRSPEEDY — color tokens used by ConnectionMethods and SplitTunnel.
+  Every value here is taken 1:1 from the design files (design-source/*.dc.html).
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+  <!-- Brand -->
+  <Color x:Key="Color.Accent">#1E3A8A</Color>
+  <SolidColorBrush x:Key="Brush.Accent" Color="{StaticResource Color.Accent}" />
+
+  <!-- Window -->
+  <LinearGradientBrush x:Key="Brush.WindowBg" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#FFFFFF" Offset="0" />
+    <GradientStop Color="#F8FAFC" Offset="1" />
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="Brush.WindowEdge" Color="#99FFFFFF" />
+
+  <!-- Text -->
+  <SolidColorBrush x:Key="Brush.TextStrong" Color="#141B33" />     <!-- window titles -->
+  <SolidColorBrush x:Key="Brush.TextPrimary" Color="#1B2033" />    <!-- row titles -->
+  <SolidColorBrush x:Key="Brush.TextInput" Color="#1F2433" />      <!-- typed text -->
+  <SolidColorBrush x:Key="Brush.TextSecondary" Color="#6B7280" />  <!-- "3 برنامه انتخاب شده" -->
+  <SolidColorBrush x:Key="Brush.TextMuted" Color="#9CA3B4" />      <!-- subtitles, placeholder -->
+
+  <!-- Lines & surfaces -->
+  <SolidColorBrush x:Key="Brush.Divider" Color="#EEF0F4" />
+  <SolidColorBrush x:Key="Brush.CardBg" Color="#FFFFFF" />
+  <SolidColorBrush x:Key="Brush.CardBorder" Color="#ECEEF3" />
+  <SolidColorBrush x:Key="Brush.CardBorderHover" Color="#D8DCE6" />
+  <SolidColorBrush x:Key="Brush.FieldBorder" Color="#E1E4EC" />
+  <SolidColorBrush x:Key="Brush.SurfaceSoft" Color="#F5F7FB" />     <!-- activation row background -->
+  <SolidColorBrush x:Key="Brush.Chevron" Color="#C3C8D4" />
+  <SolidColorBrush x:Key="Brush.ScrollThumb" Color="#D7DBE3" />
+
+  <!-- Status -->
+  <SolidColorBrush x:Key="Brush.StatusOn" Color="#159A63" />
+  <SolidColorBrush x:Key="Brush.StatusOff" Color="#9CA3B4" />
+  <SolidColorBrush x:Key="Brush.Danger" Color="#DC2626" />
+
+  <!-- Toggle switch -->
+  <LinearGradientBrush x:Key="Brush.ToggleOn" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#22B37A" Offset="0" />
+    <GradientStop Color="#159A63" Offset="1" />
+  </LinearGradientBrush>
+  <SolidColorBrush x:Key="Brush.ToggleOff" Color="#DEE1E8" />
+
+  <!-- Buttons -->
+  <LinearGradientBrush x:Key="Brush.PrimaryGradient" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#2447A8" Offset="0" />
+    <GradientStop Color="#1E3A8A" Offset="1" />
+  </LinearGradientBrush>
+  <LinearGradientBrush x:Key="Brush.CloseGradient" StartPoint="0,0" EndPoint="0,1">
+    <GradientStop Color="#EF4444" Offset="0" />
+    <GradientStop Color="#DC2626" Offset="1" />
+  </LinearGradientBrush>
+
+  <!-- "افزودن برنامه" dashed button -->
+  <SolidColorBrush x:Key="Brush.AddBg" Color="#F7F9FD" />
+  <SolidColorBrush x:Key="Brush.AddBgHover" Color="#EEF3FC" />
+  <SolidColorBrush x:Key="Brush.AddBorder" Color="#C3D0EA" />
+  <SolidColorBrush x:Key="Brush.AddBorderHover" Color="#A9BCE3" />
+
+  <!-- Trash button on manually-added apps -->
+  <SolidColorBrush x:Key="Brush.RemoveHoverBg" Color="#FDECEC" />
+
+</ResourceDictionary>

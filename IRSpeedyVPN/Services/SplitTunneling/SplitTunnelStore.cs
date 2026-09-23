@@ -24,6 +24,9 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 document["Version"] = 2;
                 var settings = document.ToObject<SplitTunnelSettings>();
                 Validate(settings);
+                settings.CustomApps = settings.CustomApps.Concat(settings.Apps.Where(a => a.Source == "Manual"))
+                    .GroupBy(a => a.Identity, StringComparer.OrdinalIgnoreCase).Select(g => g.First()).ToList();
+                Validate(settings);
                 return settings;
             }
             // Retain the preview selections, but require an explicit enable before
@@ -49,7 +52,9 @@ namespace IRSpeedyVPN.Services.SplitTunneling
         {
             if (settings == null || settings.Version != 2
                 || settings.Apps == null || settings.Apps.Count > 2048
-                || settings.Apps.Any(a => AppPathPattern.ForApp(a) == null))
+                || settings.Apps.Any(a => AppPathPattern.ForApp(a) == null)
+                || settings.CustomApps == null || settings.CustomApps.Count > 2048
+                || settings.CustomApps.Any(a => AppPathPattern.ForApp(a) == null || a.Source != "Manual"))
                 throw new InvalidOperationException("تنظیمات تقسیم تونل معتبر نیست؛ فهرست برنامه‌ها را دوباره ذخیره کنید.");
         }
     }

@@ -9,17 +9,19 @@ namespace IRSpeedyVPN.Services.SplitTunneling
     // no second engine, driver, firewall rules or live rule-file watcher is added.
     internal static class SplitTunnelPolicyBuilder
     {
-        public static string Apply(string json, SplitTunnelSettings settings)
+        public static string Apply(string json, SplitTunnelSettings settings, string clientExecutablePath = null)
         {
             if (settings == null || !settings.Enabled) return json;
             if (settings.Version != 2 || settings.Apps == null)
                 throw new InvalidOperationException("Invalid split tunnel policy.");
             var config = JObject.Parse(json);
-            var tunTags = (config["inbounds"] as JArray)?.OfType<JObject>()
-                .Where(i => (string)i["type"] == "tun").Select(i => (string)i["tag"]).ToArray();
-            // Proxy-only connections and URL tests cannot identify arbitrary apps.
-            if (tunTags == null || tunTags.Length == 0) return json;
-            if (tunTags.Any(string.IsNullOrEmpty)) throw new InvalidOperationException("TUN tag is missing.");
+            var inbounds = config["inbounds"] as JArray;
+            var tunTags = Tags(inbounds, "tun");
+            var proxyTags = Tags(inbounds, "mixed", "http", "socks");
+            if (tunTags.Length == 0 && proxyTags.Length == 0) return json;
+            if (tunTags.Concat(proxyTags).Any(string.IsNullOrEmpty))
+                throw new InvalidOperationException("Split tunnel inbound tag is missing.");
+            var scope = ProcessScope(tunTags, proxyTags, clientExecutablePath);
             var patterns = settings.Apps.Select(AppPathPattern.ForApp).ToArray();
             if (patterns.Any(p => p == null)) throw new InvalidOperationException("Invalid split tunnel executable path.");
             patterns = patterns.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
@@ -50,7 +52,8 @@ namespace IRSpeedyVPN.Services.SplitTunneling
             foreach (var rule in rules.OfType<JObject>().Where(r =>
                 (r["process_name"] != null || r["process_path"] != null)
                 && r["outbound"] != null && (string)r["outbound"] != "proxy")) prefix.Add(rule.DeepClone());
-            prefix.Add(new JObject { ["inbound"] = new JArray(tunTags), ["port"] = 53, ["action"] = "hijack-dns" });
+            if (tunTags.Length > 0)
+                prefix.Add(new JObject { ["inbound"] = new JArray(tunTags), ["port"] = 53, ["action"] = "hijack-dns" });
 
             var matcher = DirectMatcher(patterns);
             if (matcher != null)
@@ -59,13 +62,13 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                     ["domain_resolver"] = "split-dns-direct" });
                 ((JArray)dns["servers"]).Add(new JObject { ["tag"] = "split-dns-direct", ["type"] = "udp",
                     ["server"] = "8.8.8.8", ["detour"] = "split-direct" });
-                var traffic = ScopedMatcher(matcher, tunTags);
+                var traffic = ScopedMatcher(matcher, scope);
                 traffic["action"] = "route";
                 traffic["outbound"] = "split-direct";
                 // Deliberate direct apps precede geo, shield, AI and the VPN-only
                 // UDP/443 reject. All unclassified/forwarded traffic keeps VPN policy.
                 prefix.Add(traffic);
-                var dnsRule = ScopedMatcher(matcher, tunTags);
+                var dnsRule = ScopedMatcher(matcher, scope);
                 dnsRule["action"] = "route";
                 dnsRule["server"] = "split-dns-direct";
                 // Do not let a direct resolver answer populate the VPN DNS cache
@@ -74,16 +77,19 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 var dnsRules = dns["rules"] as JArray ?? new JArray();
                 if (!((JArray)dns["servers"]).OfType<JObject>().Any(s => (string)s["tag"] == "dns-remote"))
                     throw new InvalidOperationException("VPN DNS resolver is missing.");
-                var sharedDns = ScopedMatcher(new JObject
-                { ["process_name"] = new JArray("svchost.exe", "svchost") }, tunTags);
-                // Windows DNS Client resolves on behalf of selected AND unselected
-                // apps. Its process is known, but is not the calling browser.
-                // Only its DNS queries use VPN; ordinary svchost traffic stays direct.
-                sharedDns["action"] = "route";
-                sharedDns["server"] = "dns-remote";
                 var orderedDns = new JArray(dnsRules.OfType<JObject>()
                     .Where(r => (string)r["action"] == "predefined").Select(r => r.DeepClone()));
-                orderedDns.Add(sharedDns);
+                if (tunTags.Length > 0)
+                {
+                    // Only TUN captures the Windows DNS Client. Proxy mode cannot
+                    // intercept system DNS or traffic that bypasses the proxy.
+                    var sharedDns = ScopedMatcher(new JObject
+                        { ["process_name"] = new JArray("svchost.exe", "svchost") },
+                        new JObject { ["inbound"] = new JArray(tunTags) });
+                    sharedDns["action"] = "route";
+                    sharedDns["server"] = "dns-remote";
+                    orderedDns.Add(sharedDns);
+                }
                 orderedDns.Add(dnsRule);
                 foreach (var rule in dnsRules.OfType<JObject>().Where(r => (string)r["action"] != "predefined"))
                     orderedDns.Add(rule.DeepClone());
@@ -95,11 +101,39 @@ namespace IRSpeedyVPN.Services.SplitTunneling
             return config.ToString(Formatting.None);
         }
 
-        private static JObject ScopedMatcher(JObject matcher, string[] tunTags)
+        private static string[] Tags(JArray inbounds, params string[] types)
+            => inbounds?.OfType<JObject>().Where(i => types.Contains((string)i["type"]))
+                .Select(i => (string)i["tag"]).ToArray() ?? new string[0];
+
+        private static JObject ProcessScope(string[] tunTags, string[] proxyTags, string clientExecutablePath)
         {
-            return new JObject { ["type"] = "logical", ["mode"] = "and", ["rules"] = new JArray(
-                new JObject { ["inbound"] = new JArray(tunTags) }, matcher.DeepClone()) };
+            var scopes = new JArray();
+            if (tunTags.Length > 0) scopes.Add(new JObject { ["inbound"] = new JArray(tunTags) });
+            if (proxyTags.Length > 0)
+            {
+                // Restrict app ownership to local proxy clients. Remote Share VPN
+                // users must not inherit the desktop's application selection.
+                var localProxy = new JObject { ["inbound"] = new JArray(proxyTags),
+                    ["source_ip_cidr"] = new JArray("127.0.0.0/8", "::1/128") };
+                if (!string.IsNullOrEmpty(clientExecutablePath))
+                {
+                    if (!AppPathPattern.IsLocalPath(clientExecutablePath))
+                        throw new InvalidOperationException("Invalid client executable path.");
+                    // The client's explicit proxy request measures VPN egress IP.
+                    // Keep it on VPN even when the client is absent from the app list.
+                    localProxy = ScopedMatcher(new JObject { ["process_path_regex"] =
+                        new JArray("(?i)^" + AppPathPattern.Escape(clientExecutablePath) + "$"),
+                        ["invert"] = true }, localProxy);
+                }
+                scopes.Add(localProxy);
+            }
+            return scopes.Count == 1 ? (JObject)scopes[0].DeepClone()
+                : new JObject { ["type"] = "logical", ["mode"] = "or", ["rules"] = scopes };
         }
+
+        private static JObject ScopedMatcher(JObject matcher, JObject scope)
+            => new JObject { ["type"] = "logical", ["mode"] = "and",
+                ["rules"] = new JArray(scope.DeepClone(), matcher.DeepClone()) };
 
         private static JObject DirectMatcher(string[] patterns)
         {
