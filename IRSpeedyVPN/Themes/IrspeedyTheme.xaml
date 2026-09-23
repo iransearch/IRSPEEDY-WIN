@@ -212,7 +212,6 @@
   <SolidColorBrush x:Key="HeaderHoverBrush" Color="{StaticResource HeaderHoverColor}"/>
   <FontFamily x:Key="AppFontFamilyMedium">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn Medium</FontFamily>
   <FontFamily x:Key="AppFontFamilySemiBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn SemiBold</FontFamily>
-  <FontFamily x:Key="AppFontFamilyBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn Bold</FontFamily>
   <FontFamily x:Key="AppFontFamilyExtraBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn ExtraBold</FontFamily>
   <GeometryGroup x:Key="IconShield">
     <PathGeometry Figures="M8 1.5l5 2v4c0 3.5-2.2 5.9-5 7-2.8-1.1-5-3.5-5-7v-4l5-2z"/>
@@ -1101,6 +1100,30 @@
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Opacity" Value="0.5"/>
             </Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
+  <Style x:Key="HandoffRoundBadge" TargetType="Border">
+    <Setter Property="CornerRadius" Value="100"/>
+  </Style>
+  <Style x:Key="HandoffCircleIconButton" TargetType="Button" BasedOn="{StaticResource HandoffPlainButton}">
+    <Setter Property="Width" Value="28"/>
+    <Setter Property="Height" Value="28"/>
+    <Setter Property="Background" Value="White"/>
+    <Setter Property="BorderBrush" Value="#ECEEF3"/>
+    <Setter Property="BorderThickness" Value="1"/>
+    <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Button">
+          <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="14">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter Property="Opacity" Value="0.8"/></Trigger>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.5"/></Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
       </Setter.Value>

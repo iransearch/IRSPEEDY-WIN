@@ -42,18 +42,20 @@ namespace IRSpeedyVPN.Windows
             hotspotCredentials.Visibility = showCredentials ? Visibility.Visible : Visibility.Collapsed;
             hotspotName.Text = active || view.State == "starting" ? view.Ssid : starting ? pendingHotspotSsid : "";
             hotspotPassword.Text = active || view.State == "starting" ? view.Password : starting ? pendingHotspotPassword : "";
-            hotspotClients.Text = active ? IRSpeedyVPN.Common.PersianDigits.Format("دستگاه‌های متصل: " + view.Clients) : "";
+            hotspotClientsRow.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
+            hotspotClientCount.Text = IRSpeedyVPN.Common.PersianDigits.Format(view.Clients.ToString());
             hotspotPasswordEditor.IsEnabled = !hotspotBusy && view.State == "off";
             hotspotSavePassword.IsEnabled = !hotspotBusy && view.State == "off";
             if (starting) hotspotStatus.Text = "در حال راه‌اندازی… اتصال پس از فعال‌شدن امکان‌پذیر است.";
             else if (hotspotBusy) hotspotStatus.Text = "در حال آماده‌سازی یا توقف…";
             else if (view.State == "error") hotspotStatus.Text = FriendlyHotspotError(view.Error);
-            else if (active) hotspotStatus.Text = "فعال — دستگاه را به این وای‌فای متصل کنید.";
+            else if (active) hotspotStatus.Text = "";
             else if (view.State == "paused") hotspotStatus.Text = "در انتظار اتصال مجدد VPN…";
             else if (view.State == "starting") hotspotStatus.Text = "در حال راه‌اندازی…";
             else if (!HotspotProcessChannel.SupportedWindows) hotspotStatus.Text = "این قابلیت به ویندوز ۱۰ نسخه ۲۰۰۴ یا جدیدتر نیاز دارد.";
             else if (!HotspotProcessChannel.Installed) hotspotStatus.Text = "این نسخهٔ برنامه قابلیت هات‌اسپات را ندارد؛ نسخهٔ کامل را دریافت کنید.";
             else hotspotStatus.Text = eligible ? "آماده فعال‌سازی" : "ابتدا VPN را در حالت TUN متصل کنید.";
+            hotspotStatus.Visibility = string.IsNullOrEmpty(hotspotStatus.Text) ? Visibility.Collapsed : Visibility.Visible;
         }
         private async void HotspotToggle_Click(object sender, RoutedEventArgs e)
         {
@@ -95,7 +97,7 @@ namespace IRSpeedyVPN.Windows
             if (hotspotBusy || proxyBusy) { RefreshHotspotUi(); return; }
             hotspotBusy = true; RefreshHotspotUi();
             try { await Task.Run(() => DirectHotspot.Controller.Stop()); }
-            catch { if (IsLoaded) hotspotStatus.Text = "توقف کامل نشد؛ دوباره تلاش کنید."; }
+            catch { if (IsLoaded) { hotspotStatus.Text = "توقف کامل نشد؛ دوباره تلاش کنید."; hotspotStatus.Visibility = Visibility.Visible; } }
             finally { hotspotBusy = false; RefreshHotspotUi(); }
         }
         private void HotspotSavePassword_Click(object sender, RoutedEventArgs e)
@@ -115,6 +117,7 @@ namespace IRSpeedyVPN.Windows
             editPasswordRequested = true;
             RefreshHotspotUi();
             hotspotStatus.Text = "برای تغییر رمز، ابتدا اشتراک مستقیم را خاموش کنید.";
+            hotspotStatus.Visibility = Visibility.Visible;
         }
         private void HotspotCopyName_Click(object sender, RoutedEventArgs e) { CopyHotspotValue(false); }
         private void HotspotCopyPassword_Click(object sender, RoutedEventArgs e) { CopyHotspotValue(true); }

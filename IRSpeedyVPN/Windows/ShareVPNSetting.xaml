@@ -52,11 +52,11 @@
                       <ColumnDefinition Width="10"/>
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Top" CornerRadius="10" Background="#1E3A8A">
+                    <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Top" Style="{StaticResource HandoffRoundBadge}" Background="#1E3A8A">
                       <TextBlock Text="۱" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="2">
-                      <TextBlock Text="فعال‌سازی اشتراک" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamilyBold}" FontWeight="Normal" TextAlignment="Right"/>
+                      <TextBlock Text="فعال‌سازی اشتراک" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right"/>
                       <TextBlock Text="اشتراک‌گذاری VPN را روی این دستگاه فعال کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0"/>
                     </StackPanel>
                   </Grid>
@@ -66,11 +66,11 @@
                       <ColumnDefinition Width="10"/>
                       <ColumnDefinition Width="*"/>
                     </Grid.ColumnDefinitions>
-                    <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Top" CornerRadius="10" Background="#C7CCD8">
+                    <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Top" Style="{StaticResource HandoffRoundBadge}" Background="#C7CCD8">
                       <TextBlock Text="۲" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
                     <StackPanel Grid.Column="2">
-                      <TextBlock Text="تنظیم پراکسی روی دستگاه دوم" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamilyBold}" FontWeight="Normal" TextAlignment="Right"/>
+                      <TextBlock Text="تنظیم پراکسی روی دستگاه دوم" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right"/>
                       <TextBlock Text="روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0"/>
                     </StackPanel>
                   </Grid>
@@ -148,15 +148,21 @@
               <RowDefinition Height="*"/>
             </Grid.RowDefinitions>
             <StackPanel>
-              <Border Height="80" CornerRadius="16" BorderBrush="#E1E6F3" BorderThickness="1" Background="White" Padding="14">
-                <StackPanel VerticalAlignment="Center">
-                  <TextBlock FontSize="13" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
-                    <Run Text="۱  اتصال دستگاه‌های دیگر" FlowDirection="RightToLeft"/>
-                  </TextBlock>
-                  <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="LeftToRight" TextWrapping="Wrap" Margin="0,4,0,0">
-                    <Run Text="این دستگاه به یک Wi-Fi مستقیم تبدیل می‌شود؛ به آن متصل شوید تا از VPN استفاده کنید." FlowDirection="RightToLeft"/>
-                  </TextBlock>
-                </StackPanel>
+              <Border CornerRadius="16" BorderBrush="#E7EAF2" BorderThickness="1" Background="White" Padding="16,14">
+                <Grid FlowDirection="RightToLeft">
+                  <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="20"/>
+                    <ColumnDefinition Width="10"/>
+                    <ColumnDefinition Width="*"/>
+                  </Grid.ColumnDefinitions>
+                  <Border Grid.Column="0" Width="20" Height="20" VerticalAlignment="Top" Style="{StaticResource HandoffRoundBadge}" Background="#1E3A8A">
+                    <TextBlock Text="۱" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                  </Border>
+                  <StackPanel Grid.Column="2">
+                    <TextBlock Text="اتصال دستگاه‌های دیگر" FontSize="12.5" Foreground="#1B2033" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" TextAlignment="Right"/>
+                    <TextBlock Text="این دستگاه به یک Wi-Fi مستقیم تبدیل می‌شود؛ به آن متصل شوید تا از VPN استفاده کنید." FontSize="11" Foreground="#8A93A6" TextAlignment="Right" TextWrapping="Wrap" Margin="0,2,0,0"/>
+                  </StackPanel>
+                </Grid>
               </Border>
               <Border Height="52" CornerRadius="15" Background="#F4F6FA" Margin="0,12,0,12" Padding="14,0">
                 <Grid>
@@ -171,31 +177,73 @@
                   </StackPanel>
                 </Grid>
               </Border>
-              <Border x:Name="hotspotCredentials" CornerRadius="15" BorderBrush="#ECEEF3" BorderThickness="1" Background="White" Padding="12,6">
-                <StackPanel>
-                  <TextBlock FontSize="11" Foreground="#31456F" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
-                    <Run Text="اطلاعات هات‌اسپات" FlowDirection="RightToLeft"/>
-                  </TextBlock>
-                  <Grid Height="45">
-                    <Button HorizontalAlignment="Left" Click="HotspotCopyName_Click" Tag="hotspotName" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی" AutomationProperties.Name="کپی">
-                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
+              <Border x:Name="hotspotCredentials" CornerRadius="14" BorderBrush="#ECEEF3" BorderThickness="1" Background="White" ClipToBounds="True">
+                <StackPanel FlowDirection="LeftToRight">
+                  <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1" CornerRadius="13,13,0,0" Padding="14,7">
+                    <Border.Background>
+                      <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Color="#F7FAFF" Offset="0"/>
+                        <GradientStop Color="White" Offset="1"/>
+                      </LinearGradientBrush>
+                    </Border.Background>
+                    <Grid>
+                      <TextBlock Text="برای اتصال دستگاه‌ها" FontSize="9" Foreground="#B9C0CE" VerticalAlignment="Center" FlowDirection="RightToLeft"/>
+                      <TextBlock Text="اطلاعات هات‌اسپات" FontSize="11" Foreground="#3C4457" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft"/>
+                    </Grid>
+                  </Border>
+                  <Grid Height="52" Margin="14,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="30"/>
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0" Click="HotspotCopyName_Click" Tag="hotspotName" Style="{StaticResource HandoffCircleIconButton}" ToolTip="کپی نام وای‌فای" AutomationProperties.Name="کپی نام وای‌فای">
+                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.3" Width="13" Height="13" Stretch="Uniform" FlowDirection="LeftToRight"/>
                     </Button>
-                    <TextBlock x:Name="hotspotName" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#141B33" FlowDirection="LeftToRight"/>
+                    <TextBlock x:Name="hotspotName" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="13.5" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" Foreground="#1F2433" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis"/>
+                    <Border Grid.Column="2" Width="30" Height="30" Style="{StaticResource HandoffRoundBadge}" Background="#1A1E3A8A">
+                      <Viewbox Width="15" Height="15" FlowDirection="LeftToRight">
+                        <Canvas Width="24" Height="24">
+                          <Path Data="M4,9.5 C8.4,5.5 15.6,5.5 20,9.5 M7,13.2 C9.8,10.8 14.2,10.8 17,13.2 M10,16.8 C11.2,15.8 12.8,15.8 14,16.8" Stroke="#1E3A8A" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                          <Ellipse Canvas.Left="10.6" Canvas.Top="18" Width="2.8" Height="2.8" Fill="#1E3A8A"/>
+                        </Canvas>
+                      </Viewbox>
+                    </Border>
                   </Grid>
-                  <Grid Height="45">
-                    <Button HorizontalAlignment="Left" Click="HotspotCopyPassword_Click" Tag="hotspotPassword" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" ToolTip="کپی" AutomationProperties.Name="کپی">
-                      <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.2" Width="15" Height="15" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                    </Button>
-                    <Button Click="HotspotEditPassword_Click" Style="{StaticResource HandoffPlainButton}" Width="28" Height="28" HorizontalAlignment="Left" Margin="32,0,0,0" ToolTip="تغییر رمز وای‌فای">
-                      <Path Data="M2,13 L3,9 12,0 16,4 7,13 Z M10,2 L14,6" Stroke="#5B6478" StrokeThickness="1.2" Width="14" Height="14" Stretch="Uniform" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
-                    </Button>
-                    <TextBlock x:Name="hotspotPassword" HorizontalAlignment="Right" VerticalAlignment="Center" FontSize="13" FontWeight="Bold" Foreground="#141B33" FlowDirection="LeftToRight"/>
+                  <Border BorderBrush="#EEF0F4" BorderThickness="0,1,0,0" Margin="14,0"/>
+                  <Grid Height="52" Margin="14,0">
+                    <Grid.ColumnDefinitions>
+                      <ColumnDefinition Width="Auto"/>
+                      <ColumnDefinition Width="*"/>
+                      <ColumnDefinition Width="30"/>
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                      <Button Click="HotspotEditPassword_Click" Style="{StaticResource HandoffCircleIconButton}" Margin="0,0,10,0" ToolTip="تغییر رمز وای‌فای" AutomationProperties.Name="تغییر رمز وای‌فای">
+                        <Path Data="M11.3,2.3 C11.9,1.7 12.9,1.7 13.5,2.3 C14.1,2.9 14.1,3.9 13.5,4.5 L5.9,12.3 3,13 3.7,10 11.3,2.3 Z" Stroke="#5B6478" StrokeThickness="1.3" Width="13" Height="13" Stretch="Uniform" FlowDirection="LeftToRight"/>
+                      </Button>
+                      <Button Click="HotspotCopyPassword_Click" Tag="hotspotPassword" Style="{StaticResource HandoffCircleIconButton}" ToolTip="کپی رمز وای‌فای" AutomationProperties.Name="کپی رمز وای‌فای">
+                        <Path Data="M5.5,5.5 L14.5,5.5 14.5,14.5 5.5,14.5 Z M3,10.2 L3,2 11,2" Stroke="#5B6478" StrokeThickness="1.3" Width="13" Height="13" Stretch="Uniform" FlowDirection="LeftToRight"/>
+                      </Button>
+                    </StackPanel>
+                    <TextBlock x:Name="hotspotPassword" Grid.Column="1" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0" FontSize="13.5" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" Foreground="#1F2433" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis"/>
+                    <Border Grid.Column="2" Width="30" Height="30" Style="{StaticResource HandoffRoundBadge}" Background="#FDF3E2">
+                      <Viewbox Width="15" Height="15" FlowDirection="LeftToRight">
+                        <Canvas Width="24" Height="24">
+                          <Rectangle Canvas.Left="4.5" Canvas.Top="10.5" Width="15" Height="10.5" RadiusX="2.6" RadiusY="2.6" Stroke="#B7791F" StrokeThickness="1.9"/>
+                          <Path Data="M8,10.5 L8,7.8 C8,2.5 16,2.5 16,7.8 L16,10.5" Stroke="#B7791F" StrokeThickness="1.9" StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                          <Ellipse Canvas.Left="10.5" Canvas.Top="14.1" Width="3" Height="3" Fill="#B7791F"/>
+                        </Canvas>
+                      </Viewbox>
+                    </Border>
                   </Grid>
                 </StackPanel>
               </Border>
-              <TextBlock FontSize="11" Foreground="#8A93A6" TextAlignment="Right" FlowDirection="LeftToRight" x:Name="hotspotClients" Margin="0,6,0,0">
-                <Run Text="" FlowDirection="RightToLeft"/>
-              </TextBlock>
+              <Grid x:Name="hotspotClientsRow" Height="22" Margin="3,8,3,0" FlowDirection="LeftToRight" Visibility="Collapsed">
+                <Border MinWidth="22" Height="22" Padding="7,0" Background="#1E3A8A" Style="{StaticResource HandoffRoundBadge}" HorizontalAlignment="Left">
+                  <TextBlock x:Name="hotspotClientCount" Foreground="White" FontSize="11" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="RightToLeft"/>
+                </Border>
+                <TextBlock Text="دستگاه‌های متصل" FontSize="11" Foreground="#6B7280" HorizontalAlignment="Right" VerticalAlignment="Center" FlowDirection="RightToLeft"/>
+              </Grid>
               <TextBlock FontSize="11" Foreground="#64748B" TextAlignment="Right" FlowDirection="LeftToRight" x:Name="hotspotStatus" TextWrapping="Wrap" Margin="0,5,0,0">
                 <Run Text="" FlowDirection="RightToLeft"/>
               </TextBlock>

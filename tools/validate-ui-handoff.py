@@ -142,7 +142,10 @@ print('PASS: left scrollbar coordinate frame, continuous app list, direct motion
 # Both proxy instructions remain separate, with the original 20-DIP numbered circles.
 share = roots[A/'Windows/ShareVPNSetting.xaml']
 step_two = next(e for e in share.iter(W+'Grid') if e.get(X+'Name') == 'ProxyStepTwo')
-steps = [e for e in share.iter(W+'Grid') if any(
+round_badge = next(e for e in theme.iter(W+'Style') if e.get(X+'Key') == 'HandoffRoundBadge')
+assert any(e.get('Property') == 'CornerRadius' and e.get('Value') == '100' for e in round_badge)
+proxy_panel = next(e for e in share.iter(W+'Grid') if e.get(X+'Name') == 'ProxyPanel')
+steps = [e for e in proxy_panel.iter(W+'Grid') if any(
     child.tag == W+'Border' and child.get('Width') == '20' and child.get('Height') == '20'
     for child in e)]
 assert len(steps) == 2 and steps[1] is step_two
@@ -151,7 +154,7 @@ for step, number, title, detail, color in [
     (steps[1], '۲', 'تنظیم پراکسی روی دستگاه دوم', 'روی دستگاه دوم پراکسی HTTP یا SOCKS5 را با آی‌پی و پورت زیر تنظیم کنید.', '#C7CCD8'),
 ]:
     badge = next(e for e in step if e.tag == W+'Border')
-    assert badge.get('CornerRadius') == '10' and badge.get('Background') == color
+    assert badge.get('Style') == '{StaticResource HandoffRoundBadge}' and badge.get('Background') == color
     assert badge.find(W+'TextBlock').get('Text') == number
     texts = [e.get('Text') for e in step.iter(W+'TextBlock')]
     assert title in texts and detail in texts
@@ -162,3 +165,28 @@ assert 'proxyIp + " : " + Service.SocksPort' in share_code
 assert '"http://" + proxyIp + ":" + Service.HttpPort' in share_code
 assert '"socks5://" + proxyIp + ":" + Service.SocksPort' in share_code
 print('PASS: two proxy guide steps, numbered badges, conditional fade, displayed addresses and machine-readable URIs.')
+
+# The direct tab shares the same step badge and renders distinct credentials,
+# controls and client count, rather than concatenating them into plain text.
+direct = next(e for e in share.iter(W+'Grid') if e.get(X+'Name') == 'DirectPanel')
+direct_badge = next(e for e in direct.iter(W+'Border') if e.get('Width') == '20')
+assert direct_badge.get('Style') == '{StaticResource HandoffRoundBadge}'
+assert direct_badge.find(W+'TextBlock').get('Text') == '۱'
+card = next(e for e in direct.iter(W+'Border') if e.get(X+'Name') == 'hotspotCredentials')
+card_texts = {e.get('Text') for e in card.iter(W+'TextBlock')}
+assert {'اطلاعات هات‌اسپات', 'برای اتصال دستگاه‌ها'} <= card_texts
+icon_badges = [e for e in card.iter(W+'Border') if e.get('Width') == '30']
+assert {e.get('Background') for e in icon_badges} == {'#1A1E3A8A', '#FDF3E2'}
+assert all(e.get('Style') == '{StaticResource HandoffRoundBadge}' for e in icon_badges)
+round_buttons = [e for e in card.iter(W+'Button') if e.get('Style') == '{StaticResource HandoffCircleIconButton}']
+assert {e.get('Click') for e in round_buttons} == {
+    'HotspotCopyName_Click', 'HotspotCopyPassword_Click', 'HotspotEditPassword_Click'}
+button_style = next(e for e in theme.iter(W+'Style') if e.get(X+'Key') == 'HandoffCircleIconButton')
+assert any(e.get('Property') == 'BorderBrush' and e.get('Value') == '#ECEEF3' for e in button_style)
+clients = next(e for e in direct.iter(W+'Grid') if e.get(X+'Name') == 'hotspotClientsRow')
+assert any(e.get(X+'Name') == 'hotspotClientCount' for e in clients.iter(W+'TextBlock'))
+hotspot_code = (A/'Windows/ShareVPNSetting.Hotspot.cs').read_text(encoding='utf-8')
+assert 'hotspotClientCount.Text = IRSpeedyVPN.Common.PersianDigits.Format(view.Clients.ToString())' in hotspot_code
+assert 'فعال — دستگاه را به این وای‌فای متصل کنید.' not in hotspot_code
+assert 'hotspotStatus.Visibility = string.IsNullOrEmpty(hotspotStatus.Text) ? Visibility.Collapsed : Visibility.Visible' in hotspot_code
+print('PASS: direct-tab guide badge, credential icons, outlined actions, client count and clean active state.')
