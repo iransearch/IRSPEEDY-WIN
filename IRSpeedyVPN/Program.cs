@@ -20,6 +20,7 @@ namespace IRSpeedyVPN
         [STAThread]
         static void Main()
         {
+            AppContext.SetSwitch("Switch.System.Windows.DoNotScaleForDpiChanges", false);
             RegisterCrashHandlers();
             RegisterEmbeddedAssemblyResolver();
 

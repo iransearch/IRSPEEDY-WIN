@@ -138,6 +138,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
+            UpdateConnectedMotion();
 
             globalInfo = AppServices.GlobalInfo;
             timerTick = 0;
@@ -173,6 +174,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void UserControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
+            UpdateConnectedMotion();
             if (!IsVisible)
             {
                 uiTimer?.Change(Timeout.Infinite, Timeout.Infinite);

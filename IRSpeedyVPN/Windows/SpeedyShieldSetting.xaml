@@ -1,8 +1,8 @@
-<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.SpeedyShieldSetting" Title="تنظیمات شیلد" Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{StaticResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="LeftToRight" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+<Window xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.SpeedyShieldSetting" Title="تنظیمات شیلد" Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{StaticResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" SizeToContent="Manual">
   <WindowChrome.WindowChrome>
     <WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/>
   </WindowChrome.WindowChrome>
-  <Grid>
+  <Grid ClipToBounds="True">
     <Grid.RowDefinitions>
       <RowDefinition Height="62"/>
       <RowDefinition Height="*"/>
@@ -33,11 +33,11 @@
           <Border Height="60" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="42"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <controls:ServiceToggle x:Name="GoogleAdsToggle" AutomationProperties.Name="GoogleAdsToggle"/>
+              <controls:ServiceToggle x:Name="GoogleAdsToggle" AutomationProperties.Name="GoogleAdsToggle" Grid.Column="2"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                 <TextBlock Text="تبلیغات گوگل" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
                 <TextBlock FontSize="10.5" TextAlignment="Right" FlowDirection="RightToLeft">
@@ -55,8 +55,8 @@
                   </TextBlock.Style>
                 </TextBlock>
               </StackPanel>
-              <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1AF97316">
-                <Image Source="{StaticResource HandoffAdsImage}" Width="21" Height="21"/>
+              <Border Grid.Column="0" Width="36" Height="36" CornerRadius="13" Background="#1AF97316">
+                <Image Source="{StaticResource HandoffAdsImage}" Width="21" Height="21" FlowDirection="LeftToRight"/>
               </Border>
             </Grid>
           </Border>
@@ -65,11 +65,11 @@
           <Border Height="60" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="42"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <controls:ServiceToggle x:Name="TrackersToggle" AutomationProperties.Name="TrackersToggle"/>
+              <controls:ServiceToggle x:Name="TrackersToggle" AutomationProperties.Name="TrackersToggle" Grid.Column="2"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                 <TextBlock Text="تبلیغات و ردیاب" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
                 <TextBlock FontSize="10.5" TextAlignment="Right" FlowDirection="RightToLeft">
@@ -87,8 +87,8 @@
                   </TextBlock.Style>
                 </TextBlock>
               </StackPanel>
-              <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1A0EA5E9">
-                <Image Source="{StaticResource HandoffTrackerImage}" Width="21" Height="21"/>
+              <Border Grid.Column="0" Width="36" Height="36" CornerRadius="13" Background="#1A0EA5E9">
+                <Image Source="{StaticResource HandoffTrackerImage}" Width="21" Height="21" FlowDirection="LeftToRight"/>
               </Border>
             </Grid>
           </Border>
@@ -97,11 +97,11 @@
           <Border Height="60" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="42"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <controls:ServiceToggle x:Name="AdultToggle" AutomationProperties.Name="AdultToggle"/>
+              <controls:ServiceToggle x:Name="AdultToggle" AutomationProperties.Name="AdultToggle" Grid.Column="2"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                 <TextBlock Text="محتوای +۱۸" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
                 <TextBlock FontSize="10.5" TextAlignment="Right" FlowDirection="RightToLeft">
@@ -119,8 +119,8 @@
                   </TextBlock.Style>
                 </TextBlock>
               </StackPanel>
-              <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1ADC2626">
-                <Image Source="{StaticResource HandoffAdultImage}" Width="21" Height="21"/>
+              <Border Grid.Column="0" Width="36" Height="36" CornerRadius="13" Background="#1ADC2626">
+                <Image Source="{StaticResource HandoffAdultImage}" Width="21" Height="21" FlowDirection="LeftToRight"/>
               </Border>
             </Grid>
           </Border>
@@ -129,11 +129,11 @@
           <Border Height="60" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="42"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <controls:ServiceToggle x:Name="SocialsToggle" AutomationProperties.Name="SocialsToggle"/>
+              <controls:ServiceToggle x:Name="SocialsToggle" AutomationProperties.Name="SocialsToggle" Grid.Column="2"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                 <TextBlock Text="شبکه‌های اجتماعی" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
                 <TextBlock FontSize="10.5" TextAlignment="Right" FlowDirection="RightToLeft">
@@ -151,8 +151,8 @@
                   </TextBlock.Style>
                 </TextBlock>
               </StackPanel>
-              <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1A7C3AED">
-                <Image Source="{StaticResource HandoffSocialImage}" Width="21" Height="21"/>
+              <Border Grid.Column="0" Width="36" Height="36" CornerRadius="13" Background="#1A7C3AED">
+                <Image Source="{StaticResource HandoffSocialImage}" Width="21" Height="21" FlowDirection="LeftToRight"/>
               </Border>
             </Grid>
           </Border>
@@ -161,11 +161,11 @@
           <Border Height="60" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="42"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <controls:ServiceToggle x:Name="CryptoToggle" AutomationProperties.Name="CryptoToggle"/>
+              <controls:ServiceToggle x:Name="CryptoToggle" AutomationProperties.Name="CryptoToggle" Grid.Column="2"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                 <TextBlock Text="رمزارز" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
                 <TextBlock FontSize="10.5" TextAlignment="Right" FlowDirection="RightToLeft">
@@ -183,8 +183,8 @@
                   </TextBlock.Style>
                 </TextBlock>
               </StackPanel>
-              <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1ACA8A04">
-                <Image Source="{StaticResource HandoffCryptoImage}" Width="21" Height="21"/>
+              <Border Grid.Column="0" Width="36" Height="36" CornerRadius="13" Background="#1ACA8A04">
+                <Image Source="{StaticResource HandoffCryptoImage}" Width="21" Height="21" FlowDirection="LeftToRight"/>
               </Border>
             </Grid>
           </Border>
@@ -193,11 +193,11 @@
           <Border Height="60" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="42"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <controls:ServiceToggle x:Name="GamblingToggle" AutomationProperties.Name="GamblingToggle"/>
+              <controls:ServiceToggle x:Name="GamblingToggle" AutomationProperties.Name="GamblingToggle" Grid.Column="2"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                 <TextBlock Text="قمار" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
                 <TextBlock FontSize="10.5" TextAlignment="Right" FlowDirection="RightToLeft">
@@ -215,8 +215,8 @@
                   </TextBlock.Style>
                 </TextBlock>
               </StackPanel>
-              <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1ADB2777">
-                <Image Source="{StaticResource HandoffGamblingImage}" Width="21" Height="21"/>
+              <Border Grid.Column="0" Width="36" Height="36" CornerRadius="13" Background="#1ADB2777">
+                <Image Source="{StaticResource HandoffGamblingImage}" Width="21" Height="21" FlowDirection="LeftToRight"/>
               </Border>
             </Grid>
           </Border>
@@ -225,11 +225,11 @@
           <Border Height="60" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="42"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <controls:ServiceToggle x:Name="PhishingToggle" AutomationProperties.Name="PhishingToggle"/>
+              <controls:ServiceToggle x:Name="PhishingToggle" AutomationProperties.Name="PhishingToggle" Grid.Column="2"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                 <TextBlock Text="فیشینگ" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
                 <TextBlock FontSize="10.5" TextAlignment="Right" FlowDirection="RightToLeft">
@@ -247,8 +247,8 @@
                   </TextBlock.Style>
                 </TextBlock>
               </StackPanel>
-              <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1A0D9488">
-                <Image Source="{StaticResource HandoffPhishingImage}" Width="21" Height="21"/>
+              <Border Grid.Column="0" Width="36" Height="36" CornerRadius="13" Background="#1A0D9488">
+                <Image Source="{StaticResource HandoffPhishingImage}" Width="21" Height="21" FlowDirection="LeftToRight"/>
               </Border>
             </Grid>
           </Border>
@@ -257,11 +257,11 @@
           <Border Height="60" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto"/>
-                <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="42"/>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
               </Grid.ColumnDefinitions>
-              <controls:ServiceToggle x:Name="MalwareToggle" AutomationProperties.Name="MalwareToggle"/>
+              <controls:ServiceToggle x:Name="MalwareToggle" AutomationProperties.Name="MalwareToggle" Grid.Column="2"/>
               <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                 <TextBlock Text="بدافزار" FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="RightToLeft" FontWeight="Bold"/>
                 <TextBlock FontSize="10.5" TextAlignment="Right" FlowDirection="RightToLeft">
@@ -279,8 +279,8 @@
                   </TextBlock.Style>
                 </TextBlock>
               </StackPanel>
-              <Border Grid.Column="2" Width="36" Height="36" CornerRadius="13" Background="#1A475569">
-                <Image Source="{StaticResource HandoffMalwareImage}" Width="21" Height="21"/>
+              <Border Grid.Column="0" Width="36" Height="36" CornerRadius="13" Background="#1A475569">
+                <Image Source="{StaticResource HandoffMalwareImage}" Width="21" Height="21" FlowDirection="LeftToRight"/>
               </Border>
             </Grid>
           </Border>

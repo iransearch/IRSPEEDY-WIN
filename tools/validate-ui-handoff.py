@@ -11,7 +11,7 @@ files = list(A.rglob('*.xaml'))
 roots = {p: E.parse(p).getroot() for p in files}
 keys = {el.get(X+'Key') for root in roots.values() for el in root.iter() if el.get(X+'Key')}
 new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','MainWindow','IrspeedyTheme'}]
-events = {'Click','Loaded','IsVisibleChanged','MouseLeftButtonDown','MouseLeftButtonUp','PreviewMouseDown','Checked','Unchecked','TextChanged','PasswordChanged'}
+events = {'Click','Loaded','IsVisibleChanged','MouseLeftButtonDown','MouseLeftButtonUp','PreviewMouseDown','Checked','Unchecked','TextChanged','PasswordChanged','Unloaded','SizeChanged'}
 for p in new_files:
     root = roots[p]
     names = [el.get(X+'Name') for el in root.iter() if el.get(X+'Name')]
@@ -23,7 +23,9 @@ for p in new_files:
                 assert key in keys, f'{p}: missing resource {key}'
             if attr in events and not value.startswith('{'):
                 assert re.search(r'\b'+re.escape(value)+r'\s*\(',source), f'{p}: missing handler {value}'
-    if root.tag == W+'Window' and p.stem not in {'MainWindow'}:
+    if root.tag == W+'Window':
+        assert root.get('SizeToContent') == 'Manual', p
+        assert root.get('FlowDirection') == 'RightToLeft', p
         assert root.get('Width') == '420', p
         assert root.get('Height') == ('460' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '700'), p
         assert not list(root.iter(W+'ScrollViewer')), p
@@ -46,3 +48,16 @@ for element in theme:
 assert 7 * (48 + 6) <= 700 - 62 - 68 - 32 - 46 - 58 - 32
 print(f'PASS: parsed {len(files)} XAML files; checked {len(new_files)} handoff views, resources, handlers, sizes and app-list capacity.')
 print('Windows compilation, UI rendering, DPI and live network validation remain required.')
+
+manifest = E.parse(A / 'app.manifest').getroot()
+assert manifest.find('.//{http://schemas.microsoft.com/SMI/2016/WindowsSettings}dpiAwareness').text == 'PerMonitorV2, PerMonitor'
+connected = roots[A/'UserControls/UCUserInfo.xaml']
+for key in ['ConnectedGlowMotion','ConnectedRingMotion','ConnectedExhaustMotion']:
+    board = next(el for el in connected.iter(W+'Storyboard') if el.get(X+'Key') == key)
+    assert board.get('RepeatBehavior') == 'Forever'
+    assert all(a.get('Duration') == ('0:0:0.42' if key.endswith('ExhaustMotion') else '0:0:1.3') for a in board)
+# Every declared storyboard target must resolve within the Connected view.
+names = {e.get(X+'Name') for e in connected.iter()}
+for el in connected.iter():
+    if el.get('Storyboard.TargetName'): assert el.get('Storyboard.TargetName') in names
+print('PASS: explicit DIP/RTL window contract, active PMv2 manifest and Connected motion targets/durations.')
