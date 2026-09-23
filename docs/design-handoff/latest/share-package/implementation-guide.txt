@@ -1,0 +1,122 @@
+راهنمای پیاده‌سازی — صفحه «اشتراک‌گذاری اتصال» (SettingsShare)
+مستند اختصاصی این صفحه — شامل توضیح کامل کارکرد، وضعیت‌ها، و پیاده‌سازی موشن در WPF
+درباره این سند
+این مستند فقط صفحه «اشتراک‌گذاری اتصال» را پوشش می‌دهد و کامل‌تر و دقیق‌تر از توضیح مختصری است که پیش‌تر در گفتگو داده شد. تصاویر مرجع چهار حالت واقعی صفحه پیوست شده‌اند؛ رنگ/فاصله/تایپوگرافی دقیقاً باید مطابق همین تصاویر باشد و در متن تکرار نشده. فایل خام HTML/CSS این صفحه (که طراحی از روی آن تولید شده) در پوشه source/ همراه است — SettingsShare.dc.html — و برای هر مقدار دقیق (رنگ هگز، اندازه پیکسل، زمان‌بندی انیمیشن) می‌توان مستقیماً به آن مراجعه کرد.
+اندازه پنجره: استاندارد ۴۲۰×۷۰۰ پیکسل منطقی، بدون اسکرول.
+وضعیت در اپ: این صفحه پیش‌تر طراحی و ارسال شده بود؛ این نسخه شامل ویجت موشن نهایی‌شده (هر دو تب) است — در صورتی که پیاده‌سازی فعلی نسخه قدیمی‌تر آیکون‌ها یا اندازه ویجت موشن را دارد، باید با این نسخه به‌روزرسانی شود.
+ساختار کلی و state
+صفحه دو تب دارد که با کلیک بین آن‌ها سوییچ می‌شود: «اشتراک با پراکسی» (پیش‌فرض) و «اشتراک مستقیم». هرکدام یک کلید فعال/غیرفعال‌سازی مستقل دارند:
+activeTab: "proxy" | "direct" — تب فعال.
+proxyOn: boolean — وضعیت روشن/خاموش اشتراک با پراکسی؛ وقتی خاموش است، به‌جای ردیف‌های HTTP/SOCKS5 و ویجت موشن، یک پیام راهنمای خط‌چین نمایش داده می‌شود.
+directOn: boolean — وضعیت روشن/خاموش هات‌اسپات مستقیم؛ وقتی خاموش است، به‌جای کارت اطلاعات Wi-Fi و ویجت موشن، همان الگوی پیام خط‌چین نمایش داده می‌شود.
+چهار حالت ممکن (۲ تب × روشن/خاموش) در تصاویر زیر آمده است:
+تب «اشتراک با پراکسی» — روشن (proxyOn=true)
+تب «اشتراک با پراکسی» — خاموش (proxyOn=false)
+تب «اشتراک مستقیم» — روشن (directOn=true)
+تب «اشتراک مستقیم» — خاموش (directOn=false)
+بخش ۱ — موشن تونل رمزنگاری‌شده (تب پراکسی)
+این ویجت زمانی نمایش داده می‌شود که proxyOn=true باشد و نشان می‌دهد داده بین «این دستگاه» (چپ) و «دستگاه دوم» (راست) از یک تونل رمزنگاری‌شده رد می‌شود. اجزای آن، از پایین به بالا:
+۱.۱ حلقه‌های پخش (pulse rings)
+پشت هرکدام از دو دایره (این دستگاه / دستگاه دوم)، ۲ تا ۳ حلقه هم‌مرکز قرار دارند که پیوسته بزرگ و محو می‌شوند — دقیقاً مثل جلوه «broadcast» رادار.
+<!-- هر حلقه: یک Ellipse با انیمیشن Scale + Opacity، تکرار بی‌نهایت -->
+<Storyboard x:Key="PulseRing" RepeatBehavior="Forever">
+  <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                   From="0.7" To="2.15" Duration="0:0:2" />
+  <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                   From="0.7" To="2.15" Duration="0:0:2" />
+  <DoubleAnimation Storyboard.TargetProperty="Opacity"
+                   From="0.55" To="0" Duration="0:0:2" />
+</Storyboard>
+<!-- ۳ نمونه از همین Storyboard روی ۳ Ellipse یکسان، با BeginTime متفاوت:
+     نمونه ۱: BeginTime="0:0:0"   نمونه ۲: BeginTime="0:0:0.65"   نمونه ۳: BeginTime="0:0:1.3" -->
+RenderTransformOrigin هر Ellipse باید "0.5,0.5" باشد تا از مرکز بزرگ شود، نه از گوشه بالا-چپ.
+حلقه‌های سمت راست (دستگاه دوم) رنگ خاکستری #9AA2B4 دارند و تایمینگ متفاوت (تأخیر ۰٫۴ و ۱٫۰۵ ثانیه)، تا با حلقه‌های آبی سمت چپ هم‌زمان نباشند و حس دو منبع مستقل بدهند.
+۱.۲ تونل و بسته‌های داده (comet trail)
+یک کپسول افقی (تونل) بین دو دایره قرار دارد؛ حاشیه آن با تغییر opacity پیوسته کم‌وزیاد می‌شود («نفس کشیدن» تونل). داخل تونل، دو ردیف نقطه (یکی آبی برای HTTP، یکی سبز-آبی #0D9488 برای SOCKS5) از چپ به راست حرکت می‌کنند و هر ردیف از ۳ نقطه با شعاع و شفافیت کاهشی تشکیل شده تا حس دنباله (comet trail) بدهد.
+<!-- بدنه تونل: نفس‌کشیدن -->
+<Storyboard x:Key="TunnelPulse" RepeatBehavior="Forever" AutoReverse="True">
+  <DoubleAnimation Storyboard.TargetProperty="(Shape.Stroke).(SolidColorBrush.Opacity)"
+                   From="0.35" To="0.95" Duration="0:0:0.65" />
+</Storyboard>
+
+<!-- هر نقطه از دنباله: حرکت خطی روی مسیر تونل، تکرار هر ۱٫۳ ثانیه -->
+<!-- در WPF از PointAnimationUsingPath یا (ساده‌تر) MatrixAnimationUsingPath
+     روی یک Ellipse با RenderTransform=MatrixTransform استفاده کنید: -->
+<Storyboard x:Key="PacketMove" RepeatBehavior="Forever">
+  <MatrixAnimationUsingPath Storyboard.TargetProperty="(UIElement.RenderTransform).(MatrixTransform.Matrix)"
+                            Duration="0:0:1.3" DoesRotateWithTangent="False">
+    <MatrixAnimationUsingPath.PathGeometry>
+      <PathGeometry Figures="M119,88 L277,88" />
+    </MatrixAnimationUsingPath.PathGeometry>
+  </MatrixAnimationUsingPath>
+</Storyboard>
+<!-- سه نمونه (شعاع 3.8/4.8/5.8، Opacity 0.2/0.5/1) با BeginTime پلکانی
+     (۰، ۰٫۰۷، ۰٫۱۴ ثانیه) تا دنباله‌ی محو پشت سرشون دیده بشه -->
+<!-- برای ردیف SOCKS5 (رنگ #0D9488) همین سه نمونه با BeginTime آفست ۰٫۶۵ ثانیه‌ای
+     تا با ردیف HTTP هم‌پوشانی نکنه -->
+نقطه جلوی هر دنباله (بزرگ‌ترین، Opacity=1) یک DropShadowEffect ملایم با شعاع ~۳ پیکسل و رنگ خودش داشته باشد تا حس درخشش (glow) بدهد؛ در طراحی وب این با فیلتر SVG feGaussianBlur ساخته شده.
+مسیر مستقیم و افقی است (خط ساده بین دو دهانه تونل)، نیازی به منحنی نیست.
+۱.۳ جرقه ورود (arrival spark)
+در دو سر تونل (محل ورود/خروج بسته‌ها به دایره‌ها)، یک نقطه رنگی وجود دارد که پیوسته با مقیاس بزرگ‌شونده محو می‌شود — جلوه «ضربه/جرقه» در لحظه رسیدن بسته.
+<Storyboard x:Key="ArrivalSpark" RepeatBehavior="Forever">
+  <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                   From="0.3" To="2.3" Duration="0:0:1.3" />
+  <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)"
+                   From="0.3" To="2.3" Duration="0:0:1.3" />
+  <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="Opacity">
+    <LinearDoubleKeyFrame KeyTime="0:0:0"    Value="0.9" />
+    <LinearDoubleKeyFrame KeyTime="0:0:0.91" Value="0" />
+    <LinearDoubleKeyFrame KeyTime="0:0:1.3"  Value="0" />
+  </DoubleAnimationUsingKeyFrames>
+</Storyboard>
+<!-- جرقه سمت راست (SOCKS5 سبز #0D9488) با BeginTime="0:0:0.65" اجرا شود -->
+۱.۴ حلقه چرخان رمزنگاری
+بالای وسط تونل، یک نشان قفل کوچک (دایره سفید ۳۵×۳۵) وجود دارد که یک حلقه خط‌چین دور آن پیوسته و با سرعت ثابت می‌چرخد — نماد «رمزنگاری فعال».
+<Storyboard x:Key="EncryptionRingRotate" RepeatBehavior="Forever">
+  <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                   From="0" To="360" Duration="0:0:4" />
+</Storyboard>
+<!-- RenderTransformOrigin="0.5,0.5" روی حلقه؛ نوع خط: StrokeDashArray="9,8" -->
+چرخش باید خطی (linear easing) باشد، بدون شتاب‌گیری/کندشدن، تا حس مکانیکی و پیوسته بدهد.
+۱.۵ آیکون‌های دو سر تونل
+سمت چپ («این دستگاه»): دایره سفید ۸۱×۸۱، داخل آن لوگوی IRSPEEDY (فایل پیوست logo-this-device.png در پوشه assets/) — بدون انیمیشن، فقط ثابت داخل دایره.
+سمت راست («دستگاه دوم»): دایره سفید ۶۹×۶۹، داخل آن آیکون کاربر (فایل پیوست user-second-device.png در پوشه assets/) — بدون انیمیشن.
+هر دو تصویر با object-fit: contain (یا معادل Stretch="Uniform" در WPF Image) داخل دایره مرکز چین شده‌اند.
+بخش ۲ — موشن پخش هات‌اسپات (تب مستقیم)
+این ویجت زمانی نمایش داده می‌شود که directOn=true باشد. یک هاب مرکزی (این دستگاه/PC) در سمت چپ، سه دستگاه (تلویزیون، PS5، موبایل) در سمت راست را نشان می‌دهد که هرکدام با یک بسته داده در حال دریافت جریان از هاب هستند.
+۲.۱ حلقه‌های پخش دور هاب
+دقیقاً همان Storyboard بخش ۱.۱ (PulseRing)، فقط دور مربع گرد هاب (نه یک دایره ساده) و با رنگ accent؛ سه نمونه با BeginTime یکسان (۰ / ۰٫۶۵ / ۱٫۳ ثانیه).
+۲.۲ سه مسیر انحنادار پخش داده
+برخلاف تونل تب پراکسی که مسیر مستقیم بود، اینجا سه مسیر بیزیه (منحنی) از هاب به هرکدام از سه دستگاه کشیده شده — یک نقطه رنگی با درخشش (glow) روی هرکدام با سرعت و تأخیر متفاوت حرکت می‌کند:
+<!-- مسیر به تلویزیون (بالا): -->
+<PathGeometry Figures="M70,90 C150,45 230,20 314,31" />   <!-- dur 1.7s, begin 0s,   رنگ accent -->
+<!-- مسیر به PS5 (وسط): -->
+<PathGeometry Figures="M70,90 C150,95 230,92 314,90" />   <!-- dur 1.9s, begin 0.35s, رنگ #7C3AED -->
+<!-- مسیر به موبایل (پایین): -->
+<PathGeometry Figures="M70,90 C150,135 230,160 314,150" /> <!-- dur 1.5s, begin 0.7s, رنگ #0D9488 -->
+
+<!-- خود مسیرها (خط راهنما) به رنگ خاکستری کم‌رنگ #E1E7F3 و ضخامت ۱٫۶ پیکسل، ثابت و بدون انیمیشن، همیشه دیده می‌شوند -->
+<!-- هر نقطه با همان تکنیک MatrixAnimationUsingPath بخش ۱.۲ حرکت می‌کند؛
+     فقط پارامتر DoesRotateWithTangent همچنان False می‌ماند (نقطه نباید بچرخد) -->
+هر سه مسیر با repeatCount نامحدود اجرا می‌شوند و مستقل از هم تکرار می‌شوند (هم‌زمان‌سازی لازم نیست).
+۲.۳ چشمک آنلاین‌بودن دستگاه‌ها
+روی هر سه کارت دستگاه (تلویزیون/PS5/موبایل)، یک نقطه سبز کوچک بالا-چپ کارت وجود دارد که با یک halo سبز محو پیوسته چشمک می‌زند تا نشان دهد دستگاه «آنلاین و متصل» است:
+<Storyboard x:Key="OnlineDotPulse" RepeatBehavior="Forever" AutoReverse="True">
+  <!-- روی DropShadowEffect یا یک Ellipse بیرونی جدا با شفافیت -->
+  <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
+                   From="0.5" To="0" Duration="0:0:0.9" />
+  <DoubleAnimation Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)"
+                   From="0" To="8" Duration="0:0:0.9" />
+</Storyboard>
+<!-- تأخیر شروع هر کدام متفاوت: تلویزیون 0s، PS5 0.4s، موبایل 0.8s -->
+پیاده‌سازی کلی در WPF — نکات فنی
+تمام انیمیشن‌های این صفحه در طراحی با CSS keyframes / SVG animateMotion ساخته شده‌اند؛ معادل مستقیم WPF همان چیزی است که در بخش‌های بالا آمد (Storyboard + DoubleAnimation/MatrixAnimationUsingPath).
+پیشنهاد می‌شود همه این Storyboardها در یک ResourceDictionary مشترک (مثلاً ShareMotionStyles.xaml) تعریف شوند تا هم در تب پراکسی و هم تب مستقیم قابل استفاده مجدد باشند (مثلاً PulseRing و ArrivalSpark در هر دو تب تکرار می‌شوند).
+تمام Storyboardهای این صفحه باید فقط وقتی View مربوطه (تب یا کل صفحه) قابل مشاهده است اجرا شوند و هنگام خروج از صفحه/تب متوقف (Stop) شوند تا مصرف CPU در پس‌زمینه صفر باشد.
+چون هر دو تب می‌توانند بین حالت روشن/خاموش سوییچ کنند، توصیه می‌شود ویجت موشن هر تب در یک UserControl جدا (مثلاً ProxyRelayMotion.xaml و HotspotBroadcastMotion.xaml) قرار گیرد که Storyboardهایش را در Loaded شروع و در Unloaded متوقف می‌کند — همین الگو دقیقاً برای موشن راکت صفحه Connected هم پیشنهاد شده بود.
+در حالت خاموش (proxyOff / directOff)، کل ویجت موشن اصلاً رندر نمی‌شود (نه فقط مخفی) — طبق تصاویر مرجع proxy_off و direct_off، به‌جای آن فقط یک پیام راهنمای خط‌چین ساده نمایش داده می‌شود؛ نیازی به هیچ موشنی در این حالت نیست.
+محتوای پوشه‌های پیوست
+screenshots/ — تصویر مرجع دقیق هر ۴ حالت صفحه (همان تصاویر بالا، فایل PNG با کیفیت کامل).
+assets/logo-this-device.png — همان لوگوی IRSPEEDY استفاده‌شده در دایره «این دستگاه» (پس‌زمینه شفاف).
+assets/user-second-device.png — آیکون کاربر استفاده‌شده در دایره «دستگاه دوم» (پس‌زمینه شفاف).
+source/SettingsShare.dc.html — فایل خام HTML/CSS/SVG این صفحه؛ شامل مقدار دقیق تمام رنگ‌ها، اندازه‌ها، مختصات و timing انیمیشن‌ها (keyframes @irsPulseRing، @irsRotate، @irsTunnelPulse، @irsSpark، @irsOnlineDot) — مرجع نهایی برای هر عدد دقیق که در این سند نیامده.

@@ -28,7 +28,6 @@
             <RowDefinition Height="46"/>
             <RowDefinition Height="58"/>
             <RowDefinition Height="*"/>
-            <RowDefinition Height="32"/>
           </Grid.RowDefinitions>
           <Border CornerRadius="14" BorderBrush="#DFE4EF" BorderThickness="1" Background="White">
             <TextBox x:Name="SearchBox" Margin="12,0" BorderThickness="0" Background="Transparent" TextAlignment="Right" FlowDirection="RightToLeft" VerticalContentAlignment="Center" FontSize="13" TextChanged="Search_Changed" ToolTip="جستجوی نام برنامه" AutomationProperties.Name="جستجوی برنامه‌ها"/>
@@ -42,7 +41,8 @@
               </TextBlock>
             </StackPanel>
           </Grid>
-          <ItemsControl Grid.Row="2" x:Name="AppList">
+          <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled" CanContentScroll="False" x:Name="AppScroll">
+          <ItemsControl x:Name="AppList">
             <ItemsControl.ItemTemplate>
               <DataTemplate>
                 <Border Height="48" Margin="0,0,0,6" CornerRadius="14" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="12,0">
@@ -63,12 +63,9 @@
               </DataTemplate>
             </ItemsControl.ItemTemplate>
           </ItemsControl>
+          </ScrollViewer>
           <TextBlock Grid.Row="2" x:Name="EmptyText" Text="در حال خواندن برنامه‌های نصب‌شده…" FontSize="12" Foreground="#9CA3B4" HorizontalAlignment="Center" VerticalAlignment="Center"/>
-          <Grid Grid.Row="3">
-            <Button x:Name="PreviousButton" HorizontalAlignment="Left" Content="قبلی" Click="Previous_Click" Style="{StaticResource HandoffPlainButton}"/>
-            <TextBlock x:Name="PageText" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#9CA3B4" FontSize="10" FlowDirection="LeftToRight"/>
-            <Button x:Name="NextButton" HorizontalAlignment="Right" Content="بعدی" Click="Next_Click" Style="{StaticResource HandoffPlainButton}"/>
-          </Grid>
+
         </Grid>
       </Grid>
       <Button Grid.Row="2" Margin="16,0,16,18" Height="50" Style="{StaticResource DesignActionButton}" Content="تایید و ذخیره" Click="btnOK_Click"/>

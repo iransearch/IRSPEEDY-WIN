@@ -19,7 +19,7 @@ for path, root in roots.items():
                 assert not any(later.tag == W+'Setter' for later in children[index + 1:]), (
                     f'{path}: Style.Triggers must follow all Setter children (MC3088)')
 keys = {el.get(X+'Key') for root in roots.values() for el in root.iter() if el.get(X+'Key')}
-new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ProxySharingMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','MainWindow','IrspeedyTheme'}]
+new_files = [p for p in files if p.stem in {'SettingsHub','SettingsPassword','SettingsSplitTunnelApps','VGAURDServiceSetting','SpeedyShieldSetting','ShareVPNSetting','UCConnecting','SharingMotion','ProxySharingMotion','HotspotBroadcastMotion','ServiceToggle','UCLogin','UCUserInfo','ServerCountryPicker','MainWindow','IrspeedyTheme'}]
 events = {'Click','Loaded','IsVisibleChanged','MouseLeftButtonDown','MouseLeftButtonUp','PreviewMouseDown','Checked','Unchecked','TextChanged','PasswordChanged','Unloaded','SizeChanged'}
 for p in new_files:
     root = roots[p]
@@ -42,7 +42,7 @@ for p in new_files:
         assert viewport[0].get('Width') == '420', p
         assert viewport[0].get('Height') == ('460' if p.stem in {'VGAURDServiceSetting','SettingsPassword'} else '700'), p
         if p.stem != 'MainWindow': assert viewport[0].get('FlowDirection') == 'LeftToRight', p
-        assert not list(root.iter(W+'ScrollViewer')), p
+        if p.stem != 'SettingsSplitTunnelApps': assert not list(root.iter(W+'ScrollViewer')), p
         assert root.get('AllowsTransparency') == 'False', p
         assert 'WindowDrag.Begin(this, e)' in source, p
 for name in ['UCLogin','UCUserInfo']:
@@ -58,8 +58,9 @@ for element in theme:
                 for ref in re.findall(r'\{StaticResource ([^}]+)\}',value):
                     assert ref in seen, f'{key}: forward theme reference {ref}'
         seen.add(key)
-# Fixed-height app pagination must fit the available body height.
-assert 7 * (48 + 6) <= 700 - 62 - 68 - 32 - 46 - 58 - 32
+# Installed applications use a bounded, continuous scroller.
+assert roots[A/'Windows/SettingsSplitTunnelApps.xaml'].find('.//'+W+'ScrollViewer') is not None
+assert 'PageSize' not in (A/'Windows/SettingsSplitTunnelApps.xaml.cs').read_text()
 print(f'PASS: parsed {len(files)} XAML files; checked {len(new_files)} handoff views, resources, handlers, sizes and app-list capacity.')
 print('Windows compilation, UI rendering, DPI and live network validation remain required.')
 
@@ -127,3 +128,13 @@ assert _light.find('w:Rectangle.OpacityMask/w:ImageBrush', _ns).get('ImageSource
 assert _light.find('w:Rectangle.RenderTransform', _ns) is None
 assert not _art.findall('.//w:PathGeometry', _ns)
 print('PASS: original rocket layer order and stationary PNG alpha mask; no approximate flame geometry.')
+
+# Physical scrollbar placement must be independent of inherited RTL.
+picker = roots[A/'Components/ServerListControl/ServerCountryPicker.xaml']
+scroll_template = next(e for e in picker.iter(W+'ControlTemplate') if e.get('TargetType') == 'ScrollViewer')
+assert scroll_template.find(W+'Grid').get('FlowDirection') == 'LeftToRight'
+hotspot = roots[A/'Controls/HotspotBroadcastMotion.xaml']
+assert hotspot.get('Unloaded') == 'Motion_Unloaded'
+assert len([e for e in hotspot.iter(W+'Path') if (e.get(X+'Name') or '').startswith('Route')]) == 3
+assert (A/'Resources/Irspeedy/Reference/user-second-device.png').exists()
+print('PASS: left scrollbar coordinate frame, continuous app list, direct motion lifecycle and receiver asset.')

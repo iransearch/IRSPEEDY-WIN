@@ -114,11 +114,10 @@
                 </Border>
               </StackPanel>
               <controls:ProxySharingMotion x:Name="ProxyMotion" VerticalAlignment="Bottom" FlowDirection="LeftToRight"/>
-              <Border x:Name="ProxyOffHint" Height="60" VerticalAlignment="Center" CornerRadius="16" BorderBrush="#D5DEEF" BorderThickness="1" Padding="16">
-                <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" TextWrapping="Wrap" VerticalAlignment="Center">
-                  <Run Text="برای مشاهده آدرس و پورت پراکسی، ابتدا اشتراک‌گذاری را فعال کنید." FlowDirection="RightToLeft"/>
-                </TextBlock>
-              </Border>
+              <Grid x:Name="ProxyOffHint" Height="78" VerticalAlignment="Center">
+                <Rectangle RadiusX="14" RadiusY="14" Stroke="#D7DCE6" StrokeThickness="1.5" StrokeDashArray="4,3"/>
+                <TextBlock Margin="20" FontSize="11.5" Foreground="#9CA3B4" TextAlignment="Center" FlowDirection="RightToLeft" TextWrapping="Wrap" VerticalAlignment="Center" Text="برای مشاهده آدرس و پورت پراکسی، ابتدا اشتراک‌گذاری را فعال کنید."/>
+              </Grid>
             </Grid>
           </Grid>
           <Grid x:Name="DirectPanel" Grid.Row="1" Margin="0,16,0,0" Visibility="Collapsed">
@@ -179,7 +178,7 @@
                 <Run Text="" FlowDirection="RightToLeft"/>
               </TextBlock>
               <Button x:Name="hotspotRetryStop" Content="تلاش دوباره برای توقف" Click="HotspotStop_Click" Style="{StaticResource HandoffPlainButton}" Foreground="#DC2626" FontSize="11" Height="28" Visibility="Collapsed"/>
-              <Grid x:Name="PasswordEditorPanel" Margin="0,10,0,0">
+              <Grid x:Name="PasswordEditorPanel" Visibility="Collapsed" Margin="0,10,0,0">
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="85"/>
                   <ColumnDefinition Width="*"/>
@@ -193,7 +192,11 @@
                 </StackPanel>
               </Grid>
             </StackPanel>
-            <controls:SharingMotion x:Name="DirectMotion" Grid.Row="1" IsDirect="True" VerticalAlignment="Bottom" FlowDirection="LeftToRight"/>
+            <Grid x:Name="DirectOffHint" Grid.Row="1" Height="78" VerticalAlignment="Center">
+              <Rectangle RadiusX="14" RadiusY="14" Stroke="#D7DCE6" StrokeThickness="1.5" StrokeDashArray="4,3"/>
+              <TextBlock Margin="20" FontSize="11.5" Foreground="#9CA3B4" TextAlignment="Center" FlowDirection="RightToLeft" TextWrapping="Wrap" VerticalAlignment="Center" Text="برای مشاهده نام و رمز Wi-Fi، ابتدا اشتراک‌گذاری مستقیم را فعال کنید"/>
+            </Grid>
+            <controls:HotspotBroadcastMotion x:Name="DirectMotion" Grid.Row="1" VerticalAlignment="Bottom" FlowDirection="LeftToRight"/>
           </Grid>
           <Popup x:Name="QrPopup" Placement="Center" StaysOpen="False" AllowsTransparency="True">
             <Border Background="White" BorderBrush="#DDE2EF" BorderThickness="1" CornerRadius="16" Padding="16">

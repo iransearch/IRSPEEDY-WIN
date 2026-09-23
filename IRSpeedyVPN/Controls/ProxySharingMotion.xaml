@@ -20,8 +20,7 @@
 <Grid x:Name="LockRing" Canvas.Left="168" Canvas.Top="24" Width="53" Height="53" RenderTransformOrigin="0.5,0.5"><Grid.RenderTransform><RotateTransform/></Grid.RenderTransform><Ellipse Width="44" Height="44" Stroke="#1E3A8A" StrokeThickness="2" StrokeDashArray="4.5,4" Opacity="0.55"/></Grid>
 <Border Canvas.Left="177" Canvas.Top="33" Width="35" Height="35" CornerRadius="17.5" Background="White" BorderBrush="#ECEEF3" BorderThickness="1"><Path Data="M7.1,10.5 L16.9,10.5 Q19.5,10.5 19.5,13.1 L19.5,18.4 Q19.5,21 16.9,21 L7.1,21 Q4.5,21 4.5,18.4 L4.5,13.1 Q4.5,10.5 7.1,10.5 M8,10.5 L8,7.8 A4,4 0 0 1 16,7.8 L16,10.5 M12,14.2 L12,17" Stroke="#1E3A8A" StrokeThickness="1.9" Width="18" Height="21" Stretch="Uniform"/></Border>
 <Border Canvas.Left="285" Canvas.Top="54" Width="69" Height="69" CornerRadius="34.5" Background="White" BorderBrush="#D3D9E5" BorderThickness="1"><Border.Effect><DropShadowEffect Color="#101828" BlurRadius="8" ShadowDepth="3" Opacity="0.12"/></Border.Effect>
-<!-- Exact receiver artwork from the supplied screenshot; isolated with an ImageBrush viewbox. -->
-<Rectangle Width="47" Height="47"><Rectangle.Fill><ImageBrush ImageSource="/Resources/Irspeedy/Reference/proxy-reference.png" ViewboxUnits="RelativeToBoundingBox" Viewbox="0.7476190476,0.8171428571,0.1119047619,0.0671428571" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/></Rectangle.Fill></Rectangle></Border>
+<Image Source="/Resources/Irspeedy/Reference/user-second-device.png" Width="47" Height="47" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/></Border>
 <Ellipse x:Name="OnlineHalo" Canvas.Left="283" Canvas.Top="52" Width="12" Height="12" Stroke="#8022B37A" StrokeThickness="2" RenderTransformOrigin="0.5,0.5"><Ellipse.RenderTransform><ScaleTransform/></Ellipse.RenderTransform></Ellipse>
 <Ellipse Canvas.Left="283" Canvas.Top="52" Width="12" Height="12" Fill="#22B37A" Stroke="White" StrokeThickness="2"/>
 </Canvas></Viewbox></UserControl>

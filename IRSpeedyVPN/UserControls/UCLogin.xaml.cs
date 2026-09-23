@@ -62,11 +62,12 @@ namespace IRSpeedyVPN.UserControls
         {
             ShowPassword(false);
         }
-        void ShowPassword(Boolean show)
+        void ShowPassword(Boolean show, bool focus = true)
         {
             txtPasswordShow.Text = txtPassword.Password;
             txtPassword.Visibility = show ? Visibility.Hidden : Visibility.Visible;
             txtPasswordShow.Visibility = !show ? Visibility.Hidden : Visibility.Visible;
+            if (!focus) return;
             if (show)
                 txtPasswordShow.Focus();
             else
@@ -86,7 +87,8 @@ namespace IRSpeedyVPN.UserControls
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
-            ShowPassword(false);
+            ShowPassword(false, false);
+            Dispatcher.BeginInvoke(new Action(() => { if (IsVisible) txtUsername.Focus(); }), System.Windows.Threading.DispatcherPriority.Input);
             UpdatePasswordPlaceholder();
             btnSignup.IsEnabled = GetSignupUri() != null;
             btnSignup.ToolTip = btnSignup.IsEnabled ? "ثبت‌نام" : "برای تهیه حساب با پشتیبانی تماس بگیرید";

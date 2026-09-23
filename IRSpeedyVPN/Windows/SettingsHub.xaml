@@ -33,7 +33,7 @@
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <Grid Grid.Row="0">
-            <Button Style="{StaticResource HandoffPlainButton}" Click="Methods_Click">
+            <Button Style="{StaticResource HandoffPlainButton}" x:Name="MethodsButton" Click="Methods_Click">
               <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
@@ -60,7 +60,7 @@
             </Button>
           </Grid>
           <Grid Grid.Row="1">
-            <Button Style="{StaticResource HandoffPlainButton}" Click="Shield_Click">
+            <Button Style="{StaticResource HandoffPlainButton}" x:Name="ShieldButton" Click="Shield_Click">
               <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
@@ -87,7 +87,7 @@
             </Button>
           </Grid>
           <Grid Grid.Row="2">
-            <Button Style="{StaticResource HandoffPlainButton}" Click="Share_Click">
+            <Button Style="{StaticResource HandoffPlainButton}" x:Name="ShareButton" Click="Share_Click">
               <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
@@ -113,7 +113,7 @@
               </Border>
             </Button>
           </Grid>
-          <Grid Grid.Row="3">
+          <Grid Grid.Row="3" x:Name="GameRow">
             <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
               <Grid>
                 <Grid.ColumnDefinitions>
@@ -136,7 +136,7 @@
               </Grid>
             </Border>
           </Grid>
-          <Grid Grid.Row="4">
+          <Grid Grid.Row="4" x:Name="AiRow">
             <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
               <Grid>
                 <Grid.ColumnDefinitions>
@@ -160,7 +160,7 @@
             </Border>
           </Grid>
           <Grid Grid.Row="5">
-            <Button Style="{StaticResource HandoffPlainButton}" Click="Password_Click">
+            <Button Style="{StaticResource HandoffPlainButton}" x:Name="PasswordButton" Click="Password_Click">
               <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
@@ -188,7 +188,7 @@
           </Grid>
         </Grid>
       </Grid>
-      <Button Grid.Row="2" Margin="16,0,16,18" Height="50" Style="{StaticResource DesignActionButton}" Content="تایید و ذخیره" Click="btnOK_Click"/>
+      <Button Grid.Row="2" Margin="16,0,16,18" Height="50" Style="{StaticResource DesignActionButton}" x:Name="SaveButton" Content="تایید و ذخیره" Click="btnOK_Click"/>
     </Grid>
   </Viewbox>
 </Window>

@@ -14,11 +14,9 @@ namespace IRSpeedyVPN.Windows
 {
     public partial class SettingsSplitTunnelApps : Window
     {
-        private const int PageSize = 7;
         private const string SelectionKey = "SplitTunnelPreviewApplications";
         private List<InstalledApplication> apps = new List<InstalledApplication>();
         private HashSet<string> saved = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        private int page;
         private bool ready;
         public SettingsSplitTunnelApps() { InitializeComponent(); }
         private void Header_DragMove(object sender, MouseButtonEventArgs e) => Common.WindowDrag.Begin(this, e);
@@ -41,7 +39,7 @@ namespace IRSpeedyVPN.Windows
                     app.PropertyChanged += SelectionChanged;
                 }
                 ready = true;
-                RenderPage();
+                RenderList();
             }
             catch { EmptyText.Text = "خواندن برنامه‌ها ممکن نشد؛ پنجره را دوباره باز کنید."; }
         }
@@ -50,25 +48,18 @@ namespace IRSpeedyVPN.Windows
             var query = SearchBox.Text.Trim();
             return apps.Where(a => a.Name.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0 || a.ExecutableName.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
         }
-        private void RenderPage()
+        private void RenderList()
         {
             if (!ready) return;
             var filtered = Filtered();
-            int pages = Math.Max(1, (filtered.Count + PageSize - 1) / PageSize);
-            page = Math.Max(0, Math.Min(page, pages - 1));
-            AppList.ItemsSource = filtered.Skip(page * PageSize).Take(PageSize).ToList();
+            AppList.ItemsSource = filtered;
             EmptyText.Text = "برنامه‌ای با مسیر اجرایی ثبت‌شده پیدا نشد.";
             EmptyText.Visibility = filtered.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
-            PreviousButton.IsEnabled = page > 0;
-            NextButton.IsEnabled = page + 1 < pages;
-            PageText.Text = PersianDigits.Format($"{page + 1} / {pages}");
             UpdateCount();
         }
         private void UpdateCount() => SelectedCount.Text = PersianDigits.Format(apps.Count(a => a.Selected) + " برنامه انتخاب شده");
         private void SelectionChanged(object sender, PropertyChangedEventArgs e) => UpdateCount();
-        private void Search_Changed(object sender, TextChangedEventArgs e) { page = 0; RenderPage(); }
-        private void Previous_Click(object sender, RoutedEventArgs e) { page--; RenderPage(); }
-        private void Next_Click(object sender, RoutedEventArgs e) { page++; RenderPage(); }
+        private void Search_Changed(object sender, TextChangedEventArgs e) { RenderList(); AppScroll?.ScrollToTop(); }
         private void SelectAll_Click(object sender, RoutedEventArgs e)
         {
             if (!ready) return;

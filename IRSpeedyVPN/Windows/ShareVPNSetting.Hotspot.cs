@@ -10,6 +10,7 @@ namespace IRSpeedyVPN.Windows
     {
         private readonly DispatcherTimer hotspotUiTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
         private bool hotspotBusy;
+        private bool editPasswordRequested;
         private string pendingHotspotSsid, pendingHotspotPassword;
         private void InitializeHotspotUi()
         {
@@ -33,7 +34,8 @@ namespace IRSpeedyVPN.Windows
             hotspotStateLabel.Text = active ? "فعال" : starting ? "در حال راه‌اندازی…" : "غیرفعال";
             hotspotStateLabel.Foreground = active ? System.Windows.Media.Brushes.MediumSeaGreen : System.Windows.Media.Brushes.Gray;
             DirectMotion.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
-            PasswordEditorPanel.Visibility = view.State == "off" ? Visibility.Visible : Visibility.Collapsed;
+            DirectOffHint.Visibility = !showCredentials && !editPasswordRequested ? Visibility.Visible : Visibility.Collapsed;
+            PasswordEditorPanel.Visibility = view.State == "off" && editPasswordRequested ? Visibility.Visible : Visibility.Collapsed;
             hotspotToggle.IsEnabled = !hotspotBusy && !proxyBusy && (running || (eligible && HotspotProcessChannel.Installed && HotspotProcessChannel.SupportedWindows));
             hotspotRetryStop.Visibility = view.State == "error" ? Visibility.Visible : Visibility.Collapsed;
             hotspotRetryStop.IsEnabled = !hotspotBusy;
@@ -105,11 +107,13 @@ namespace IRSpeedyVPN.Windows
             {
                 MessageBox.Show(this, "رمز باید دقیقاً ۱۰ رقم انگلیسی (0 تا 9) باشد.", "رمز وای‌فای"); return;
             }
-            try { DirectHotspot.SavePassword(password); hotspotPasswordEditor.Clear(); hotspotStatus.Text = "رمز برای اتصال بعدی ذخیره شد."; }
+            try { DirectHotspot.SavePassword(password); hotspotPasswordEditor.Clear(); editPasswordRequested = false; RefreshHotspotUi(); hotspotStatus.Text = "رمز برای اتصال بعدی ذخیره شد."; }
             catch { MessageBox.Show(this, "ذخیره رمز انجام نشد.", "رمز وای‌فای"); }
         }
         private void HotspotEditPassword_Click(object sender, RoutedEventArgs e)
         {
+            editPasswordRequested = true;
+            RefreshHotspotUi();
             hotspotStatus.Text = "برای تغییر رمز، ابتدا اشتراک مستقیم را خاموش کنید.";
         }
         private void HotspotCopyName_Click(object sender, RoutedEventArgs e) { CopyHotspotValue(false); }

@@ -125,6 +125,7 @@
 		<Resource Include="Resources\Irspeedy\Logo\icon-16.png" />
 		<Resource Include="Resources\Irspeedy\Icons\*.svg" />
         <Resource Include="Resources\Irspeedy\Reference\proxy-reference.png" />
+        <Resource Include="Resources\Irspeedy\Reference\user-second-device.png" />
 		<Resource Include="Resources\Irspeedy\Logo\icon-24.png" />
 		<Resource Include="Resources\Irspeedy\Logo\icon-32.png" />
 		<Resource Include="Resources\Irspeedy\Logo\icon-48.png" />
