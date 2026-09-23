@@ -106,3 +106,13 @@
 راهکار مرحلهٔ بعد برای فونت: حذف Viewbox سراسری و تبدیل اندازه‌ها به چیدمان مستقیم در اندازهٔ مصوب پنجره، بدون تغییر اندازهٔ ظاهری. در حال حاضر بوم ۴۲۰ به حدود ۳۸۱٫۶ کوچک می‌شود؛ این تبدیل کسری یک عامل محتمل افت وضوح است، نه تشخیص قطعی بدون اجرای ویندوز. وزن‌های واقعی Medium/SemiBold/Bold، UseLayoutRounding و تنظیمات DPI باید حفظ شوند. مقایسهٔ Display و Ideal روی عبارت‌های فارسی واقعی در مقیاس‌های ۱۰۰، ۱۲۵ و ۱۵۰ درصد لازم است؛ ClearType به‌تنهایی تضمین‌کنندهٔ تطابق با مرورگر نیست. این بازنویسی سراسری در اصلاح محدود لیست انجام نشده است.
 
 مراجع فنی: https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/typography-in-wpf و https://learn.microsoft.com/en-us/dotnet/desktop/wpf/advanced/layout
+
+## تطبیق بستهٔ IRSPEEDY_Vazirmatn_Fonts.zip
+
+مقایسهٔ بایت‌به‌بایت هر پنج TTF ارسالی با فایل‌های پروژه یکسان بود. هیچ‌کدام جدول fvar ندارند و وزن OS/2 به ترتیب ۴۰۰، ۵۰۰، ۶۰۰، ۷۰۰ و ۸۰۰ است. پنج فایل از قبل Resource بودند؛ پس نبودن embed یا Variable بودن فونت در سورس فعلی تأیید نمی‌شود. این بررسی تضمین نمی‌کند که بیلد نصب‌شده همین منابع را بارگذاری کرده باشد.
+
+تمام TextBlockهایی که Medium/SemiBold/ExtraBold را صرفاً با FontWeight انتخاب می‌کردند به AppFontFamilyMedium/AppFontFamilySemiBold/AppFontFamilyExtraBold متصل شدند؛ FontWeight=Normal روی این خانواده‌های مستقل از وزن‌دهی مضاعف یا ارث‌بری جلوگیری می‌کند. Regular و Bold با خانوادهٔ مشترک AppFontFamily و وزن Normal/Bold باقی می‌مانند. منابع مرکزی از قبل مسیر pack://application:,,,/Fonts/Vazirmatn/# و نام‌های داخلی صحیح داشتند.
+
+راهنمای ارسالی بدون تغییر در vazirmatn-README.txt ذخیره شد. OFL.txt کنار فونت‌ها و به‌صورت Resource در خروجی قرار گرفت. نیازی به نصب فونت در ویندوز یا دانلود از Google Fonts نیست؛ فایل‌های فونت تغییر نکردند.
+
+بررسی نهایی روی ویندوز: Clean/Rebuild همان خروجی single-file، آزمایش روی سیستمی بدون Vazirmatn نصب‌شده، و بررسی Typeface.TryGetGlyphTypeface / GlyphTypeface.FontUri برای هر وزن و قلم واقعی Run فارسی انجام شود. مسیر باید به فونت بسته‌شدهٔ متناظر برسد. سپس جمله و اعداد فارسی در وزن‌های ۴۰۰ تا ۸۰۰ و DPIهای مختلف مقایسه شوند. اجرای این بررسی زمان اجرا در محیط لینوکس فعلی ممکن نیست؛ افت وضوح ناشی از Viewbox همچنان یک احتمال مستقل است.

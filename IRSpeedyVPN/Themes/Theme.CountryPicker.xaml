@@ -42,7 +42,7 @@
 
                 <TextBlock Grid.Column="2" Text="{Binding Display}"
                            FlowDirection="RightToLeft" TextAlignment="Right"
-                           FontWeight="SemiBold" FontSize="13"
+                           FontFamily="{DynamicResource AppFontFamilySemiBold}" FontWeight="Normal" FontSize="13"
                            VerticalAlignment="Center" Margin="0,0,12,0">
                     <TextBlock.Style>
                         <Style TargetType="TextBlock">

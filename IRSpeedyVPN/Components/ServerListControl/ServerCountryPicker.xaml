@@ -178,7 +178,7 @@
                   </TextBlock>
                 </Grid>
                 <!-- Label -->
-                <TextBlock Grid.Column="2" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamily}" FontWeight="SemiBold" FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}" TextAlignment="Right" VerticalAlignment="Center" Margin="10,0">
+                <TextBlock Grid.Column="2" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontWeight="Normal" FontSize="{StaticResource FontSizeRow}" Foreground="{StaticResource RowTitleBrush}" TextAlignment="Right" VerticalAlignment="Center" Margin="10,0">
                   <Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/>
                 </TextBlock>
                 <!-- Latency -->

@@ -12,7 +12,7 @@
       <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1">
         <Grid Margin="16,0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
           <StackPanel VerticalAlignment="Center">
-            <TextBlock FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="ExtraBold" HorizontalAlignment="Center">
+            <TextBlock FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center">
               <Run Text="تنظیمات سرویس" FlowDirection="RightToLeft"/>
             </TextBlock>
             <TextBlock FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Center">

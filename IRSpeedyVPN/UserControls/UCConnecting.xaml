@@ -8,7 +8,7 @@
    <Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="124" Height="168" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality"/>
   </Grid>
   <StackPanel Grid.Row="2" Margin="0,35,0,0" HorizontalAlignment="Center">
-   <TextBlock Text="در حال اتصال…" FlowDirection="RightToLeft" FontSize="20" FontWeight="ExtraBold" Foreground="#141B33" TextAlignment="Center"/>
+   <TextBlock Text="در حال اتصال…" FlowDirection="RightToLeft" FontSize="20" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" Foreground="#141B33" TextAlignment="Center"/>
    <TextBlock Text="در حال برقراری یک ارتباط امن" FlowDirection="RightToLeft" FontSize="12" Foreground="#9CA3B4" TextAlignment="Center" Margin="0,8,0,18"/>
    <Border Width="200" Height="5" CornerRadius="2.5" Background="#EDF1F8" ClipToBounds="True"><Border x:Name="ProgressSegment" Width="58" Background="#2447A8" CornerRadius="2.5" HorizontalAlignment="Left"><Border.RenderTransform><TranslateTransform/></Border.RenderTransform></Border></Border>
    <Button Content="لغو اتصال" Style="{StaticResource HandoffPlainButton}" Click="Cancel_Click" Foreground="#64748B" FontSize="11" HorizontalAlignment="Center" Margin="0,16,0,0"/>

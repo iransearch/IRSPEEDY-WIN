@@ -12,7 +12,7 @@
       <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1">
         <Grid Margin="16,0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
           <StackPanel VerticalAlignment="Center">
-            <TextBlock FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="ExtraBold" HorizontalAlignment="Center">
+            <TextBlock FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center">
               <Run Text="اشتراک‌گذاری اتصال" FlowDirection="RightToLeft"/>
             </TextBlock>
             <TextBlock FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Center">
@@ -87,7 +87,7 @@
                     </StackPanel>
                     <TextBlock x:Name="HTTPAddress" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="#24365F" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
                     <Border Grid.Column="2" Background="#1E3A8A" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
-                      <TextBlock Text="HTTP" FontSize="11" Foreground="White" FontWeight="ExtraBold"/>
+                      <TextBlock Text="HTTP" FontSize="11" Foreground="White" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal"/>
                     </Border>
                   </Grid>
                 </Border>
@@ -108,7 +108,7 @@
                     </StackPanel>
                     <TextBlock x:Name="SOCKS5Address" Grid.Column="1" FontSize="13" FontWeight="Bold" Foreground="#24365F" VerticalAlignment="Center" HorizontalAlignment="Center" FlowDirection="LeftToRight"/>
                     <Border Grid.Column="2" Background="#0D9488" CornerRadius="8" Padding="9,5" VerticalAlignment="Center">
-                      <TextBlock Text="SOCKS5" FontSize="11" Foreground="White" FontWeight="ExtraBold"/>
+                      <TextBlock Text="SOCKS5" FontSize="11" Foreground="White" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal"/>
                     </Border>
                   </Grid>
                 </Border>

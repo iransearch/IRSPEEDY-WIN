@@ -147,6 +147,7 @@
 		<Resource Include="Resources\Irspeedy\Flags\Iso\*.png" />
 		<Resource Include="Resources\Irspeedy\Flags\Iso\LICENSE.txt" />
 		<!-- Vazirmatn (OFL), bundled locally per DESIGN-SPEC §5 — no network font loading -->
+		<Resource Include="Fonts\Vazirmatn\OFL.txt" />
 		<Resource Include="Fonts\Vazirmatn\Vazirmatn-Regular.ttf" />
 		<Resource Include="Fonts\Vazirmatn\Vazirmatn-Medium.ttf" />
 		<Resource Include="Fonts\Vazirmatn\Vazirmatn-SemiBold.ttf" />

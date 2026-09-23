@@ -136,7 +136,7 @@
             </Image>
             <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
               <TextBlock x:Name="txtCountry" FontSize="14" FontWeight="Bold" Foreground="#142057" TextTrimming="CharacterEllipsis"/>
-              <TextBlock x:Name="txtServerDetail" FontSize="12" FontWeight="Medium" Foreground="#5B6BA8" TextTrimming="CharacterEllipsis"/>
+              <TextBlock x:Name="txtServerDetail" FontSize="12" FontFamily="{StaticResource AppFontFamilyMedium}" FontWeight="Normal" Foreground="#5B6BA8" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
             <Button x:Name="btn_ChangeServer" Grid.Column="2" Width="32" Height="32" ToolTip="تغییر سرور" Click="btn_ChangeServer_Click" Background="#141E3A8A" Cursor="Hand">
               <Viewbox Width="17" Height="17" FlowDirection="LeftToRight"><Canvas Width="24" Height="24"><Path Data="{StaticResource IconSwapServer}" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" FlowDirection="LeftToRight" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
@@ -205,7 +205,7 @@
       </Border>
       <TextBlock x:Name="txtServiceName" Visibility="Collapsed"/>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
-        <TextBlock Text="آی‌پی جدید شما: " FontSize="11.5" FontWeight="Medium" Foreground="#5B6478"/>
+        <TextBlock Text="آی‌پی جدید شما: " FontSize="11.5" FontFamily="{StaticResource AppFontFamilyMedium}" FontWeight="Normal" Foreground="#5B6478"/>
         <TextBlock Text="—" FlowDirection="LeftToRight" FontSize="11.5" Foreground="#5B6478" ToolTip="آی‌پی عمومی در دسترس نیست" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"/>
       </StackPanel>
     </StackPanel>
