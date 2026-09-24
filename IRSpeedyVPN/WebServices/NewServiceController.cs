@@ -235,6 +235,8 @@ namespace IRSpeedyVPN.WebServices
 
             int startIndex = _index;
             int attempts = 0;
+            int missingPasswordEndpoints = 0;
+            BaseHttpResponse<TResponse> missingPasswordResponse = null;
             Exception lastException = null;
             int attemptNumber = 1;
             var flowStopwatch = Stopwatch.StartNew();
@@ -284,7 +286,16 @@ namespace IRSpeedyVPN.WebServices
                         var result = call(svc, perAttemptTimeout);
                         attemptSw.Stop();
 
-                        bool retryable = IsRetriableFailure(result);
+                        // A login host may not deploy the password-change route. A 404
+                        // is safe to fail over; credential/business rejections are final.
+                        bool missingPasswordRoute = flowName == "ChangePassword"
+                            && result != null && result.StatusCode == HttpStatusCode.NotFound;
+                        if (missingPasswordRoute)
+                        {
+                            missingPasswordEndpoints++;
+                            missingPasswordResponse = result;
+                        }
+                        bool retryable = missingPasswordRoute || IsRetriableFailure(result);
                         history.Add(diagnosticEndpoint + ":http=" + (result == null ? "none" : ((int)result.StatusCode).ToString())
                             + ":ms=" + attemptSw.ElapsedMilliseconds);
                         LogHelper.WriteExLog("[StartupAuth] stage=endpoint-end requestId=" + requestId
@@ -297,11 +308,13 @@ namespace IRSpeedyVPN.WebServices
 
                         if (!retryable)
                         {
-                            _lastGoodBaseUrl = GetBaseUrl(svc);
+                            if (result != null && result.StatusCode == HttpStatusCode.OK)
+                                _lastGoodBaseUrl = GetBaseUrl(svc);
                             LogHelper.WriteExLog("[StartupAuth] stage=flow-end requestId=" + requestId
                                 + " flow=" + flowName
                                 + " endpoint=" + endpoint
-                                + " result=success");
+                                + " result=" + (result != null && result.StatusCode == HttpStatusCode.OK
+                                    ? "http-ok" : "http-rejected"));
                             return result;
                         }
 
@@ -339,6 +352,13 @@ namespace IRSpeedyVPN.WebServices
 
                     if (_index == startIndex)
                         break;
+                }
+
+                if (missingPasswordEndpoints == _services.Count)
+                {
+                    LogHelper.WriteExLog("[StartupAuth] stage=flow-end requestId=" + requestId
+                        + " flow=" + flowName + " result=route-not-found");
+                    return missingPasswordResponse;
                 }
 
                 if (flowBudgetMs > 0 && flowStopwatch.ElapsedMilliseconds >= flowBudgetMs)

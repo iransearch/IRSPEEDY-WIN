@@ -1221,7 +1221,9 @@ namespace IRSpeedyVPN
             if (oldPassword != gInfo.Password) return "رمز فعلی صحیح نیست.";
             string username = gInfo.Username;
             var response = await Task.Run(() => serviceController.ChangePassword(username, oldPassword, newPassword));
-            if (response.StatusCode != System.Net.HttpStatusCode.OK || response.ResponseData == null)
+            if (response?.StatusCode == System.Net.HttpStatusCode.NotFound)
+                return "سرویس تغییر رمز در سرورهای فعلی در دسترس نیست (۴۰۴). با پشتیبانی تماس بگیرید.";
+            if (response == null || response.StatusCode != System.Net.HttpStatusCode.OK || response.ResponseData == null)
                 return "خطا در فراخوانی سرویس";
             if (!response.ResponseData.IsSuccess)
                 return string.IsNullOrWhiteSpace(response.ResponseData.ErrorMessage) ? "تغییر رمز انجام نشد." : response.ResponseData.ErrorMessage;
