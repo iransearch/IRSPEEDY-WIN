@@ -17,7 +17,7 @@ namespace IRSpeedyVPN.Services.Xray
 					""connectivity"": """",
 					""destination"": ""https://connectivitycheck.gstatic.com/generate_204"",
 					""httpMethod"": ""HEAD"",
-					""interval"": ""30m"",
+					""interval"": ""15m"",
 					""sampling"": 2,
 					""timeout"": ""5s""
 				},
