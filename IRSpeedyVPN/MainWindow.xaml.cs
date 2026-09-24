@@ -382,7 +382,6 @@ namespace IRSpeedyVPN
 
         private void Proxifier_onResult(bool connected, string message)
         {
-            HideLoading();
             Dispatcher.Invoke((Action)(() =>
            {
                ProcessConnectionResult(connected, message);
@@ -504,8 +503,6 @@ namespace IRSpeedyVPN
                 if (version != Interlocked.Read(ref connectionRequestVersion) ||
                     !ReferenceEquals(service, gInfo.CurrentService))
                     return;
-                if (!service.IsUsingProxifire || !connected)
-                    HideLoading();
                 if (connected && service.IsUsingProxifire)
                     proxifier.Attach("127.0.0.1", listenPort,
                         service.ProxifierWithPassword ? gInfo.Username : null,
@@ -515,8 +512,25 @@ namespace IRSpeedyVPN
                     ProcessConnectionResult(connected, message);
             }));
         }
-        void ProcessConnectionResult(bool connected,string Message)
+        private System.Diagnostics.Stopwatch connectingPresentationTime;
+        private long connectionPresentationResult;
+
+        async void ProcessConnectionResult(bool connected,string Message)
         {
+            long result = ++connectionPresentationResult;
+            long version = Interlocked.Read(ref connectionRequestVersion);
+            var service = gInfo.CurrentService;
+            var presentation = connectingPresentationTime;
+            if (connected && presentation != null)
+            {
+                int remaining = (int)Math.Max(0L, 4000L - presentation.ElapsedMilliseconds);
+                if (remaining > 0) await Task.Delay(remaining);
+                // A cancellation, disconnect or newer result must win over delayed success.
+                if (Dispatcher.HasShutdownStarted || result != connectionPresentationResult ||
+                    version != Interlocked.Read(ref connectionRequestVersion) ||
+                    !ReferenceEquals(service, gInfo.CurrentService) ||
+                    !ReferenceEquals(presentation, connectingPresentationTime)) return;
+            }
             HideLoading();
             if (connected)
             {
@@ -1109,6 +1123,7 @@ namespace IRSpeedyVPN
                 ShowMessage("");
                 if (connecting)
                 {
+                    connectingPresentationTime = System.Diagnostics.Stopwatch.StartNew();
                     uCLoading.Visibility = Visibility.Hidden;
                     uCConnecting.Visibility = Visibility.Visible;
                     panelHeaderIcons.Visibility = Visibility.Collapsed;
@@ -1127,6 +1142,7 @@ namespace IRSpeedyVPN
             {
                 uCLoading.Visibility = Visibility.Hidden;
                 uCConnecting.Visibility = Visibility.Collapsed;
+                connectingPresentationTime = null;
                 var uiStopwatch = loginUiStopwatch;
                 if (uiStopwatch == null)
                     return;
