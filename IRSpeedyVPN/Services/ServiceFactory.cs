@@ -24,6 +24,19 @@ namespace IRSpeedyVPN.Services
         }
         public void RenewServiceList(List<Group> groups)
         {
+            var cached = (services ?? new List<IVPNService>())
+                .SelectMany(service => service.GetServerUrls() ?? new List<Url>())
+                .Where(u => u != null && !string.IsNullOrEmpty(u.url))
+                .GroupBy(u => u.url, StringComparer.Ordinal)
+                .ToDictionary(g => g.Key, g => g.OrderByDescending(u => u.latencychkTime).First(), StringComparer.Ordinal);
+            foreach (var url in groups.SelectMany(g => g.servers).SelectMany(s => s.urls))
+            {
+                if (url != null && url.url != null && cached.TryGetValue(url.url, out var previous))
+                {
+                    url.latency = previous.latency;
+                    url.latencychkTime = previous.latencychkTime;
+                }
+            }
             services = new List<IVPNService>();
             foreach(var g in groups)
             {

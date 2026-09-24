@@ -47,6 +47,7 @@ namespace IRSpeedyVPN.UserControls
         public UCServerList()
         {
             InitializeComponent();
+            probeTimer.Tick += (s, e) => RunBackgroundUrlTests(_currentServices);
             countryPicker.ServerSelected += svc =>
             {
                 selectedService = svc;
@@ -67,7 +68,7 @@ namespace IRSpeedyVPN.UserControls
         private void UserControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (IsVisible) UpdateHeaderIcons();
-            else ClearHeaderIcons();
+            else { ClearHeaderIcons(); probeTimer.Stop(); _urlTestCts?.Cancel(); }
         }
 
         #endregion
@@ -201,19 +202,32 @@ namespace IRSpeedyVPN.UserControls
 
         #region Background URL tests
 
-        /// <summary>
-        /// A row is fresh only when every URL belonging to that service record has a
-        /// recent test result. Failed URLs also receive latencychkTime, so they are not
-        /// retried continuously during the five-minute freshness window.
-        /// </summary>
-        private static bool HasFreshResultsForAllUrls(IVPNService service)
-        {
-            var urls = service.GetServerUrls();
-            if (urls == null || urls.Count == 0) return false;
+        private readonly System.Windows.Threading.DispatcherTimer probeTimer =
+            new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(3) };
+        private Task probeTask = Task.CompletedTask;
+        private bool probesPaused;
+        private bool initialScanFinished;
+        private readonly Dictionary<string, DateTime> countryChecked = new Dictionary<string, DateTime>();
 
-            return urls.All(u => u != null
-                && u.latencychkTime != default(DateTime)
-                && !Sig.IsStale(u));
+        internal void PauseServerChecks()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(PauseServerChecks); return; }
+            probesPaused = true;
+            probeTimer.Stop();
+            StopUrlTests();
+        }
+
+        internal async Task DrainServerChecksAsync()
+        {
+            PauseServerChecks();
+            await probeTask;
+        }
+
+        internal void ResumeServerChecksAfterCleanup()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ResumeServerChecksAfterCleanup); return; }
+            probesPaused = false;
+            if (IsVisible) RunBackgroundUrlTests(_currentServices);
         }
 
         private void StopUrlTests()
@@ -222,52 +236,55 @@ namespace IRSpeedyVPN.UserControls
             _urlTestCts?.Cancel();
         }
 
-        /// <summary>
-        /// Tests every URL of every visible numbered country row. The picker displays
-        /// only the minimum positive latency for that row.
-        /// </summary>
-        private void RunBackgroundUrlTests(IVPNService[] services)
+        private async void RunBackgroundUrlTests(IVPNService[] services)
         {
-            _urlTestCts?.Cancel();
+            if (probesPaused || !IsVisible || services == null || !probeTask.IsCompleted
+                || globalInfo?.CurrentService != null) return;
+            probeTimer.Stop();
+            var groups = services.Where(s => s.IsUrlTestSupported)
+                .GroupBy(s => s.CountryCode ?? s.Country ?? "")
+                .OrderBy(g => countryChecked.TryGetValue(g.Key, out var time) ? time : DateTime.MinValue)
+                .ToArray();
+            if (groups.Length == 0) return;
+            var batch = initialScanFinished ? groups.Take(1).ToArray() : groups;
+            _urlTestCts?.Dispose();
             _urlTestCts = new CancellationTokenSource();
             var token = _urlTestCts.Token;
-
             UrlTestCoordinator.BeginBatch();
-
-            Task.Run(() =>
+            probeTask = Task.Run(() =>
             {
-                foreach (var service in services)
+                foreach (var group in batch)
                 {
-                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
-                        break;
-
-                    if (!HasFreshResultsForAllUrls(service))
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
+                    foreach (var service in group)
                     {
+                        if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
                         try
                         {
+                            var urls = service.GetServerUrls();
+                            // A resumed initial pass need not repeat completed records.
+                            if (!initialScanFinished && urls != null && urls.Count > 0 &&
+                                urls.All(u => u.latencychkTime != default(DateTime))) continue;
                             if (service is TunnelPlusService tunnel)
-                                tunnel.UrlTestWithProgress(latency =>
-                                {
-                                    Dispatcher.BeginInvoke(new Action(() =>
-                                    {
-                                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
-                                            countryPicker.ShowGroupProgress(service, latency);
-                                    }));
-                                }, () => token.IsCancellationRequested);
-                            else
-                                service.UrlTest();
+                                tunnel.UrlTestFull(null, false, null, () => token.IsCancellationRequested);
+                            else service.UrlTest();
                         }
-                        catch { }
+                        catch (Exception ex) { LogHelper.WriteLog(ex); }
+                        Dispatcher.BeginInvoke(new Action(() =>
+                        {
+                            if (!token.IsCancellationRequested) countryPicker.RefreshGroup(service);
+                        }));
                     }
-
-                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
-                    Dispatcher.BeginInvoke(new Action(() =>
-                    {
-                        if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
-                            countryPicker.RefreshGroup(service);
-                    }));
+                    if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
+                        Dispatcher.Invoke(() => countryChecked[group.Key] = DateTime.UtcNow);
                 }
             });
+            try { await probeTask; }
+            catch (Exception ex) { LogHelper.WriteLog(ex); }
+            if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
+                initialScanFinished = true;
+            if (!probesPaused && IsVisible && globalInfo?.CurrentService == null)
+                probeTimer.Start();
         }
 
         #endregion
@@ -282,7 +299,7 @@ namespace IRSpeedyVPN.UserControls
             {
                 // A numbered country row has already loaded ALL URLs belonging to that
                 // row into ISmartFastConnection. Keep the mixed sing-box/Xray pool intact.
-                StopUrlTests();
+                PauseServerChecks();
                 OnConnectRequest.Invoke(this, selectedService, selectedProtocol);
             }
             else
@@ -295,8 +312,7 @@ namespace IRSpeedyVPN.UserControls
         {
             if (_selectedServiceName == null) return;
 
-            _urlTestCts?.Cancel();
-            UrlTestCoordinator.BeginBatch();
+            PauseServerChecks();
 
             var services = serviceFactory.Services
                 .Where(x => x.IsUrlTestSupported
@@ -311,6 +327,7 @@ namespace IRSpeedyVPN.UserControls
                 OnLoadingRequest?.Invoke(true, "در حال یافتن سریعترین سرور");
                 try
                 {
+                    probeTask.GetAwaiter().GetResult();
                     services.First().DisconnectAll();
                     OnLoadingRequest?.Invoke(false, null);
 

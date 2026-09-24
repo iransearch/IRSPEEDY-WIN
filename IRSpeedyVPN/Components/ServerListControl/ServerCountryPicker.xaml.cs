@@ -27,7 +27,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
     /// <summary>
     /// Latency -> the "38 ms" style green text used by the DESIGN-SPEC row (§3
-    /// "Server list", "Latency: bold green"). Rows without a fresh positive
+    /// "Server list", "Latency: bold green"). Rows without a recorded positive
     /// result are not selectable and show a muted placeholder instead.
     /// </summary>
     internal static class Sig
@@ -230,7 +230,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             var urls = GetUrls();
             var positive = urls
-                .Where(u => u.latency > 0 && !Sig.IsStale(u))
+                .Where(u => u.latency > 0)
                 .Select(u => u.latency)
                 .ToArray();
 
@@ -248,9 +248,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
             IsSelectable = false;
             SortKey = long.MaxValue;
             var allFresh = urls.Count > 0 && urls.All(u =>
-                u.latencychkTime != default(DateTime) && !Sig.IsStale(u));
+                u.latencychkTime != default(DateTime));
 
-            // "—" = not tested/stale, or every URL in this row was tested recently and
+            // Retain recorded latency while connected; age alone must not blank the list.
+            // "—" = not tested, or every URL in this row was tested and
             // none returned a positive result. Only rows with a positive result can be
             // selected.
             Sig.FromLatency(allFresh ? -1 : 0, out var emptyText);

@@ -407,6 +407,7 @@ namespace IRSpeedyVPN
 
         private async void UCUserInfo_OnDisconnectRequest(object sender, EventArgs e)
         {
+            uCServerList.PauseServerChecks();
             // Accept the user's intent immediately, without exposing cleanup details.
             long version = Interlocked.Increment(ref connectionRequestVersion);
             UnRegiserVpnService();
@@ -442,10 +443,12 @@ namespace IRSpeedyVPN
 
         private async Task ApplyConnectionRequestAsync(IVPNService next, string protocol, long version)
         {
+            uCServerList.PauseServerChecks();
             await connectionRequestGate.WaitAsync();
             try
             {
                 if (version != Interlocked.Read(ref connectionRequestVersion)) return;
+                await uCServerList.DrainServerChecksAsync();
                 var previous = gInfo.CurrentService;
                 if (previous != null)
                 {
@@ -478,6 +481,8 @@ namespace IRSpeedyVPN
             finally
             {
                 connectionRequestGate.Release();
+                if (version == Interlocked.Read(ref connectionRequestVersion) && gInfo.CurrentService == null && IsUserLogin)
+                    uCServerList.ResumeServerChecksAfterCleanup();
             }
         }
 
@@ -544,6 +549,8 @@ namespace IRSpeedyVPN
                         
                 proxifier.Detach();
                 UnRegiserVpnService();
+                await ApplyConnectionRequestAsync(null, null, version);
+                if (version != Interlocked.Read(ref connectionRequestVersion)) return;
                 if (IsUserLogin)
                 {
                     ShowControl(uCServerList);
