@@ -5,7 +5,7 @@ internal static class StatusChangeWaiter
 {
     internal static async Task WaitAsync<T>(Func<Action<T>, Action> subscribe,
         Action request, Func<T> readStatus, Func<T, bool> succeeded,
-        Func<T, Exception?> failure, TimeSpan timeout, Func<Exception> timedOut)
+        Func<T, Exception?> failure, TimeSpan timeout, Func<Exception> timedOut, bool acceptInitialSuccess = false)
     {
         var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         void Observe(T state)
@@ -22,6 +22,8 @@ internal static class StatusChangeWaiter
         Action unsubscribe = subscribe(Observe);
         try
         {
+            // Stop is idempotent: do not call native Stop on an already terminal publisher.
+            if (acceptInitialSuccess && succeeded(readStatus())) return;
             request();
             // Also cover implementations that change status before delivering their event.
             if (!completion.Task.IsCompleted) Observe(readStatus());

@@ -56,9 +56,11 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
             publisher.Advertisement.LegacySettings.IsEnabled = true;
             publisher.Advertisement.LegacySettings.Ssid = ssid;
             publisher.Advertisement.LegacySettings.Passphrase = new PasswordCredential { Password = password };
+            await WaitForPublisher(publisher, starting: true);
+            // Match the desktop legacy-AP lifecycle: listen only after advertising starts.
+            // Clients remain gated until Session has bound and verified ICS.
             listener = new WiFiDirectConnectionListener();
             listener.ConnectionRequested += ConnectionRequested;
-            await WaitForPublisher(publisher, starting: true);
         }
         catch (Exception ex) { ex.Data["hotspot.stage"] ??= "wfd.start"; throw; }
     }
@@ -84,14 +86,17 @@ internal sealed class WiFiDirectBackend(Guid? recoveryPrivateId = null) : IHotsp
                 ? Failure("publisher-" + value, "wfd.start") : null,
             TimeSpan.FromSeconds(10),
             () => Failure(starting ? "publisher-start-timeout" : "publisher-stop-timeout",
-                starting ? "wfd.start" : "wfd.stop"));
+                starting ? "wfd.start" : "wfd.stop"), acceptInitialSuccess: !starting);
     }
 
     private void StatusChanged(WiFiDirectAdvertisementPublisher sender, WiFiDirectAdvertisementPublisherStatusChangedEventArgs args)
     {
         lock (sync)
         {
-            status = args.Status.ToString(); publisherError = args.Error.ToString();
+            status = args.Status.ToString();
+            // Keep the failure evidence even if a subsequent cleanup event reports Success.
+            if (publisherError == "None" || args.Error != WiFiDirectError.Success)
+                publisherError = args.Error.ToString();
             if (args.Status != WiFiDirectAdvertisementPublisherStatus.Started) accepting = false;
         }
     }

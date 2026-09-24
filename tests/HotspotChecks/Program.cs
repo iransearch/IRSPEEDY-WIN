@@ -575,6 +575,14 @@ internal static class Program
 
     private static async Task PublisherWaitChecks()
     {
+        foreach (var terminal in new[] { PublisherState.Created, PublisherState.Stopped, PublisherState.Aborted })
+            await Test("already terminal publisher avoids native Stop: " + terminal, async () =>
+            {
+                var p = new FakePublisher { State = terminal };
+                await WaitPublisher(p, false, () => throw new Exception("native Stop must not run"));
+                Check(p.Subscribers == 0);
+            });
+
         await Test("publisher inline event is not missed", async () =>
         {
             var p = new FakePublisher();
@@ -675,7 +683,8 @@ internal static class Program
             state => starting && (state is PublisherState.Stopped or PublisherState.Aborted)
                 ? new HotspotException("publisher-" + state) : null,
             timeout ?? TimeSpan.FromSeconds(3),
-            () => new HotspotException(starting ? "publisher-start-timeout" : "publisher-stop-timeout"));
+            () => new HotspotException(starting ? "publisher-start-timeout" : "publisher-stop-timeout"),
+            acceptInitialSuccess: !starting);
 
     private static (Session s, FakeBackend b, MemoryJournal j) New()
     {
