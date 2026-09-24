@@ -95,7 +95,7 @@
                   <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.4" Color="#159A63" />
                 </Ellipse.Effect>
               </Ellipse>
-              <Path Data="M1,6 L5,10 12,2" Stroke="White" StrokeThickness="2" Width="13" Height="13" Stretch="Uniform"/>
+              <Path FlowDirection="LeftToRight" Data="M1,6 L5,10 12,2" Stroke="White" StrokeThickness="2" Width="13" Height="13" Stretch="Uniform"/>
             </Grid>
 
             <!-- ACTIVE: pulsing halo + white disc + spinning arc -->
