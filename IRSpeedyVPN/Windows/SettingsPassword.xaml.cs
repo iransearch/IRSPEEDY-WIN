@@ -44,8 +44,8 @@ namespace IRSpeedyVPN.Windows
             string oldPassword = Read(CurrentPassword, CurrentVisible);
             string password = Read(NewPassword, NewVisible);
             if (oldPassword.Length == 0) { ErrorText.Text = "رمز فعلی را وارد کنید."; return; }
-            if (password.Length < 8 || !password.Any(char.IsLetter) || !password.Any(char.IsDigit))
-            { ErrorText.Text = "رمز جدید باید حداقل ۸ کاراکتر و شامل حروف و عدد باشد."; return; }
+            if (password.Length < 5 || password.Any(c => c < '0' || c > '9'))
+            { ErrorText.Text = "رمز جدید باید حداقل ۵ رقم و فقط شامل اعداد 0 تا 9 باشد."; return; }
             if (password != Read(ConfirmPassword, ConfirmVisible))
             { ErrorText.Text = "تکرار رمز عبور با رمز جدید یکسان نیست."; return; }
             if (password == oldPassword) { ErrorText.Text = "رمز جدید باید با رمز فعلی متفاوت باشد."; return; }
