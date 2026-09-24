@@ -18,6 +18,7 @@ namespace IRSpeedyVPN
     {
         protected override void OnExit(ExitEventArgs e)
         {
+            AppServices.Proxifier?.Detach();
             Services.Hotspot.DirectHotspot.Controller.Stop();
             base.OnExit(e);
         }

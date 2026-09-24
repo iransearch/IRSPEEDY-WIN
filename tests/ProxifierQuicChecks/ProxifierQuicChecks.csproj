@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <NoWarn>CA1416;CS0414</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../IRSpeedyVPN/Services/ProxifierBrowserQuic.cs" Link="ProxifierBrowserQuic.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/BrowserQuicFilterSession.cs" Link="BrowserQuicFilterSession.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Proxifier.cs" Link="Proxifier.cs" />
+    <Compile Include="../../IRSpeedyVPN/Common/ProxifierType.cs" Link="ProxifierType.cs" />
+    <Compile Include="../../IRSpeedyVPN/Common/ProxyType.cs" Link="ProxyType.cs" />
+    <Compile Include="../../IRSpeedyVPN/Interfaces/IProxifier.cs" Link="IProxifier.cs" />
+    <Compile Include="../../IRSpeedyVPN/Events/OnResult.cs" Link="OnResult.cs" />
+  </ItemGroup>
+</Project>
