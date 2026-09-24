@@ -1,5 +1,69 @@
 <UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker" mc:Ignorable="d" Loaded="Picker_Loaded" Unloaded="Picker_Unloaded" IsVisibleChanged="Picker_IsVisibleChanged" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}">
   <UserControl.Resources>
+  <DrawingImage x:Key="Mosaic.SmartSelection">
+    <DrawingImage.Drawing>
+      <DrawingGroup ClipGeometry="M0,0 H140 V58 H0 Z">
+        <DrawingGroup>
+          <DrawingGroup.ClipGeometry><PathGeometry Figures="M -20,0 L 40,0 26,58 -34,58 Z"/></DrawingGroup.ClipGeometry>
+          <GeometryDrawing Brush="#239F40">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="-40,0,100,19.4"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#FFFFFF">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="-40,19.4,100,19.3"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#DA0000">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="-40,38.7,100,19.3"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+        </DrawingGroup>
+        <DrawingGroup>
+          <DrawingGroup.ClipGeometry><PathGeometry Figures="M 40,0 L 74,0 60,58 26,58 Z"/></DrawingGroup.ClipGeometry>
+          <GeometryDrawing Brush="#E30A17">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="20,0,80,58"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <DrawingGroup>
+            <DrawingGroup.Transform><MatrixTransform Matrix="1.25,0,0,1.25,26.25,5.25"/></DrawingGroup.Transform>
+            <GeometryDrawing Brush="#FFFFFF">
+              <GeometryDrawing.Geometry><EllipseGeometry Center="16.5,19" RadiusX="8" RadiusY="8"/></GeometryDrawing.Geometry>
+            </GeometryDrawing>
+            <GeometryDrawing Brush="#E30A17">
+              <GeometryDrawing.Geometry><EllipseGeometry Center="19,19" RadiusX="6.6" RadiusY="6.6"/></GeometryDrawing.Geometry>
+            </GeometryDrawing>
+            <GeometryDrawing Brush="#FFFFFF">
+              <GeometryDrawing.Geometry><PathGeometry Figures="M 24,13.5 L 25.3,17.2 29.2,17.3 26.1,19.6 27.2,23.3 24,21.1 20.8,23.3 21.9,19.6 18.8,17.3 22.7,17.2 Z"/></GeometryDrawing.Geometry>
+            </GeometryDrawing>
+          </DrawingGroup>
+        </DrawingGroup>
+        <DrawingGroup>
+          <DrawingGroup.ClipGeometry><PathGeometry Figures="M 74,0 L 108,0 94,58 60,58 Z"/></DrawingGroup.ClipGeometry>
+          <GeometryDrawing Brush="#141414">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="60,0,80,19.4"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#D0021B">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="60,19.4,80,19.3"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#F5C518">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="60,38.7,80,19.3"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+        </DrawingGroup>
+        <DrawingGroup>
+          <DrawingGroup.ClipGeometry><PathGeometry Figures="M 108,0 L 160,0 146,58 94,58 Z"/></DrawingGroup.ClipGeometry>
+          <GeometryDrawing Brush="#C8102E">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="100,0,90,19.4"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#FFFFFF">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="100,19.4,90,19.3"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+          <GeometryDrawing Brush="#21468B">
+            <GeometryDrawing.Geometry><RectangleGeometry Rect="100,38.7,90,19.3"/></GeometryDrawing.Geometry>
+          </GeometryDrawing>
+        </DrawingGroup>
+        <GeometryDrawing>
+          <GeometryDrawing.Geometry><PathGeometry Figures="M 40 0 L 26 58 M 74 0 L 60 58 M 108 0 L 94 58"/></GeometryDrawing.Geometry>
+          <GeometryDrawing.Pen><Pen Brush="#FFFFFF" Thickness="3"/></GeometryDrawing.Pen>
+        </GeometryDrawing>
+      </DrawingGroup>
+    </DrawingImage.Drawing>
+  </DrawingImage>
     <!-- Scoped to the server list: a transparent rail and a rounded 6-DIP thumb. -->
     <Style x:Key="ServerScrollPage" TargetType="RepeatButton">
       <Setter Property="Focusable" Value="False"/>
@@ -106,39 +170,86 @@
   <Grid x:Name="root" FlowDirection="LeftToRight">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <Grid x:Name="SmartCardHost" Margin="0,0,0,12" IsVisibleChanged="Picker_IsVisibleChanged">
-      <Button x:Name="smartCard" FontFamily="{StaticResource AppFontFamily}" Height="68" FlowDirection="RightToLeft" Cursor="Hand" Click="SmartCard_Click" SizeChanged="SmartCard_SizeChanged" AutomationProperties.Name="انتخاب هوشمند">
+      <Button x:Name="smartCard" FontFamily="{StaticResource AppFontFamily}" Height="82" FlowDirection="RightToLeft" Cursor="Hand" Click="SmartCard_Click" SizeChanged="SmartCard_SizeChanged" AutomationProperties.Name="انتخاب هوشمند">
         <Button.Template>
           <ControlTemplate TargetType="Button">
-            <Border Background="{StaticResource SmartLocationBackgroundBrush}" BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="1" CornerRadius="14">
-              <ContentPresenter Margin="12,13,12,9"/>
+            <Border BorderBrush="#C9DBFB" BorderThickness="1" CornerRadius="14">
+              <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#EFF5FF" Offset="0"/><GradientStop Color="#E6F0FE" Offset="1"/></LinearGradientBrush></Border.Background>
+              <ContentPresenter Margin="12,0"/>
             </Border>
           </ControlTemplate>
         </Button.Template>
-        <StackPanel>
-          <Grid Height="26">
-            <Grid.ColumnDefinitions><ColumnDefinition Width="18"/><ColumnDefinition Width="*"/><ColumnDefinition Width="26"/></Grid.ColumnDefinitions>
-            <Grid Width="18" Height="18" VerticalAlignment="Center">
-              <Ellipse Stroke="#D9DEE7" StrokeThickness="1.5"/>
-              <Grid x:Name="smartCheck" Margin="-4" Visibility="Collapsed">
-                <Ellipse Fill="White" Stroke="#C9DBFB" StrokeThickness="1"/>
-                <Ellipse Width="18" Height="18" Fill="{StaticResource AccentBrush}"/>
+              <Grid>
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="18" />  <!-- radio (physical right) -->
+                  <ColumnDefinition Width="12" />
+                  <ColumnDefinition Width="*" />   <!-- title + subtitle -->
+                  <ColumnDefinition Width="12" />
+                  <ColumnDefinition Width="140" /> <!-- flag mosaic (physical left) -->
+                </Grid.ColumnDefinitions>
+
+                <Grid Grid.Column="0" Width="18" Height="18" VerticalAlignment="Center">
+<Ellipse Stroke="#D9DEE7" StrokeThickness="1.5"/>
+<Grid x:Name="smartCheck" Margin="-4" Visibility="Collapsed"><Ellipse Fill="White" Stroke="#C9DBFB" StrokeThickness="1"/><Ellipse Width="18" Height="18" Fill="{StaticResource AccentBrush}"/></Grid>
+</Grid>
+
+                <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                  <StackPanel Orientation="Horizontal">
+                    <TextBlock Text="انتخاب هوشمند" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontSize="14" Foreground="#142057" VerticalAlignment="Center" />
+                    <Path Data="M13 2L4.5 13.5H11L9.5 22L19.5 9.5H13L13 2Z" Fill="#F5B301" Width="16" Height="16" Stretch="Uniform" FlowDirection="LeftToRight" Margin="5,0,0,0" VerticalAlignment="Center"/>
+                  </StackPanel>
+                  <TextBlock Text="بهترین سرور بر اساس موقعیت شما" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
+                             FontFamily="{StaticResource AppFontFamily}" FontSize="11" Foreground="#5B6BA8" />
+                </StackPanel>
+
+                <!-- FLAG MOSAIC 140x58: one rounded rectangle cut diagonally into Iran · Turkey · Germany · Netherlands -->
+                <Grid Grid.Column="4" Width="140" Height="58" FlowDirection="LeftToRight" RenderTransformOrigin="0.5,0.5">
+                  <Grid.Style>
+                    <Style TargetType="Grid">
+                      <Setter Property="RenderTransform"><Setter.Value><ScaleTransform ScaleX="1" ScaleY="1" /></Setter.Value></Setter>
+                      <Style.Triggers>
+                        <!-- hover on the card → mosaic grows 3% -->
+                        <DataTrigger Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=Button}}" Value="True">
+                          <Setter Property="RenderTransform"><Setter.Value><ScaleTransform ScaleX="1.03" ScaleY="1.03" /></Setter.Value></Setter>
+                        </DataTrigger>
+                      </Style.Triggers>
+                    </Style>
+                  </Grid.Style>
+
+                  <!-- shadow + hairline: 0 0 0 1px rgba(16,24,40,.08), 0 8px 16px -8px rgba(30,58,138,.45) -->
+                  <Border CornerRadius="12" Background="White" BorderBrush="#14101828" BorderThickness="1">
+                    <Border.Effect>
+                      <DropShadowEffect BlurRadius="14" ShadowDepth="5" Direction="270" Opacity="0.35" Color="#1E3A8A" />
+                    </Border.Effect>
+                  </Border>
+
+                  <!-- flags + sheen, clipped to the rounded rectangle -->
+                  <Grid>
+                    <Grid.Clip>
+                      <RectangleGeometry Rect="0,0,140,58" RadiusX="12" RadiusY="12" />
+                    </Grid.Clip>
+                    <Image Source="{StaticResource Mosaic.SmartSelection}" Stretch="Fill" />
+
+                    <!-- diagonal sheen: skew -14°, sweeps left → right in the first 55% of every 3.2s -->
+                    <Rectangle Width="34" Margin="0,-10" HorizontalAlignment="Left" IsHitTestVisible="False">
+                      <Rectangle.Fill>
+                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                          <GradientStop Color="#00FFFFFF" Offset="0" />
+                          <GradientStop Color="#8CFFFFFF" Offset="0.5" />
+                          <GradientStop Color="#00FFFFFF" Offset="1" />
+                        </LinearGradientBrush>
+                      </Rectangle.Fill>
+                      <Rectangle.RenderTransform>
+                        <TransformGroup>
+                          <SkewTransform AngleX="-14" CenterY="39" />
+                          <TranslateTransform x:Name="SmartMosaicShift" X="-60" />
+                        </TransformGroup>
+                      </Rectangle.RenderTransform>
+
+                    </Rectangle>
+                  </Grid>
+                </Grid>
               </Grid>
-            </Grid>
-            <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0" FlowDirection="RightToLeft">
-              <TextBlock FontWeight="Bold" FontSize="13" Foreground="#142057" Text="انتخاب هوشمند"/>
-              <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight" Margin="0,0,7,0" VerticalAlignment="Center">
-                <Image Source="{StaticResource ServerListFlag_IR}" Width="16" Height="16" Margin="0,0,3,0"/>
-                <Image Source="{StaticResource ServerListFlag_TR}" Width="16" Height="16" Margin="0,0,3,0"/>
-                <Image Source="{StaticResource ServerListFlag_DE}" Width="16" Height="16" Margin="0,0,3,0"/>
-                <Image Source="{StaticResource ServerListFlag_NL}" Width="16" Height="16"/>
-              </StackPanel>
-            </StackPanel>
-            <Viewbox Grid.Column="2" Width="26" Height="26" FlowDirection="LeftToRight">
-              <Canvas Width="24" Height="24"><Path Data="M13 2L4.5 13.5H11L9.5 22L19.5 9.5H13L13 2Z" Fill="#F5B301" Stroke="#F5B301" StrokeThickness="0.6" StrokeLineJoin="Round"/></Canvas>
-            </Viewbox>
-          </Grid>
-          <TextBlock FontSize="11" LineHeight="14" LineStackingStrategy="BlockLineHeight" Foreground="#5B6BA8" TextAlignment="Right" FlowDirection="LeftToRight" Margin="0,4,26,0"><Run FlowDirection="RightToLeft" Text="بهترین سرور بر اساس موقعیت شما"/></TextBlock>
-        </StackPanel>
       </Button>
       <Path x:Name="SmartCardShine" FlowDirection="LeftToRight" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeDashCap="Round" IsHitTestVisible="False">
         <Path.Stroke><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#0060A5FA" Offset="0"/><GradientStop Color="White" Offset="0.5"/><GradientStop Color="#002563EB" Offset="1"/></LinearGradientBrush></Path.Stroke>

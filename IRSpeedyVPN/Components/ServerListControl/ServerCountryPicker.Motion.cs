@@ -72,11 +72,18 @@ namespace IRSpeedyVPN.Components.ServerListControl
             var perimeter = 2 * (width + height - 4 * radius) + 2 * Math.PI * radius;
             var dashUnits = perimeter / SmartCardShine.StrokeThickness;
             SmartCardShine.StrokeDashArray = new DoubleCollection { dashUnits * 0.14, dashUnits * 0.86 };
-            var animation = new DoubleAnimation(0, -dashUnits, TimeSpan.FromSeconds(1.6));
+            var animation = new DoubleAnimation(0, -dashUnits, TimeSpan.FromSeconds(1.6)) { RepeatBehavior = RepeatBehavior.Forever };
             Storyboard.SetTargetName(animation, nameof(SmartCardShine));
             Storyboard.SetTargetProperty(animation, new PropertyPath("StrokeDashOffset"));
             _smartShine = new Storyboard { RepeatBehavior = RepeatBehavior.Forever };
             _smartShine.Children.Add(animation);
+            var sheen = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(3.2), RepeatBehavior = RepeatBehavior.Forever };
+            sheen.KeyFrames.Add(new DiscreteDoubleKeyFrame(-60, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            sheen.KeyFrames.Add(new EasingDoubleKeyFrame(190, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(1.76)), new SineEase { EasingMode = EasingMode.EaseInOut }));
+            sheen.KeyFrames.Add(new DiscreteDoubleKeyFrame(190, KeyTime.FromTimeSpan(TimeSpan.FromSeconds(3.2))));
+            Storyboard.SetTargetName(sheen, nameof(SmartMosaicShift));
+            Storyboard.SetTargetProperty(sheen, new PropertyPath("X"));
+            _smartShine.Children.Add(sheen);
             _smartShine.Begin(this, true);
         }
 
