@@ -1,0 +1,256 @@
+<UserControl x:Class="IRSpeedyVPN.UserControls.UCLoginLoading" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" FlowDirection="RightToLeft" Background="#FAFBFD" IsVisibleChanged="VisibilityChanged" Unloaded="Control_Unloaded">
+<UserControl.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="/IRSpeedyVPN;component/Themes/ConnectionSplit/Controls.xaml"/></ResourceDictionary.MergedDictionaries>
+    <!-- ================= loader motion (all Forever, started on Window.Loaded) ================= -->
+    <SineEase x:Key="InOut" EasingMode="EaseInOut" />
+
+    <Storyboard x:Key="LoaderMotion">
+      <!-- ambient glow: opacity 0.55↔1 and scale 0.96↔1.05, 2.2s cycle -->
+      <DoubleAnimation Storyboard.TargetName="Glow" Storyboard.TargetProperty="Opacity"
+                       From="0.55" To="1" Duration="0:0:1.1" AutoReverse="True" RepeatBehavior="Forever" EasingFunction="{StaticResource InOut}" />
+      <DoubleAnimation Storyboard.TargetName="GlowScale" Storyboard.TargetProperty="ScaleX"
+                       From="0.96" To="1.05" Duration="0:0:1.1" AutoReverse="True" RepeatBehavior="Forever" EasingFunction="{StaticResource InOut}" />
+      <DoubleAnimation Storyboard.TargetName="GlowScale" Storyboard.TargetProperty="ScaleY"
+                       From="0.96" To="1.05" Duration="0:0:1.1" AutoReverse="True" RepeatBehavior="Forever" EasingFunction="{StaticResource InOut}" />
+
+      <!-- badge breathing: scale 1↔1.045, 2.2s cycle -->
+      <DoubleAnimation Storyboard.TargetName="BadgeScale" Storyboard.TargetProperty="ScaleX"
+                       From="1" To="1.045" Duration="0:0:1.1" AutoReverse="True" RepeatBehavior="Forever" EasingFunction="{StaticResource InOut}" />
+      <DoubleAnimation Storyboard.TargetName="BadgeScale" Storyboard.TargetProperty="ScaleY"
+                       From="1" To="1.045" Duration="0:0:1.1" AutoReverse="True" RepeatBehavior="Forever" EasingFunction="{StaticResource InOut}" />
+
+      <!-- outer laser: CLOCKWISE, one turn per 1.2s, linear -->
+      <DoubleAnimation Storyboard.TargetName="LaserRotate" Storyboard.TargetProperty="Angle"
+                       From="0" To="360" Duration="0:0:1.2" RepeatBehavior="Forever" />
+
+      <!-- dashed orbit: clockwise, very slow (14s) -->
+      <DoubleAnimation Storyboard.TargetName="OrbitRotate" Storyboard.TargetProperty="Angle"
+                       From="0" To="360" Duration="0:0:14" RepeatBehavior="Forever" />
+
+      <!-- inner comet: COUNTER-clockwise, one turn per 1.9s, linear -->
+      <DoubleAnimation Storyboard.TargetName="CometRotate" Storyboard.TargetProperty="Angle"
+                       From="0" To="-360" Duration="0:0:1.9" RepeatBehavior="Forever" />
+
+      <!-- 3 dots after the title: 1.4s cycle, opacity 0.18 → 1 (at 40%) → 0.18 (from 80%), staggered 0.18s -->
+      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Dot1" Storyboard.TargetProperty="Opacity" RepeatBehavior="Forever" BeginTime="0:0:0">
+        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0.18" />
+        <EasingDoubleKeyFrame KeyTime="0:0:0.56" Value="1" EasingFunction="{StaticResource InOut}" />
+        <EasingDoubleKeyFrame KeyTime="0:0:1.12" Value="0.18" EasingFunction="{StaticResource InOut}" />
+        <LinearDoubleKeyFrame KeyTime="0:0:1.4" Value="0.18" />
+      </DoubleAnimationUsingKeyFrames>
+      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Dot2" Storyboard.TargetProperty="Opacity" RepeatBehavior="Forever" BeginTime="0:0:0.18">
+        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0.18" />
+        <EasingDoubleKeyFrame KeyTime="0:0:0.56" Value="1" EasingFunction="{StaticResource InOut}" />
+        <EasingDoubleKeyFrame KeyTime="0:0:1.12" Value="0.18" EasingFunction="{StaticResource InOut}" />
+        <LinearDoubleKeyFrame KeyTime="0:0:1.4" Value="0.18" />
+      </DoubleAnimationUsingKeyFrames>
+      <DoubleAnimationUsingKeyFrames Storyboard.TargetName="Dot3" Storyboard.TargetProperty="Opacity" RepeatBehavior="Forever" BeginTime="0:0:0.36">
+        <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0.18" />
+        <EasingDoubleKeyFrame KeyTime="0:0:0.56" Value="1" EasingFunction="{StaticResource InOut}" />
+        <EasingDoubleKeyFrame KeyTime="0:0:1.12" Value="0.18" EasingFunction="{StaticResource InOut}" />
+        <LinearDoubleKeyFrame KeyTime="0:0:1.4" Value="0.18" />
+      </DoubleAnimationUsingKeyFrames>
+    </Storyboard>
+
+    <!-- ================= step template ================= -->
+    <DataTemplate x:Key="StepTemplate">
+      <StackPanel Orientation="Horizontal">
+
+        <!-- connector BEFORE the step (physical right of it in RTL); none before the first step -->
+        <Grid Width="34" Height="2" Margin="0,13,0,0" VerticalAlignment="Top"
+              Visibility="{Binding HasLine, Converter={StaticResource BoolToVis}}">
+          <Border CornerRadius="1" Background="#E3E8F2" />
+          <Border CornerRadius="1" Background="#22B37A"
+                  Visibility="{Binding LineDone, Converter={StaticResource BoolToVis}}" />
+          <!-- running step: accent fill grows from the done side (physical RIGHT) in a 1.4s loop.
+               In an RTL tree, local x=0 is the physical right edge → RenderTransformOrigin 0,0.5 -->
+          <Border CornerRadius="1" Background="{StaticResource Brush.Accent}" RenderTransformOrigin="0,0.5"
+                  Visibility="{Binding LineActive, Converter={StaticResource BoolToVis}}">
+            <Border.RenderTransform><ScaleTransform ScaleX="0" /></Border.RenderTransform>
+            <Border.Triggers>
+              <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                <BeginStoryboard>
+                  <Storyboard>
+                    <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)"
+                                     From="0" To="1" Duration="0:0:1.4" RepeatBehavior="Forever" EasingFunction="{StaticResource InOut}" />
+                  </Storyboard>
+                </BeginStoryboard>
+              </EventTrigger>
+            </Border.Triggers>
+          </Border>
+        </Grid>
+
+        <StackPanel Width="78">
+          <Grid Width="28" Height="28" HorizontalAlignment="Center">
+
+            <!-- DONE: green disc + white check -->
+            <Grid Visibility="{Binding IsDone, Converter={StaticResource BoolToVis}}">
+              <Ellipse>
+                <Ellipse.Fill>
+                  <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                    <GradientStop Color="#22B37A" Offset="0" />
+                    <GradientStop Color="#159A63" Offset="1" />
+                  </LinearGradientBrush>
+                </Ellipse.Fill>
+                <Ellipse.Effect>
+                  <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.4" Color="#159A63" />
+                </Ellipse.Effect>
+              </Ellipse>
+              <Path Data="M1,6 L5,10 12,2" Stroke="White" StrokeThickness="2" Width="13" Height="13" Stretch="Uniform"/>
+            </Grid>
+
+            <!-- ACTIVE: pulsing halo + white disc + spinning arc -->
+            <Grid Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}">
+              <Ellipse x:Name="Pulse" Fill="{StaticResource Brush.Accent}" Opacity="0" RenderTransformOrigin="0.5,0.5">
+                <Ellipse.RenderTransform><ScaleTransform /></Ellipse.RenderTransform>
+                <Ellipse.Triggers>
+                  <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                    <BeginStoryboard>
+                      <!-- ≈ box-shadow 0 → 7px spread, alpha 0.35 → 0, 1.4s ease-out -->
+                      <Storyboard RepeatBehavior="Forever">
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity" From="0.35" To="0" Duration="0:0:1.4">
+                          <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleX)" From="1" To="1.5" Duration="0:0:1.4">
+                          <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(ScaleTransform.ScaleY)" From="1" To="1.5" Duration="0:0:1.4">
+                          <DoubleAnimation.EasingFunction><QuadraticEase EasingMode="EaseOut" /></DoubleAnimation.EasingFunction>
+                        </DoubleAnimation>
+                      </Storyboard>
+                    </BeginStoryboard>
+                  </EventTrigger>
+                </Ellipse.Triggers>
+              </Ellipse>
+              <Ellipse Fill="White" Stroke="#C9DBFB" StrokeThickness="1.5" />
+              <!-- 18x18 spinner: gray ring + quarter arc, one turn per 0.9s -->
+              <Canvas Width="18" Height="18" FlowDirection="LeftToRight" RenderTransformOrigin="0.5,0.5">
+                <Canvas.RenderTransform><RotateTransform /></Canvas.RenderTransform>
+                <Canvas.Triggers>
+                  <EventTrigger RoutedEvent="FrameworkElement.Loaded">
+                    <BeginStoryboard>
+                      <Storyboard>
+                        <DoubleAnimation Storyboard.TargetProperty="(UIElement.RenderTransform).(RotateTransform.Angle)"
+                                         From="0" To="360" Duration="0:0:0.9" RepeatBehavior="Forever" />
+                      </Storyboard>
+                    </BeginStoryboard>
+                  </EventTrigger>
+                </Canvas.Triggers>
+                <Path Stroke="#E3E8F2" StrokeThickness="2">
+                  <Path.Data><EllipseGeometry Center="9,9" RadiusX="7" RadiusY="7" /></Path.Data>
+                </Path>
+                <Path Data="M 9,2 A 7,7 0 0 1 16,9" Stroke="{StaticResource Brush.Accent}" StrokeThickness="2"
+                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+              </Canvas>
+            </Grid>
+
+            <!-- PENDING: light disc + small gray dot -->
+            <Grid Visibility="{Binding IsPending, Converter={StaticResource BoolToVis}}">
+              <Ellipse Fill="#F3F5F9" Stroke="#E3E8F2" StrokeThickness="1.5" />
+              <Ellipse Width="6" Height="6" Fill="#C7CCD8" />
+            </Grid>
+          </Grid>
+
+          <TextBlock Text="{Binding Label}" Margin="0,6,0,0" HorizontalAlignment="Center"
+                     FontFamily="{StaticResource Font.Regular}" FontSize="11"
+                     FontWeight="{Binding LabelWeight}" Foreground="{Binding LabelBrush}" />
+        </StackPanel>
+      </StackPanel>
+    </DataTemplate>
+  </ResourceDictionary></UserControl.Resources>
+<Grid>      <StackPanel  VerticalAlignment="Center" HorizontalAlignment="Center" Margin="28,0,28,20">
+
+        <!-- LOADER 310x310 — forced LTR (geometry) -->
+        <Grid Width="310" Height="310" FlowDirection="LeftToRight">
+
+          <!-- ambient glow (inset 8) -->
+          <Ellipse x:Name="Glow" Margin="8" Opacity="0.55" RenderTransformOrigin="0.5,0.5">
+            <Ellipse.RenderTransform><ScaleTransform x:Name="GlowScale" ScaleX="0.96" ScaleY="0.96" /></Ellipse.RenderTransform>
+            <Ellipse.Fill>
+              <RadialGradientBrush>
+                <GradientStop Color="#331E3A8A" Offset="0" />
+                <GradientStop Color="#001E3A8A" Offset="1" />
+              </RadialGradientBrush>
+            </Ellipse.Fill>
+          </Ellipse>
+
+          <!-- outer track r139 -->
+          <Path Stroke="#E1E9FA" StrokeThickness="4">
+            <Path.Data><EllipseGeometry Center="155,155" RadiusX="139" RadiusY="139" /></Path.Data>
+          </Path>
+
+          <!-- outer LASER: a glowing dot on r139 at 3 o'clock, the whole layer rotates clockwise -->
+          <Canvas RenderTransformOrigin="0.5,0.5">
+            <Canvas.RenderTransform><RotateTransform x:Name="LaserRotate" /></Canvas.RenderTransform>
+            <Ellipse Canvas.Left="286" Canvas.Top="147" Width="16" Height="16" Fill="#2F6BFF" Opacity="0.55">
+              <Ellipse.Effect><BlurEffect Radius="6" /></Ellipse.Effect>
+            </Ellipse>
+            <Ellipse Canvas.Left="290.5" Canvas.Top="151.5" Width="7" Height="7" Fill="#2F6BFF" />
+            <Ellipse Canvas.Left="292.5" Canvas.Top="153.5" Width="3" Height="3" Fill="White" />
+          </Canvas>
+
+          <!-- dashed orbit r125 (dash 2px / gap 9px at 1.5px stroke → 1.333 / 6 in WPF units) -->
+          <Path Stroke="#C9DBFB" StrokeThickness="1.5" StrokeDashArray="1.333 6" StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+            <Path.RenderTransform><RotateTransform x:Name="OrbitRotate" /></Path.RenderTransform>
+            <Path.Data><EllipseGeometry Center="155,155" RadiusX="125" RadiusY="125" /></Path.Data>
+          </Path>
+
+          <!-- inner track r111 -->
+          <Path Stroke="#EEF1F8" StrokeThickness="3">
+            <Path.Data><EllipseGeometry Center="155,155" RadiusX="111" RadiusY="111" /></Path.Data>
+          </Path>
+
+          <!-- inner COMET on r111: tail = 14% of the circle (0°→50.4°), brighter part 28.8°→50.4°,
+               white head at 50.4°. The whole layer rotates counter-clockwise. -->
+          <Canvas RenderTransformOrigin="0.5,0.5">
+            <Canvas.RenderTransform><RotateTransform x:Name="CometRotate" /></Canvas.RenderTransform>
+            <Path Data="M 266,155 A 111,111 0 0 1 225.75,240.53" Stroke="#60A5FA" StrokeThickness="3" Opacity="0.35"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+            <Path Data="M 252.27,208.47 A 111,111 0 0 1 225.75,240.53" Stroke="#60A5FA" StrokeThickness="3.5" Opacity="0.8"
+                  StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
+            <Ellipse Canvas.Left="223.25" Canvas.Top="238.03" Width="5" Height="5" Fill="White" />
+          </Canvas>
+
+          <!-- center badge 196, breathing -->
+          <Grid Width="196" Height="196" RenderTransformOrigin="0.5,0.5">
+            <Grid.RenderTransform><ScaleTransform x:Name="BadgeScale" /></Grid.RenderTransform>
+            <Ellipse>
+              <Ellipse.Fill>
+                <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                  <GradientStop Color="#F7FFFFFF" Offset="0" />
+                  <GradientStop Color="#F7EFF5FF" Offset="1" />
+                </LinearGradientBrush>
+              </Ellipse.Fill>
+              <Ellipse.Effect>
+                <!-- ≈ 0 18px 36px -12px rgba(30,58,138,0.38) -->
+                <DropShadowEffect BlurRadius="30" ShadowDepth="12" Direction="270" Opacity="0.3" Color="#1E3A8A" />
+              </Ellipse.Effect>
+            </Ellipse>
+            <Ellipse Stroke="#B3C9DBFB" StrokeThickness="1" />
+            <Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="134" Height="180" Stretch="Uniform"
+                   RenderOptions.BitmapScalingMode="HighQuality" />
+          </Grid>
+        </Grid>
+
+        <!-- title + animated dots -->
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,26,0,0">
+          <TextBlock Text="در حال ورود به حساب" VerticalAlignment="Center"
+                     FontFamily="{StaticResource Font.Regular}" FontWeight="Bold" FontSize="16" Foreground="#141B33" />
+          <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,2,0,0">
+            <Ellipse x:Name="Dot1" Width="5" Height="5" Fill="{StaticResource Brush.Accent}" Opacity="0.18" />
+            <Ellipse x:Name="Dot2" Width="5" Height="5" Fill="{StaticResource Brush.Accent}" Opacity="0.18" Margin="3,0,0,0" />
+            <Ellipse x:Name="Dot3" Width="5" Height="5" Fill="{StaticResource Brush.Accent}" Opacity="0.18" Margin="3,0,0,0" />
+          </StackPanel>
+        </StackPanel>
+
+        <TextBlock Text="اطلاعات ورود بررسی و لیست سرورها آماده می‌شود" HorizontalAlignment="Center" Margin="0,8,0,0"
+                   FontFamily="{StaticResource Font.Regular}" FontSize="12.5" Foreground="#9CA3B4" />
+
+        <!-- 3-step indicator (first step = physical right) -->
+        <ItemsControl Margin="0,26,0,0" HorizontalAlignment="Center" Focusable="False"
+                      x:Name="StepsList" ItemTemplate="{StaticResource StepTemplate}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+        </ItemsControl>
+      </StackPanel>
+</Grid></UserControl>

@@ -228,7 +228,7 @@ namespace IRSpeedyVPN
                     if (acc != null)
                     {
                         uCLogin.SetUserPassword(acc.UserAccount.Username, localResource.Password);
-                        RunAsync(() =>
+                        RunLoginWithPresentation(() =>
                         {
 
                             if (!Login(acc.UserAccount.Username, localResource.Password, true))
@@ -544,6 +544,11 @@ namespace IRSpeedyVPN
             accountMenu.IsEnabled = IsUserLogin && !ReferenceEquals(ctrl, uCUserInfo);
             settingsMenu.IsEnabled = IsUserLogin;
             panelHeaderIcons.Visibility = (ReferenceEquals(ctrl, uCServerList) || ReferenceEquals(ctrl, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
+            if (loginPresentationActive)
+            {
+                panelHeaderIcons.Visibility = Visibility.Collapsed;
+                txtVersion.Visibility = Visibility.Collapsed;
+            }
             HeaderDivider.Visibility = panelHeaderIcons.Visibility;
 
             if (TransitionBox.Content == null || !TransitionBox.Content.Equals(ctrl))
@@ -719,6 +724,40 @@ namespace IRSpeedyVPN
         }
 
 
+        private bool loginPresentationActive;
+        private async void RunLoginWithPresentation(Action action)
+        {
+            if (loginPresentationActive) return;
+            loginPresentationActive = true;
+            TransitionBox.IsEnabled = false;
+            uCLoginLoading.SetStage(0);
+            uCLoginLoading.Visibility = Visibility.Visible;
+            panelHeaderIcons.Visibility = Visibility.Collapsed;
+            btnSettings.Visibility = Visibility.Collapsed;
+            txtVersion.Visibility = Visibility.Collapsed;
+            // Let the first layout/render complete before starting the minimum timer.
+            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            var visibleTime = Stopwatch.StartNew();
+            try { await System.Threading.Tasks.Task.Run(action); }
+            catch (Exception ex) { LogHelper.WriteLog(ex); ShowMessage("ارتباط با سرور برقرار نیست"); }
+            finally
+            {
+                int remaining = Math.Max(0, 3000 - (int)visibleTime.ElapsedMilliseconds);
+                if (remaining > 0) await System.Threading.Tasks.Task.Delay(remaining);
+                uCLoginLoading.Visibility = Visibility.Collapsed;
+                HideLoading();
+                loginPresentationActive = false;
+                TransitionBox.IsEnabled = true;
+                txtVersion.Visibility = ReferenceEquals(TransitionBox.Content, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
+                panelHeaderIcons.Visibility = (ReferenceEquals(TransitionBox.Content, uCServerList) || ReferenceEquals(TransitionBox.Content, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
+                HeaderDivider.Visibility = panelHeaderIcons.Visibility;
+            }
+        }
+        private void SetLoginStage(int stage)
+        {
+            Dispatcher.Invoke((Action)(() => { if (loginPresentationActive) uCLoginLoading.SetStage(stage); }));
+        }
+
         private void UCLogin_OnCredentialEntered(UCLogin sender, string username, string password,bool Remember)
         {
             gInfo.CurrentService = null;
@@ -737,7 +776,7 @@ namespace IRSpeedyVPN
                 var uiStopwatch = loginUiStopwatch;
                 uCLogin.HideRenewMessage();
                 ShowMessage("");
-                RunAsync(() =>
+                RunLoginWithPresentation(() =>
                 {
                     LogHelper.WriteExLog("[LoginPerformance] stage=worker-start elapsedMs=" + uiStopwatch.ElapsedMilliseconds);
                     Login(username, password, Remember);
@@ -900,6 +939,7 @@ namespace IRSpeedyVPN
         }
         private bool ProcessInfo(AccountInfoEx acc, string password, bool onlyRenew = false)
         {
+            if (!onlyRenew) SetLoginStage(1);
             var processStopwatch = Stopwatch.StartNew();
             // Prefer settings already returned by Login response to avoid an extra
             // network call during initial login latency.
@@ -926,6 +966,7 @@ namespace IRSpeedyVPN
                     //server.Service = "sslProxy";
                     //acc.Servers.Add(server);
                     /////////
+                    if (!onlyRenew) SetLoginStage(2);
                     IsUserLogin = true;
                     //serviceFactory.RenewServiceList(acc.Servers);
                     serviceFactory.RenewServiceList(acc.groups);

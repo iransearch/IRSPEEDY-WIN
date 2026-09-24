@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<title>آی‌آر اسپیدی — در حال ورود</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;500;600;700;800&display=swap');
+  body { margin: 0; font-family: 'Vazirmatn', system-ui, sans-serif; }
+  .irs-btn:hover { background: rgba(17,24,39,0.06); }
+
+  /* same family as the Connecting screen: glow + breathing badge + laser on the outer ring */
+  @keyframes irsPulseGlow {
+    0%, 100% { opacity: 0.55; transform: scale(0.96); }
+    50% { opacity: 1; transform: scale(1.05); }
+  }
+  .irs-glow { animation: irsPulseGlow 2.2s ease-in-out infinite; }
+
+  @keyframes irsBreath {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.045); }
+  }
+  .irs-badge { animation: irsBreath 2.2s ease-in-out infinite; }
+
+  @keyframes irsDotFade {
+    0%, 80%, 100% { opacity: 0.18; }
+    40% { opacity: 1; }
+  }
+  .irs-dot { animation: irsDotFade 1.4s ease-in-out infinite; }
+  .irs-dot:nth-child(1) { animation-delay: 0s; }
+  .irs-dot:nth-child(2) { animation-delay: 0.18s; }
+  .irs-dot:nth-child(3) { animation-delay: 0.36s; }
+
+  /* outer laser: clockwise (as on Connecting) */
+  @keyframes irsLaserDash { to { stroke-dashoffset: -100; } }
+  .irs-laser-dash { animation: irsLaserDash 1.2s linear infinite; }
+
+  /* NEW — inner comet: counter-clockwise, slower, lighter blue */
+  @keyframes irsCometReverse { to { stroke-dashoffset: 100; } }
+  .irs-comet { animation: irsCometReverse 1.9s linear infinite; }
+
+  /* NEW — dashed orbit ring slowly turning between the two tracks */
+  @keyframes irsSpin { to { transform: rotate(360deg); } }
+  .irs-orbit { animation: irsSpin 14s linear infinite; transform-origin: 50% 50%; }
+
+  /* NEW — step indicator */
+  .irs-step-spin { animation: irsSpin 0.9s linear infinite; transform-origin: 50% 50%; }
+  @keyframes irsStepPulse {
+    0% { box-shadow: 0 0 0 0 rgba(30,58,138,0.35); }
+    100% { box-shadow: 0 0 0 7px rgba(30,58,138,0); }
+  }
+  .irs-step-active { animation: irsStepPulse 1.4s ease-out infinite; }
+  @keyframes irsLineFill {
+    0% { transform: scaleX(0); }
+    100% { transform: scaleX(1); }
+  }
+  .irs-line-fill { animation: irsLineFill 1.4s ease-in-out infinite; transform-origin: right center; }
+</style>
+</helmet>
+
+<div dir="rtl" style="width: 1280px; height: 860px; box-sizing: border-box; position: relative; display: flex; align-items: center; justify-content: center; background: radial-gradient(1100px 700px at 78% 12%, #EAF1FB 0%, #DCE6F5 38%, #CBD8ED 100%); overflow: hidden; font-family: 'Vazirmatn', sans-serif;">
+
+  <!-- soft desktop taskbar hint, for context only -->
+  <div style="position: absolute; left: 0; right: 0; bottom: 0; height: 56px; background: rgba(255,255,255,0.35); backdrop-filter: blur(6px); border-top: 1px solid rgba(255,255,255,0.5);"></div>
+
+  <!-- floating window -->
+  <div dir="rtl" style="width: 420px; height: 700px; box-sizing: border-box; border-radius: 20px; background: linear-gradient(180deg, #FFFFFF 0%, #F8FAFC 100%); box-shadow: 0 40px 80px -24px rgba(23,35,64,0.35), 0 0 0 1px rgba(255,255,255,0.6) inset; display: flex; flex-direction: column; overflow: hidden;">
+
+    <!-- header (same as Connecting) -->
+    <div style="height: 56px; flex-shrink: 0; display: flex; align-items: center; padding: 0 18px 0 12px; gap: 10px;">
+      <img src="/_blob/2f27cbfce3e251e295dfdedc3f5db28c" alt="نشان آی‌آر اسپیدی، سپر و موشک" style="width: 22px; height: 29px; object-fit: contain; flex-shrink: 0;">
+      <div dir="ltr" style="display: flex; align-items: baseline; gap: 8px; flex-grow: 1; min-width: 0;">
+        <span style="font-size: 14px; font-weight: 700; color: #141B33; letter-spacing: 0.2px;">IRSPEEDY</span>
+      </div>
+      <button aria-label="کوچک کردن پنجره" class="irs-btn" style="width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1.5" y1="9.5" x2="10.5" y2="9.5" stroke="#5B6478" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+      <button aria-label="بستن پنجره" class="irs-btn" style="width: 30px; height: 30px; border-radius: 8px; border: none; background: transparent; display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><line x1="1.5" y1="1.5" x2="10.5" y2="10.5" stroke="#5B6478" stroke-width="1.4" stroke-linecap="round"/><line x1="10.5" y1="1.5" x2="1.5" y2="10.5" stroke="#5B6478" stroke-width="1.4" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+
+    <!-- content -->
+    <div style="flex-grow: 1; min-height: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px 28px 28px; gap: 26px;">
+
+      <!-- loader -->
+      <div style="position: relative; width: 310px; height: 310px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+
+        <!-- ambient glow -->
+        <div class="irs-glow" style="position: absolute; inset: 8px; border-radius: 50%; background: radial-gradient(circle, rgba(30,58,138,0.20) 0%, rgba(30,58,138,0) 70%);"></div>
+
+        <!-- static outer track -->
+        <svg width="310" height="310" viewBox="0 0 310 310" style="position: absolute; inset: 0;">
+          <circle cx="155" cy="155" r="139" fill="none" stroke="#E1E9FA" stroke-width="4"/>
+        </svg>
+
+        <!-- outer laser, clockwise -->
+        <svg width="310" height="310" viewBox="0 0 310 310" style="position: absolute; inset: 0; overflow: visible;">
+          <defs>
+            <filter id="irsLoginLaserBlur" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="3"/>
+            </filter>
+          </defs>
+          <circle cx="155" cy="155" r="139" fill="none" stroke="#2F6BFF" stroke-width="16" stroke-linecap="round" pathLength="100" stroke-dasharray="0.01 99.99" class="irs-laser-dash" opacity="0.55" filter="url(#irsLoginLaserBlur)"/>
+          <circle cx="155" cy="155" r="139" fill="none" stroke="#2F6BFF" stroke-width="7" stroke-linecap="round" pathLength="100" stroke-dasharray="0.01 99.99" class="irs-laser-dash"/>
+          <circle cx="155" cy="155" r="139" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" pathLength="100" stroke-dasharray="0.01 99.99" class="irs-laser-dash"/>
+        </svg>
+
+        <!-- slowly turning dashed orbit between the tracks -->
+        <svg width="310" height="310" viewBox="0 0 310 310" class="irs-orbit" style="position: absolute; inset: 0;">
+          <circle cx="155" cy="155" r="125" fill="none" stroke="#C9DBFB" stroke-width="1.5" stroke-dasharray="2 9" stroke-linecap="round"/>
+        </svg>
+
+        <!-- static inner track -->
+        <svg width="310" height="310" viewBox="0 0 310 310" style="position: absolute; inset: 0;">
+          <circle cx="155" cy="155" r="111" fill="none" stroke="#EEF1F8" stroke-width="3"/>
+        </svg>
+
+        <!-- inner comet, counter-clockwise: a short gradient tail + bright head -->
+        <svg width="310" height="310" viewBox="0 0 310 310" style="position: absolute; inset: 0; overflow: visible;">
+          <circle cx="155" cy="155" r="111" fill="none" stroke="#60A5FA" stroke-width="3" stroke-linecap="round" pathLength="100" stroke-dasharray="14 86" class="irs-comet" opacity="0.35"/>
+          <circle cx="155" cy="155" r="111" fill="none" stroke="#60A5FA" stroke-width="3.5" stroke-linecap="round" pathLength="100" stroke-dasharray="6 94" stroke-dashoffset="-8" class="irs-comet" opacity="0.8"/>
+          <circle cx="155" cy="155" r="111" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round" pathLength="100" stroke-dasharray="0.01 99.99" stroke-dashoffset="-14" class="irs-comet"/>
+        </svg>
+
+        <!-- center badge -->
+        <div class="irs-badge" style="position: relative; width: 196px; height: 196px; border-radius: 50%; background: linear-gradient(180deg, rgba(255,255,255,0.97), rgba(239,245,255,0.97)); display: flex; align-items: center; justify-content: center; box-shadow: 0 18px 36px -12px rgba(30,58,138,0.38), 0 0 0 1px rgba(201,219,251,0.7) inset;">
+          <img src="/_blob/2f27cbfce3e251e295dfdedc3f5db28c" alt="نشان آی‌آر اسپیدی" style="width: 134px; height: 180px; object-fit: contain;">
+        </div>
+      </div>
+
+      <!-- status text -->
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 8px;">
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <span style="font-size: 16px; font-weight: 700; color: #141B33;">در حال ورود به حساب</span>
+          <span style="display: flex; align-items: center; gap: 3px;">
+            <span class="irs-dot" style="width: 5px; height: 5px; border-radius: 50%; background: {{accent}};"></span>
+            <span class="irs-dot" style="width: 5px; height: 5px; border-radius: 50%; background: {{accent}};"></span>
+            <span class="irs-dot" style="width: 5px; height: 5px; border-radius: 50%; background: {{accent}};"></span>
+          </span>
+        </div>
+        <span style="font-size: 12.5px; color: #9CA3B4;">اطلاعات ورود بررسی و لیست سرورها آماده می‌شود</span>
+      </div>
+
+      <!-- step indicator (replaces the progress bar of the Connecting screen) -->
+      <div style="width: 100%; display: flex; align-items: flex-start; justify-content: center; flex-shrink: 0;">
+        <sc-for list="{{steps}}" as="s" hint-placeholder-count="3">
+          <div style="display: flex; align-items: flex-start;">
+
+            <!-- connector before every step except the first (right side in RTL) -->
+            <sc-if value="{{s.hasLine}}" hint-placeholder-val="{{false}}">
+              <div style="width: 34px; height: 2px; margin-top: 13px; border-radius: 1px; background: #E3E8F2; position: relative; overflow: hidden;">
+                <sc-if value="{{s.lineDone}}" hint-placeholder-val="{{false}}">
+                  <div style="position: absolute; inset: 0; background: #22B37A;"></div>
+                </sc-if>
+                <sc-if value="{{s.lineActive}}" hint-placeholder-val="{{false}}">
+                  <div class="irs-line-fill" style="position: absolute; inset: 0; background: {{accent}};"></div>
+                </sc-if>
+              </div>
+            </sc-if>
+
+            <div style="width: 78px; display: flex; flex-direction: column; align-items: center; gap: 6px;">
+              <!-- done -->
+              <sc-if value="{{s.isDone}}" hint-placeholder-val="{{true}}">
+                <span style="width: 28px; height: 28px; border-radius: 50%; background: linear-gradient(180deg, #22B37A 0%, #159A63 100%); display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 10px -3px rgba(21,154,99,0.5);">
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M3 7.3l2.6 2.6L11 4.4" stroke="#FFFFFF" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                </span>
+              </sc-if>
+              <!-- active -->
+              <sc-if value="{{s.isActive}}" hint-placeholder-val="{{false}}">
+                <span class="irs-step-active" style="width: 28px; height: 28px; border-radius: 50%; background: #FFFFFF; box-sizing: border-box; border: 1.5px solid #C9DBFB; display: flex; align-items: center; justify-content: center;">
+                  <svg width="18" height="18" viewBox="0 0 18 18" class="irs-step-spin"><circle cx="9" cy="9" r="7" fill="none" stroke="#E3E8F2" stroke-width="2"/><path d="M9 2a7 7 0 0 1 7 7" fill="none" stroke="{{accent}}" stroke-width="2" stroke-linecap="round"/></svg>
+                </span>
+              </sc-if>
+              <!-- pending -->
+              <sc-if value="{{s.isPending}}" hint-placeholder-val="{{false}}">
+                <span style="width: 28px; height: 28px; border-radius: 50%; background: #F3F5F9; box-sizing: border-box; border: 1.5px solid #E3E8F2; display: flex; align-items: center; justify-content: center;">
+                  <span style="width: 6px; height: 6px; border-radius: 50%; background: #C7CCD8;"></span>
+                </span>
+              </sc-if>
+              <span style="font-size: 11px; font-weight: {{s.labelWeight}}; color: {{s.labelColor}}; text-align: center; white-space: nowrap;">{{s.label}}</span>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"accent":{"editor":"color","default":"#1E3A8A","options":["#1E3A8A","#1D4ED8","#0F2E6B","#1E293B"]},"step":{"editor":"enum","default":"2","options":["1","2","3"],"section":"State"},"$preview":{"width":1280,"height":860}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const accent = this.props.accent ?? '#1E3A8A';
+    const current = Number(this.props.step ?? '2');
+    const labels = ['تأیید حساب', 'بررسی اشتراک', 'دریافت سرورها'];
+    const steps = labels.map((label, i) => {
+      const n = i + 1;
+      const isDone = n < current;
+      const isActive = n === current;
+      return {
+        label,
+        isDone,
+        isActive,
+        isPending: n > current,
+        hasLine: i > 0,
+        lineDone: i > 0 && n < current,
+        lineActive: i > 0 && n === current,
+        labelWeight: isActive ? '700' : '500',
+        labelColor: isDone ? '#159A63' : isActive ? '#141B33' : '#9CA3B4',
+      };
+    });
+    return { accent, steps };
+  }
+}
+</script>
+</body>
+</html>

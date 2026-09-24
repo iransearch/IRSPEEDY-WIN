@@ -100,6 +100,7 @@
         <!-- Overlays: loading, error banner, hint popup. Span the whole window,
                  same as the old header-anchored hack, but expressed directly now that
                  there is a real content row to span. -->
+        <uc:UCLoginLoading x:Name="uCLoginLoading" Grid.Row="1" Visibility="Collapsed" Panel.ZIndex="11"/>
         <uc:UCConnecting x:Name="uCConnecting" Grid.Row="1" Visibility="Collapsed" Panel.ZIndex="9"/>
         <uc:UCLoading x:Name="uCLoading" Grid.Row="0" Grid.RowSpan="2" Visibility="Hidden" Panel.ZIndex="10"/>
         <TextBlock Grid.Row="1" x:Name="lblErrorMessage" Text="" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Visibility="Hidden" Foreground="Red" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" VerticalAlignment="Top" Margin="0,8,0,0" Panel.ZIndex="5"/>
