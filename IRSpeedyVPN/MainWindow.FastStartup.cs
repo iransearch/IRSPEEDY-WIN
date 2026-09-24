@@ -15,6 +15,7 @@ namespace IRSpeedyVPN
     {
         private int fastStartupPrepared;
         private int deferredAutoLoginVisible;
+        private System.Diagnostics.Stopwatch startupPresentationTime;
         private Timer sessionMaintenanceTimer;
         private int sessionMaintenanceTick;
         private int serverRefreshBusy;
@@ -74,6 +75,8 @@ namespace IRSpeedyVPN
         private void FastStartup_ContentRendered(object sender, EventArgs e)
         {
             ContentRendered -= FastStartup_ContentRendered;
+            if (deferredAutoLoginVisible != 0)
+                startupPresentationTime = System.Diagnostics.Stopwatch.StartNew();
 
             // Never put the first paint behind filesystem/WMI/network work.
             Task.Run((Action)CompleteDeferredStartup);
@@ -97,7 +100,12 @@ namespace IRSpeedyVPN
             if (Interlocked.Exchange(ref deferredAutoLoginVisible, 1) != 0)
                 return;
 
-            ShowLoading("در حال ورود خودکار...");
+            loginPresentationActive = true;
+            TransitionBox.IsEnabled = false;
+            uCLoading.Visibility = Visibility.Hidden;
+            uCLoginLoading.SetStage(0);
+            uCLoginLoading.Visibility = Visibility.Visible;
+            txtVersion.Visibility = Visibility.Collapsed;
         }
 
         private void HideDeferredAutoLogin()
@@ -105,7 +113,21 @@ namespace IRSpeedyVPN
             if (Interlocked.Exchange(ref deferredAutoLoginVisible, 0) == 0)
                 return;
 
-            Dispatcher.BeginInvoke((Action)(() => uCLoading.Visibility = Visibility.Hidden));
+            Dispatcher.BeginInvoke((Action)(async () =>
+            {
+                var elapsed = startupPresentationTime?.ElapsedMilliseconds ?? 0;
+                int remaining = (int)Math.Max(0L, 4000L - elapsed);
+                if (remaining > 0) await Task.Delay(remaining);
+                if (Dispatcher.HasShutdownStarted) return;
+                uCLoginLoading.Visibility = Visibility.Collapsed;
+                uCLoading.Visibility = Visibility.Hidden;
+                loginPresentationActive = false;
+                TransitionBox.IsEnabled = true;
+                txtVersion.Visibility = ReferenceEquals(TransitionBox.Content, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
+                panelHeaderIcons.Visibility = (ReferenceEquals(TransitionBox.Content, uCServerList) || ReferenceEquals(TransitionBox.Content, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
+                HeaderDivider.Visibility = panelHeaderIcons.Visibility;
+                startupPresentationTime = null;
+            }));
         }
 
         /// <summary>
@@ -121,6 +143,7 @@ namespace IRSpeedyVPN
                 if (account?.UserAccount == null || account.groups == null)
                     return false;
 
+                SetLoginStage(1);
                 var status = account.UserAccount.Status;
                 var validStatus = status == "OK" || status == "FirstUse" || status == null;
                 if (!validStatus)
@@ -153,6 +176,7 @@ namespace IRSpeedyVPN
                     return false;
                 }
 
+                SetLoginStage(2);
                 IsUserLogin = true;
                 serviceFactory.RenewServiceList(account.groups);
 
@@ -262,7 +286,8 @@ namespace IRSpeedyVPN
                     // Keep credentials ready underneath the overlay. If the local cache
                     // cannot be applied, the user gets the populated manual-login form.
                     uCLogin.SetUserPassword(username, passwordValue);
-                    TryApplyCachedAccount(account, passwordValue);
+                    if (!TryApplyCachedAccount(account, passwordValue))
+                        ShowMessage("ورود خودکار انجام نشد؛ لطفاً دوباره وارد شوید.");
                     HideDeferredAutoLogin();
                 }));
             }
