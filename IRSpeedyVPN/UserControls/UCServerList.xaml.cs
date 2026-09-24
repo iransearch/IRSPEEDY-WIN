@@ -320,55 +320,51 @@ namespace IRSpeedyVPN.UserControls
                     && (string.IsNullOrEmpty(selectedProtocol) || x.Protocols.Contains(selectedProtocol)))
                 .Randomize().ToList();
 
-            if (!services.Any()) return;
-
-            Action action = () =>
+            if (!services.Any())
             {
-                OnLoadingRequest?.Invoke(true, "در حال یافتن سریعترین سرور");
-                try
+                ResumeServerChecksAfterCleanup();
+                return;
+            }
+
+            // Smart selection only prepares the pool here. The shared connection
+            // handler owns the Connecting view, cancellation, probe drain and cleanup.
+            // Do not disconnect or show the legacy loader before entering that handler.
+            try
+            {
+                var smartService = services.FirstOrDefault(x => x is ISmartFastConnection);
+                var allUrls = services
+                    .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
+                    .Where(u => u != null)
+                    .OrderByHysteriaFirst()
+                    .Select(u => u.url)
+                    .Where(u => !string.IsNullOrWhiteSpace(u))
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+
+                if (smartService != null && allUrls.Length > 0)
                 {
-                    probeTask.GetAwaiter().GetResult();
-                    services.First().DisconnectAll();
-                    OnLoadingRequest?.Invoke(false, null);
-
-                    var smartService = services.FirstOrDefault(x => x is ISmartFastConnection);
-
-                    // Global Fast keeps every URL. Native protocols stay in sing-box;
-                    // Xray-compatible links use its observatory/leastLoad pool.
-                    var allUrls = services
-                        .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
-                        .Where(u => u != null)
-                        // hy2 first, so the balancer's fallback outbound is one that comes
-                        // up quickly while its own probes are still warming up.
-                        .OrderByHysteriaFirst()
-                        .Select(u => u.url)
-                        .Where(u => !string.IsNullOrWhiteSpace(u))
-                        .Distinct(StringComparer.Ordinal)
-                        .ToArray();
-
-                    if (smartService != null && allUrls.Length > 0)
-                    {
-                        smartService.SelectedServerUrl = null; // marks global Smart, not a country pool
-                        ((ISmartFastConnection)smartService).SetSmartFastUrls(allUrls);
-                        OnConnectRequest.Invoke(this, smartService, selectedProtocol ?? "");
-                        return;
-                    }
-
-                    var fastest = services.Where(x => x.UrlTestSpeed > 0)
-                        .OrderBy(x => x.UrlTestSpeed).FirstOrDefault();
-
-                    if (fastest != null)
-                        OnConnectRequest.Invoke(this, fastest, selectedProtocol ?? "");
-                    else
-                        Dispatcher.Invoke((Action)(() => GetMainWindow()?.ShowUserMessage("سرور یافت نشد")));
+                    smartService.SelectedServerUrl = null;
+                    ((ISmartFastConnection)smartService).SetSmartFastUrls(allUrls);
+                    OnConnectRequest?.Invoke(this, smartService, selectedProtocol ?? "");
+                    return;
                 }
-                catch
+
+                var fastest = services.Where(x => x.UrlTestSpeed > 0)
+                    .OrderBy(x => x.UrlTestSpeed).FirstOrDefault();
+                if (fastest != null)
+                    OnConnectRequest?.Invoke(this, fastest, selectedProtocol ?? "");
+                else
                 {
-                    OnLoadingRequest?.Invoke(false, null);
+                    ResumeServerChecksAfterCleanup();
+                    GetMainWindow()?.ShowUserMessage("سرور یافت نشد");
                 }
-            };
-
-            action.BeginInvoke(null, null);
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteLog(ex);
+                ResumeServerChecksAfterCleanup();
+                GetMainWindow()?.ShowUserMessage("آماده‌سازی اتصال انجام نشد؛ دوباره تلاش کنید.");
+            }
         }
 
         #endregion
