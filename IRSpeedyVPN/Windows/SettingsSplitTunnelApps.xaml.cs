@@ -22,7 +22,14 @@ namespace IRSpeedyVPN.Windows
         private bool ready;
         private bool closed;
         private bool selectionRefreshPending;
-        public SettingsSplitTunnelApps() { InitializeComponent(); DataContext = this; }
+        private readonly System.Windows.Threading.DispatcherTimer searchDelay = new System.Windows.Threading.DispatcherTimer
+        { Interval = TimeSpan.FromMilliseconds(250) };
+        public SettingsSplitTunnelApps()
+        {
+            InitializeComponent(); DataContext = this;
+            searchDelay.Tick += SearchDelay_Tick;
+        }
+        private ScrollViewer AppScroll => AppList?.Template?.FindName("AppScroll", AppList) as ScrollViewer;
         public event PropertyChangedEventHandler PropertyChanged;
         private bool splitEnabled;
         public bool IsSplitTunnelEnabled
@@ -118,7 +125,8 @@ namespace IRSpeedyVPN.Windows
         }
         private void RenderList()
         {
-            if (!ready) return;
+            if (!ready || closed) return;
+            searchDelay.Stop();
             var filtered = Filtered();
             AppList.ItemsSource = filtered;
             EmptyText.Text = "برنامه‌ای پیدا نشد؛ فایل اجرایی را دستی اضافه کنید.";
@@ -140,7 +148,18 @@ namespace IRSpeedyVPN.Windows
                 if (!closed) RenderList();
             }));
         }
-        private void Search_Changed(object sender, TextChangedEventArgs e) { RenderList(); AppScroll?.ScrollToTop(); }
+        private void Search_Changed(object sender, TextChangedEventArgs e)
+        {
+            searchDelay.Stop();
+            if (ready && !closed) searchDelay.Start();
+        }
+        private void SearchDelay_Tick(object sender, EventArgs e)
+        {
+            searchDelay.Stop();
+            if (closed) return;
+            RenderList();
+            AppScroll?.ScrollToTop();
+        }
         private void SelectAll_Click(object sender, RoutedEventArgs e)
         {
             if (!CanEditApps) return;
@@ -180,7 +199,7 @@ namespace IRSpeedyVPN.Windows
             }
             SearchBox.Clear();
             RenderList();
-            AppScroll.ScrollToTop();
+            AppScroll?.ScrollToTop();
         }
         private void RemoveApp_Click(object sender, RoutedEventArgs e)
         {
@@ -202,6 +221,8 @@ namespace IRSpeedyVPN.Windows
         protected override void OnClosed(EventArgs e)
         {
             closed = true;
+            searchDelay.Stop();
+            searchDelay.Tick -= SearchDelay_Tick;
             loading?.Cancel();
             foreach (var app in apps) app.PropertyChanged -= SelectionChanged;
             base.OnClosed(e);

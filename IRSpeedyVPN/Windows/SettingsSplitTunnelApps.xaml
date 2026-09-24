@@ -139,13 +139,24 @@
           </Grid>
 
           <!-- app list -->
-          <ScrollViewer x:Name="AppScroll" Grid.Row="6" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
-                        Focusable="False" Padding="0,0,0,4">
-            <ScrollViewer.Resources>
+          <ItemsControl x:Name="AppList" Grid.Row="6" ItemTemplate="{StaticResource AppRow}" Focusable="False"
+                        VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling"
+                        VirtualizingPanel.ScrollUnit="Pixel" ScrollViewer.CanContentScroll="True">
+            <ItemsControl.Resources>
               <Style TargetType="ScrollBar" BasedOn="{StaticResource ThinScrollBar}" />
-            </ScrollViewer.Resources>
-            <ItemsControl x:Name="AppList" ItemTemplate="{StaticResource AppRow}" Focusable="False" />
-          </ScrollViewer>
+            </ItemsControl.Resources>
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.Template>
+              <ControlTemplate TargetType="ItemsControl">
+                <ScrollViewer x:Name="AppScroll" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"
+                              CanContentScroll="True" Focusable="False" Padding="0,0,0,4">
+                  <ItemsPresenter />
+                </ScrollViewer>
+              </ControlTemplate>
+            </ItemsControl.Template>
+          </ItemsControl>
 
           <!-- not in the design: empty search result -->
           <TextBlock Grid.Row="6" x:Name="EmptyText" Text="برنامه‌ای پیدا نشد" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,24,0,0"
