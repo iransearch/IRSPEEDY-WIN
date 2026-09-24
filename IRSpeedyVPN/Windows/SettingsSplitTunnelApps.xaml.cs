@@ -21,6 +21,7 @@ namespace IRSpeedyVPN.Windows
         private CancellationTokenSource loading;
         private bool ready;
         private bool closed;
+        private bool selectionRefreshPending;
         public SettingsSplitTunnelApps() { InitializeComponent(); DataContext = this; }
         public event PropertyChangedEventHandler PropertyChanged;
         private bool splitEnabled;
@@ -112,7 +113,8 @@ namespace IRSpeedyVPN.Windows
             var query = SearchBox.Text.Trim();
             return apps.Where(a => (a.Name ?? "").IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0
                 || a.Path.IndexOf(query, StringComparison.OrdinalIgnoreCase) >= 0
-                || a.Category.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0).ToList();
+                || a.Category.IndexOf(query, StringComparison.CurrentCultureIgnoreCase) >= 0)
+                .OrderByDescending(a => a.Selected).ToList();
         }
         private void RenderList()
         {
@@ -124,7 +126,20 @@ namespace IRSpeedyVPN.Windows
             UpdateCount();
         }
         private void UpdateCount() => SelectedCountText.Text = PersianDigits.Format(apps.Count(a => a.Selected) + " برنامه انتخاب شده");
-        private void SelectionChanged(object sender, PropertyChangedEventArgs e) { if (e.PropertyName == "Selected") UpdateCount(); }
+        private void SelectionChanged(object sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName != "Selected" || closed) return;
+            UpdateCount();
+            if (selectionRefreshPending) return;
+            selectionRefreshPending = true;
+            // Finish the switch click before moving its row. Batch Select All
+            // notifications into one refresh and preserve the current search.
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() =>
+            {
+                selectionRefreshPending = false;
+                if (!closed) RenderList();
+            }));
+        }
         private void Search_Changed(object sender, TextChangedEventArgs e) { RenderList(); AppScroll?.ScrollToTop(); }
         private void SelectAll_Click(object sender, RoutedEventArgs e)
         {
