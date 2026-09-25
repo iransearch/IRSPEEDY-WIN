@@ -161,6 +161,12 @@ namespace IRSpeedyVPN.UserControls
             txtCountry.Text = isGlobalSmart
                 ? "سرور هوشمند"
                 : globalInfo.CurrentService.Country;
+            // Hardcoded preview for Germany; global Smart does not identify an exit country.
+            // Population: Destatis, 20 June 2025 (end-2024 estimate, 83.6 million).
+            // https://www.destatis.de/DE/Presse/Pressemitteilungen/2025/06/PD25_221_124.html
+            GermanyFacts.Visibility = !isGlobalSmart && string.Equals(
+                globalInfo.CurrentService.CountryCode?.Trim(), "DE", StringComparison.OrdinalIgnoreCase)
+                ? Visibility.Visible : Visibility.Collapsed;
             imgCountry.Source = IRSpeedyVPN.Components.ServerListControl.FlagCatalog.TryGet(globalInfo.CurrentService.CountryCode);
             imgCountry.Visibility = imgCountry.Source == null ? Visibility.Hidden : Visibility.Visible;
             RefreshServerDetail();

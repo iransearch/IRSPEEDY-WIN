@@ -122,13 +122,21 @@
         </Canvas></Viewbox></Border>
       </Grid>
       <Grid>
-        <Border Height="52" CornerRadius="14" BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="1" Background="{StaticResource SmartLocationBackgroundBrush}" x:Name="ConnectedServerCard">
-          <Grid Margin="14,0">
+        <Border MinHeight="52" CornerRadius="14" BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="1" Background="{StaticResource SmartLocationBackgroundBrush}" x:Name="ConnectedServerCard">
+          <Grid Margin="14,9">
+            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="30"/>
               <ColumnDefinition Width="*"/>
               <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
+            <Border x:Name="GermanyFacts" Grid.Row="1" Grid.ColumnSpan="3" Visibility="Collapsed"
+                    BorderBrush="#C9DBFB" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,6,0,0">
+              <TextBlock Text="پایتخت: برلین&#10;جمعیت: حدود ۸۳٫۶ میلیون نفر (۲۰۲۴)"
+                         FontFamily="{StaticResource AppFontFamilyMedium}" FontSize="11" Foreground="#5B6BA8"
+                         FlowDirection="RightToLeft" TextAlignment="Right" TextWrapping="Wrap"
+                         ToolTip="جمعیت پایان ۲۰۲۴؛ منبع: ادارهٔ آمار آلمان (Destatis)"/>
+            </Border>
             <Image x:Name="imgCountry" Width="30" Height="30" Stretch="UniformToFill">
               <Image.Clip>
                 <EllipseGeometry Center="15,15" RadiusX="15" RadiusY="15"/>
