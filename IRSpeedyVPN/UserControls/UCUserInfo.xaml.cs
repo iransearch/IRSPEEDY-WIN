@@ -1,6 +1,7 @@
 using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
+using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Services;
 using IRSpeedyVPN.Windows;
 using System;
@@ -54,6 +55,7 @@ namespace IRSpeedyVPN.UserControls
             Dispatcher.Invoke((Action)(() =>
             {
                 if (globalInfo == null || !IsVisible) return;
+                RefreshServerDetail();
                 var elapsed = DateTime.Now - globalInfo.ConnectionTime;
                 if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
                 txtConnectionTime.Text = PersianDigits(((int)elapsed.TotalHours).ToString("00") + elapsed.ToString(@"\:mm\:ss"));
@@ -161,9 +163,7 @@ namespace IRSpeedyVPN.UserControls
                 : globalInfo.CurrentService.Country;
             imgCountry.Source = IRSpeedyVPN.Components.ServerListControl.FlagCatalog.TryGet(globalInfo.CurrentService.CountryCode);
             imgCountry.Visibility = imgCountry.Source == null ? Visibility.Hidden : Visibility.Visible;
-            var ping = globalInfo.CurrentService.UrlTestSpeed;
-            txtServerDetail.Text = (ping > 0 ? PersianDigits(ping.ToString()) + " میلی‌ثانیه" : "")
-                + (isGlobalSmart ? (ping > 0 ? " · " : "") + "موقعیت هوشمند" : "");
+            RefreshServerDetail();
 
             txtServiceName.Text = globalInfo.CurrentService.Name + (proxifier.IsAttached() && proxifier.ProxyType.GetDescription().Length > 0 ? " / " + proxifier.ProxyType.GetDescription() : "");
             txtConnectionTime.Text = "۰۰:۰۰:۰۰";
@@ -175,6 +175,37 @@ namespace IRSpeedyVPN.UserControls
             RefreshPublicIp();
 
             
+        }
+
+        private void RefreshServerDetail()
+        {
+            var service = globalInfo?.CurrentService;
+            if (service == null) return;
+            var smart = service as ISmartFastConnection;
+            bool isSmart = smart != null && smart.IsSmartFast;
+            bool isGlobalSmart = isSmart && service.SelectedServerUrl == null;
+            long ping = ResolveRecordedLatency(service, isSmart);
+            txtServerDetail.Text = (ping > 0
+                ? PersianDigits(ping.ToString()) + " میلی‌ثانیه"
+                : "پینگ نامشخص") + (isGlobalSmart ? " · موقعیت هوشمند" : "");
+        }
+
+        internal static long ResolveRecordedLatency(IVPNService service, bool isSmart)
+        {
+            // A country Smart URL is only a scope marker. Use the same minimum
+            // recorded result as the server picker, even if a canceled retest reset
+            // the transient service-level speed. Never borrow another country's data.
+            if (service.IsUrlTestSupported)
+            {
+                var urls = !isSmart && service.SelectedServerUrl != null
+                    ? new[] { service.SelectedServerUrl }
+                    : (service.GetServerUrls() ?? new List<Url>()).ToArray();
+                long recorded = urls.Where(u => u != null && u.latency > 0)
+                    .Select(u => u.latency).DefaultIfEmpty(0).Min();
+                if (recorded > 0) return recorded;
+                return service.UrlTestSpeed;
+            }
+            return 0;
         }
 
         private void UserControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
