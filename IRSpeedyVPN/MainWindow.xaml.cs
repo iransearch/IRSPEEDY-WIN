@@ -276,11 +276,17 @@ namespace IRSpeedyVPN
         private async void UCChangePassword_OnResult(UCChangePassword sender, string oldPassword, string newpassword, bool cancel)
         {
             if (cancel) { ShowPreviousControl(); return; }
+            string username = gInfo.Username;
+            bool remember = IsRememberChecked;
             try
             {
                 string error = await ChangeAccountPasswordAsync(oldPassword, newpassword);
                 if (error != null) ShowMessage(error);
-                else sender.ResetInput();
+                else
+                {
+                    sender.ResetInput();
+                    BeginPasswordChangeLogin(username, newpassword, remember);
+                }
             }
             catch { ShowMessage("وضعیت ثبت درخواست مشخص نشد؛ پیش از ارسال مجدد، وضعیت سرویس را بررسی کنید."); }
         }
@@ -1161,8 +1167,11 @@ namespace IRSpeedyVPN
 
         public void OpenSettings(IVPNService service)
         {
+            string username = gInfo.Username;
+            bool remember = IsRememberChecked;
             new SettingsHub { Owner = this, Service = service,
                 ChangePasswordAsync = ChangeAccountPasswordAsync,
+                PasswordChangeAccepted = password => BeginPasswordChangeLogin(username, password, remember),
                 IsConnected = () => ReferenceEquals(TransitionBox.Content, uCUserInfo) }.ShowDialog();
         }
 
@@ -1170,7 +1179,37 @@ namespace IRSpeedyVPN
 
         private void OpenPassword(Window owner)
         {
-            new SettingsPassword { Owner = owner, ChangePasswordAsync = ChangeAccountPasswordAsync }.ShowDialog();
+            string username = gInfo.Username;
+            bool remember = IsRememberChecked;
+            new SettingsPassword { Owner = owner, ChangePasswordAsync = ChangeAccountPasswordAsync,
+                PasswordChangeAccepted = password => BeginPasswordChangeLogin(username, password, remember) }.ShowDialog();
+        }
+
+        private void BeginPasswordChangeLogin(string username, string newPassword, bool remember)
+        {
+            if (!IsUserLogin || gInfo.Username != username || loginPresentationActive) return;
+            // The password modal (and its settings owner) have already closed.
+            IsUserLogin = false;
+            Interlocked.Increment(ref connectionRequestVersion);
+            UnRegiserVpnService();
+            mainTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            sessionMaintenanceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            uCServerList.PauseServerChecks();
+            uCLogin.SetUserPassword(username, newPassword, remember);
+            uCLogin.HideRenewMessage();
+            txtUsername.Text = "";
+            ShowMessage("");
+            ShowControl(uCLogin);
+            loginUiStopwatch = Stopwatch.StartNew();
+            RunLoginWithPresentation(() =>
+            {
+                DisconnectAll();
+                proxifier.Detach();
+                gInfo.CurrentService = null;
+                // Reuse the regular account verification, device-limit and retry UI.
+                // Failure leaves the new credential in the masked login form for retry.
+                Login(username, newPassword, remember);
+            });
         }
 
         private bool passwordChangeInProgress;
@@ -1192,9 +1231,9 @@ namespace IRSpeedyVPN
                 if (response.StatusCode != System.Net.HttpStatusCode.OK || !response.ResponseData.IsSuccess || response.ResponseData.Code != 0)
                     return string.IsNullOrWhiteSpace(response.ResponseData.ErrorMessage)
                         ? "درخواست تغییر رمز پذیرفته نشد." : response.ResponseData.ErrorMessage;
-                // Accepted into the server queue, NOT confirmation that the login password has changed.
-                // Keep both the active credential and remembered credential until actual server completion.
-                ShowHintPopup("درخواست تغییر رمز ثبت شد");
+                // Acceptance starts verification immediately; Login persists the new password only after success.
+                if (!IsUserLogin || gInfo.Username != username)
+                    return "درخواست ثبت شد؛ برای تأیید تغییر، با رمز جدید وارد حساب مربوطه شوید.";
                 return null;
             }
             finally { passwordChangeInProgress = false; }

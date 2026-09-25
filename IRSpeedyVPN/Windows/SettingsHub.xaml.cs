@@ -26,6 +26,7 @@ namespace IRSpeedyVPN.Windows
                 control.Opacity = control.IsEnabled ? 1 : 0.45;
         }
         public Func<string, string, Task<string>> ChangePasswordAsync { get; set; }
+        public Action<string> PasswordChangeAccepted { get; set; }
 
         public SettingsHub()
         {
@@ -82,6 +83,18 @@ namespace IRSpeedyVPN.Windows
         private void Share_Click(object sender, RoutedEventArgs e)
         { if (Connected) new ShareVPNSetting { Owner = this, Service = AppServices.GlobalInfo?.CurrentService }.ShowDialog(); }
         private void Password_Click(object sender, RoutedEventArgs e)
-        { if (!Connected) new SettingsPassword { Owner = this, ChangePasswordAsync = ChangePasswordAsync }.ShowDialog(); }
+        {
+            if (Connected) return;
+            new SettingsPassword
+            {
+                Owner = this,
+                ChangePasswordAsync = ChangePasswordAsync,
+                PasswordChangeAccepted = password =>
+                {
+                    Close();
+                    PasswordChangeAccepted?.Invoke(password);
+                }
+            }.ShowDialog();
+        }
     }
 }

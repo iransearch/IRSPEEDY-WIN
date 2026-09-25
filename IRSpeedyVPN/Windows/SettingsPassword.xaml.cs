@@ -10,6 +10,7 @@ namespace IRSpeedyVPN.Windows
     public partial class SettingsPassword : Window
     {
         public Func<string, string, Task<string>> ChangePasswordAsync { get; set; }
+        public Action<string> PasswordChangeAccepted { get; set; }
         private bool saving;
         public SettingsPassword() { InitializeComponent(); }
         private void Header_DragMove(object sender, MouseButtonEventArgs e) => Common.WindowDrag.Begin(this, e);
@@ -56,7 +57,12 @@ namespace IRSpeedyVPN.Windows
             try
             {
                 var error = await ChangePasswordAsync(oldPassword, password);
-                if (error == null) { DialogResult = true; }
+                if (error == null)
+                {
+                    // Close the modal before revealing the account verification screen.
+                    DialogResult = true;
+                    PasswordChangeAccepted?.Invoke(password);
+                }
                 else ErrorText.Text = error;
             }
             catch { ErrorText.Text = "ارتباط با سرویس برقرار نشد. دوباره تلاش کنید."; }

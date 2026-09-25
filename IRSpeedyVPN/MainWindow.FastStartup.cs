@@ -424,72 +424,77 @@ namespace IRSpeedyVPN
                 }
 
                 var response = serviceController.Login2(username, password);
-                if (response == null)
-                    return;
-
-                if (response.StatusCode != HttpStatusCode.OK)
-                {
-                    // Do not log out on timeouts, endpoint outages, 5xx responses, etc.
-                    // Only statuses that explicitly mean authentication/session rejection
-                    // terminate the local login session.
-                    if (IsExplicitSessionFailure(response.StatusCode))
-                        LogoutInvalidSession(response.ResponseData?.message);
-                    return;
-                }
-
-                var account = response.ResponseData?.Decrypted;
-                if (account?.UserAccount == null || account.groups == null)
-                    return;
-
-                account.UserAccount.Username = username;
-
-                if (account.UserAccount.ExpiryDate != null
-                    && account.UserAccount.ExpiryDate.Value < DateTime.Now)
-                {
-                    RechareLogout(false);
-                    return;
-                }
-
-                var status = account.UserAccount.Status;
-                if (status == "Expired")
-                {
-                    RechareLogout(false);
-                    return;
-                }
-
-                // AuthServerError means the validation service itself is unavailable;
-                // it is not proof that the user's credentials/session are invalid.
-                if (status == "AuthServerError")
-                    return;
-
-                var validStatus = status == "OK" || status == "FirstUse" || status == null;
-                if (!validStatus)
-                {
-                    LogoutInvalidSession("نام کاربری یا رمز عبور صحیح نیست");
-                    return;
-                }
-
-                // Login2 may not carry the separate settings payload. Keep the currently
-                // active settings so the cache remains complete without a GetSettings call.
-                if (account.Settings == null)
-                    account.Settings = gInfo.settings;
-
-                var currentService = gInfo.CurrentService;
-
-                // Replace only the list/account cache. Keep CurrentService pointing at the
-                // exact live object so a successful 30-minute refresh cannot disconnect or
-                // replace the currently running VPN session.
+                // Apply refresh results on the UI thread atomically with password re-login.
+                // An old in-flight refresh must never log out or restore the previous password.
                 Dispatcher.Invoke((Action)(() =>
                 {
-                    serviceFactory.RenewServiceList(account.groups);
-                    gInfo.Import(account, password, localResource.TempPath);
-                    gInfo.CurrentService = currentService;
-                    gInfo.ServerResponse = response.ResponseData.DecryptedString;
-                    uCServerList.RefreshServicesFromFactory();
-                }));
+                    if (!IsUserLogin || gInfo.Username != username || gInfo.Password != password) return;
+                    if (response == null)
+                        return;
 
-                if (IsRememberChecked)
-                    localResource.SaveConfig(account, password);
+                    if (response.StatusCode != HttpStatusCode.OK)
+                    {
+                        // Do not log out on timeouts, endpoint outages, 5xx responses, etc.
+                        // Only statuses that explicitly mean authentication/session rejection
+                        // terminate the local login session.
+                        if (IsExplicitSessionFailure(response.StatusCode))
+                            LogoutInvalidSession(response.ResponseData?.message);
+                        return;
+                    }
+
+                    var account = response.ResponseData?.Decrypted;
+                    if (account?.UserAccount == null || account.groups == null)
+                        return;
+
+                    account.UserAccount.Username = username;
+
+                    if (account.UserAccount.ExpiryDate != null
+                        && account.UserAccount.ExpiryDate.Value < DateTime.Now)
+                    {
+                        RechareLogout(false);
+                        return;
+                    }
+
+                    var status = account.UserAccount.Status;
+                    if (status == "Expired")
+                    {
+                        RechareLogout(false);
+                        return;
+                    }
+
+                    // AuthServerError means the validation service itself is unavailable;
+                    // it is not proof that the user's credentials/session are invalid.
+                    if (status == "AuthServerError")
+                        return;
+
+                    var validStatus = status == "OK" || status == "FirstUse" || status == null;
+                    if (!validStatus)
+                    {
+                        LogoutInvalidSession("نام کاربری یا رمز عبور صحیح نیست");
+                        return;
+                    }
+
+                    // Login2 may not carry the separate settings payload. Keep the currently
+                    // active settings so the cache remains complete without a GetSettings call.
+                    if (account.Settings == null)
+                        account.Settings = gInfo.settings;
+
+                    var currentService = gInfo.CurrentService;
+
+                    // Replace only the list/account cache. Keep CurrentService pointing at the
+                    // exact live object so a successful 30-minute refresh cannot disconnect or
+                    // replace the currently running VPN session.
+                    {
+                        serviceFactory.RenewServiceList(account.groups);
+                        gInfo.Import(account, password, localResource.TempPath);
+                        gInfo.CurrentService = currentService;
+                        gInfo.ServerResponse = response.ResponseData.DecryptedString;
+                        uCServerList.RefreshServicesFromFactory();
+                    }
+
+                    if (IsRememberChecked)
+                        localResource.SaveConfig(account, password);
+                }));
             }
             catch (Exception ex)
             {

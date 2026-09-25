@@ -41,11 +41,11 @@ namespace IRSpeedyVPN.UserControls
         {            
             boxRenew.Visibility = Visibility.Collapsed;
         }
-        public void SetUserPassword(string username,string password)
+        public void SetUserPassword(string username,string password, bool remember = true)
         {
             txtUsername.Text = username;
             txtPassword.Password = txtPasswordShow.Text = password;
-            chkRemember.IsChecked = true;            
+            chkRemember.IsChecked = remember;
         }
         public void SetUserName(string username)
         {
