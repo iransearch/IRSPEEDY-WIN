@@ -206,7 +206,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             if (latency <= 0) return;
             IsSelectable = true;
-            SignalStatus = "";
+            SignalStatus = "در حال بررسی";
+            SignalToolTip = "نتیجهٔ اولیهٔ تست جاری؛ بررسی سایر سرورها ادامه دارد.";
             Sig.FromLatency(latency, out var text);
             SignalText = text;
             SetSignalColor(latency);

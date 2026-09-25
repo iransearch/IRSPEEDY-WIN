@@ -14,19 +14,36 @@ class TunnelPlusService : IVPNService {
  public int ID {get;set;} public string Name=>"xfast"; public string CountryCode {get;set;} public string Country=>CountryCode; public bool IsUrlTestSupported=>true;
  public List<Url> urls=new List<Url>(); public List<Url> GetServerUrls()=>urls;
  public static ConcurrentQueue<string> Calls=new ConcurrentQueue<string>(); public static volatile bool Hold,Fail; public static string HoldCountry;
- public void UrlTest(){} public void UrlTestFull(object a,bool b,object c,Func<bool> cancel){
- Calls.Enqueue(CountryCode+ID); while((Hold || HoldCountry==CountryCode) && !cancel()) Thread.Sleep(1);
+ public static Action<TunnelPlusService,Action<long>,Func<bool>> Probe;
+ public void UrlTest(){} public void UrlTestFull(object a,bool b,Action<long> progress,Func<bool> cancel){
+ Calls.Enqueue(CountryCode+ID); Probe?.Invoke(this,progress,cancel);
+ while((Hold || HoldCountry==CountryCode) && !cancel()) Thread.Sleep(1);
  if(!cancel()) foreach(var u in urls){u.latency=Fail?-1:100+ID;u.latencychkTime=DateTime.Now;}
  }
 }
 class Info { public object CurrentService; }
-class FakeDispatcher { readonly SynchronizationContext context=SynchronizationContext.Current; public bool CheckAccess()=>true; public void Invoke(Action a)=>a(); public void BeginInvoke(Action a)=>context.Post(_=>a(),null); }
+class FakeDispatcher {
+ readonly SynchronizationContext context=SynchronizationContext.Current;
+ readonly int thread=Thread.CurrentThread.ManagedThreadId;
+ public bool HoldPosted; readonly ConcurrentQueue<Action> held=new ConcurrentQueue<Action>();
+ public bool CheckAccess()=>Thread.CurrentThread.ManagedThreadId==thread;
+ public void Invoke(Action a){if(!CheckAccess())throw new Exception("unexpected synchronous dispatcher call");a();}
+ public void BeginInvoke(Action a){if(HoldPosted)held.Enqueue(a);else context.Post(_=>a(),null);}
+ public void ReleasePosted(){HoldPosted=false;while(held.TryDequeue(out var a))context.Post(_=>a(),null);}
+}
 class UiContext : SynchronizationContext {
  readonly BlockingCollection<Action> queue=new BlockingCollection<Action>();
  public override void Post(SendOrPostCallback d,object state)=>queue.Add(()=>d(state));
  public void Run(Func<Task> action){SetSynchronizationContext(this);var task=action();while(!task.IsCompleted){if(queue.TryTake(out var next,100))next();}task.GetAwaiter().GetResult();}
 }
-class Picker { public int Updates; public void RefreshGroup(IVPNService s){Updates++;} }
+class Picker {
+ readonly int thread=Thread.CurrentThread.ManagedThreadId;
+ public int Updates,Progresses; public long Displayed;
+ public Action<IVPNService> OnRefresh;
+ void CheckThread(){if(Thread.CurrentThread.ManagedThreadId!=thread)throw new Exception("picker updated off UI thread");}
+ public void RefreshGroup(IVPNService s){CheckThread();Updates++;Displayed=s.GetServerUrls()[0].latency;OnRefresh?.Invoke(s);}
+ public void ShowGroupProgress(IVPNService s,long latency){CheckThread();Progresses++;Displayed=latency;}
+}
 class LogHelper { public static void WriteLog(Exception e)=>throw e; }
 class UrlTestCoordinator { public static volatile bool AbortRequested; public static void CancelAll()=>AbortRequested=true; public static void BeginBatch()=>AbortRequested=false; }
 class Program {
@@ -37,10 +54,50 @@ tests = r'''
  static void Check(bool value,string name){if(!value)throw new Exception(name); Console.WriteLine("PASS "+name);}
  static TunnelPlusService S(string country,int id,string config=null){return new TunnelPlusService{ID=id,CountryCode=country,urls=new List<Url>{new Url{url=config??("vless://secret-"+id+"@host"),extra_field_1="config"}}};}
  async Task Settle(){await probeTask;for(int i=0;i<500 && probeRunning;i++)await Task.Delay(2);await Task.Delay(10);Check(!probeRunning,"worker settled");}
+ static async Task Until(Func<bool> condition){for(int i=0;i<1000 && !condition();i++)await Task.Delay(2);Check(condition(),"asynchronous condition completed");}
  static void Main(){new UiContext().Run(MainAsync);}
  static async Task MainAsync(){
  string dir=Path.Combine(Path.GetTempPath(),"irspeedy-check-"+Guid.NewGuid());Directory.CreateDirectory(dir);
  try{
+ // Drive the production scheduler while the fake RPC remains in flight. The
+ // final URL value differs from progress so a late callback is observable.
+ var live=new Program();var liveService=S("DE",21);live._currentServices=new IVPNService[]{liveService};
+ live.probeCache=new ServerCheckCache("live","xfast",dir);live.probeCache.Bind(live._currentServices);
+ TunnelPlusService.Hold=true;
+ TunnelPlusService.Probe=(service,progress,cancel)=>{if(progress==null)throw new Exception("missing live progress callback");progress(750);};
+ live.RunBackgroundUrlTests(live._currentServices);
+ await Until(()=>live.countryPicker.Progresses==1);
+ Check(live.probeRunning && live.countryPicker.Updates==0 && live.countryPicker.Displayed==750,"first success reaches UI while remaining server checks are blocked");
+ Check(liveService.urls[0].latencychkTime==default(DateTime),"partial progress does not commit incomplete results to cache");
+ TunnelPlusService.Hold=false;await live.Settle();
+ Check(live.countryPicker.Displayed==121 && live.countryPicker.Updates==1,"final result replaces progress on UI thread before worker completion");
+ // Exercise repeated timer cycles, failure and recovery on the SAME row objects.
+ TunnelPlusService.Probe=null;
+ for(int cycle=0;cycle<3;cycle++){
+ TunnelPlusService.Fail=cycle==1;live.probeSchedule.Completed(DateTime.UtcNow.AddMinutes(-3));
+ live.RunBackgroundUrlTests(live._currentServices);await live.Settle();
+ Check(live.countryPicker.Updates==cycle+2 && live.countryPicker.Displayed==(cycle==1?-1:121),"every periodic result refreshes UI, including failure and recovery");
+ }
+ TunnelPlusService.Fail=false;TunnelPlusService.Hold=true;
+ TunnelPlusService.Probe=(service,progress,cancel)=>progress(999);
+ live.ResumeServerChecksAfterCleanup();await Until(()=>live.countryPicker.Displayed==999);
+ await live.DrainServerChecksAsync();
+ Check(live.countryPicker.Displayed==121 && liveService.urls[0].latency==121,"cancel/drain restores cached UI before allowing connection startup");
+ await live.Settle();TunnelPlusService.Hold=false;
+ // Delay dispatcher progress until AFTER the final result has been applied.
+ live.Dispatcher.HoldPosted=true;int shown=live.countryPicker.Progresses;
+ live.ResumeServerChecksAfterCleanup();await live.Settle();live.Dispatcher.ReleasePosted();await Task.Delay(10);
+ Check(live.countryPicker.Displayed==121 && live.countryPicker.Progresses==shown,"queued progress cannot overwrite a completed result");
+ // Rebinding API rows while an old RPC is in flight must reject its callbacks.
+ live.Dispatcher.HoldPosted=true;TunnelPlusService.Hold=true;
+ int callsBefore=TunnelPlusService.Calls.Count;live.ResumeServerChecksAfterCleanup();
+ await Until(()=>TunnelPlusService.Calls.Count>callsBefore);
+ live._urlTestCts.Cancel();var replacement=S("DE",21);live._currentServices=new IVPNService[]{replacement};
+ live.probeCache.Bind(live._currentServices);live.countryPicker.OnRefresh=s=>Check(ReferenceEquals(s,replacement),"obsolete row cannot receive a final UI update");
+ live.RunBackgroundUrlTests(live._currentServices);TunnelPlusService.Hold=false;await live.Settle();
+ live.Dispatcher.ReleasePosted();await Task.Delay(10);
+ Check(live.countryPicker.Progresses==shown && live.countryPicker.Displayed==121,"old progress is rejected after API list replacement");
+ TunnelPlusService.Probe=null;TunnelPlusService.Calls=new ConcurrentQueue<string>();
  var bootstrap=new Program();bootstrap._currentServices=new IVPNService[]{S("DE",1),S("US",3)};
  bootstrap.probeCache=new ServerCheckCache("bootstrap","xfast",dir);bootstrap.probeCache.Bind(bootstrap._currentServices);
  TunnelPlusService.HoldCountry="US";bootstrap.RunBackgroundUrlTests(bootstrap._currentServices);

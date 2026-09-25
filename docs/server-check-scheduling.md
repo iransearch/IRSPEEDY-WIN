@@ -7,5 +7,8 @@
 - Connect cancels/drains the active probe and preserves an unfinished country's turn. Reloads of the API list cancel obsolete probes; their callbacks cannot update replacement rows.
 - Completed failed probes keep their last successful ping separately and display “last” and “latest test failed”. Historical success does not make a failed row selectable. Successful results show their timestamp in a tooltip.
 - Results and cursor use atomic file replacement after completed service/country tests. Failure to write cache does not stop in-memory operation. Abrupt termination before a country commits may repeat that country on restart.
+- During each service test, publish the first successful latency and subsequent improvements through the existing Core progress query. Update only that row in place while retry/remaining members continue; do not persist partial results or reorder on progress. If progress querying is unavailable, the authoritative final response still refreshes the row.
+- Final and canceled-result refreshes run on the UI continuation before the country worker finishes draining. Cancellation restores the cached row, including availability, history and status. Queued progress is closed when the service test finishes and cannot overwrite a final result or update rows from a replaced API list.
+- The country rotation remains three minutes after completion. The separate 60-second `RunUrlTest` cache validity is not a background UI timer.
 
 Validation: tests/ServerRefreshChecks/run.py exercises the production scheduler/cache with fake network/UI and real temporary files. tests/PasswordReloginChecks/run.py covers password-change re-login integration. Actual Windows UI/runtime testing remains necessary.
