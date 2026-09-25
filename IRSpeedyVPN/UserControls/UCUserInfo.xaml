@@ -122,20 +122,23 @@
         </Canvas></Viewbox></Border>
       </Grid>
       <Grid>
-        <Border MinHeight="52" CornerRadius="14" BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="1" Background="{StaticResource SmartLocationBackgroundBrush}" x:Name="ConnectedServerCard">
-          <Grid Margin="14,9">
-            <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="Auto"/></Grid.RowDefinitions>
+        <Border Height="52" CornerRadius="14" BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="1" Background="{StaticResource SmartLocationBackgroundBrush}" x:Name="ConnectedServerCard">
+          <Grid Margin="14,0">
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="30"/>
               <ColumnDefinition Width="*"/>
               <ColumnDefinition Width="Auto"/>
+              <ColumnDefinition Width="Auto"/>
             </Grid.ColumnDefinitions>
-            <Border x:Name="GermanyFacts" Grid.Row="1" Grid.ColumnSpan="3" Visibility="Collapsed"
-                    BorderBrush="#C9DBFB" BorderThickness="0,1,0,0" Margin="0,8,0,0" Padding="0,6,0,0">
-              <TextBlock Text="پایتخت: برلین&#10;جمعیت: حدود ۸۳٫۶ میلیون نفر (۲۰۲۴)"
-                         FontFamily="{StaticResource AppFontFamilyMedium}" FontSize="11" Foreground="#5B6BA8"
-                         FlowDirection="RightToLeft" TextAlignment="Right" TextWrapping="Wrap"
-                         ToolTip="جمعیت پایان ۲۰۲۴؛ منبع: ادارهٔ آمار آلمان (Destatis)"/>
+            <Border x:Name="GermanyFacts" Grid.Column="2" Visibility="Collapsed"
+                    VerticalAlignment="Center" Margin="4,0,10,0"
+                    ToolTip="جمعیت برآوردی میانهٔ ۲۰۲۶: ۸۳٬۶۴۴٬۲۵۸ نفر؛ Worldometer بر پایهٔ داده‌های سازمان ملل">
+              <StackPanel FlowDirection="RightToLeft">
+                <TextBlock Text="پایتخت: برلین" FontFamily="{StaticResource AppFontFamilyMedium}"
+                           FontSize="10.5" Foreground="#5B6BA8"/>
+                <TextBlock Text="جمعیت: ≈۸۳٫۶ میلیون" FontFamily="{StaticResource AppFontFamilyMedium}"
+                           FontSize="10.5" Foreground="#5B6BA8"/>
+              </StackPanel>
             </Border>
             <Image x:Name="imgCountry" Width="30" Height="30" Stretch="UniformToFill">
               <Image.Clip>
@@ -146,7 +149,7 @@
               <TextBlock x:Name="txtCountry" FontSize="14" FontWeight="Bold" Foreground="#142057" TextTrimming="CharacterEllipsis"/>
               <TextBlock x:Name="txtServerDetail" FontSize="12" FontFamily="{StaticResource AppFontFamilyMedium}" FontWeight="Normal" Foreground="#5B6BA8" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
-            <Button x:Name="btn_ChangeServer" Grid.Column="2" Width="32" Height="32" ToolTip="تغییر سرور" Click="btn_ChangeServer_Click" Background="#141E3A8A" Cursor="Hand">
+            <Button x:Name="btn_ChangeServer" Grid.Column="3" Width="32" Height="32" ToolTip="تغییر سرور" Click="btn_ChangeServer_Click" Background="#141E3A8A" Cursor="Hand">
               <Viewbox Width="17" Height="17" FlowDirection="LeftToRight"><Canvas Width="24" Height="24"><Path Data="{StaticResource IconSwapServer}" Stroke="{StaticResource AccentBrush}" StrokeThickness="2" FlowDirection="LeftToRight" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
               </Canvas></Viewbox><Button.Template>
                 <ControlTemplate TargetType="Button">

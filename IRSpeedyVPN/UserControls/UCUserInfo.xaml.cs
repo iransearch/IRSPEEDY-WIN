@@ -162,8 +162,8 @@ namespace IRSpeedyVPN.UserControls
                 ? "سرور هوشمند"
                 : globalInfo.CurrentService.Country;
             // Hardcoded preview for Germany; global Smart does not identify an exit country.
-            // Population: Destatis, 20 June 2025 (end-2024 estimate, 83.6 million).
-            // https://www.destatis.de/DE/Presse/Pressemitteilungen/2025/06/PD25_221_124.html
+            // Population: mid-2026 projection, 83,644,258 (rounded to 83.6 million).
+            // https://www.worldometers.info/world-population/germany-population/
             GermanyFacts.Visibility = !isGlobalSmart && string.Equals(
                 globalInfo.CurrentService.CountryCode?.Trim(), "DE", StringComparison.OrdinalIgnoreCase)
                 ? Visibility.Visible : Visibility.Collapsed;
