@@ -1,39 +1,55 @@
-<Window xmlns:uiScale="clr-namespace:IRSpeedyVPN.Common" uiScale:WindowUiScale.Factor="{StaticResource UiScale}" Title="روش‌های اتصال" x:Class="IRSpeedyVPN.Windows.VGAURDServiceSetting" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ctl="clr-namespace:IRSpeedyVPN.Controls"
- Width="420" Height="460" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" SizeToContent="Manual" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+<Window xmlns:uiScale="clr-namespace:IRSpeedyVPN.Common" uiScale:WindowUiScale.Factor="1" Title="روش‌های اتصال" x:Class="IRSpeedyVPN.Windows.VGAURDServiceSetting" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ctl="clr-namespace:IRSpeedyVPN.Controls"
+ Width="380" Height="416" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" SizeToContent="Manual" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
  Background="{StaticResource WindowBackgroundBrush}" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" >
  <WindowChrome.WindowChrome><WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/></WindowChrome.WindowChrome>
  <Window.Resources><ResourceDictionary>
  <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="/IRSpeedyVPN;component/Themes/ConnectionSplit/Controls.xaml"/></ResourceDictionary.MergedDictionaries>
+ <!-- Native-size text: do not resample a 420-DIP canvas through a Viewbox. -->
+ <Style x:Key="NativeMethodTitle" TargetType="TextBlock" BasedOn="{StaticResource Text.MethodTitle}">
+   <Setter Property="FontSize" Value="13"/>
+   <Setter Property="TextOptions.TextFormattingMode" Value="Display"/>
+   <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled"/>
+ </Style>
+ <Style x:Key="NativeMethodSubtitle" TargetType="TextBlock" BasedOn="{StaticResource Text.MethodSubtitle}">
+   <Setter Property="FontSize" Value="11"/>
+   <Setter Property="LineHeight" Value="15"/>
+   <Setter Property="Foreground" Value="#727D92"/>
+   <Setter Property="RenderOptions.ClearTypeHint" Value="Enabled"/>
+ </Style>
+ <Style x:Key="NativeMethodCard" TargetType="Border" BasedOn="{StaticResource MethodCardStyle}">
+   <Setter Property="MinHeight" Value="54"/>
+   <Setter Property="Padding" Value="12,8"/>
+ </Style>
  </ResourceDictionary></Window.Resources>
-<Viewbox x:Name="DesignViewport" Stretch="Uniform" FlowDirection="LeftToRight"><Border Width="420" Height="460" CornerRadius="20" Background="{StaticResource Brush.WindowBg}" FlowDirection="RightToLeft"><Grid>
- <Grid.RowDefinitions><RowDefinition Height="62"/><RowDefinition Height="*"/><RowDefinition Height="66"/></Grid.RowDefinitions>
+<Border CornerRadius="20" Background="{StaticResource Brush.WindowBg}" FlowDirection="RightToLeft"><Grid>
+ <Grid.RowDefinitions><RowDefinition Height="56"/><RowDefinition Height="*"/><RowDefinition Height="60"/></Grid.RowDefinitions>
 <Grid Background="Transparent" MouseLeftButtonDown="Header_DragMove">
  <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1"/>
  <StackPanel VerticalAlignment="Center"><TextBlock Text="روش‌های اتصال" Style="{StaticResource Text.WindowTitle}"/><TextBlock Text="فعال‌سازی و غیرفعال‌سازی روش‌های اتصال" Style="{StaticResource Text.WindowSubtitle}"/></StackPanel>
  <Button Style="{StaticResource CloseButtonStyle}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,16,0" Click="Close_Click" AutomationProperties.Name="بستن"/>
- </Grid><StackPanel Grid.Row="1" Margin="16,10" VerticalAlignment="Center"><Border x:Name="rowVpn" Style="{StaticResource MethodCardStyle}" Margin="0,6">
+ </Grid><StackPanel Grid.Row="1" Margin="14,8" VerticalAlignment="Center"><Border x:Name="rowVpn" Style="{StaticResource NativeMethodCard}" Margin="0,5">
  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="11"/><ColumnDefinition Width="*"/><ColumnDefinition Width="11"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
  <Border Width="36" Height="36" CornerRadius="11" Background="#1A1E3A8A"><Control Template="{StaticResource Icon.Globe}" Foreground="#1E3A8A" Width="18" Height="18"/></Border>
- <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="وی‌پی‌ان سراسری" Style="{StaticResource Text.MethodTitle}"/><TextBlock Text="اتصال کل ترافیک سیستم به VPN" Style="{StaticResource Text.MethodSubtitle}"/></StackPanel>
+ <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="وی‌پی‌ان سراسری" Style="{StaticResource NativeMethodTitle}"/><TextBlock Text="اتصال کل ترافیک سیستم به VPN" Style="{StaticResource NativeMethodSubtitle}"/></StackPanel>
  <ctl:SettingsToggleSwitch x:Name="VPNMode" Grid.Column="4" Width="42" Height="24" Checked="VPNMode_Checked" Unchecked="VPNMode_Unchecked" AutomationProperties.Name="وی‌پی‌ان سراسری"/>
- </Grid></Border><Border  Style="{StaticResource MethodCardStyle}" Margin="0,6">
+ </Grid></Border><Border  Style="{StaticResource NativeMethodCard}" Margin="0,5">
  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="11"/><ColumnDefinition Width="*"/><ColumnDefinition Width="11"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
  <Border Width="36" Height="36" CornerRadius="11" Background="#1A7C3AED"><Control Template="{StaticResource Icon.Stack}" Foreground="#7C3AED" Width="18" Height="18"/></Border>
- <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="پروکسی سیستمی" Style="{StaticResource Text.MethodTitle}"/><TextBlock Text="اعمال روی تنظیمات شبکه ویندوز" Style="{StaticResource Text.MethodSubtitle}"/></StackPanel>
+ <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="پروکسی سیستمی" Style="{StaticResource NativeMethodTitle}"/><TextBlock Text="اعمال روی تنظیمات شبکه ویندوز" Style="{StaticResource NativeMethodSubtitle}"/></StackPanel>
  <ctl:SettingsToggleSwitch x:Name="SystemProxy" Grid.Column="4" Width="42" Height="24" Checked="SystemProxy_Checked" Unchecked="SystemProxy_Unchecked" AutomationProperties.Name="پروکسی سیستمی"/>
- </Grid></Border><Border  Style="{StaticResource MethodCardStyle}" Margin="0,6">
+ </Grid></Border><Border  Style="{StaticResource NativeMethodCard}" Margin="0,5">
  <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="11"/><ColumnDefinition Width="*"/><ColumnDefinition Width="11"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
  <Border Width="36" Height="36" CornerRadius="11" Background="#1AF59E0B"><Control Template="{StaticResource Icon.Route}" Foreground="#F59E0B" Width="18" Height="18"/></Border>
- <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="پروکسی‌فایر" Style="{StaticResource Text.MethodTitle}"/><TextBlock Text="مسیریابی هوشمند برنامه‌های خاص" Style="{StaticResource Text.MethodSubtitle}"/></StackPanel>
+ <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="پروکسی‌فایر" Style="{StaticResource NativeMethodTitle}"/><TextBlock Text="مسیریابی هوشمند برنامه‌های خاص" Style="{StaticResource NativeMethodSubtitle}"/></StackPanel>
  <ctl:SettingsToggleSwitch x:Name="GlobalProxy" Grid.Column="4" Width="42" Height="24" Checked="GlobalProxy_Checked" Unchecked="GlobalProxy_Unchecked" AutomationProperties.Name="پروکسی‌فایر"/>
- </Grid></Border><Button Style="{StaticResource CardButtonStyle}" Margin="0,6" Click="SplitApps_Click" AutomationProperties.Name="تقسیم تونل">
- <Border Style="{StaticResource MethodCardStyle}"><Grid>
+ </Grid></Border><Button Style="{StaticResource CardButtonStyle}" Margin="0,5" Click="SplitApps_Click" AutomationProperties.Name="تقسیم تونل">
+ <Border Style="{StaticResource NativeMethodCard}"><Grid>
  <Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="11"/><ColumnDefinition Width="*"/><ColumnDefinition Width="11"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="11"/><ColumnDefinition Width="14"/></Grid.ColumnDefinitions>
  <Border Width="36" Height="36" CornerRadius="11" Background="#1A0D9488"><Control Template="{StaticResource Icon.Split}" Foreground="#0D9488" Width="18" Height="18"/></Border>
- <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="تقسیم تونل" Style="{StaticResource Text.MethodTitle}"/><TextBlock Text="انتخاب برنامه‌هایی که از تونل امن عبور کنند" Style="{StaticResource Text.MethodSubtitle}"/></StackPanel>
+ <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="تقسیم تونل" Style="{StaticResource NativeMethodTitle}"/><TextBlock Text="انتخاب برنامه‌هایی که از تونل امن عبور کنند" Style="{StaticResource NativeMethodSubtitle}"/></StackPanel>
  <TextBlock x:Name="SplitTunnelStatus" Grid.Column="4" Style="{StaticResource Text.RowStatus}"/>
  <Control Grid.Column="6" Template="{StaticResource Icon.ChevronBack}" Foreground="#C3C8D4" Width="14" Height="14" VerticalAlignment="Center"/>
  </Grid></Border></Button></StackPanel>
  <StackPanel Visibility="Collapsed"><ctl:SettingsToggleSwitch x:Name="TelegramRouteProxy" Checked="TelegramRouteProxy_Checked"/><ctl:SettingsToggleSwitch x:Name="VodService"/><ctl:SettingsToggleSwitch x:Name="GameMode" Checked="GameMode_Checked" Unchecked="GameMode_Unchecked"/></StackPanel>
- <Button Grid.Row="2" Margin="16,0,16,18" Height="48" Style="{StaticResource PrimaryButtonStyle}" Content="تایید و ذخیره" Click="btnOK_Click"/>
- </Grid></Border></Viewbox></Window>
+ <Button Grid.Row="2" Margin="14,0,14,16" Height="44" Style="{StaticResource PrimaryButtonStyle}" Content="تایید و ذخیره" Click="btnOK_Click"/>
+ </Grid></Border></Window>
