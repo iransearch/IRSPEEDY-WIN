@@ -32,8 +32,13 @@ class Program
             Check(!denied.ResponseData.IsSuccess && denied.ResponseData.Code == code && denied.ResponseData.ErrorMessage == "denied", "403 error parsing");
         }
         Check(!PasswordChangeClient.Parse(HttpStatusCode.Forbidden, "{\"st\":true,\"code\":0}", "old", "00123").ResponseData.IsSuccess, "HTTP status is authoritative");
+        var conflict = PasswordChangeClient.Parse(HttpStatusCode.Conflict, "{\"st\":false,\"code\":36,\"msg\":\"ambiguous service\"}", "old", "00123");
+        Check(!conflict.ResponseData.IsSuccess && conflict.ResponseData.Code == 36 && conflict.ResponseData.ErrorMessage == "ambiguous service", "409 preserves server explanation");
+        var missingConflictMessage = PasswordChangeClient.Parse(HttpStatusCode.Conflict, "{\"st\":false,\"code\":36}", "old", "00123");
+        Check(!missingConflictMessage.ResponseData.IsSuccess && missingConflictMessage.ResponseData.ErrorMessage.Contains("هیچ سرویسی تغییر نکرد"), "409 fallback explains no mutation");
+        Check(!PasswordChangeClient.Parse(HttpStatusCode.Conflict, "{\"st\":true,\"code\":0}", "old", "00123").ResponseData.IsSuccess, "409 cannot initiate relogin even with success body");
         var echoed = PasswordChangeClient.Parse(HttpStatusCode.BadRequest, "{\"st\":false,\"code\":32,\"msg\":\"old&pass old%26pass 00123\"}", "old&pass", "00123");
         Check(!echoed.ResponseData.ErrorMessage.Contains("old") && !echoed.ResponseData.ErrorMessage.Contains("00123"), "redact echoed credentials");
-        Console.WriteLine("PASS: form contract, fixed email, leading zeroes, TLS/redirect policy, queued response, 403/invalid responses and secret redaction; no live requests.");
+        Console.WriteLine("PASS: form contract, fixed email, leading zeroes, TLS/redirect policy, queued response, 403/409/invalid responses and secret redaction; no live requests.");
     }
 }

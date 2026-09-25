@@ -63,6 +63,8 @@ tests = r'''
  Check(await rejected.ChangeAccountPasswordAsync("old","00123")!=null && rejected.Worker==null,"nonzero code does not initiate login");
  rejected.serviceController.Next.ResponseData.Code=0;rejected.serviceController.Next.StatusCode=HttpStatusCode.Forbidden;
  Check(await rejected.ChangeAccountPasswordAsync("old","00123")!=null,"non-200 response is rejected");
+ rejected.serviceController.Next.ResponseData.Code=36;rejected.serviceController.Next.StatusCode=HttpStatusCode.Conflict;
+ Check(await rejected.ChangeAccountPasswordAsync("old","00123")!=null && rejected.Worker==null && rejected.localResource.Saves==0,"409/code36 keeps session credentials and does not initiate login");
  var stale=new Program();stale.gInfo.Username="other";stale.BeginPasswordChangeLogin("user","00123",true);
  Check(stale.Worker==null,"do not log into stale account");
  var refreshRace=new Program();refreshRace.Dispatcher.Before=()=>{refreshRace.IsUserLogin=false;};

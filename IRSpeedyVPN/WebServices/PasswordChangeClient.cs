@@ -15,7 +15,8 @@ namespace IRSpeedyVPN.WebServices
     internal static class PasswordChangeClient
     {
         internal const string Endpoint = "https://shop.ir-speedy.online/app-change-password.php";
-        internal const string OwnerEmail = "info@irspeedy.us";
+        // Compatibility field only: the endpoint ignores email and authenticates service credentials.
+        internal const string CompatibilityEmail = "info@irspeedy.us";
         internal const string ClientHeader = "windows-v1";
         private const string UnknownStatus = "وضعیت ثبت درخواست مشخص نشد؛ پیش از ارسال مجدد، وضعیت سرویس را بررسی کنید.";
 
@@ -23,7 +24,7 @@ namespace IRSpeedyVPN.WebServices
         {
             var fields = new[] {
                 new KeyValuePair<string, string>("Action", "ChangePassword"),
-                new KeyValuePair<string, string>("email", OwnerEmail),
+                new KeyValuePair<string, string>("email", CompatibilityEmail),
                 new KeyValuePair<string, string>("username", username),
                 new KeyValuePair<string, string>("password", password),
                 new KeyValuePair<string, string>("newuser", username),
@@ -108,7 +109,17 @@ namespace IRSpeedyVPN.WebServices
                     && (bool)json["st"] && json["code"]?.Type == JTokenType.Integer && (int)json["code"] == 0;
                 string message = json["msg"]?.Type == JTokenType.String ? (string)json["msg"] : null;
                 int code = json["code"]?.Type == JTokenType.Integer ? (int)json["code"] : -1;
-                if (string.IsNullOrWhiteSpace(message)) message = accepted ? "درخواست تغییر رمز ثبت شد" : UnknownStatus;
+                if (string.IsNullOrWhiteSpace(message))
+                {
+                    if (accepted) message = "درخواست تغییر رمز ثبت شد";
+                    else if (status == HttpStatusCode.Conflict && code == 36)
+                        message = "این نام کاربری و رمز به چند سرویس تعلق دارد؛ هیچ سرویسی تغییر نکرد. برای رفع تداخل با پشتیبانی تماس بگیرید.";
+                    else if (status == HttpStatusCode.Forbidden && code == 32)
+                        message = "نام کاربری یا رمز فعلی سرویس نامعتبر است.";
+                    else if (status == HttpStatusCode.Forbidden && code == 34)
+                        message = "درخواست اپ پذیرفته نشد؛ برنامه را به‌روز کنید و در صورت تکرار با پشتیبانی تماس بگیرید.";
+                    else message = UnknownStatus;
+                }
                 foreach (string secret in new[] { password, newPassword })
                     if (!string.IsNullOrEmpty(secret))
                         message = message.Replace(secret, "[حذف شد]").Replace(Uri.EscapeDataString(secret), "[حذف شد]");
