@@ -31,6 +31,12 @@ namespace IRSpeedyVPN.Models.NewService
         public long latency { get; set; }
         public DateTime latencychkTime { get; set; }
 
+        // Display-only history: failed current results never become selectable successes.
+        [Newtonsoft.Json.JsonIgnore]
+        public long LastSuccessfulLatency { get; set; }
+        [Newtonsoft.Json.JsonIgnore]
+        public DateTime LastSuccessfulCheckTime { get; set; }
+
         public VPNType VPNType =>
             (this.chainproxy != 1) ? ((this.irancell != 1) ? VPNType.NORMAL : VPNType.VOD) : VPNType.CHAIN;
     }

@@ -28,8 +28,8 @@ class Controller {
 class TimerStub {public void Change(int a,int b){} }
 class LoginForm { public string User,Password; public bool Remember; public void SetUserPassword(string u,string p,bool r){User=u;Password=p;Remember=r;} public void HideRenewMessage(){} }
 class ServerList {
- public bool probesPaused=true,initialScanFinished=true;
- public System.Collections.Generic.Dictionary<string,DateTime> countryChecked=new System.Collections.Generic.Dictionary<string,DateTime>{{"old",DateTime.UtcNow}};
+ public bool probesPaused=true;
+ public IRSpeedyVPN.Services.CountryProbeSchedule probeSchedule=new IRSpeedyVPN.Services.CountryProbeSchedule();
  public ProbeTimer probeTimer=new ProbeTimer();
  PREPARE_METHOD
  public bool Drained; public Task DrainServerChecksAsync(){Drained=true;return Task.CompletedTask;} public void PauseServerChecks(){} public void RefreshServicesFromFactory(){} }
@@ -58,7 +58,7 @@ class Program {
 tests = r'''
  static async Task Main(){
  var list=new ServerList();list.PrepareServerChecksForLogin();
- Check(!list.probesPaused && !list.initialScanFinished && list.countryChecked.Count==0 && list.probeTimer.Stopped,"successful login resets pause and full-scan history before new services load");
+ Check(!list.probesPaused && list.probeSchedule.Remaining(DateTime.UtcNow)==TimeSpan.Zero && list.probeTimer.Stopped,"successful login resumes pending country before new services load");
  var p=new Program();
  Check(await p.ChangeAccountPasswordAsync("old","00123")==null,"200/st=true/code=0 accepted");
  Check(p.serviceController.Logins==0 && p.localResource.Password=="old","acceptance alone does not persist password");
@@ -91,6 +91,6 @@ tests = r'''
 }
 '''
 with tempfile.TemporaryDirectory() as d:
- p=Path(d);(p/'Program.cs').write_text(prefix.replace('PREPARE_METHOD',prepare)+flow+login+refresh+tests)
+ p=Path(d);(p/'Program.cs').write_text(prefix.replace('PREPARE_METHOD',prepare)+flow+login+refresh+tests+(root/'IRSpeedyVPN/Services/CountryProbeSchedule.cs').read_text().replace('using System;', ''))
  (p/'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion><NoWarn>CS0649;CS0414</NoWarn></PropertyGroup></Project>')
  subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',str(p/'Checks.csproj'),'-v:q'],check=True)

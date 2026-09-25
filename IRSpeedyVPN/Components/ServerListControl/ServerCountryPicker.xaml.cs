@@ -183,6 +183,11 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private string _signalText = "—";
         public string SignalText { get => _signalText; private set { _signalText = value; On(); } }
 
+        private string _signalStatus = "";
+        public string SignalStatus { get => _signalStatus; private set { _signalStatus = value; On(); } }
+        private string _signalToolTip = "";
+        public string SignalToolTip { get => _signalToolTip; private set { _signalToolTip = value; On(); } }
+
         private Brush _signalBrush = Brushes.Gray;
         public Brush SignalBrush { get => _signalBrush; private set { _signalBrush = value; On(); } }
         private void SetSignalColor(long latency)
@@ -201,6 +206,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             if (latency <= 0) return;
             IsSelectable = true;
+            SignalStatus = "";
             Sig.FromLatency(latency, out var text);
             SignalText = text;
             SetSignalColor(latency);
@@ -229,6 +235,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public void RefreshSignals()
         {
             var urls = GetUrls();
+            SignalStatus = "";
+            SignalToolTip = "";
             var positive = urls
                 .Where(u => u.latency > 0)
                 .Select(u => u.latency)
@@ -242,6 +250,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 Sig.FromLatency(best, out var text);
                 SignalText = text;
                 SetSignalColor(best);
+                var checkedAt = urls.Where(u => u.latency == best).Max(u => u.latencychkTime);
+                SignalToolTip = "آخرین تست موفق: " + checkedAt.ToString("yyyy/MM/dd HH:mm");
                 return;
             }
 
@@ -250,12 +260,17 @@ namespace IRSpeedyVPN.Components.ServerListControl
             var allFresh = urls.Count > 0 && urls.All(u =>
                 u.latencychkTime != default(DateTime));
 
-            // Retain recorded latency while connected; age alone must not blank the list.
-            // "—" = not tested, or every URL in this row was tested and
-            // none returned a positive result. Only rows with a positive result can be
-            // selected.
-            Sig.FromLatency(allFresh ? -1 : 0, out var emptyText);
-            SignalText = emptyText;
+            // History is display-only. A failed current test never becomes a
+            // selectable success just because an earlier test had a positive ping.
+            var previous = urls.Where(u => u.LastSuccessfulLatency > 0)
+                .OrderBy(u => u.LastSuccessfulLatency).FirstOrDefault();
+            SignalText = previous != null
+                ? "آخرین: " + previous.LastSuccessfulLatency.ToString(CultureInfo.InvariantCulture) + " ms"
+                : allFresh ? "ناموفق" : "—";
+            SignalStatus = previous != null ? "تست اخیر ناموفق" : "";
+            if (previous != null)
+                SignalToolTip = "آخرین تست موفق: " + previous.LastSuccessfulCheckTime.ToString("yyyy/MM/dd HH:mm")
+                    + "؛ نتیجهٔ فعلی ناموفق است.";
             SetSignalColor(0);
         }
     }

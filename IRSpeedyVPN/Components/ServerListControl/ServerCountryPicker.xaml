@@ -284,7 +284,14 @@
                 <TextBlock Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="#1B2033" TextAlignment="Right" VerticalAlignment="Center" Margin="10,0" ToolTip="{Binding CountryName}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/></TextBlock>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
                   <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                  <TextBlock Text="{Binding SignalText}" FontWeight="Bold" FontSize="12.5" Foreground="{Binding SignalBrush}"/>
+                  <StackPanel ToolTip="{Binding SignalToolTip}">
+                    <TextBlock Text="{Binding SignalText}" FontWeight="Bold" FontSize="12.5" Foreground="{Binding SignalBrush}"/>
+                    <TextBlock Text="{Binding SignalStatus}" FontSize="10" Foreground="#9CA3B4" FlowDirection="RightToLeft">
+                      <TextBlock.Style><Style TargetType="TextBlock"><Style.Triggers>
+                        <DataTrigger Binding="{Binding SignalStatus}" Value=""><Setter Property="Visibility" Value="Collapsed"/></DataTrigger>
+                      </Style.Triggers></Style></TextBlock.Style>
+                    </TextBlock>
+                  </StackPanel>
                 </StackPanel>
               </Grid>
             </Button>

@@ -1250,6 +1250,7 @@ namespace IRSpeedyVPN
         }
         void Logout(string Message,bool resetInput=true)
         {
+            uCServerList.PauseServerChecks();
 
             Interlocked.Increment(ref connectionRequestVersion);
             UnRegiserVpnService();

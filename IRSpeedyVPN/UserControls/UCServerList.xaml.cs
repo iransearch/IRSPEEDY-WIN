@@ -67,8 +67,13 @@ namespace IRSpeedyVPN.UserControls
 
         private void UserControl_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
-            if (IsVisible) UpdateHeaderIcons();
-            else { ClearHeaderIcons(); probeTimer.Stop(); _urlTestCts?.Cancel(); }
+            if (IsVisible)
+            {
+                UpdateHeaderIcons();
+                // Loaded may not fire again after restoring a hidden window.
+                Dispatcher.BeginInvoke(new Action(() => RunBackgroundUrlTests(_currentServices)));
+            }
+            else { ClearHeaderIcons(); }
         }
 
         #endregion
@@ -148,7 +153,17 @@ namespace IRSpeedyVPN.UserControls
             _isUrlTestSupported = services.Any(x => x.IsUrlTestSupported);
             ResolveSelectedService(services);
 
+            // Retire an old API-list scan before rebinding replacement service objects.
+            _urlTestCts?.Cancel();
             _currentServices = services;
+            string context = (globalInfo?.Username ?? "") + "\n" + _selectedServiceName + "\n" + (protocol ?? "");
+            if (probeCache == null || probeCacheContext != context)
+            {
+                probeCache = new ServerCheckCache(globalInfo?.Username ?? "", _selectedServiceName + "\n" + (protocol ?? ""));
+                probeCacheContext = context;
+                probeSchedule.RestartNow();
+            }
+            probeCache.Bind(services);
             countryPicker.Load(services, _isUrlTestSupported);
             countryPicker.SelectedService = selectedService;
 
@@ -206,8 +221,11 @@ namespace IRSpeedyVPN.UserControls
             new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(3) };
         private Task probeTask = Task.CompletedTask;
         private bool probesPaused;
-        private bool initialScanFinished;
-        private readonly Dictionary<string, DateTime> countryChecked = new Dictionary<string, DateTime>();
+        private bool probeRunning;
+        private bool probeWakeRequested;
+        private ServerCheckCache probeCache;
+        private string probeCacheContext;
+        private readonly CountryProbeSchedule probeSchedule = new CountryProbeSchedule();
 
         internal void PauseServerChecks()
         {
@@ -226,10 +244,9 @@ namespace IRSpeedyVPN.UserControls
         internal void PrepareServerChecksForLogin()
         {
             // Called on the UI thread after successful login and connection cleanup,
-            // before Loaded binds the new account's services and starts their scan.
+            // before Loaded restores this account's saved results and resumes its country turn.
             probeTimer.Stop();
-            countryChecked.Clear();
-            initialScanFinished = false;
+            probeSchedule.RestartNow();
             probesPaused = false;
         }
 
@@ -237,7 +254,8 @@ namespace IRSpeedyVPN.UserControls
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ResumeServerChecksAfterCleanup); return; }
             probesPaused = false;
-            if (IsVisible) RunBackgroundUrlTests(_currentServices);
+            probeSchedule.RestartNow();
+            RunBackgroundUrlTests(_currentServices);
         }
 
         private void StopUrlTests()
@@ -248,53 +266,73 @@ namespace IRSpeedyVPN.UserControls
 
         private async void RunBackgroundUrlTests(IVPNService[] services)
         {
-            if (probesPaused || !IsVisible || services == null || !probeTask.IsCompleted
+            if (probesPaused || services == null || probeCache == null
                 || globalInfo?.CurrentService != null) return;
+            if (probeRunning) { probeWakeRequested = true; return; }
             probeTimer.Stop();
-            var groups = services.Where(s => s.IsUrlTestSupported)
-                .GroupBy(s => s.CountryCode ?? s.Country ?? "")
-                .OrderBy(g => countryChecked.TryGetValue(g.Key, out var time) ? time : DateTime.MinValue)
-                .ToArray();
-            if (groups.Length == 0) return;
-            var batch = initialScanFinished ? groups.Take(1).ToArray() : groups;
+            var remaining = probeSchedule.Remaining(DateTime.UtcNow);
+            if (remaining > TimeSpan.Zero)
+            {
+                probeTimer.Interval = remaining;
+                probeTimer.Start();
+                return;
+            }
+            var cache = probeCache;
+            string country = cache.NextCountry;
+            var group = services.Where(s => s.IsUrlTestSupported && ServerCheckCache.CountryKey(s) == country)
+                .OrderBy(s => s.ID).ToArray();
+            if (group.Length == 0) return;
             _urlTestCts?.Dispose();
             _urlTestCts = new CancellationTokenSource();
             var token = _urlTestCts.Token;
+            probeRunning = true;
+            probeWakeRequested = false;
             UrlTestCoordinator.BeginBatch();
+            bool completed = false;
             probeTask = Task.Run(() =>
             {
-                foreach (var group in batch)
+                foreach (var service in group)
                 {
-                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
-                    foreach (var service in group)
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return;
+                    DateTime started = DateTime.Now;
+                    try
                     {
-                        if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) break;
-                        try
-                        {
-                            var urls = service.GetServerUrls();
-                            // A resumed initial pass need not repeat completed records.
-                            if (!initialScanFinished && urls != null && urls.Count > 0 &&
-                                urls.All(u => u.latencychkTime != default(DateTime))) continue;
-                            if (service is TunnelPlusService tunnel)
-                                tunnel.UrlTestFull(null, false, null, () => token.IsCancellationRequested);
-                            else service.UrlTest();
-                        }
-                        catch (Exception ex) { LogHelper.WriteLog(ex); }
-                        Dispatcher.BeginInvoke(new Action(() =>
-                        {
-                            if (!token.IsCancellationRequested) countryPicker.RefreshGroup(service);
-                        }));
+                        if (service is TunnelPlusService tunnel)
+                            tunnel.UrlTestFull(null, false, null, () => token.IsCancellationRequested);
+                        else service.UrlTest();
                     }
-                    if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
-                        Dispatcher.Invoke(() => countryChecked[group.Key] = DateTime.UtcNow);
+                    catch (Exception ex) { LogHelper.WriteLog(ex); }
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
+                    {
+                        cache.Restore(service);
+                        return;
+                    }
+                    cache.Record(service, started);
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (!token.IsCancellationRequested && ReferenceEquals(services, _currentServices))
+                            countryPicker.RefreshGroup(service);
+                    }));
                 }
+                if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return;
+                cache.CompleteCountry(country);
+                completed = true;
             });
             try { await probeTask; }
             catch (Exception ex) { LogHelper.WriteLog(ex); }
-            if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
-                initialScanFinished = true;
-            if (!probesPaused && IsVisible && globalInfo?.CurrentService == null)
-                probeTimer.Start();
+            finally { probeRunning = false; }
+            if (completed && !token.IsCancellationRequested && ReferenceEquals(services, _currentServices))
+                probeSchedule.Completed(DateTime.UtcNow);
+            if (probesPaused || globalInfo?.CurrentService != null) return;
+            if (probeWakeRequested || token.IsCancellationRequested)
+            {
+                // A reload/resume arrived while the previous canceled worker was draining.
+                RunBackgroundUrlTests(_currentServices);
+                return;
+            }
+            probeTimer.Interval = probeSchedule.Remaining(DateTime.UtcNow);
+            if (probeTimer.Interval <= TimeSpan.Zero) probeTimer.Interval = TimeSpan.FromMinutes(3);
+            probeTimer.Start();
         }
 
         #endregion
