@@ -115,11 +115,13 @@ namespace IRSpeedyVPN
 
             Dispatcher.BeginInvoke((Action)(async () =>
             {
-                await uCLoginLoading.FinishStagesAsync();
+                await uCLoginLoading.FinishStagesAsync(
+                    IsUserLogin && ReferenceEquals(TransitionBox.Content, uCServerList));
                 var elapsed = startupPresentationTime?.ElapsedMilliseconds ?? 0;
                 int remaining = (int)Math.Max(0L, 4000L - elapsed);
                 if (remaining > 0) await Task.Delay(remaining);
                 if (Dispatcher.HasShutdownStarted) return;
+                await uCLoginLoading.FadeOutAsync();
                 uCLoginLoading.Visibility = Visibility.Collapsed;
                 uCLoading.Visibility = Visibility.Hidden;
                 loginPresentationActive = false;

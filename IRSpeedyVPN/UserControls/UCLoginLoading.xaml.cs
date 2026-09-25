@@ -22,7 +22,10 @@ namespace IRSpeedyVPN.UserControls
         private readonly Stopwatch stageVisibleTime = new Stopwatch();
         private int presentationVersion;
         private int requestedStage;
-        private const int MinimumStageMs = 350;
+        // Give every real stage a full, readable checking cycle, even from cache.
+        private const int MinimumStageMs = 1600;
+        private const int TickRevealMs = 600;
+        private const int CompletedHoldMs = 850;
 
         public void SetStage(int stage)
         {
@@ -65,19 +68,46 @@ namespace IRSpeedyVPN.UserControls
             if (version != presentationVersion) return;
             await WaitForStageAsync();
             if (version != presentationVersion) return;
+            // Finish just one tick, then start the next spinner after its reveal.
+            Steps[stage - 1].SetState(2);
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
+            await Task.Delay(TickRevealMs);
+            if (version != presentationVersion) return;
             ApplyStage(stage);
             await StartStageClockAsync(version);
         }
 
-        public async Task FinishStagesAsync()
+        public async Task FinishStagesAsync(bool succeeded)
         {
+            int version = presentationVersion;
             await stageQueue;
+            if (version != presentationVersion) return;
             await WaitForStageAsync();
+            if (version != presentationVersion) return;
+            // Only a confirmed successful login may complete the server stage.
+            if (succeeded && requestedStage == Steps.Length - 1)
+            {
+                Steps[Steps.Length - 1].SetState(2);
+                await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
+                await Task.Delay(CompletedHoldMs);
+            }
+        }
+
+        public async Task FadeOutAsync()
+        {
+            BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0,
+                TimeSpan.FromMilliseconds(450))
+            {
+                EasingFunction = new SineEase { EasingMode = EasingMode.EaseInOut }
+            });
+            await Task.Delay(450);
         }
         private void VisibilityChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
             if (IsVisible)
             {
+                BeginAnimation(OpacityProperty, null);
+                Opacity = 1;
                 StepsList.ItemsSource = Steps;
                 motion = ((Storyboard)Resources["LoaderMotion"]).Clone();
                 motion.Begin(this, true);

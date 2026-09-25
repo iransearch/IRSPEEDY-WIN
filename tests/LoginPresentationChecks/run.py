@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess, sys, tempfile
 root = Path(__file__).resolve().parents[2]
 source = (root/'IRSpeedyVPN/UserControls/UCLoginLoading.xaml.cs').read_text()
-methods = source[source.index('        private Task stageQueue'):source.index('        private void VisibilityChanged')]
+methods = source[source.index('        private Task stageQueue'):source.index('        public async Task FadeOutAsync')]
 harness = r'''
 using System;
 using System.Diagnostics;
@@ -31,15 +31,24 @@ class Program {
  static async Task Run(){
  var l=new Loader();l.SetStage(0);l.SetStage(1);l.SetStage(2);
  Check(l.Steps[0].State==1,"fast results do not skip account step");
- var finish=l.FinishStagesAsync();var seen=new HashSet<int>();int heartbeats=0;
- while(!finish.IsCompleted){for(int i=0;i<3;i++)if(l.Steps[i].State==1)seen.Add(i);heartbeats++;await Task.Delay(10);}
+ var clock=Stopwatch.StartNew();var ticks=new Dictionary<int,long>();
+ var finish=l.FinishStagesAsync(true);var seen=new HashSet<int>();int heartbeats=0;
+ while(!finish.IsCompleted){for(int i=0;i<3;i++){
+ if(l.Steps[i].State==1)seen.Add(i);
+ if(l.Steps[i].State==2&&!ticks.ContainsKey(i))ticks[i]=clock.ElapsedMilliseconds;
+ }heartbeats++;await Task.Delay(10);}
  await finish;
  Check(seen.Count==3,"all three real stages are visible before dismissal");
  Check(heartbeats>20,"dispatcher keeps processing while stages wait");
- l.SetStage(1);Check(l.Steps[2].State==1,"late progress cannot move backwards");
+ Check(ticks.Count==3&&ticks[0]>=1500,"first tick waits for a full checking cycle");
+ Check(ticks[1]-ticks[0]>=2100&&ticks[2]-ticks[1]>=2100,"ticks complete separately with time for their reveals");
+ Check(clock.ElapsedMilliseconds-ticks[2]>=800,"final tick stays visible before dismissal");
+ l.SetStage(1);Check(l.Steps[2].State==2,"late progress cannot move backwards");
  l.SetStage(0);l.SetStage(2);await Task.Delay(30);l.SetStage(0);await Task.Delay(800);
  Check(l.Steps[0].State==1&&l.Steps[1].State==0&&l.Steps[2].State==0,"retry invalidates pending previous stages");
- await l.FinishStagesAsync();Check(l.Steps[0].State==1,"failed authentication does not invent successful steps");
+ await l.FinishStagesAsync(false);Check(l.Steps[0].State==1,"failed authentication does not invent successful steps");
+ l.SetStage(0);l.SetStage(2);await l.FinishStagesAsync(false);
+ Check(l.Steps[2].State==1,"failed server preparation never gets a success tick");
  }
 }
 '''

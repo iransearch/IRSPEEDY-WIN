@@ -59,8 +59,17 @@
         <Grid Width="34" Height="2" Margin="0,13,0,0" VerticalAlignment="Top"
               Visibility="{Binding HasLine, Converter={StaticResource BoolToVis}}">
           <Border CornerRadius="1" Background="#E3E8F2" />
-          <Border CornerRadius="1" Background="#22B37A"
-                  Visibility="{Binding LineDone, Converter={StaticResource BoolToVis}}" />
+          <Border CornerRadius="1" Background="#22B37A">
+            <Border.Style><Style TargetType="Border">
+              <Setter Property="Opacity" Value="0" />
+              <Style.Triggers><DataTrigger Binding="{Binding LineDone}" Value="True">
+                <DataTrigger.EnterActions><BeginStoryboard x:Name="LineComplete"><Storyboard>
+                  <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.5" />
+                </Storyboard></BeginStoryboard></DataTrigger.EnterActions>
+                <DataTrigger.ExitActions><RemoveStoryboard BeginStoryboardName="LineComplete" /></DataTrigger.ExitActions>
+              </DataTrigger></Style.Triggers>
+            </Style></Border.Style>
+          </Border>
           <!-- running step: accent fill grows from the done side (physical RIGHT) in a 1.4s loop.
                In an RTL tree, local x=0 is the physical right edge → RenderTransformOrigin 0,0.5 -->
           <Border CornerRadius="1" Background="{StaticResource Brush.Accent}" RenderTransformOrigin="0,0.5"
@@ -83,7 +92,22 @@
           <Grid Width="28" Height="28" HorizontalAlignment="Center">
 
             <!-- DONE: green disc + white check -->
-            <Grid Visibility="{Binding IsDone, Converter={StaticResource BoolToVis}}">
+            <Grid IsHitTestVisible="False">
+              <Grid.Style>
+                <Style TargetType="Grid">
+                  <Setter Property="Opacity" Value="0" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsDone}" Value="True">
+                      <DataTrigger.EnterActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.45" EasingFunction="{StaticResource InOut}" />
+                      </Storyboard></BeginStoryboard></DataTrigger.EnterActions>
+                      <DataTrigger.ExitActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.3" />
+                      </Storyboard></BeginStoryboard></DataTrigger.ExitActions>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Grid.Style>
               <Ellipse>
                 <Ellipse.Fill>
                   <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
@@ -95,11 +119,37 @@
                   <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.4" Color="#159A63" />
                 </Ellipse.Effect>
               </Ellipse>
-              <Path FlowDirection="LeftToRight" Data="M1,6 L5,10 12,2" Stroke="White" StrokeThickness="2" Width="13" Height="13" Stretch="Uniform"/>
+              <Path FlowDirection="LeftToRight" Data="M1,6 L5,10 12,2" Stroke="White" StrokeThickness="2" Width="13" Height="13" Stretch="Uniform"
+                    StrokeDashArray="12 12" StrokeStartLineCap="Round" StrokeEndLineCap="Round">
+                <Path.Style><Style TargetType="Path">
+                  <Setter Property="StrokeDashOffset" Value="12" />
+                  <Style.Triggers><DataTrigger Binding="{Binding IsDone}" Value="True">
+                    <DataTrigger.EnterActions><BeginStoryboard x:Name="DrawTick"><Storyboard>
+                      <DoubleAnimation Storyboard.TargetProperty="StrokeDashOffset" From="12" To="0" BeginTime="0:0:0.1" Duration="0:0:0.45" EasingFunction="{StaticResource InOut}" />
+                    </Storyboard></BeginStoryboard></DataTrigger.EnterActions>
+                    <DataTrigger.ExitActions><RemoveStoryboard BeginStoryboardName="DrawTick" /></DataTrigger.ExitActions>
+                  </DataTrigger></Style.Triggers>
+                </Style></Path.Style>
+              </Path>
             </Grid>
 
             <!-- ACTIVE: pulsing halo + white disc + spinning arc -->
-            <Grid Visibility="{Binding IsActive, Converter={StaticResource BoolToVis}}">
+            <Grid IsHitTestVisible="False">
+              <Grid.Style>
+                <Style TargetType="Grid">
+                  <Setter Property="Opacity" Value="0" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsActive}" Value="True">
+                      <DataTrigger.EnterActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.45" EasingFunction="{StaticResource InOut}" />
+                      </Storyboard></BeginStoryboard></DataTrigger.EnterActions>
+                      <DataTrigger.ExitActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.3" />
+                      </Storyboard></BeginStoryboard></DataTrigger.ExitActions>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Grid.Style>
               <Ellipse x:Name="Pulse" Fill="{StaticResource Brush.Accent}" Opacity="0" RenderTransformOrigin="0.5,0.5">
                 <Ellipse.RenderTransform><ScaleTransform /></Ellipse.RenderTransform>
                 <Ellipse.Triggers>
@@ -144,7 +194,22 @@
             </Grid>
 
             <!-- PENDING: light disc + small gray dot -->
-            <Grid Visibility="{Binding IsPending, Converter={StaticResource BoolToVis}}">
+            <Grid IsHitTestVisible="False">
+              <Grid.Style>
+                <Style TargetType="Grid">
+                  <Setter Property="Opacity" Value="0" />
+                  <Style.Triggers>
+                    <DataTrigger Binding="{Binding IsPending}" Value="True">
+                      <DataTrigger.EnterActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.45" EasingFunction="{StaticResource InOut}" />
+                      </Storyboard></BeginStoryboard></DataTrigger.EnterActions>
+                      <DataTrigger.ExitActions><BeginStoryboard><Storyboard>
+                        <DoubleAnimation Storyboard.TargetProperty="Opacity" To="0" Duration="0:0:0.3" />
+                      </Storyboard></BeginStoryboard></DataTrigger.ExitActions>
+                    </DataTrigger>
+                  </Style.Triggers>
+                </Style>
+              </Grid.Style>
               <Ellipse Fill="#F3F5F9" Stroke="#E3E8F2" StrokeThickness="1.5" />
               <Ellipse Width="6" Height="6" Fill="#C7CCD8" />
             </Grid>
