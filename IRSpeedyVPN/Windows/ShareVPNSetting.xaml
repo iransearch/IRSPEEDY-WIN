@@ -12,7 +12,7 @@
           <ControlTemplate TargetType="Button">
             <Grid>
               <Border x:Name="Surface" CornerRadius="9" Background="{TemplateBinding Background}"/>
-              <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+              <ContentPresenter x:Name="TabContent" HorizontalAlignment="Center" VerticalAlignment="Center"/>
               <Border x:Name="FocusOutline" CornerRadius="9" BorderThickness="1" BorderBrush="#1E3A8A" Visibility="Collapsed"/>
             </Grid>
             <ControlTemplate.Triggers>
@@ -22,6 +22,12 @@
                 </Setter>
               </Trigger>
               <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="FocusOutline" Property="Visibility" Value="Visible"/></Trigger>
+              <Trigger Property="IsEnabled" Value="False">
+                <Setter Property="Cursor" Value="Arrow"/>
+                <Setter TargetName="Surface" Property="Background" Value="#E9EDF4"/>
+                <Setter TargetName="TabContent" Property="Opacity" Value="0.6"/>
+                <Setter TargetName="FocusOutline" Property="Visibility" Value="Collapsed"/>
+              </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
         </Setter.Value>
@@ -52,6 +58,7 @@
         <Grid>
           <Grid.RowDefinitions>
             <RowDefinition Height="46"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
           </Grid.RowDefinitions>
           <Border CornerRadius="12" Background="#EEF1F8" Padding="4">
@@ -60,11 +67,19 @@
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="*"/>
               </Grid.ColumnDefinitions>
-              <Button x:Name="DirectTab" Margin="0,0,2,0" Content="اشتراک مستقیم" Click="DirectTab_Click" Style="{StaticResource ShareSegmentTab}" HorizontalContentAlignment="Center" FontSize="12.5" FontWeight="Bold" Foreground="#9CA3B4" Grid.Column="0"/>
+              <Button x:Name="DirectTab" Margin="0,0,2,0" IsEnabled="False" AutomationProperties.Name="اشتراک مستقیم" AutomationProperties.HelpText="{Binding Text, ElementName=DirectAvailabilityText}" Click="DirectTab_Click" Style="{StaticResource ShareSegmentTab}" HorizontalContentAlignment="Center" FontSize="12.5" FontWeight="Bold" Foreground="#9CA3B4" Grid.Column="0">
+                <StackPanel Orientation="Horizontal">
+                  <Path x:Name="DirectTabLock" Data="M3,7 L11,7 11,14 3,14 Z M4.5,7 L4.5,4.5 C4.5,1 9.5,1 9.5,4.5 L9.5,7" Stroke="#9CA3B4" StrokeThickness="1.3" Width="11" Height="13" Stretch="Uniform" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                  <TextBlock Text="اشتراک مستقیم"/>
+                </StackPanel>
+              </Button>
               <Button x:Name="ProxyTab" Tag="Selected" Margin="2,0,0,0" Grid.Column="1" Content="اشتراک با پراکسی" Click="ProxyTab_Click" Style="{StaticResource ShareSegmentTab}" HorizontalContentAlignment="Center" FontSize="12.5" FontWeight="Bold" Background="White" Foreground="#141B33"/>
             </Grid>
           </Border>
-          <Grid x:Name="ProxyPanel" Grid.Row="1" Margin="0,16,0,0">
+          <Border x:Name="DirectAvailabilityNotice" Grid.Row="1" Margin="3,8,3,0">
+            <TextBlock x:Name="DirectAvailabilityText" FontSize="11" Foreground="#6B768D" TextAlignment="Right" FlowDirection="RightToLeft" TextWrapping="Wrap" Text="در حال بررسی پشتیبانی دستگاه از اشتراک مستقیم…"/>
+          </Border>
+          <Grid x:Name="ProxyPanel" Grid.Row="2" Margin="0,16,0,0">
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="*"/>
@@ -176,7 +191,7 @@
               </Grid>
             </Grid>
           </Grid>
-          <Grid x:Name="DirectPanel" Grid.Row="1" Margin="0,16,0,0" Visibility="Collapsed">
+          <Grid x:Name="DirectPanel" Grid.Row="2" Margin="0,16,0,0" Visibility="Collapsed">
             <Grid.RowDefinitions>
               <RowDefinition Height="Auto"/>
               <RowDefinition Height="*"/>

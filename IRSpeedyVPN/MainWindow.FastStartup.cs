@@ -178,6 +178,7 @@ namespace IRSpeedyVPN
 
                 SetLoginStage(2);
                 IsUserLogin = true;
+                Services.Hotspot.DirectSharingProbe.BeginLoginCheck();
                 serviceFactory.RenewServiceList(account.groups);
 
                 // Disable the legacy 10-minute Login() renew loop. Session maintenance

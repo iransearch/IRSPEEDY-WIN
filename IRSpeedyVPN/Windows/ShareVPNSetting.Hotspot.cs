@@ -24,6 +24,7 @@ namespace IRSpeedyVPN.Windows
         {
             if (!IsLoaded) return;
             var view = DirectHotspot.Controller.View;
+            ApplyDirectAvailability(view);
             bool active = view.State == "active";
             bool running = active || view.State == "paused" || view.State == "starting";
             bool starting = view.State == "starting" || (pendingHotspotSsid != null && view.State != "error");
@@ -36,7 +37,7 @@ namespace IRSpeedyVPN.Windows
             DirectMotion.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
             DirectOffHint.Visibility = !showCredentials && !editPasswordRequested ? Visibility.Visible : Visibility.Collapsed;
             PasswordEditorPanel.Visibility = view.State == "off" && editPasswordRequested ? Visibility.Visible : Visibility.Collapsed;
-            hotspotToggle.IsEnabled = !hotspotBusy && !proxyBusy && (running || (eligible && HotspotProcessChannel.Installed && HotspotProcessChannel.SupportedWindows));
+            hotspotToggle.IsEnabled = !hotspotBusy && !proxyBusy && (running || (DirectTab.IsEnabled && eligible && HotspotProcessChannel.Installed && HotspotProcessChannel.SupportedWindows));
             hotspotRetryStop.Visibility = view.State == "error" ? Visibility.Visible : Visibility.Collapsed;
             hotspotRetryStop.IsEnabled = !hotspotBusy;
             hotspotCredentials.Visibility = showCredentials ? Visibility.Visible : Visibility.Collapsed;
@@ -71,6 +72,8 @@ namespace IRSpeedyVPN.Windows
                     await Task.Run(() => DirectHotspot.Controller.Stop());
                 else
                 {
+                    // A queued/programmatic click cannot start an unavailable feature.
+                    if (!DirectTab.IsEnabled) return;
                     var source = Service as IHotspotSource;
                     string ssid = DirectHotspot.Ssid, password = DirectHotspot.Password;
                     // Publish exactly the credentials passed to the worker before it starts.

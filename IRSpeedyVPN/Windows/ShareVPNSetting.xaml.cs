@@ -41,6 +41,8 @@ namespace IRSpeedyVPN.Windows
         private void DirectTab_Click(object sender, RoutedEventArgs e) => SelectTab(true);
         private void SelectTab(bool direct)
         {
+            // Guard programmatic selection as well as the disabled mouse/keyboard tab.
+            if (direct && !DirectTab.IsEnabled) direct = false;
             DirectPanel.Visibility = direct ? Visibility.Visible : Visibility.Collapsed;
             ProxyPanel.Visibility = direct ? Visibility.Collapsed : Visibility.Visible;
             DirectTab.Tag = direct ? "Selected" : null;

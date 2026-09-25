@@ -960,6 +960,7 @@ namespace IRSpeedyVPN
                             btnSettings.Visibility = Visibility.Visible;
                             txtUsername.Text = gInfo.Username;
                             ShowMessage("");                            
+                            Services.Hotspot.DirectSharingProbe.BeginLoginCheck();
                             uCServerList.PrepareServerChecksForLogin();
                             ShowControl(uCServerList);
                             LogHelper.WriteExLog("[LoginPerformance] stage=list-content-set processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
