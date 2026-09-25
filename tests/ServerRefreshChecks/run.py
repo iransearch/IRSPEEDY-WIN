@@ -38,7 +38,8 @@ class UiContext : SynchronizationContext {
 }
 class Picker {
  readonly int thread=Thread.CurrentThread.ManagedThreadId;
- public int Updates,Progresses; public long Displayed;
+ public int Updates,Progresses; public long Displayed; public bool Checking;
+ public void SetGroupChecking(IVPNService s,bool checking){CheckThread();Checking=checking;}
  public Action<IVPNService> OnRefresh;
  void CheckThread(){if(Thread.CurrentThread.ManagedThreadId!=thread)throw new Exception("picker updated off UI thread");}
  public void RefreshGroup(IVPNService s){CheckThread();Updates++;Displayed=s.GetServerUrls()[0].latency;OnRefresh?.Invoke(s);}
@@ -64,12 +65,14 @@ tests = r'''
  var live=new Program();var liveService=S("DE",21);live._currentServices=new IVPNService[]{liveService};
  live.probeCache=new ServerCheckCache("live","xfast",dir);live.probeCache.Bind(live._currentServices);
  TunnelPlusService.Hold=true;
- TunnelPlusService.Probe=(service,progress,cancel)=>{if(progress==null)throw new Exception("missing live progress callback");progress(750);};
+ TunnelPlusService.Probe=(service,progress,cancel)=>{if(!live.countryPicker.Checking)throw new Exception("indicator must start before first result");if(progress==null)throw new Exception("missing live progress callback");progress(750);};
  live.RunBackgroundUrlTests(live._currentServices);
  await Until(()=>live.countryPicker.Progresses==1);
+ Check(live.countryPicker.Checking,"indicator remains active while RPC is in flight");
  Check(live.probeRunning && live.countryPicker.Updates==0 && live.countryPicker.Displayed==750,"first success reaches UI while remaining server checks are blocked");
  Check(liveService.urls[0].latencychkTime==default(DateTime),"partial progress does not commit incomplete results to cache");
  TunnelPlusService.Hold=false;await live.Settle();
+ Check(!live.countryPicker.Checking,"indicator stops when probe completes");
  Check(live.countryPicker.Displayed==121 && live.countryPicker.Updates==1,"final result replaces progress on UI thread before worker completion");
  // Exercise repeated timer cycles, failure and recovery on the SAME row objects.
  TunnelPlusService.Probe=null;
@@ -82,6 +85,7 @@ tests = r'''
  TunnelPlusService.Probe=(service,progress,cancel)=>progress(999);
  live.ResumeServerChecksAfterCleanup();await Until(()=>live.countryPicker.Displayed==999);
  await live.DrainServerChecksAsync();
+ Check(!live.countryPicker.Checking,"cancel and drain stop the indicator");
  Check(live.countryPicker.Displayed==121 && liveService.urls[0].latency==121,"cancel/drain restores cached UI before allowing connection startup");
  await live.Settle();TunnelPlusService.Hold=false;
  // Delay dispatcher progress until AFTER the final result has been applied.

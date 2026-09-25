@@ -12,6 +12,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Animation;
 using System.Windows.Media.Imaging;
 
 namespace IRSpeedyVPN.Windows
@@ -22,12 +23,14 @@ namespace IRSpeedyVPN.Windows
         private bool proxyBusy;
         private string proxyIp;
         private string proxyError;
+        private bool proxyRefreshPending, proxyListenerActive;
+        private int proxyNetworkVersion, proxySnapshotPort;
+        private object proxySnapshotService;
         public ShareVPNSetting() { InitializeComponent(); }
         private void Header_DragMove(object sender, MouseButtonEventArgs e) => Common.WindowDrag.Begin(this, e);
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
         private void Window_Loaded(object sender, RoutedEventArgs e)
         {
-            proxyIp = GetInternetInterfaceIp();
             InitializeHotspotUi();
             RefreshProxyUi();
         }
@@ -43,6 +46,7 @@ namespace IRSpeedyVPN.Windows
         {
             // Guard programmatic selection as well as the disabled mouse/keyboard tab.
             if (direct && !DirectTab.IsEnabled) direct = false;
+            if ((DirectPanel.Visibility == Visibility.Visible) == direct) return;
             DirectPanel.Visibility = direct ? Visibility.Visible : Visibility.Collapsed;
             ProxyPanel.Visibility = direct ? Visibility.Collapsed : Visibility.Visible;
             DirectTab.Tag = direct ? "Selected" : null;
@@ -52,27 +56,65 @@ namespace IRSpeedyVPN.Windows
             DirectTab.Foreground = direct ? new SolidColorBrush(Color.FromRgb(20, 27, 51)) : new SolidColorBrush(Color.FromRgb(156, 163, 180));
             ProxyTab.Foreground = direct ? new SolidColorBrush(Color.FromRgb(156, 163, 180)) : new SolidColorBrush(Color.FromRgb(20, 27, 51));
             QrPopup.IsOpen = false;
-            proxyIp = GetInternetInterfaceIp();
-            RefreshProxyUi();
+            // Tab selection only changes presentation; network queries run on a worker.
+            AnimatePanel(direct ? DirectPanel : ProxyPanel, direct ? -8 : 8);
+        }
+        private static void AnimatePanel(FrameworkElement panel, double offset)
+        {
+            panel.BeginAnimation(OpacityProperty, null);
+            var shift = new TranslateTransform();
+            panel.RenderTransform = shift;
+            if (!SystemParameters.ClientAreaAnimation) return;
+            var duration = TimeSpan.FromMilliseconds(180);
+            panel.BeginAnimation(OpacityProperty, new DoubleAnimation(0.65, 1, duration) { FillBehavior = FillBehavior.Stop });
+            shift.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(offset, 0, duration)
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut },
+                FillBehavior = FillBehavior.Stop
+            });
         }
         private bool ProxyAvailable => Service is TunnelPlusService tunnel && tunnel.IsTunnelConnected
             && ReferenceEquals(AppServices.GlobalInfo?.CurrentService, Service);
-        private bool ProxyListening()
+        private bool ProxyListening() => ProxyAvailable && Service.IsShareActive && proxyListenerActive && !proxyBusy
+            && ReferenceEquals(Service, proxySnapshotService) && Service.HttpPort == proxySnapshotPort;
+        private async void RefreshProxyUi()
         {
-            if (!ProxyAvailable || Service.IsShareActive != true || string.IsNullOrEmpty(proxyIp)) return false;
-            int port = Service.HttpPort ?? 0;
-            if (port <= 0) return false;
+            if (!IsLoaded || proxyBusy || proxyRefreshPending) return;
+            var service = Service;
+            int version = proxyNetworkVersion;
+            bool available = ProxyAvailable;
+            bool sharing = available && service.IsShareActive;
+            int port = service?.HttpPort ?? 0;
+            bool active = false;
+            string address = null;
+            proxyRefreshPending = true;
             try
             {
-                return IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(p => p.Port == port
-                    && (IPAddress.Any.Equals(p.Address) || IPAddress.IPv6Any.Equals(p.Address) || p.Address.ToString() == proxyIp));
+                if (sharing && port > 0)
+                {
+                    // Adapter/driver and listener enumeration can block; never do it on the dispatcher.
+                    await Task.Run(() =>
+                    {
+                        address = GetInternetInterfaceIp();
+                        if (string.IsNullOrEmpty(address)) return;
+                        try
+                        {
+                            active = IPGlobalProperties.GetIPGlobalProperties().GetActiveTcpListeners().Any(p => p.Port == port
+                                && (IPAddress.Any.Equals(p.Address) || IPAddress.IPv6Any.Equals(p.Address) || p.Address.ToString() == address));
+                        }
+                        catch (NetworkInformationException) { }
+                    });
+                }
             }
-            catch (NetworkInformationException) { return false; }
-        }
-        private void RefreshProxyUi()
-        {
-            if (!IsLoaded || proxyBusy) return;
-            bool active = ProxyListening();
+            catch { active = false; }
+            finally { proxyRefreshPending = false; }
+            // A delayed snapshot must not overwrite a toggle or a changed VPN session.
+            if (!IsLoaded || proxyBusy || version != proxyNetworkVersion || !ReferenceEquals(service, Service) || available != ProxyAvailable
+                || sharing != (ProxyAvailable && Service.IsShareActive) || port != (Service?.HttpPort ?? 0)) return;
+            proxyIp = address;
+            proxyListenerActive = active;
+            proxySnapshotService = service;
+            proxySnapshotPort = port;
             btnStartStop.IsChecked = ProxyAvailable && Service.IsShareActive;
             btnStartStop.IsEnabled = ProxyAvailable && !hotspotBusy;
             pnlShowIP.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
@@ -90,7 +132,9 @@ namespace IRSpeedyVPN.Windows
             if (proxyBusy || hotspotBusy || !ProxyAvailable) { RefreshProxyUi(); return; }
             bool requested = btnStartStop.IsChecked == true;
             proxyBusy = true;
+            proxyNetworkVersion++;
             proxyError = null;
+            proxyListenerActive = false;
             btnStartStop.IsEnabled = false;
             pnlShowIP.Visibility = ProxyMotion.Visibility = Visibility.Collapsed;
             ProxyStatus.Text = "در حال اعمال…";
@@ -99,7 +143,6 @@ namespace IRSpeedyVPN.Windows
             {
                 Service.IsShareActive = requested;
                 await Task.Run(() => Service.ApplyShareSetting());
-                proxyIp = GetInternetInterfaceIp();
             }
             catch { proxyError = "اعمال تنظیم انجام نشد؛ دوباره تلاش کنید."; }
             finally { proxyBusy = false; RefreshProxyUi(); RefreshHotspotUi(); }

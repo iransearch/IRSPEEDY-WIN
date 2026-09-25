@@ -318,36 +318,45 @@ namespace IRSpeedyVPN.UserControls
             {
                 if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
                 int acceptingProgress = 1;
-                await Task.Run(() =>
+                countryPicker.SetGroupChecking(service, true);
+                try
                 {
-                    DateTime started = DateTime.Now;
-                    try
+                    await Task.Run(() =>
                     {
-                        if (service is TunnelPlusService tunnel)
-                            tunnel.UrlTestFull(null, false, latency =>
-                            {
-                                Dispatcher.BeginInvoke(new Action(() =>
+                        DateTime started = DateTime.Now;
+                        try
+                        {
+                            if (service is TunnelPlusService tunnel)
+                                tunnel.UrlTestFull(null, false, latency =>
                                 {
-                                    // A queued partial result must not overwrite a final/rolled-back
-                                    // result, a replacement API row, or a newly connected session.
-                                    if (Volatile.Read(ref acceptingProgress) != 0
-                                        && !token.IsCancellationRequested && !probesPaused
-                                        && !UrlTestCoordinator.AbortRequested
-                                        && ReferenceEquals(services, _currentServices)
-                                        && globalInfo?.CurrentService == null)
-                                        countryPicker.ShowGroupProgress(service, latency);
-                                }));
-                            }, () => token.IsCancellationRequested);
-                        else service.UrlTest();
-                    }
-                    catch (Exception ex) { LogHelper.WriteLog(ex); }
-                    finally { Interlocked.Exchange(ref acceptingProgress, 0); }
+                                    Dispatcher.BeginInvoke(new Action(() =>
+                                    {
+                                        // A queued partial result must not overwrite a final/rolled-back
+                                        // result, a replacement API row, or a newly connected session.
+                                        if (Volatile.Read(ref acceptingProgress) != 0
+                                            && !token.IsCancellationRequested && !probesPaused
+                                            && !UrlTestCoordinator.AbortRequested
+                                            && ReferenceEquals(services, _currentServices)
+                                            && globalInfo?.CurrentService == null)
+                                            countryPicker.ShowGroupProgress(service, latency);
+                                    }));
+                                }, () => token.IsCancellationRequested);
+                            else service.UrlTest();
+                        }
+                        catch (Exception ex) { LogHelper.WriteLog(ex); }
+                        finally { Interlocked.Exchange(ref acceptingProgress, 0); }
 
-                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
-                        cache.Restore(service);
-                    else
-                        cache.Record(service, started);
-                });
+                        if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
+                            cache.Restore(service);
+                        else
+                            cache.Record(service, started);
+                    });
+                }
+                finally
+                {
+                    // Always stop the indicator, including cancellation and cache/write errors.
+                    countryPicker.SetGroupChecking(service, false);
+                }
 
                 // This continuation runs on the UI thread. Apply the committed result
                 // (or restored cache on cancellation) before advancing/draining the worker.

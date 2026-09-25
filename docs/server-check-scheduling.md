@@ -12,3 +12,6 @@
 - The country rotation remains three minutes after completion. The separate 60-second `RunUrlTest` cache validity is not a background UI timer.
 
 Validation: tests/ServerRefreshChecks/run.py exercises the production scheduler/cache with fake network/UI and real temporary files. tests/PasswordReloginChecks/run.py covers password-change re-login integration. Actual Windows UI/runtime testing remains necessary.
+
+## Probe indicator
+Each numbered row starts a clipped diagonal flag sheen before its RPC starts, and clears it in a UI-thread finally block, including cancellation and errors. Partial latency updates do not end the sheen. The sheen uses the smart flag’s white gradient, skew and 3.2-second easing cycle; clocks are removed when hidden/unloaded/minimized. Removed the checking/failure subtitle; cached latency and its history tooltip remain.

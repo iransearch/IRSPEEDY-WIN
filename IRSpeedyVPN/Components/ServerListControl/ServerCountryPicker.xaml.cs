@@ -183,8 +183,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private string _signalText = "—";
         public string SignalText { get => _signalText; private set { _signalText = value; On(); } }
 
-        private string _signalStatus = "";
-        public string SignalStatus { get => _signalStatus; private set { _signalStatus = value; On(); } }
+        private bool _isChecking;
+        public bool IsChecking { get => _isChecking; set { if (_isChecking == value) return; _isChecking = value; On(); } }
         private string _signalToolTip = "";
         public string SignalToolTip { get => _signalToolTip; private set { _signalToolTip = value; On(); } }
 
@@ -206,7 +206,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             if (latency <= 0) return;
             IsSelectable = true;
-            SignalStatus = "در حال بررسی";
             SignalToolTip = "نتیجهٔ اولیهٔ تست جاری؛ بررسی سایر سرورها ادامه دارد.";
             Sig.FromLatency(latency, out var text);
             SignalText = text;
@@ -236,7 +235,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public void RefreshSignals()
         {
             var urls = GetUrls();
-            SignalStatus = "";
             SignalToolTip = "";
             var positive = urls
                 .Where(u => u.latency > 0)
@@ -268,7 +266,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
             SignalText = previous != null
                 ? "آخرین: " + previous.LastSuccessfulLatency.ToString(CultureInfo.InvariantCulture) + " ms"
                 : allFresh ? "ناموفق" : "—";
-            SignalStatus = previous != null ? "تست اخیر ناموفق" : "";
             if (previous != null)
                 SignalToolTip = "آخرین تست موفق: " + previous.LastSuccessfulCheckTime.ToString("yyyy/MM/dd HH:mm")
                     + "؛ نتیجهٔ فعلی ناموفق است.";
@@ -408,6 +405,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
             icCountries.ItemsSource = _groups;
             EmptyResults.Visibility = _groups.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public void SetGroupChecking(IVPNService service, bool checking)
+        {
+            var group = _allGroups.FirstOrDefault(g => ReferenceEquals(g.Service, service));
+            if (group != null) group.IsChecking = checking;
         }
 
         /// <summary>Display progress in place without changing ordering or selection.</summary>
