@@ -264,7 +264,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             var previous = urls.Where(u => u.LastSuccessfulLatency > 0)
                 .OrderBy(u => u.LastSuccessfulLatency).FirstOrDefault();
             SignalText = previous != null
-                ? "آخرین: " + previous.LastSuccessfulLatency.ToString(CultureInfo.InvariantCulture) + " ms"
+                ? previous.LastSuccessfulLatency.ToString(CultureInfo.InvariantCulture) + " ms"
                 : allFresh ? "ناموفق" : "—";
             if (previous != null)
                 SignalToolTip = "آخرین تست موفق: " + previous.LastSuccessfulCheckTime.ToString("yyyy/MM/dd HH:mm")

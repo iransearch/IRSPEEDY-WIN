@@ -179,7 +179,7 @@
           </Path>
 
           <!-- outer LASER: a glowing dot on r139 at 3 o'clock, the whole layer rotates clockwise -->
-          <Canvas RenderTransformOrigin="0.5,0.5">
+          <Canvas RenderTransformOrigin="0.5,0.5" CacheMode="BitmapCache">
             <Canvas.RenderTransform><RotateTransform x:Name="LaserRotate" /></Canvas.RenderTransform>
             <Ellipse Canvas.Left="286" Canvas.Top="147" Width="16" Height="16" Fill="#2F6BFF" Opacity="0.55">
               <Ellipse.Effect><BlurEffect Radius="6" /></Ellipse.Effect>
@@ -201,7 +201,7 @@
 
           <!-- inner COMET on r111: tail = 14% of the circle (0°→50.4°), brighter part 28.8°→50.4°,
                white head at 50.4°. The whole layer rotates counter-clockwise. -->
-          <Canvas RenderTransformOrigin="0.5,0.5">
+          <Canvas RenderTransformOrigin="0.5,0.5" CacheMode="BitmapCache">
             <Canvas.RenderTransform><RotateTransform x:Name="CometRotate" /></Canvas.RenderTransform>
             <Path Data="M 266,155 A 111,111 0 0 1 225.75,240.53" Stroke="#60A5FA" StrokeThickness="3" Opacity="0.35"
                   StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
@@ -211,7 +211,7 @@
           </Canvas>
 
           <!-- center badge 196, breathing -->
-          <Grid Width="196" Height="196" RenderTransformOrigin="0.5,0.5">
+          <Grid Width="196" Height="196" RenderTransformOrigin="0.5,0.5" CacheMode="BitmapCache">
             <Grid.RenderTransform><ScaleTransform x:Name="BadgeScale" /></Grid.RenderTransform>
             <Ellipse>
               <Ellipse.Fill>

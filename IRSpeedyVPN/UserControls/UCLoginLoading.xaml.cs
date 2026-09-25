@@ -1,5 +1,8 @@
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
+using System.Threading.Tasks;
+using System.Windows.Threading;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -15,9 +18,61 @@ namespace IRSpeedyVPN.UserControls
             new LoginProgressStep("دریافت سرورها", false) };
         private Storyboard motion;
         public UCLoginLoading() { InitializeComponent(); DataContext = this; }
+        private Task stageQueue = Task.CompletedTask;
+        private readonly Stopwatch stageVisibleTime = new Stopwatch();
+        private int presentationVersion;
+        private int requestedStage;
+        private const int MinimumStageMs = 350;
+
         public void SetStage(int stage)
         {
-            for (int i = 0; i < Steps.Length; i++) Steps[i].SetState(i < stage ? 2 : i == stage ? 1 : 0);
+            if (stage == 0)
+            {
+                presentationVersion++;
+                requestedStage = 0;
+                ApplyStage(0);
+                stageQueue = StartStageClockAsync(presentationVersion);
+                return;
+            }
+            if (stage <= requestedStage || stage >= Steps.Length) return;
+            // Serialize real progress reports so a fast/cache login still paints each step.
+            for (int next = requestedStage + 1; next <= stage; next++)
+                stageQueue = AdvanceStageAsync(stageQueue, next, presentationVersion);
+            requestedStage = stage;
+        }
+
+        private void ApplyStage(int stage)
+        {
+            for (int i = 0; i < Steps.Length; i++)
+                Steps[i].SetState(i < stage ? 2 : i == stage ? 1 : 0);
+        }
+
+        private async Task StartStageClockAsync(int version)
+        {
+            await Dispatcher.InvokeAsync(() => { }, DispatcherPriority.Background);
+            if (version == presentationVersion) stageVisibleTime.Restart();
+        }
+
+        private async Task WaitForStageAsync()
+        {
+            int remaining = Math.Max(0, MinimumStageMs - (int)stageVisibleTime.ElapsedMilliseconds);
+            if (remaining > 0) await Task.Delay(remaining);
+        }
+
+        private async Task AdvanceStageAsync(Task previous, int stage, int version)
+        {
+            await previous;
+            if (version != presentationVersion) return;
+            await WaitForStageAsync();
+            if (version != presentationVersion) return;
+            ApplyStage(stage);
+            await StartStageClockAsync(version);
+        }
+
+        public async Task FinishStagesAsync()
+        {
+            await stageQueue;
+            await WaitForStageAsync();
         }
         private void VisibilityChanged(object sender, DependencyPropertyChangedEventArgs e)
         {
@@ -29,7 +84,7 @@ namespace IRSpeedyVPN.UserControls
             }
             else StopMotion();
         }
-        private void StopMotion() { motion?.Remove(this); motion = null; if (StepsList != null) StepsList.ItemsSource = null; }
+        private void StopMotion() { presentationVersion++; motion?.Remove(this); motion = null; if (StepsList != null) StepsList.ItemsSource = null; }
         private void Control_Unloaded(object sender, RoutedEventArgs e) => StopMotion();
     }
     public sealed class LoginProgressStep : INotifyPropertyChanged
@@ -46,6 +101,6 @@ namespace IRSpeedyVPN.UserControls
         public FontWeight LabelWeight => IsActive ? FontWeights.Bold : FontWeights.Medium;
         public Brush LabelBrush => (Brush)new BrushConverter().ConvertFromString(IsDone ? "#159A63" : IsActive ? "#141B33" : "#9CA3B4");
         public event PropertyChangedEventHandler PropertyChanged;
-        public void SetState(int value) { state = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null)); }
+        public void SetState(int value) { if (state == value) return; state = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null)); }
     }
 }

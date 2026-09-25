@@ -115,6 +115,7 @@ namespace IRSpeedyVPN
 
             Dispatcher.BeginInvoke((Action)(async () =>
             {
+                await uCLoginLoading.FinishStagesAsync();
                 var elapsed = startupPresentationTime?.ElapsedMilliseconds ?? 0;
                 int remaining = (int)Math.Max(0L, 4000L - elapsed);
                 if (remaining > 0) await Task.Delay(remaining);
@@ -136,7 +137,7 @@ namespace IRSpeedyVPN
         /// immediately and credentials/session are validated by the 30-minute maintenance
         /// task. Manual login behavior is unchanged.
         /// </summary>
-        private bool TryApplyCachedAccount(AccountInfoEx account, string password)
+        private async Task<bool> TryApplyCachedAccountAsync(AccountInfoEx account, string password)
         {
             try
             {
@@ -177,8 +178,8 @@ namespace IRSpeedyVPN
                 }
 
                 SetLoginStage(2);
+                await Task.Run(() => serviceFactory.RenewServiceList(account.groups));
                 IsUserLogin = true;
-                serviceFactory.RenewServiceList(account.groups);
 
                 // Disable the legacy 10-minute Login() renew loop. Session maintenance
                 // below validates credentials/session and refreshes servers every 30 min.
@@ -238,12 +239,17 @@ namespace IRSpeedyVPN
                     if (localAccount != null)
                     {
                         var password = resource.Password;
-                        Dispatcher.BeginInvoke((Action)(() =>
+                        Dispatcher.BeginInvoke((Action)(async () =>
                         {
                             try
                             {
                                 IsRememberChecked = true;
-                                ProcessInfo(localAccount, password);
+                                await Task.Run(() => ProcessInfo(localAccount, password));
+                            }
+                            catch (Exception ex)
+                            {
+                                LogHelper.WriteLog(ex);
+                                ShowMessage("ورود خودکار انجام نشد؛ لطفاً دوباره وارد شوید.");
                             }
                             finally
                             {
@@ -275,7 +281,7 @@ namespace IRSpeedyVPN
                     return;
                 }
 
-                Dispatcher.BeginInvoke((Action)(() =>
+                Dispatcher.BeginInvoke((Action)(async () =>
                 {
                     // Do not race an explicit login the user already started while the
                     // deferred remembered-account read was running.
@@ -288,7 +294,7 @@ namespace IRSpeedyVPN
                     // Keep credentials ready underneath the overlay. If the local cache
                     // cannot be applied, the user gets the populated manual-login form.
                     uCLogin.SetUserPassword(username, passwordValue);
-                    if (!TryApplyCachedAccount(account, passwordValue))
+                    if (!await TryApplyCachedAccountAsync(account, passwordValue))
                         ShowMessage("ورود خودکار انجام نشد؛ لطفاً دوباره وارد شوید.");
                     HideDeferredAutoLogin();
                 }));

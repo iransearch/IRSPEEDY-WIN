@@ -720,6 +720,7 @@ namespace IRSpeedyVPN
             catch (Exception ex) { LogHelper.WriteLog(ex); ShowMessage("ارتباط با سرور برقرار نیست"); }
             finally
             {
+                await uCLoginLoading.FinishStagesAsync();
                 int remaining = Math.Max(0, 4000 - (int)visibleTime.ElapsedMilliseconds);
                 if (remaining > 0) await System.Threading.Tasks.Task.Delay(remaining);
                 uCLoginLoading.Visibility = Visibility.Collapsed;
