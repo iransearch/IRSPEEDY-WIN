@@ -517,6 +517,8 @@ namespace IRSpeedyVPN
         }
         void ShowControl(object ctrl)
         {
+            // Navigation to an error/update/login page cancels a queued login result.
+            loginServerListPending = false;
             txtVersion.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
             btnSettings.Visibility = Visibility.Collapsed;
             accountMenu.IsEnabled = IsUserLogin && !ReferenceEquals(ctrl, uCUserInfo);
@@ -703,10 +705,53 @@ namespace IRSpeedyVPN
 
 
         private bool loginPresentationActive;
+        private bool loginServerListPending;
+        private bool loginServerListPrepared;
+
+        private void ShowLoginServerList()
+        {
+            if (loginPresentationActive)
+            {
+                // Do not attach the list: Loaded builds flags, bindings and cached rows.
+                loginServerListPending = true;
+                return;
+            }
+            uCServerList.PrepareServerChecksForLogin();
+            ShowControl(uCServerList);
+            Services.Hotspot.DirectSharingProbe.BeginLoginCheck();
+        }
+
+        private async Task PrepareLoginResultAsync()
+        {
+            if (!loginServerListPending || !IsUserLogin) return;
+            loginServerListPending = false;
+            // All ticks have finished. Hold that completed frame while WPF lays out
+            // the result, then fade only after its Loaded/layout work has drained.
+            uCLoginLoading.HoldCompletedFrame();
+            uCServerList.PrepareServerChecksForLogin();
+            uCServerList.PauseServerChecks();
+            ShowControl(uCServerList);
+            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+            loginServerListPrepared = true;
+        }
+
+        private void StartPostLoginChecks()
+        {
+            if (!loginServerListPrepared) return;
+            loginServerListPrepared = false;
+            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, new Action(() =>
+            {
+                if (!IsUserLogin || loginPresentationActive || !ReferenceEquals(TransitionBox.Content, uCServerList)) return;
+                uCServerList.ResumeServerChecksAfterCleanup();
+                Services.Hotspot.DirectSharingProbe.BeginLoginCheck();
+            }));
+        }
         private async void RunLoginWithPresentation(Action action)
         {
             if (loginPresentationActive) return;
             loginPresentationActive = true;
+            loginServerListPending = false;
+            loginServerListPrepared = false;
             TransitionBox.IsEnabled = false;
             uCLoginLoading.SetStage(0);
             uCLoginLoading.Visibility = Visibility.Visible;
@@ -721,13 +766,15 @@ namespace IRSpeedyVPN
             finally
             {
                 await uCLoginLoading.FinishStagesAsync(
-                    IsUserLogin && ReferenceEquals(TransitionBox.Content, uCServerList));
+                    IsUserLogin && loginServerListPending);
                 int remaining = Math.Max(0, 4000 - (int)visibleTime.ElapsedMilliseconds);
                 if (remaining > 0) await System.Threading.Tasks.Task.Delay(remaining);
+                await PrepareLoginResultAsync();
                 await uCLoginLoading.FadeOutAsync();
                 uCLoginLoading.Visibility = Visibility.Collapsed;
                 HideLoading();
                 loginPresentationActive = false;
+                StartPostLoginChecks();
                 TransitionBox.IsEnabled = true;
                 txtVersion.Visibility = ReferenceEquals(TransitionBox.Content, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
                 panelHeaderIcons.Visibility = (ReferenceEquals(TransitionBox.Content, uCServerList) || ReferenceEquals(TransitionBox.Content, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
@@ -963,11 +1010,8 @@ namespace IRSpeedyVPN
                             btnSettings.Visibility = Visibility.Visible;
                             txtUsername.Text = gInfo.Username;
                             ShowMessage("");                            
-                            uCServerList.PrepareServerChecksForLogin();
-                            ShowControl(uCServerList);
-                            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle,
-                                new Action(Services.Hotspot.DirectSharingProbe.BeginLoginCheck));
-                            LogHelper.WriteExLog("[LoginPerformance] stage=list-content-set processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
+                            ShowLoginServerList();
+                            LogHelper.WriteExLog("[LoginPerformance] stage=list-ready-for-presentation processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
                         }));
                         /*
                         var ip = GetIPInfo();

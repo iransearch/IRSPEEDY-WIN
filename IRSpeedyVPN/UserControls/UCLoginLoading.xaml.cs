@@ -93,6 +93,11 @@ namespace IRSpeedyVPN.UserControls
             }
         }
 
+        public void HoldCompletedFrame()
+        {
+            motion?.Pause(this);
+        }
+
         public async Task FadeOutAsync()
         {
             BeginAnimation(OpacityProperty, new DoubleAnimation(1, 0,

@@ -101,6 +101,8 @@ namespace IRSpeedyVPN
                 return;
 
             loginPresentationActive = true;
+            loginServerListPending = false;
+            loginServerListPrepared = false;
             TransitionBox.IsEnabled = false;
             uCLoading.Visibility = Visibility.Hidden;
             uCLoginLoading.SetStage(0);
@@ -116,15 +118,17 @@ namespace IRSpeedyVPN
             Dispatcher.BeginInvoke((Action)(async () =>
             {
                 await uCLoginLoading.FinishStagesAsync(
-                    IsUserLogin && ReferenceEquals(TransitionBox.Content, uCServerList));
+                    IsUserLogin && loginServerListPending);
                 var elapsed = startupPresentationTime?.ElapsedMilliseconds ?? 0;
                 int remaining = (int)Math.Max(0L, 4000L - elapsed);
                 if (remaining > 0) await Task.Delay(remaining);
                 if (Dispatcher.HasShutdownStarted) return;
+                await PrepareLoginResultAsync();
                 await uCLoginLoading.FadeOutAsync();
                 uCLoginLoading.Visibility = Visibility.Collapsed;
                 uCLoading.Visibility = Visibility.Hidden;
                 loginPresentationActive = false;
+                StartPostLoginChecks();
                 TransitionBox.IsEnabled = true;
                 txtVersion.Visibility = ReferenceEquals(TransitionBox.Content, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
                 panelHeaderIcons.Visibility = (ReferenceEquals(TransitionBox.Content, uCServerList) || ReferenceEquals(TransitionBox.Content, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
@@ -190,9 +194,7 @@ namespace IRSpeedyVPN
                 btnSettings.Visibility = Visibility.Visible;
                 txtUsername.Text = gInfo.Username;
                 ShowMessage("");
-                ShowControl(uCServerList);
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle,
-                    new Action(Services.Hotspot.DirectSharingProbe.BeginLoginCheck));
+                ShowLoginServerList();
                 StartSessionMaintenance();
                 return true;
             }

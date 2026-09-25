@@ -3,7 +3,7 @@ from pathlib import Path
 import subprocess, sys, tempfile
 root = Path(__file__).resolve().parents[2]
 source = (root/'IRSpeedyVPN/UserControls/UCLoginLoading.xaml.cs').read_text()
-methods = source[source.index('        private Task stageQueue'):source.index('        public async Task FadeOutAsync')]
+methods = source[source.index('        private Task stageQueue'):source.index('        public void HoldCompletedFrame')]
 harness = r'''
 using System;
 using System.Diagnostics;
