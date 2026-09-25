@@ -9,10 +9,13 @@ namespace IRSpeedyVPN.Models.Services
     [JsonConvertible]
     public class ChangePasswordResult
     {
-        [JsonProperty("st")]
+        [JsonProperty("msg")]
         public string ErrorMessage { get; set; }
-        [JsonProperty("ChangePasswordStatusisTrue")]
+        [JsonProperty("st")]
         public bool IsSuccess { get; set; }
+
+        [JsonProperty("code")]
+        public int Code { get; set; }
 
 
     }

@@ -1,4 +1,4 @@
-using IRSpeedyVPN.WebServices;
+﻿using IRSpeedyVPN.WebServices;
 using IRSpeedyVPN.UserControls;
 using IRSpeedyVPN.Windows;
 using System;
@@ -273,65 +273,16 @@ namespace IRSpeedyVPN
             }
         }
 
-        private void UCChangePassword_OnResult(UCChangePassword sender, string oldPassword, string newpassword, bool cancel)
+        private async void UCChangePassword_OnResult(UCChangePassword sender, string oldPassword, string newpassword, bool cancel)
         {
-
-            if (!cancel)
+            if (cancel) { ShowPreviousControl(); return; }
+            try
             {
-                if (string.IsNullOrEmpty(oldPassword))
-                {
-                    ShowMessage("رمز عبور فعلی را وارد کنید");
-                }
-                else if (newpassword.Length < 8 || !newpassword.Any(char.IsLetter) || !newpassword.Any(char.IsDigit))
-                {
-                    ShowMessage("طول رمز عبور جدید کوتاه است ");
-                }
-                else if (oldPassword!=gInfo.Password)
-                {
-                    ShowMessage("رمز فعلی صحیح نیست");
-                }
-                else if(oldPassword==newpassword)
-                {
-                    ShowMessage("رمز فعلی و رمز جدید یکسان است");
-                }
-                else
-                {
-                    ShowMessage("");
-                    RunAsync(() =>
-                    {
-                        try
-                        {
-                            var ret = serviceController.ChangePassword(gInfo.Username, oldPassword, newpassword);
-                            if (ret.StatusCode == System.Net.HttpStatusCode.OK)
-                            {
-                                if (ret.ResponseData.IsSuccess)
-                                {
-                                    ShowMessage("تغییر رمز با موفقیت انجام شد", true);
-                                    gInfo.Password = newpassword;
-                                    uCChangePassword.ResetInput();
-                                    if (IsRememberChecked)
-                                        localResource.SaveConfig(localResource.GetConfig(), newpassword);
-                                }
-                                else
-                                {
-                                    ShowMessage(string.IsNullOrEmpty(ret.ResponseData.ErrorMessage)?"عملیات تغییر رمز با خطا مواجه شد": ret.ResponseData.ErrorMessage);
-                                }
-
-                            }
-                            else
-                                ShowMessage("خطا در فراخوانی سرویس");
-                        }
-                        catch(Exception ex)
-                        {
-                            ShowMessage(ex.Message);
-                        }
-                });
-                }
+                string error = await ChangeAccountPasswordAsync(oldPassword, newpassword);
+                if (error != null) ShowMessage(error);
+                else sender.ResetInput();
             }
-            else
-            {
-                ShowPreviousControl();
-            }
+            catch { ShowMessage("وضعیت ثبت درخواست مشخص نشد؛ پیش از ارسال مجدد، وضعیت سرویس را بررسی کنید."); }
         }
         void ShowPreviousControl()
         {
@@ -1222,25 +1173,31 @@ namespace IRSpeedyVPN
             new SettingsPassword { Owner = owner, ChangePasswordAsync = ChangeAccountPasswordAsync }.ShowDialog();
         }
 
+        private bool passwordChangeInProgress;
         private async Task<string> ChangeAccountPasswordAsync(string oldPassword, string newPassword)
         {
             if (!IsUserLogin) return "ابتدا وارد حساب کاربری شوید.";
-            if (oldPassword != gInfo.Password) return "رمز فعلی صحیح نیست.";
+            if (passwordChangeInProgress) return "درخواست تغییر رمز در حال ارسال است.";
+            if (string.IsNullOrEmpty(oldPassword)) return "رمز فعلی را وارد کنید.";
+            if (string.IsNullOrEmpty(newPassword) || newPassword.Length < 5 || newPassword.Any(c => c < '0' || c > '9'))
+                return "رمز جدید باید حداقل ۵ رقم و فقط شامل اعداد 0 تا 9 باشد.";
+            if (oldPassword == newPassword) return "رمز فعلی و رمز جدید یکسان است.";
             string username = gInfo.Username;
-            var response = await Task.Run(() => serviceController.ChangePassword(username, oldPassword, newPassword));
-            if (response?.StatusCode == System.Net.HttpStatusCode.NotFound)
-                return "سرویس تغییر رمز در سرورهای فعلی در دسترس نیست (۴۰۴). با پشتیبانی تماس بگیرید.";
-            if (response == null || response.StatusCode != System.Net.HttpStatusCode.OK || response.ResponseData == null)
-                return "خطا در فراخوانی سرویس";
-            if (!response.ResponseData.IsSuccess)
-                return string.IsNullOrWhiteSpace(response.ResponseData.ErrorMessage) ? "تغییر رمز انجام نشد." : response.ResponseData.ErrorMessage;
-            if (IsUserLogin && gInfo.Username == username)
+            passwordChangeInProgress = true;
+            try
             {
-                gInfo.Password = newPassword;
-                if (IsRememberChecked) localResource.SaveConfig(localResource.GetConfig(), newPassword);
+                // The server validates the current password; a queued change can make the local cache stale.
+                var response = await Task.Run(() => serviceController.ChangePassword(username, oldPassword, newPassword));
+                if (response?.ResponseData == null) return "پاسخ معتبر از سرویس دریافت نشد.";
+                if (response.StatusCode != System.Net.HttpStatusCode.OK || !response.ResponseData.IsSuccess || response.ResponseData.Code != 0)
+                    return string.IsNullOrWhiteSpace(response.ResponseData.ErrorMessage)
+                        ? "درخواست تغییر رمز پذیرفته نشد." : response.ResponseData.ErrorMessage;
+                // Accepted into the server queue, NOT confirmation that the login password has changed.
+                // Keep both the active credential and remembered credential until actual server completion.
+                ShowHintPopup("درخواست تغییر رمز ثبت شد");
+                return null;
             }
-            ShowHintPopup("تغییر رمز با موفقیت انجام شد");
-            return null;
+            finally { passwordChangeInProgress = false; }
         }
 
         private void Logout_PreviewMouseDown(object sender, MouseButtonEventArgs e)

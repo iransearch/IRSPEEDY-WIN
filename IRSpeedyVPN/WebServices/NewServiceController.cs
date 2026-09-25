@@ -1,4 +1,4 @@
-using IRSpeedyVPN.Common;
+﻿using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Models.Services;
@@ -15,7 +15,6 @@ namespace IRSpeedyVPN.WebServices
 {
     public class NewServiceController
     {
-        private const string ChangePasswordKey = "5LCzP4gMSpZ5nMMmuCXnkWJwwGWgEWcJ";
 
         // Server-list payload key version. The server encrypts its response with the key
         // matching this value; an old server that does not read "kv" keeps using the
@@ -68,21 +67,7 @@ namespace IRSpeedyVPN.WebServices
             => getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString());
 
         internal BaseHttpResponse<ChangePasswordResult> ChangePassword(string username, string oldPassword, string newPassword)
-        {
-            // Now uses the same failover pool (no _mainService).
-            string url =
-                $"change_password.php?username={Utils.UrlEncode(username)}" +
-                $"&old_password={Utils.UrlEncode(oldPassword)}" +
-                $"&new_password={Utils.UrlEncode(newPassword)}" +
-                $"&key={ChangePasswordKey}";
-
-            return ExecuteWithFailover(
-                Guid.NewGuid().ToString("N"),
-                "ChangePassword",
-                (svc, timeoutSeconds) => svc.SendRequest<ChangePasswordResult>(
-                    url, null, null, null, null, timeoutSeconds, skipDoh: true),
-                LoginRequestTimeoutSeconds);
-        }
+            => PasswordChangeClient.Send(username, oldPassword, newPassword);
 
         internal BaseHttpResponse<GeoIp> GetIpInfo()
             => _geoIpService.SendRequest<GeoIp>("", null, null, null);
