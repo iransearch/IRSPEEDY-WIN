@@ -15,3 +15,8 @@ Validation: tests/ServerRefreshChecks/run.py exercises the production scheduler/
 
 ## Probe indicator
 Each numbered row starts a clipped diagonal flag sheen before its RPC starts, and clears it in a UI-thread finally block, including cancellation and errors. Partial latency updates do not end the sheen. The sheen uses the smart flag’s white gradient, skew and 3.2-second easing cycle; clocks are removed when hidden/unloaded/minimized. Removed the checking/failure subtitle; cached latency and its history tooltip remain.
+
+### Frozen-template crash correction
+The 2026-09-25 Windows crash occurred in UpdateProbeShine: WPF had frozen the DataTemplate's TranslateTransform, and even BeginAnimation(XProperty, null) cannot mutate it. ProbeShift now clones a frozen group or frozen child graph onto the specific element before either starting or removing animation. Mutable instances are reused. This also covers the unload path.
+
+Validation: tests/ProbeShineChecks/run.py exercises production ownership logic using portable transform doubles. tests/ProbeShineChecks/run-wpf.ps1 exercises the production probe methods against actual WPF frozen transforms, animation and unload (run with Windows PowerShell -STA). The latter requires Windows and was not run in the Linux workspace.

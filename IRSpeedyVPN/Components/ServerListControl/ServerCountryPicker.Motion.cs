@@ -24,8 +24,22 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private void ProbeShine_VisibilityChanged(object sender, DependencyPropertyChangedEventArgs e)
             => UpdateProbeShine((FrameworkElement)sender);
         private static TranslateTransform ProbeShift(FrameworkElement element)
-            => element.RenderTransform is TransformGroup group && group.Children.Count == 2
-                ? group.Children[1] as TranslateTransform : null;
+        {
+            var group = element.RenderTransform as TransformGroup;
+            if (group == null || group.Children.Count != 2) return null;
+            var shift = group.Children[1] as TranslateTransform;
+            if (shift == null) return null;
+            // DataTemplate transforms may be frozen/shared. Even removing an
+            // animation with BeginAnimation(..., null) requires a mutable target.
+            // Clone the whole graph so each row owns its animated child.
+            if (group.IsFrozen || shift.IsFrozen)
+            {
+                group = group.Clone();
+                element.RenderTransform = group;
+                shift = (TranslateTransform)group.Children[1];
+            }
+            return shift;
+        }
         private void UpdateProbeShine(FrameworkElement element)
         {
             var shift = ProbeShift(element);
