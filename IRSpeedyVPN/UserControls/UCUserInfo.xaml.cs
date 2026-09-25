@@ -160,7 +160,7 @@ namespace IRSpeedyVPN.UserControls
                 && globalInfo.CurrentService.SelectedServerUrl == null;
             txtCountry.Text = isGlobalSmart
                 ? "سرور هوشمند"
-                : globalInfo.CurrentService.Country;
+                : PersianDigits(globalInfo.CurrentService.Country);
             // Hardcoded preview for Germany; global Smart does not identify an exit country.
             // Population: mid-2026 projection, 83,644,258 (rounded to 83.6 million).
             // https://www.worldometers.info/world-population/germany-population/
