@@ -322,9 +322,12 @@ namespace IRSpeedyVPN.UserControls
             catch (Exception ex) { LogHelper.WriteLog(ex); }
             finally { probeRunning = false; }
             if (completed && !token.IsCancellationRequested && ReferenceEquals(services, _currentServices))
-                probeSchedule.Completed(DateTime.UtcNow);
+            {
+                if (cache.InitialScanCompleted) probeSchedule.Completed(DateTime.UtcNow);
+                else probeSchedule.RestartNow();
+            }
             if (probesPaused || globalInfo?.CurrentService != null) return;
-            if (probeWakeRequested || token.IsCancellationRequested)
+            if (probeWakeRequested || token.IsCancellationRequested || (completed && !cache.InitialScanCompleted))
             {
                 // A reload/resume arrived while the previous canceled worker was draining.
                 RunBackgroundUrlTests(_currentServices);

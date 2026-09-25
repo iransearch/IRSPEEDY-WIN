@@ -30,6 +30,9 @@ namespace IRSpeedyVPN.Services
         {
             public int Version { get; set; } = 1;
             public string NextCountry { get; set; }
+            public bool InitialScanCompleted { get; set; }
+            // Null identifies caches from the earlier rotating-only implementation.
+            public List<string> InitialCountries { get; set; }
             public Dictionary<string, Result> Results { get; set; } = new Dictionary<string, Result>();
         }
 
@@ -85,9 +88,30 @@ namespace IRSpeedyVPN.Services
                     }
                 var live = new HashSet<string>(bound.Values);
                 foreach (string key in state.Results.Keys.Where(k => !live.Contains(k)).ToArray()) state.Results.Remove(key);
+                if (state.InitialCountries == null)
+                {
+                    state.InitialCountries = items.GroupBy(CountryKey)
+                        .Where(g => g.All(service => (service.GetServerUrls() ?? new List<Url>())
+                            .Where(u => u != null && !string.IsNullOrWhiteSpace(u.url))
+                            .All(u => bound.TryGetValue(u, out string key) && state.Results.ContainsKey(key))))
+                        .Select(g => g.Key).ToList();
+                }
+                if (!state.InitialScanCompleted)
+                {
+                    // A config changed during bootstrap must be checked before bootstrap ends.
+                    state.InitialCountries.RemoveAll(c => !countries.Contains(c) || items.Where(s => CountryKey(s) == c)
+                        .SelectMany(s => s.GetServerUrls() ?? new List<Url>())
+                        .Where(u => u != null && !string.IsNullOrWhiteSpace(u.url))
+                        .Any(u => !bound.TryGetValue(u, out string key) || !state.Results.ContainsKey(key)));
+                    state.InitialScanCompleted = countries.Length > 0 && countries.All(state.InitialCountries.Contains);
+                }
                 if (!countries.Contains(state.NextCountry)) state.NextCountry = countries.FirstOrDefault();
+                if (!state.InitialScanCompleted && state.InitialCountries.Contains(state.NextCountry))
+                    state.NextCountry = countries.FirstOrDefault(c => !state.InitialCountries.Contains(c));
             }
         }
+
+        internal bool InitialScanCompleted { get { lock (gate) return state.InitialScanCompleted; } }
 
         internal string NextCountry { get { lock (gate) return state.NextCountry; } }
 
@@ -133,7 +157,14 @@ namespace IRSpeedyVPN.Services
             {
                 int index = Array.IndexOf(countries, country);
                 if (index < 0) return;
+                if (!state.InitialScanCompleted)
+                {
+                    if (!state.InitialCountries.Contains(country)) state.InitialCountries.Add(country);
+                    state.InitialScanCompleted = countries.All(state.InitialCountries.Contains);
+                }
                 state.NextCountry = countries[(index + 1) % countries.Length];
+                if (!state.InitialScanCompleted)
+                    state.NextCountry = countries.First(c => !state.InitialCountries.Contains(c));
                 Save();
             }
         }

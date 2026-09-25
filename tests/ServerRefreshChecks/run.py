@@ -13,9 +13,9 @@ namespace IRSpeedyVPN.Interfaces { interface IVPNService { int ID {get;} string 
 class TunnelPlusService : IVPNService {
  public int ID {get;set;} public string Name=>"xfast"; public string CountryCode {get;set;} public string Country=>CountryCode; public bool IsUrlTestSupported=>true;
  public List<Url> urls=new List<Url>(); public List<Url> GetServerUrls()=>urls;
- public static ConcurrentQueue<string> Calls=new ConcurrentQueue<string>(); public static volatile bool Hold,Fail;
+ public static ConcurrentQueue<string> Calls=new ConcurrentQueue<string>(); public static volatile bool Hold,Fail; public static string HoldCountry;
  public void UrlTest(){} public void UrlTestFull(object a,bool b,object c,Func<bool> cancel){
- Calls.Enqueue(CountryCode+ID); while(Hold && !cancel()) Thread.Sleep(1);
+ Calls.Enqueue(CountryCode+ID); while((Hold || HoldCountry==CountryCode) && !cancel()) Thread.Sleep(1);
  if(!cancel()) foreach(var u in urls){u.latency=Fail?-1:100+ID;u.latencychkTime=DateTime.Now;}
  }
 }
@@ -41,10 +41,35 @@ tests = r'''
  static async Task MainAsync(){
  string dir=Path.Combine(Path.GetTempPath(),"irspeedy-check-"+Guid.NewGuid());Directory.CreateDirectory(dir);
  try{
+ var bootstrap=new Program();bootstrap._currentServices=new IVPNService[]{S("DE",1),S("US",3)};
+ bootstrap.probeCache=new ServerCheckCache("bootstrap","xfast",dir);bootstrap.probeCache.Bind(bootstrap._currentServices);
+ TunnelPlusService.HoldCountry="US";bootstrap.RunBackgroundUrlTests(bootstrap._currentServices);
+ for(int i=0;i<500 && !TunnelPlusService.Calls.Contains("US3");i++)await Task.Delay(2);
+ Check(TunnelPlusService.Calls.SequenceEqual(new[]{"DE1","US3"}),"bootstrap immediately moves to next country without a three minute wait");
+ await bootstrap.DrainServerChecksAsync();await bootstrap.Settle();
+ string legacyDir=Path.Combine(dir,"legacy");Directory.CreateDirectory(legacyDir);
+ foreach(var file in Directory.GetFiles(dir,"*.json")){
+ var old=Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(file));old.Remove("InitialScanCompleted");old.Remove("InitialCountries");
+ File.WriteAllText(Path.Combine(legacyDir,Path.GetFileName(file)),old.ToString());}
+ var legacy=new ServerCheckCache("bootstrap","xfast",legacyDir);legacy.Bind(new IVPNService[]{S("DE",1),S("US",3)});
+ Check(!legacy.InitialScanCompleted && legacy.NextCountry=="US","legacy partial cache retains completed countries and resumes missing ones");
+ var resumed=new Program();resumed._currentServices=new IVPNService[]{S("DE",1),S("US",3)};
+ resumed.probeCache=new ServerCheckCache("bootstrap","xfast",dir);resumed.probeCache.Bind(resumed._currentServices);
+ Check(!resumed.probeCache.InitialScanCompleted && resumed.probeCache.NextCountry=="US","incomplete bootstrap and unfinished country persist across restart");
+ TunnelPlusService.HoldCountry=null;TunnelPlusService.Calls=new ConcurrentQueue<string>();
+ resumed.RunBackgroundUrlTests(resumed._currentServices);await resumed.Settle();
+ Check(TunnelPlusService.Calls.SequenceEqual(new[]{"US3"}) && resumed.probeCache.InitialScanCompleted,"restart completes only remaining bootstrap countries");
+ var completeCache=new ServerCheckCache("bootstrap","xfast",dir);completeCache.Bind(resumed._currentServices);
+ Check(completeCache.InitialScanCompleted,"bootstrap completion persists across restart");
+ TunnelPlusService.Calls=new ConcurrentQueue<string>();
  var p=new Program(); p._currentServices=new IVPNService[]{S("US",3),S("DE",2),S("DE",1)};
  p.probeCache=new ServerCheckCache("user","xfast",dir);p.probeCache.Bind(p._currentServices);
  p.RunBackgroundUrlTests(p._currentServices);await p.Settle();
- Check(TunnelPlusService.Calls.SequenceEqual(new[]{"DE1","DE2"}),"startup checks one country, including its numbered rows");
+ Check(TunnelPlusService.Calls.SequenceEqual(new[]{"DE1","DE2","US3"}) && p.probeCache.InitialScanCompleted,"first startup checks every country sequentially including numbered rows");
+ Check(p.probeTimer.Interval>TimeSpan.FromSeconds(175),"three minute cycle begins only after full initial scan");
+ TunnelPlusService.Calls=new ConcurrentQueue<string>();p.countryPicker.Updates=0;
+ p.ResumeServerChecksAfterCleanup();await p.Settle();
+ Check(TunnelPlusService.Calls.SequenceEqual(new[]{"DE1","DE2"}),"after bootstrap disconnect checks only the pending country");
  Check(p.countryPicker.Updates==2 && p.probeCache.NextCountry=="US","results refresh and cursor advances only after entire country");
  int count=TunnelPlusService.Calls.Count;
  p.RunBackgroundUrlTests(p._currentServices);await Task.Delay(20);
