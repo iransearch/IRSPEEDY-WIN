@@ -960,6 +960,7 @@ namespace IRSpeedyVPN
                             btnSettings.Visibility = Visibility.Visible;
                             txtUsername.Text = gInfo.Username;
                             ShowMessage("");                            
+                            uCServerList.PrepareServerChecksForLogin();
                             ShowControl(uCServerList);
                             LogHelper.WriteExLog("[LoginPerformance] stage=list-content-set processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
                         }));
@@ -1203,6 +1204,10 @@ namespace IRSpeedyVPN
             loginUiStopwatch = Stopwatch.StartNew();
             RunLoginWithPresentation(() =>
             {
+                // Wait on the worker, leaving the UI free for the canceled probe's callbacks.
+                Task checksDrained = null;
+                Dispatcher.Invoke((Action)(() => checksDrained = uCServerList.DrainServerChecksAsync()));
+                checksDrained.GetAwaiter().GetResult();
                 DisconnectAll();
                 proxifier.Detach();
                 gInfo.CurrentService = null;

@@ -223,6 +223,16 @@ namespace IRSpeedyVPN.UserControls
             await probeTask;
         }
 
+        internal void PrepareServerChecksForLogin()
+        {
+            // Called on the UI thread after successful login and connection cleanup,
+            // before Loaded binds the new account's services and starts their scan.
+            probeTimer.Stop();
+            countryChecked.Clear();
+            initialScanFinished = false;
+            probesPaused = false;
+        }
+
         internal void ResumeServerChecksAfterCleanup()
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ResumeServerChecksAfterCleanup); return; }

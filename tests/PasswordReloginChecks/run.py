@@ -7,6 +7,9 @@ flow = s[s.index('        private void BeginPasswordChangeLogin('):s.index('    
 login = s[s.index('        bool Login('):s.index('        private List<DeviceInfo> TryParseDeviceList')]
 refresh_source = (root/'IRSpeedyVPN/MainWindow.FastStartup.cs').read_text()
 refresh = refresh_source[refresh_source.index('        private void ValidateSessionAndRefreshServerList()'):refresh_source.index('        private void FastStartup_Closing')]
+list_source = (root/'IRSpeedyVPN/UserControls/UCServerList.xaml.cs').read_text(encoding='utf-8-sig')
+prepare = list_source[list_source.index('        internal void PrepareServerChecksForLogin()'):list_source.index('        internal void ResumeServerChecksAfterCleanup()')]
+assert 'uCServerList.PrepareServerChecksForLogin();\n                            ShowControl(uCServerList);' in s
 prefix = r'''
 using System; using System.Linq; using System.Threading; using System.Threading.Tasks; using System.Diagnostics; using System.Net;
 class Info { public string Username="user",Password="old",ServerResponse; public object CurrentService=new object(),settings; public void Import(Account a,string p,string t){Password=p;} }
@@ -24,7 +27,13 @@ class Controller {
 }
 class TimerStub {public void Change(int a,int b){} }
 class LoginForm { public string User,Password; public bool Remember; public void SetUserPassword(string u,string p,bool r){User=u;Password=p;Remember=r;} public void HideRenewMessage(){} }
-class ServerList { public void PauseServerChecks(){} public void RefreshServicesFromFactory(){} }
+class ServerList {
+ public bool probesPaused=true,initialScanFinished=true;
+ public System.Collections.Generic.Dictionary<string,DateTime> countryChecked=new System.Collections.Generic.Dictionary<string,DateTime>{{"old",DateTime.UtcNow}};
+ public ProbeTimer probeTimer=new ProbeTimer();
+ PREPARE_METHOD
+ public bool Drained; public Task DrainServerChecksAsync(){Drained=true;return Task.CompletedTask;} public void PauseServerChecks(){} public void RefreshServicesFromFactory(){} }
+class ProbeTimer {public bool Stopped; public void Stop(){Stopped=true;} }
 class Factory { public void RenewServiceList(object groups){} }
 class FakeDispatcher { public Action Before;public void Invoke(Action action){Before?.Invoke();action();} }
 class Label {public string Text;}
@@ -48,6 +57,8 @@ class Program {
 '''
 tests = r'''
  static async Task Main(){
+ var list=new ServerList();list.PrepareServerChecksForLogin();
+ Check(!list.probesPaused && !list.initialScanFinished && list.countryChecked.Count==0 && list.probeTimer.Stopped,"successful login resets pause and full-scan history before new services load");
  var p=new Program();
  Check(await p.ChangeAccountPasswordAsync("old","00123")==null,"200/st=true/code=0 accepted");
  Check(p.serviceController.Logins==0 && p.localResource.Password=="old","acceptance alone does not persist password");
@@ -55,6 +66,7 @@ tests = r'''
  Check(!p.IsUserLogin && ReferenceEquals(p.Screen,p.uCLogin) && p.Worker!=null,"immediate account verification screen");
  Check(p.uCLogin.Password=="00123" && !p.uCLogin.Remember,"new password and remember preference retained for retry");
  p.serviceController.Auth.StatusCode=HttpStatusCode.Forbidden;p.Worker();
+ Check(p.uCServerList.Drained,"old scan drained before password login");
  Check(p.serviceController.Logins==1 && p.serviceController.AuthPassword=="00123","first login uses new password immediately");
  Check(p.localResource.Saves==0 && p.localResource.Password=="old" && p.uCLogin.Password=="00123","failed login preserves cache and retry credential");
  p.serviceController.Auth.StatusCode=HttpStatusCode.OK;
@@ -79,6 +91,6 @@ tests = r'''
 }
 '''
 with tempfile.TemporaryDirectory() as d:
- p=Path(d);(p/'Program.cs').write_text(prefix+flow+login+refresh+tests)
+ p=Path(d);(p/'Program.cs').write_text(prefix.replace('PREPARE_METHOD',prepare)+flow+login+refresh+tests)
  (p/'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion><NoWarn>CS0649;CS0414</NoWarn></PropertyGroup></Project>')
  subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',str(p/'Checks.csproj'),'-v:q'],check=True)
