@@ -66,6 +66,8 @@ namespace IRSpeedyVPN.Services
         public bool IsTunnelConnected => IsConnected;
         volatile bool userCancelRequested;
         private readonly object connectionLifecycleGate = new object();
+        private readonly object startCancellationGate = new object();
+        private CancellationTokenSource startCancellation;
         private long connectionGeneration;
         int reconnecting;
 
@@ -126,6 +128,7 @@ namespace IRSpeedyVPN.Services
         const int CorePort = 19810;
         const int VpnCorePort = 19811;
         const int CoreConnectTimeoutMs = 8000;
+        const int CoreStartDeadlineMs = 12000;
         const int CoreConnectRetryDelayMs = 200;
         const int DisconnectStopDeadlineMs = 750;
         const int DisconnectKillWaitMs = 1000;        
@@ -149,6 +152,11 @@ namespace IRSpeedyVPN.Services
             diagnosticConnectionId = Guid.NewGuid().ToString("N");
             Diagnostic("connect-request");
             userCancelRequested = false;
+            lock (startCancellationGate)
+            {
+                startCancellation?.Dispose();
+                startCancellation = new CancellationTokenSource();
+            }
             useSystemProxy = (ProxifierRuleType == ProxifierType.None);
             IsConnected = false;
             long generation = Interlocked.Increment(ref connectionGeneration);
@@ -501,14 +509,23 @@ namespace IRSpeedyVPN.Services
                 return false;
             }
             Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData) + " needXray=" + needXray);
+            if (userCancelRequested)
+            {
+                error = "Connection canceled.";
+                return false;
+            }
             EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
             ErrorResp startResp;
             try
             {
+                var cancellation = GetStartCancellation();
                 startResp = ExecuteCoreCall(client =>
                 {
-                    SafeStopCore(client);
-                    return client.Start(new LoadConfigReq
+                    if (!SafeStopCore(client))
+                        throw new IOException("Core did not acknowledge Stop before Start.");
+                    cancellation.ThrowIfCancellationRequested();
+                    Diagnostic("core-start-rpc-begin");
+                    return client.StartWithDeadline(new LoadConfigReq
                     {
                         CoreConfig = configData ?? "",
                         DisableStats = false,
@@ -520,16 +537,31 @@ namespace IRSpeedyVPN.Services
                         ExtraNoOut = false,
                         NeedXray = needXray,
                         XrayConfig = xrayConfig ?? ""
-                    });
+                    }, CoreStartDeadlineMs, cancellation);
                 });
             }
             catch (TimeoutException ex)
             {
                 LogHelper.WriteLog(ex);
                 error = "Timeout connecting to core service.";
-                TryStopCore();
+                RecoverCoreAfterFailedStart();
                 return false;
             }
+            catch (OperationCanceledException)
+            {
+                Diagnostic("core-start-rpc-canceled");
+                error = "Connection canceled.";
+                RecoverCoreAfterFailedStart();
+                return false;
+            }
+            catch (IOException ex)
+            {
+                Diagnostic("core-start-rpc-failed", "exception=" + ex.GetType().Name);
+                error = "Core did not respond while starting. Please try again.";
+                RecoverCoreAfterFailedStart();
+                return false;
+            }
+            Diagnostic("core-start-rpc-complete");
             Diagnostic("config-apply-result", "success=" + string.IsNullOrEmpty(startResp.Error));
             if (!string.IsNullOrEmpty(startResp.Error))
             {
@@ -699,13 +731,26 @@ namespace IRSpeedyVPN.Services
         private void DisconnectInternal(bool chkprocess, bool silent, bool userCanceled)
         {
             // Invalidate queued starts before waiting for an in-flight startup to drain.
-            if (userCanceled)
-            {
-                userCancelRequested = true;
-                Interlocked.Increment(ref connectionGeneration);
-            }
+            if (userCanceled) CancelPendingConnection();
             lock (connectionLifecycleGate)
                 DisconnectLocked(chkprocess, silent, userCanceled);
+        }
+
+        // Can be called from the UI without waiting for the startup lifecycle lock.
+        internal void CancelPendingConnection()
+        {
+            userCancelRequested = true;
+            Interlocked.Increment(ref connectionGeneration);
+            CancellationTokenSource pending;
+            lock (startCancellationGate) pending = startCancellation;
+            if (pending != null)
+                Task.Run(() => { try { pending.Cancel(); } catch (ObjectDisposedException) { } });
+        }
+
+        private CancellationToken GetStartCancellation()
+        {
+            lock (startCancellationGate)
+                return startCancellation?.Token ?? CancellationToken.None;
         }
 
         private void DisconnectLocked(bool chkprocess, bool silent, bool userCanceled)
@@ -804,6 +849,11 @@ namespace IRSpeedyVPN.Services
 
         private long RunUrlTest(Url[] urls, bool force, Action<long> progress, Func<bool> cancelled)
         {
+            if (force)
+            {
+                var callerCancellation = cancelled;
+                cancelled = () => userCancelRequested || callerCancellation?.Invoke() == true;
+            }
             if (cancelled?.Invoke() == true) return urlTestSpeed;
             if (!force && UrlTestCoordinator.AbortRequested && urls == null)
                 return urlTestSpeed;
@@ -1353,8 +1403,7 @@ namespace IRSpeedyVPN.Services
 
         internal void CancelForApplicationExit()
         {
-            userCancelRequested = true;
-            Interlocked.Increment(ref connectionGeneration);
+            CancelPendingConnection();
         }
 
         internal static void StopOwnedProcessesForExit()
@@ -1595,6 +1644,30 @@ namespace IRSpeedyVPN.Services
             TryStopCore(true);
         }
 
+        private void RecoverCoreAfterFailedStart()
+        {
+            // A Start may still complete inside Core after its RPC socket closes.
+            // Only terminate a process launched and held by this service; an unrelated
+            // listener on the same port must never be killed by a failed request.
+            if (coreOwned && coreProcess != null)
+            {
+                var ownedProcess = coreProcess;
+                Diagnostic("core-start-recovery", "owned=true pid=" + DiagnosticPid(ownedProcess));
+                if (TryKillProcess(ownedProcess, DisconnectKillWaitMs))
+                {
+                    ownedProcess.Exited -= CoreProcess_Exited;
+                    ownedProcess.Dispose();
+                    coreProcess = null;
+                    coreOwned = false;
+                }
+            }
+            else
+            {
+                Diagnostic("core-start-recovery", "owned=false");
+                TryStopCore(true);
+            }
+        }
+
         private void TryStopCore(bool sharingAlreadyPaused = false)
         {
             if (!sharingAlreadyPaused)
@@ -1647,20 +1720,24 @@ namespace IRSpeedyVPN.Services
             Diagnostic("tests-drain-complete");
         }
 
-        private void SafeStopCore(LibcoreServiceClient client, bool sharingAlreadyPaused = false)
+        private bool SafeStopCore(LibcoreServiceClient client, bool sharingAlreadyPaused = false)
         {
             if (!sharingAlreadyPaused)
                 PauseSharingBeforeCoreRestart();
             try
             {
                 Diagnostic("core-stop-rpc-begin");
-                client.Stop();
+                var response = client.Stop();
+                if (!string.IsNullOrEmpty(response?.Error))
+                    throw new IOException("Core Stop returned an error.");
                 Diagnostic("core-stop-rpc-complete");
                 ConnectionDiagnostics.RequestSnapshot();
+                return true;
             }
             catch (Exception ex)
             {
                 Diagnostic("core-stop-rpc-error", "exception=" + ex.GetType().Name);
+                return false;
             }
         }
 
@@ -2147,4 +2224,3 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
-

@@ -19,13 +19,24 @@ namespace IRSpeedyVPN.Services.Libcore
 
         public static ProtorpcClient Connect(string host, int port, int timeoutMs)
         {
+            return Connect(host, port, timeoutMs, CancellationToken.None);
+        }
+
+        public static ProtorpcClient Connect(string host, int port, int timeoutMs,
+            CancellationToken cancellation)
+        {
+            cancellation.ThrowIfCancellationRequested();
             var client = new TcpClient();
             try
             {
                 var ar = client.BeginConnect(host, port, null, null);
                 using (var connected = ar.AsyncWaitHandle)
                 {
-                    if (!connected.WaitOne(timeoutMs))
+                    var result = cancellation.CanBeCanceled
+                        ? WaitHandle.WaitAny(new[] { connected, cancellation.WaitHandle }, timeoutMs)
+                        : (connected.WaitOne(timeoutMs) ? 0 : WaitHandle.WaitTimeout);
+                    if (result == 1) throw new OperationCanceledException(cancellation);
+                    if (result == WaitHandle.WaitTimeout)
                         throw new TimeoutException($"Timeout connecting to {host}:{port}.");
                     client.EndConnect(ar);
                 }
@@ -96,6 +107,27 @@ namespace IRSpeedyVPN.Services.Libcore
         {
             using (var deadline = new Timer(_ => Dispose(), null, timeoutMs, Timeout.Infinite))
                 return Call(method, requestBody, decode);
+        }
+
+        // The Start RPC has its own connection. Closing it releases a pending read
+        // immediately when the user cancels, without interrupting any other RPC.
+        public TResp CallWithDeadline<TResp>(string method, byte[] requestBody,
+            Func<byte[], TResp> decode, int timeoutMs, CancellationToken cancellation)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            using (var registration = cancellation.Register(() => Dispose()))
+            using (var deadline = new Timer(_ => Dispose(), null, timeoutMs, Timeout.Infinite))
+            {
+                try { return Call(method, requestBody, decode); }
+                catch (IOException) when (cancellation.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException(cancellation);
+                }
+                catch (ObjectDisposedException) when (cancellation.IsCancellationRequested)
+                {
+                    throw new OperationCanceledException(cancellation);
+                }
+            }
         }
 
         private void WriteFrame(byte[] data)

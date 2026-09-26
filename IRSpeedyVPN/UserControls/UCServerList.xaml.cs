@@ -32,7 +32,8 @@ namespace IRSpeedyVPN.UserControls
         private const string DefaultServiceName = "xfast";
 
         internal delegate void LoadingRequest(bool Show, string Message);
-        internal delegate void ConnectRequest(UCServerList sender, IVPNService service, string protocol);
+        internal delegate void ConnectRequest(UCServerList sender, IVPNService service, string protocol,
+            Func<IVPNService> prepareService);
         internal event LoadingRequest OnLoadingRequest;
         internal event ConnectRequest OnConnectRequest;
 
@@ -385,8 +386,7 @@ namespace IRSpeedyVPN.UserControls
             {
                 // A numbered country row has already loaded ALL URLs belonging to that
                 // row into ISmartFastConnection. Keep the mixed sing-box/Xray pool intact.
-                PauseServerChecks();
-                OnConnectRequest.Invoke(this, selectedService, selectedProtocol);
+                OnConnectRequest.Invoke(this, selectedService, selectedProtocol, null);
             }
             else
             {
@@ -398,25 +398,24 @@ namespace IRSpeedyVPN.UserControls
         {
             if (_selectedServiceName == null) return;
 
-            PauseServerChecks();
+            var serviceName = _selectedServiceName;
+            var protocol = selectedProtocol;
+            var services = serviceFactory.Services.ToArray();
 
-            var services = serviceFactory.Services
-                .Where(x => x.IsUrlTestSupported
-                    && x.Name == _selectedServiceName
-                    && (string.IsNullOrEmpty(selectedProtocol) || x.Protocols.Contains(selectedProtocol)))
-                .Randomize().ToList();
+            // Show Connecting now; enumerate links and prepare the smart pool only
+            // after the background checks have drained, on a worker thread.
+            OnConnectRequest?.Invoke(this, null, protocol ?? "",
+                () => PrepareFastestServer(services, serviceName, protocol));
+        }
 
-            if (!services.Any())
-            {
-                ResumeServerChecksAfterCleanup();
-                return;
-            }
-
-            // Smart selection only prepares the pool here. The shared connection
-            // handler owns the Connecting view, cancellation, probe drain and cleanup.
-            // Do not disconnect or show the legacy loader before entering that handler.
+        private IVPNService PrepareFastestServer(IVPNService[] candidates, string serviceName, string protocol)
+        {
             try
             {
+                var services = candidates.Where(x => x.IsUrlTestSupported
+                    && x.Name == serviceName
+                    && (string.IsNullOrEmpty(protocol) || x.Protocols.Contains(protocol)))
+                    .Randomize().ToList();
                 var smartService = services.FirstOrDefault(x => x is ISmartFastConnection);
                 var allUrls = services
                     .SelectMany(x => x.GetServerUrls() ?? new List<Url>())
@@ -431,25 +430,17 @@ namespace IRSpeedyVPN.UserControls
                 {
                     smartService.SelectedServerUrl = null;
                     ((ISmartFastConnection)smartService).SetSmartFastUrls(allUrls);
-                    OnConnectRequest?.Invoke(this, smartService, selectedProtocol ?? "");
-                    return;
+                    return smartService;
                 }
 
                 var fastest = services.Where(x => x.UrlTestSpeed > 0)
                     .OrderBy(x => x.UrlTestSpeed).FirstOrDefault();
-                if (fastest != null)
-                    OnConnectRequest?.Invoke(this, fastest, selectedProtocol ?? "");
-                else
-                {
-                    ResumeServerChecksAfterCleanup();
-                    GetMainWindow()?.ShowUserMessage("سرور یافت نشد");
-                }
+                return fastest;
             }
             catch (Exception ex)
             {
                 LogHelper.WriteLog(ex);
-                ResumeServerChecksAfterCleanup();
-                GetMainWindow()?.ShowUserMessage("آماده‌سازی اتصال انجام نشد؛ دوباره تلاش کنید.");
+                return null;
             }
         }
 

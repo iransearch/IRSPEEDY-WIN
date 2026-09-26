@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace IRSpeedyVPN.Services.Libcore
@@ -20,6 +21,14 @@ namespace IRSpeedyVPN.Services.Libcore
         public ErrorResp Start(LoadConfigReq req)
         {
             return Call("LibcoreService.Start", LibcoreProto.EncodeLoadConfigReq(req), LibcoreProto.DecodeErrorResp);
+        }
+
+        public ErrorResp StartWithDeadline(LoadConfigReq req, int timeoutMs, CancellationToken cancellation)
+        {
+            cancellation.ThrowIfCancellationRequested();
+            using (var client = ProtorpcClient.Connect(_host, _port, Math.Min(_timeoutMs, timeoutMs), cancellation))
+                return client.CallWithDeadline("LibcoreService.Start", LibcoreProto.EncodeLoadConfigReq(req),
+                    LibcoreProto.DecodeErrorResp, timeoutMs, cancellation);
         }
 
         public ErrorResp Stop()

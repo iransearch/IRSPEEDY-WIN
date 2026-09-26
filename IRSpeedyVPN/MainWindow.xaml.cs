@@ -415,9 +415,10 @@ namespace IRSpeedyVPN
 
         private async void UCUserInfo_OnDisconnectRequest(object sender, EventArgs e)
         {
-            uCServerList.PauseServerChecks();
             // Accept the user's intent immediately, without exposing cleanup details.
             long version = Interlocked.Increment(ref connectionRequestVersion);
+            if (gInfo.CurrentService is TunnelPlusService tunnel)
+                tunnel.CancelPendingConnection();
             UnRegiserVpnService();
             HideLoading();
             if (IsUserLogin)
@@ -425,6 +426,7 @@ namespace IRSpeedyVPN
                 ShowControl(uCServerList);
                 ShowMessage("");
             }
+            uCServerList.PauseServerChecks();
             await ApplyConnectionRequestAsync(null, null, version);
         }
 
@@ -433,7 +435,8 @@ namespace IRSpeedyVPN
             UCUserInfo_OnDisconnectRequest(sender, e);
         }
 
-        private async void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service, string protocol)
+        private async void UCServerList_OnConnectRequest(UCServerList sender, IVPNService service,
+            string protocol, Func<IVPNService> prepareService)
         {
             if (isUpdateAvailable)
             {
@@ -442,14 +445,17 @@ namespace IRSpeedyVPN
             }
 
             long version = Interlocked.Increment(ref connectionRequestVersion);
+            if (gInfo.CurrentService is TunnelPlusService previousTunnel)
+                previousTunnel.CancelPendingConnection();
             UnRegiserVpnService();
             // Acknowledge Connect immediately, including time spent waiting for cleanup.
             // The same loading view remains visible until this request completes or is cancelled.
             ShowLoading("در حال اتصال به سرویس", true);
-            await ApplyConnectionRequestAsync(service, protocol, version);
+            await ApplyConnectionRequestAsync(service, protocol, version, prepareService);
         }
 
-        private async Task ApplyConnectionRequestAsync(IVPNService next, string protocol, long version)
+        private async Task ApplyConnectionRequestAsync(IVPNService next, string protocol, long version,
+            Func<IVPNService> prepareService = null)
         {
             uCServerList.PauseServerChecks();
             await connectionRequestGate.WaitAsync();
@@ -457,22 +463,40 @@ namespace IRSpeedyVPN
             {
                 if (version != Interlocked.Read(ref connectionRequestVersion)) return;
                 await uCServerList.DrainServerChecksAsync();
+                if (version != Interlocked.Read(ref connectionRequestVersion)) return;
+                if (prepareService != null)
+                    next = await Task.Run(prepareService);
+                if (version != Interlocked.Read(ref connectionRequestVersion)) return;
                 var previous = gInfo.CurrentService;
                 if (previous != null)
                 {
                     // Disconnect drains the previous startup too, not just its current Core.
                     await Task.Run(() => previous.Disconnect());
-                    proxifier.Detach();
                     if (ReferenceEquals(gInfo.CurrentService, previous))
                         gInfo.CurrentService = null;
                 }
+                await Task.Run(() => proxifier.Detach());
 
                 // Several clicks may arrive during cleanup. Only the latest one starts.
-                if (version != Interlocked.Read(ref connectionRequestVersion) || next == null || !IsUserLogin)
+                if (version != Interlocked.Read(ref connectionRequestVersion) || !IsUserLogin)
                     return;
+                if (next == null)
+                {
+                    HideLoading();
+                    ShowControl(uCServerList);
+                    ShowMessage("سرور یافت نشد");
+                    return;
+                }
 
                 gInfo.CurrentService = next;
                 RegiserVpnService();
+                // Runtime validation and extraction can touch the disk. Neither belongs
+                // on the dispatcher while the Connecting view is being rendered.
+                await Task.Run(() =>
+                {
+                    if (!next.IsRequirementAvailable()) localResource.ExtractResource(true);
+                });
+                if (version != Interlocked.Read(ref connectionRequestVersion)) return;
                 await Task.Run(() => next.Connect(protocol));
             }
             catch (Exception ex)
@@ -498,8 +522,6 @@ namespace IRSpeedyVPN
         {
             UnRegiserVpnService();
             var service = gInfo.CurrentService;
-            if (!service.IsRequirementAvailable())
-                localResource.ExtractResource(true);
             long version = Interlocked.Read(ref connectionRequestVersion);
             registeredVpnService = service;
             registeredVpnHandler = (source, connected, port, message) =>
@@ -554,8 +576,6 @@ namespace IRSpeedyVPN
             }
             else
             {
-                        
-                proxifier.Detach();
                 UnRegiserVpnService();
                 await ApplyConnectionRequestAsync(null, null, version);
                 if (version != Interlocked.Read(ref connectionRequestVersion)) return;
