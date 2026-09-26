@@ -12,6 +12,7 @@ namespace IRSpeedyVPN.Services.Hotspot
         // Independent of WPF windows and the dispatcher: closing the popup or dragging
         // the main window must not starve the helper's ten-second lease.
         private static readonly Timer Timer = new Timer(_ => Poll(), null, 2000, 2000);
+        internal static void StopPollingForExit() => Timer.Dispose();
         private static int polling;
         private static void Poll()
         {

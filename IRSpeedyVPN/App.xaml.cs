@@ -18,8 +18,19 @@ namespace IRSpeedyVPN
     {
         protected override void OnExit(ExitEventArgs e)
         {
-            AppServices.Proxifier?.Detach();
-            Services.Hotspot.DirectHotspot.Controller.Stop();
+            // Normal Exit already awaited bounded cleanup. Do not repeat blocking
+            // teardown here after the dispatcher is starting to shut down.
+            if (!IRSpeedyVPN.MainWindow.ExitCleanupStarted)
+            {
+                Services.TunnelPlusService.BeginApplicationExit();
+                Services.Hotspot.DirectHotspot.StopPollingForExit();
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    try { AppServices.Proxifier?.Detach(); } catch { }
+                    try { Services.Hotspot.DirectHotspot.Controller.Stop(); } catch { }
+                });
+                Services.TunnelPlusService.StopOwnedProcessesForExit();
+            }
             base.OnExit(e);
         }
 

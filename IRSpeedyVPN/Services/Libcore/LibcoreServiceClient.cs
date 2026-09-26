@@ -24,7 +24,7 @@ namespace IRSpeedyVPN.Services.Libcore
 
         public ErrorResp Stop()
         {
-            return Call("LibcoreService.Stop", LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeErrorResp);
+            return StopWithDeadline(2000);
         }
 
         public ErrorResp StopWithDeadline(int timeoutMs)

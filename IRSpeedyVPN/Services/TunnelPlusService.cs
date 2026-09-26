@@ -1342,10 +1342,39 @@ namespace IRSpeedyVPN.Services
             }
         }
 
+        private static readonly object ownedExitGate = new object();
+        private static readonly List<Process> ownedExitProcesses = new List<Process>();
+        private static volatile bool applicationExiting;
+
+        internal static void BeginApplicationExit()
+        {
+            lock (ownedExitGate) applicationExiting = true;
+        }
+
+        internal void CancelForApplicationExit()
+        {
+            userCancelRequested = true;
+            Interlocked.Increment(ref connectionGeneration);
+        }
+
+        internal static void StopOwnedProcessesForExit()
+        {
+            Process[] processes;
+            lock (ownedExitGate) processes = ownedExitProcesses.ToArray();
+            // References are registered only at our own successful Process.Start.
+            // Never enumerate/kill external processes by executable name or listening port.
+            foreach (var process in processes)
+            {
+                try { if (!process.HasExited) process.Kill(); }
+                catch (Exception ex) { LogHelper.WriteExLog("[Exit] owned-core-stop=" + ex.GetType().Name); }
+            }
+        }
+
         private void EnsureCoreRunning(int port, ref Process process, ref bool owned)
         {
             lock (coreLock)
             {
+                if (applicationExiting) throw new OperationCanceledException("Application is exiting.");
                 if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
                 {
                     CoreDiagnosticMetadata.ObserveListener(port);
@@ -1436,8 +1465,13 @@ namespace IRSpeedyVPN.Services
 
                 try
                 {
-                    if (!startedProcess.Start())
-                        throw new InvalidOperationException("Core process could not be started.");
+                    lock (ownedExitGate)
+                    {
+                        if (applicationExiting) throw new OperationCanceledException("Application is exiting.");
+                        if (!startedProcess.Start())
+                            throw new InvalidOperationException("Core process could not be started.");
+                        ownedExitProcesses.Add(startedProcess);
+                    }
                     CoreDiagnosticMetadata.Register(port, startedProcess);
                     Diagnostic("core-spawn", "pid=" + DiagnosticPid(startedProcess) + " port=" + port
                         + " runtimeId=" + ConnectionDiagnostics.Fingerprint(corePath));
@@ -1527,7 +1561,7 @@ namespace IRSpeedyVPN.Services
 
         private void StopCoreForDisconnect()
         {
-            // TUN and shared listeners must not wait for the normal eight-second Stop RPC.
+            // TUN and shared listeners must not wait for the normal graceful Stop RPC.
             // Hotspot cleanup has already run before this point. Terminate only our owned
             // Core, with a bounded wait; reused external Cores get a short graceful deadline.
             bool fastStop = lastVpnMode || IsShareActive;
@@ -1624,7 +1658,10 @@ namespace IRSpeedyVPN.Services
                 Diagnostic("core-stop-rpc-complete");
                 ConnectionDiagnostics.RequestSnapshot();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                Diagnostic("core-stop-rpc-error", "exception=" + ex.GetType().Name);
+            }
         }
 
         private T ExecuteCoreCall<T>(Func<LibcoreServiceClient, T> call)
@@ -1728,7 +1765,13 @@ namespace IRSpeedyVPN.Services
             });
             File.WriteAllText(configPath, configJson, Encoding.ASCII);
 
-            var process = ShellExecute.ShellexecAndReturnProcess(sniPath, configPath);
+            Process process;
+            lock (ownedExitGate)
+            {
+                if (applicationExiting) throw new OperationCanceledException("Application is exiting.");
+                process = ShellExecute.ShellexecAndReturnProcess(sniPath, configPath);
+                if (process != null) ownedExitProcesses.Add(process);
+            }
             if (!WaitForSniPort("127.0.0.1", listenPort, TimeSpan.FromSeconds(10)))
             {
                 TryKillProcess(process);

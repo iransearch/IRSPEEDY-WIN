@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup><ItemGroup>
+<Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs"/>
+<Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs"/>
+<Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="LibcoreProto.cs"/>
+<Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="LibcoreMessages.cs"/>
+</ItemGroup></Project>

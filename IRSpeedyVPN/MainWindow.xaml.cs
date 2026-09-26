@@ -136,12 +136,63 @@ namespace IRSpeedyVPN
             //  notify.Visible = false;
         }
 
-        private void Notify_Exit(object sender, EventArgs e)
+        internal static bool ExitCleanupStarted { get; private set; }
+        private bool exitCleanupFinished;
+
+        private async void Notify_Exit(object sender, EventArgs e)
         {
-            Services.Hotspot.DirectHotspot.Controller.Stop();
-            proxifier.Detach();
-            DisconnectAll();
-            System.Windows.Application.Current.Shutdown();
+            if (ExitCleanupStarted) return;
+            ExitCleanupStarted = true;
+            IsEnabled = false;
+            IsUserLogin = false;
+            Interlocked.Increment(ref connectionRequestVersion);
+            UnRegiserVpnService();
+            mainTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+            sessionMaintenanceTimer?.Dispose();
+            uCServerList.PauseServerChecks();
+            TunnelPlusService.BeginApplicationExit();
+            Services.Hotspot.DirectHotspot.StopPollingForExit();
+            var services = (serviceFactory.Services ?? new List<IVPNService>())
+                .Concat(new[] { gInfo.CurrentService }).Where(s => s != null).Distinct().ToArray();
+            foreach (var service in services.OfType<TunnelPlusService>()) service.CancelForApplicationExit();
+            LogHelper.WriteExLog("[Exit] stage=cleanup-begin");
+            try
+            {
+                // Independent cleanup keeps proxy restoration reachable even if Core
+                // or the hotspot helper is stalled. The dispatcher stays available.
+                var tasks = new List<Task>
+                {
+                    RunExitCleanup("hotspot", () => Services.Hotspot.DirectHotspot.Controller.Stop()),
+                    RunExitCleanup("proxifier", () => proxifier.Detach()),
+                    RunExitCleanup("system-proxy", () => SystemProxy.Disable())
+                };
+                tasks.AddRange(services.Select(service => RunExitCleanup("service", () => service.Disconnect())));
+                var cleanup = Task.WhenAll(tasks);
+                if (await Task.WhenAny(cleanup, Task.Delay(8000)) != cleanup)
+                    LogHelper.WriteExLog("[Exit] stage=cleanup-deadline elapsedMs=8000");
+                // A test service may own the shared core while CurrentService merely
+                // reused it. Use the launch registry instead of CurrentService ownership.
+                var stopOwned = RunExitCleanup("owned-cores", TunnelPlusService.StopOwnedProcessesForExit);
+                if (await Task.WhenAny(stopOwned, Task.Delay(1500)) != stopOwned)
+                    LogHelper.WriteExLog("[Exit] stage=owned-core-deadline");
+            }
+            finally
+            {
+                exitCleanupFinished = true;
+                notify.Visible = false;
+                notify.Dispose();
+                LogHelper.WriteExLog("[Exit] stage=shutdown");
+                System.Windows.Application.Current.Shutdown();
+            }
+        }
+
+        private static Task RunExitCleanup(string name, Action action)
+        {
+            return Task.Run(() =>
+            {
+                try { action(); }
+                catch (Exception ex) { LogHelper.WriteExLog("[Exit] cleanup=" + name + " exception=" + ex.GetType().Name); }
+            });
         }
         public void mainTimerCallback(object state)
         {

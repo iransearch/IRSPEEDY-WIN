@@ -523,24 +523,9 @@ namespace IRSpeedyVPN
 
         private void FastStartup_Closing(object sender, System.ComponentModel.CancelEventArgs e)
         {
-            try
-            {
-                sessionMaintenanceTimer?.Dispose();
-            }
-            catch
-            {
-            }
-
-            // A 30-minute refresh replaces ServiceFactory.Services while a connected
-            // CurrentService can remain the original live object. Ensure that exact live
-            // object is also stopped during real application shutdown.
-            try
-            {
-                gInfo?.CurrentService?.Disconnect();
-            }
-            catch
-            {
-            }
+            if (exitCleanupFinished) return;
+            e.Cancel = true;
+            Notify_Exit(sender, EventArgs.Empty);
         }
     }
 }
