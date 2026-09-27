@@ -716,7 +716,7 @@ namespace IRSpeedyVPN
         {
             // A failed connection candidate does not mean the server list is empty.
             // Keep this internal result out of the global banner above the search box.
-            if (Message == "سروری یافت نشد")
+            if (Message == "سروری یافت نشد" || Message == "سرور یافت نشد")
                 Message = string.Empty;
 
             Dispatcher.Invoke((Action)(() =>
