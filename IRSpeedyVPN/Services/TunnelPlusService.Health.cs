@@ -1,5 +1,6 @@
 using IRSpeedyVPN.Common;
 using Microsoft.Win32;
+using Shadowsocks.Controller;
 using System;
 using System.Linq;
 using System.Net;

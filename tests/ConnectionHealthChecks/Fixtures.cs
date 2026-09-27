@@ -15,6 +15,9 @@ namespace IRSpeedyVPN.Services
         private void TryReconnect() { }
         private void Diagnostic(string stage, string detail) { }
     }
+}
+namespace Shadowsocks.Controller
+{
     internal static class WinINet
     {
         internal static void SetIEProxy(bool enable, bool global, string server, string pac) { }
