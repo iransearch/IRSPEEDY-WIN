@@ -54,46 +54,94 @@ namespace IRSpeedyVPN.Services.Libcore
         }
 
         public TestResp TestWithProgress(TestReq req, Action<TestResp> report,
-            Func<bool> cancelled, Action<string> log)
+            Func<bool> cancelled, Action<string> log,
+            CancellationToken cancellation = default(CancellationToken))
         {
-            var test = Task.Run(() => Test(req));
+            Func<bool> isCancelled = () => cancellation.IsCancellationRequested || cancelled?.Invoke() == true;
+            if (isCancelled()) throw new OperationCanceledException();
+            var test = Task.Run(() =>
+            {
+                // Cancellation can arrive before this worker is scheduled.
+                if (isCancelled()) throw new OperationCanceledException();
+                return Test(req);
+            });
             var pending = new Task[] { test };
+            var stopRequested = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var wake = new Task[] { test, stopRequested.Task };
+            bool stopping = false;
+            bool querySupported = report != null;
+            bool stopAcknowledged = false;
+            using (cancellation.Register(() => stopRequested.TrySetResult(true)))
             try
             {
-                while (Task.WaitAny(pending, 150) < 0)
+                while (!test.IsCompleted)
                 {
-                    if (cancelled()) break;
-                    QueryURLTestResponse partial;
+                    // The background-test token wakes this worker as soon as Connect
+                    // cancels it. Callers without a token are still checked every 150 ms.
+                    if (Task.WaitAny(stopping ? pending : wake, 150) == 0) break;
+                    if (stopping || isCancelled())
+                    {
+                        if (!stopping) log?.Invoke("[UrlTest] stage=cancel-request");
+                        stopping = true;
+                        try
+                        {
+                            // Dedicated RPC: never wait for the lock held by Test.
+                            // Repeat until Test returns: older cores rearm their test
+                            // context and can miss a stop received during preparation.
+                            StopTest(500);
+                            if (!stopAcknowledged) log?.Invoke("[UrlTest] stage=cancel-rpc-complete");
+                            stopAcknowledged = true;
+                        }
+                        catch (Exception ex)
+                        {
+                            if (!stopAcknowledged) log?.Invoke("[UrlTest] stage=cancel-rpc-unavailable exception=" + ex.GetType().Name);
+                        }
+                        continue;
+                    }
+                    if (!querySupported) continue;
+                    QueryURLTestResponse progressResponse;
                     try
                     {
                         using (var client = ProtorpcClient.Connect(_host, _port, 250))
-                            partial = client.CallWithDeadline("LibcoreService.QueryURLTest",
+                            progressResponse = client.CallWithDeadline("LibcoreService.QueryURLTest",
                                 LibcoreProto.EncodeEmptyReq(), LibcoreProto.DecodeQueryURLTestResponse, 250);
                     }
                     catch (Exception ex)
                     {
                         // Older cores may not support querying. Keep the authoritative
                         // test running; do not restart it or turn this into a test failure.
-                        log("[UrlTest] stage=progress-unavailable exception=" + ex.GetType().Name);
-                        break;
+                        log?.Invoke("[UrlTest] stage=progress-unavailable exception=" + ex.GetType().Name);
+                        querySupported = false;
+                        continue;
                     }
-                    if (!cancelled() && partial?.Results != null)
-                        report(new TestResp { Results = partial.Results });
+                    if (!isCancelled() && progressResponse?.Results != null)
+                    {
+                        try { report(new TestResp { Results = progressResponse.Results }); }
+                        catch (Exception ex)
+                        {
+                            // A closing UI must not disable the cancellation monitor.
+                            querySupported = false;
+                            log?.Invoke("[UrlTest] stage=progress-callback-unavailable exception=" + ex.GetType().Name);
+                        }
+                    }
                 }
             }
             finally
             {
                 // A cancelled progress callback must not release test resources early.
                 try { test.GetAwaiter().GetResult(); } catch { }
+                if (stopping) log?.Invoke("[UrlTest] stage=cancel-drained");
             }
             // Always drain Test before its caller releases ports/config resources.
             // Awaiter preserves the original config rejection for candidate isolation.
             return test.GetAwaiter().GetResult();
         }
 
-        public EmptyResp StopTest()
+        public EmptyResp StopTest(int timeoutMs = 1000)
         {
-            return Call("LibcoreService.StopTest", LibcoreProto.EncodeEmptyReq(), data => new EmptyResp());
+            using (var client = ProtorpcClient.Connect(_host, _port, Math.Min(_timeoutMs, timeoutMs)))
+                return client.CallWithDeadline("LibcoreService.StopTest", LibcoreProto.EncodeEmptyReq(),
+                    data => new EmptyResp(), timeoutMs);
         }
 
         public QueryURLTestResponse QueryURLTest()

@@ -883,11 +883,12 @@ namespace IRSpeedyVPN.Services
             return urlTestSpeed;
         }
         public void UrlTestFull(Url[] urls = null, bool force = false,
-            Action<long> progress = null, Func<bool> cancelled = null)
+            Action<long> progress = null, Func<bool> cancelled = null,
+            CancellationToken cancellation = default(CancellationToken))
         {
             Diagnostic("test-group-enter", "forced=" + force);
             cancelUrlTest = false;
-            Func<bool> isCancelled = () => cancelUrlTest || cancelled?.Invoke() == true
+            Func<bool> isCancelled = () => cancellation.IsCancellationRequested || cancelUrlTest || cancelled?.Invoke() == true
                 || (!force && UrlTestCoordinator.AbortRequested);
             if (isCancelled())
                 return;
@@ -1057,10 +1058,9 @@ namespace IRSpeedyVPN.Services
                                         + " urlId=" + ConnectionDiagnostics.Fingerprint(request.Url));
                                     try
                                     {
-                                        var response = ExecuteCoreCall(client => progress == null
-                                            ? client.Test(request)
-                                            : client.TestWithProgress(request, report, isCancelled,
-                                                message => LogHelper.WriteExLog(message)));
+                                        var response = ExecuteCoreCall(client =>
+                                            client.TestWithProgress(request, progress == null ? null : report, isCancelled,
+                                                message => LogHelper.WriteExLog(message), cancellation));
                                         LogProbeAttempt(testId, diagnosticRequest, phase, request, response, tagToUrl,
                                             elapsed.ElapsedMilliseconds, null);
                                         return response;

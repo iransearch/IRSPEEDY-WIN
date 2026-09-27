@@ -341,7 +341,7 @@ namespace IRSpeedyVPN.UserControls
                                             && globalInfo?.CurrentService == null)
                                             countryPicker.ShowGroupProgress(service, latency);
                                     }));
-                                }, () => token.IsCancellationRequested);
+                                }, () => token.IsCancellationRequested, token);
                             else service.UrlTest();
                         }
                         catch (Exception ex) { LogHelper.WriteLog(ex); }

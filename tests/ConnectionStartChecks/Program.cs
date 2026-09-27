@@ -14,6 +14,7 @@ class Program
         await CheckUnresponsiveStart(false);
         await CheckUnresponsiveStart(true);
         await CheckResponsiveStart();
+        await UrlTestCancellationChecks.Run();
     }
 
     static async Task CheckUnresponsiveStart(bool cancel)
