@@ -56,6 +56,7 @@ namespace IRSpeedyVPN.UserControls
             {
                 if (globalInfo == null || !IsVisible) return;
                 RefreshServerDetail();
+                RefreshPathHealth();
                 var elapsed = DateTime.Now - globalInfo.ConnectionTime;
                 if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
                 txtConnectionTime.Text = PersianDigits(((int)elapsed.TotalHours).ToString("00") + elapsed.ToString(@"\:mm\:ss"));
@@ -243,10 +244,31 @@ namespace IRSpeedyVPN.UserControls
             }
         }
 
+        private void RefreshPathHealth()
+        {
+            var tunnel = globalInfo?.CurrentService as TunnelPlusService;
+            if (tunnel == null)
+            {
+                txtReceivedIpLabel.Text = "آی‌پی دریافتی کاربر: ";
+                ConnectedCheckBadge.Visibility = Visibility.Visible;
+                return;
+            }
+            var ip = tunnel.VerifiedPublicIp;
+            txtReceivedIp.Text = ip ?? "";
+            txtReceivedIp.ToolTip = tunnel.PathHealthStatus;
+            txtReceivedIpLabel.Text = ip == null ? tunnel.PathHealthStatus : "آی‌پی خروجی اتصال: ";
+            ConnectedCheckBadge.Visibility = ip == null ? Visibility.Hidden : Visibility.Visible;
+        }
+
         private async void RefreshPublicIp()
         {
             CancelPublicIpRequest();
             var service = globalInfo?.CurrentService;
+            if (service is TunnelPlusService)
+            {
+                RefreshPathHealth();
+                return;
+            }
             var port = service?.HttpPort;
             if (!IsLoaded || !IsVisible || !port.HasValue || port.Value < 1 || port.Value > 65535) return;
             var connectedAt = globalInfo.ConnectionTime;
