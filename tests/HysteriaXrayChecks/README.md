@@ -64,3 +64,40 @@ uses an AI member or fails; it must never use the main/default route.
 `ai-config-apply` now reports `aiPolicy=pool|blocked-empty-pool|disabled` and
 `aiFallback`. `aiRoutingEnabled=True` means the AI policy is installed; use
 `aiPolicy` to distinguish a usable pool from intentional empty-pool blocking.
+
+# Pool server DNS
+
+Smart connections pass `XrayOutboundDnsStrategy=ForceIP` to Start, encoded as
+`LoadConfigReq` field 13. In the compatible Throne Core this attaches its
+in-process sing-box resolver, pinned to `dns-direct`. ForceIP returns lookup
+errors instead of retrying the same domain through the OS resolver. The existing
+direct transport follows the physical interface and uses the configured direct
+DNS server; website DNS and AI routing rules are not replaced by this setting.
+
+The Smart generator removes `sockopt.domainStrategy` from main and AI members,
+including nested XHTTP download settings, because an explicit socket strategy
+overrides the resolver supplied by Core. Other socket/transport settings remain
+intact. Hysteria2 has no stream override and inherits the same instance resolver.
+Single-server and URL-test configurations retain their existing DNS behavior.
+Every Smart start, including reconnect and sharing reconfiguration, passes the
+strategy anew. `config-apply-begin` records `xrayDnsStrategy=ForceIP`; this records
+the requested policy, not confirmation that an old Core binary honored it.
+
+The harness verifies exact protobuf field-13 encoding, main/AI Hysteria2 and gRPC
+members, XHTTP upload/download settings, literal-IP preservation, and isolation
+from single-server/probe configs. Existing AI fallback/block and 15m/sampling-2
+checks run alongside it. These checks do not simulate Windows DNS or QUIC.
+
+Core compatibility was reviewed against `iransearch/Throne-G` commit
+`7e7c51e0011aba02a0ffe6a9bf10f3ebcaeca7da` on
+`update/fc668b60-core-only-1.3.0-beta.1`, specifically `gen/libcore.proto`,
+`server.go:xrayPreparer`, and `internal/xraydns/resolver.go`. Older Core binaries
+may ignore field 13; verify the bundled Core's source revision before release.
+This change does not replace `Resources/Files.zip` or alter Core lifecycle.
+
+On Windows with a compatible packaged Core, test a mixed domain-named Pool in
+TUN mode after both a Wi-Fi disconnect/reconnect and a WAN outage with Wi-Fi
+remaining connected. Correlate the requested DNS strategy with resolver logs
+and successful new connections. Include DNS failure: it must return an error,
+not recursively resolve through the proxy. Recheck AI-only fallback and empty-AI
+blocking. No periodic health check or network-triggered Core restart is added.

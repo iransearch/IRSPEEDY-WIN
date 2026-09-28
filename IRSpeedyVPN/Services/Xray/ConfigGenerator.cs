@@ -412,6 +412,19 @@ namespace IRSpeedyVPN.Services.Xray
             aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer,
                 serviceRoutingEnabled ?? SmartIpRouting.IsEnabled());
 
+            // The matching Start RPC wires Throne's in-process dns-direct
+            // resolver. An explicit sockopt.domainStrategy would override it
+            // with Xray's own DNS client (the OS resolver in this Pool config).
+            // Include AI members and XHTTP downloadSettings; retain all other
+            // socket/transport options and the single-server/probe policy.
+            foreach (var member in outbounds.OfType<JObject>())
+            {
+                var stream = member["streamSettings"] as JObject;
+                if (stream == null) continue;
+                foreach (var socket in stream.SelectTokens("$..sockopt").OfType<JObject>())
+                    socket.Remove("domainStrategy");
+            }
+
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
             outbounds.Add(JObject.FromObject(new Outbound
             {

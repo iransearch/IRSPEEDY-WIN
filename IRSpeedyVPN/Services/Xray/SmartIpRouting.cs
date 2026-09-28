@@ -28,6 +28,11 @@ namespace IRSpeedyVPN.Services.Xray
         public const string SmartProxyPrefix = "smart-proxy-";
         public const string SmartBalancerTag = "smart-balancer-1";
 
+        // Use the Core's dns-direct resolver for both address families. ForceIP
+        // returns a lookup failure instead of retrying through the OS resolver,
+        // which can feed back into the same Pool while TUN owns system DNS.
+        public const string OutboundDnsStrategy = "ForceIP";
+
         public const string AiProxyPrefix = "ai-proxy-";
         public const string AiBalancerTag = "ai-balancer";
         public const string AiRuleTag = "ai-routing";

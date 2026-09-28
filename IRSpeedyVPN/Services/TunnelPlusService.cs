@@ -404,7 +404,8 @@ namespace IRSpeedyVPN.Services
                     }
 
                     if (userCancelRequested) return;
-                    if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig))
+                    if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig,
+                        isSmartFast ? Xray.SmartIpRouting.OutboundDnsStrategy : ""))
                     {
                         LogHelper.WriteExLog(
                             "Core failed to start; connection dropped."
@@ -479,7 +480,8 @@ namespace IRSpeedyVPN.Services
             }
         }
 
-        private bool TryStartCoreWithConfig(string configData, out string error, bool needXray = false, string xrayConfig = null)
+        private bool TryStartCoreWithConfig(string configData, out string error, bool needXray = false,
+            string xrayConfig = null, string xrayOutboundDnsStrategy = "")
         {
             error = null;
             if (!PauseSharingBeforeCoreRestart())
@@ -511,7 +513,9 @@ namespace IRSpeedyVPN.Services
                 return false;
             }
             Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData)
-                + " xrayConfigId=" + ConnectionDiagnostics.Fingerprint(xrayConfig) + " needXray=" + needXray);
+                + " xrayConfigId=" + ConnectionDiagnostics.Fingerprint(xrayConfig) + " needXray=" + needXray
+                + " xrayDnsStrategy=" + (needXray && !string.IsNullOrEmpty(xrayOutboundDnsStrategy)
+                    ? xrayOutboundDnsStrategy : "unwired"));
             if (needXray && !string.IsNullOrEmpty(xrayConfig))
             {
                 var plan = JObject.Parse(xrayConfig);
@@ -554,7 +558,8 @@ namespace IRSpeedyVPN.Services
                         ExtraProcessConfDir = "",
                         ExtraNoOut = false,
                         NeedXray = needXray,
-                        XrayConfig = xrayConfig ?? ""
+                        XrayConfig = xrayConfig ?? "",
+                        XrayOutboundDnsStrategy = needXray ? xrayOutboundDnsStrategy : ""
                     }, CoreStartDeadlineMs, cancellation);
                 });
             }

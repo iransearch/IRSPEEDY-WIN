@@ -55,6 +55,10 @@ namespace IRSpeedyVPN.Services.Libcore
         public bool NeedXray { get; set; }
 
         public string XrayConfig { get; set; }
+
+        // LoadConfigReq field 13 in Throne: resolve Xray server domains through
+        // the running sing-box instance's dns-direct transport. Empty is unwired.
+        public string XrayOutboundDnsStrategy { get; set; }
     }
 
     internal class URLTestResp

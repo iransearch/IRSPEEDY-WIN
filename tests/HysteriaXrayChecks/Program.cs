@@ -93,6 +93,7 @@ class Program
             && IRSpeedyVPN.Common.ConnectionDiagnostics.Lines.Any(l => l.Contains("accepted=1")), "Toggle/member diagnosis missing");
         Console.WriteLine("PASS: repeated AI on/off, current members, ShowIP rule, shared startup snapshot and preserved probe policy.");
         CheckAiIsolation(links);
+        PoolDnsChecks.Run();
 
         var singBox = IRSpeedyVPN.Services.SingBox.Samples.sg_clientSample;
         var runtime = Path.Combine(Path.GetTempPath(), "IRSpeedy-GeoRouting-" + Guid.NewGuid().ToString("N"));
