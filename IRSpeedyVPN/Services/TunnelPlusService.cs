@@ -152,7 +152,6 @@ namespace IRSpeedyVPN.Services
             diagnosticConnectionId = Guid.NewGuid().ToString("N");
             Diagnostic("connect-request");
             userCancelRequested = false;
-            healthRecoveryAttempts = 0;
             lock (startCancellationGate)
             {
                 startCancellation?.Dispose();
@@ -189,7 +188,6 @@ namespace IRSpeedyVPN.Services
 
         private void RunV2rayLocked(string goUrl, int port)
         {
-            StopPathMonitor();
             if (!PauseSharingBeforeCoreRestart())
             {
                 onConnectDisconnect?.Invoke(this, false, 0, "پاک‌سازی اشتراک‌گذاری مستقیم کامل نشد؛ ابتدا آن را متوقف کنید.");
@@ -434,7 +432,6 @@ namespace IRSpeedyVPN.Services
                         WinINet.SetIEProxy(true, true, $"http://127.0.0.1:{port}", null);
                     }
                     isUsingProxifire = !vpnmode && ProxifierRuleType != ProxifierType.None;
-                    StartPathMonitor();
                     if (onConnectDisconnect != null)
                     {
                         onConnectDisconnect.Invoke(this, true, port, "");
@@ -743,7 +740,6 @@ namespace IRSpeedyVPN.Services
         internal void CancelPendingConnection()
         {
             userCancelRequested = true;
-            pathHealth.Invalidate("اتصال قطع شده است");
             Interlocked.Increment(ref connectionGeneration);
             CancellationTokenSource pending;
             lock (startCancellationGate) pending = startCancellation;
@@ -766,7 +762,6 @@ namespace IRSpeedyVPN.Services
                 return;
             }
             Diagnostic("disconnect-request", "userCanceled=" + userCanceled + " checkProcess=" + chkprocess + " silent=" + silent);
-            StopPathMonitor();
             // Keep the explicit local proxy during automatic recovery. Removing it
             // here would send browser traffic direct while Core is restarting.
             if (useSystemProxy && !silent)
@@ -2127,7 +2122,6 @@ namespace IRSpeedyVPN.Services
         {
             long generation = Interlocked.Read(ref connectionGeneration);
             if (userCancelRequested) return;
-            pathHealth.Invalidate("در حال بازیابی اتصال");
             Diagnostic("reconnect-request");
             if (Interlocked.CompareExchange(ref reconnecting, 1, 0) != 0)
                 return;

@@ -216,7 +216,7 @@
       </Border>
       <TextBlock x:Name="txtServiceName" Visibility="Collapsed"/>
       <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,10,0,0">
-        <TextBlock x:Name="txtReceivedIpLabel" Text="آی‌پی دریافتی کاربر: " FontSize="11.5" FontFamily="{StaticResource AppFontFamilyMedium}" FontWeight="Normal" Foreground="#5B6478"/>
+        <TextBlock Text="آی‌پی دریافتی کاربر: " FontSize="11.5" FontFamily="{StaticResource AppFontFamilyMedium}" FontWeight="Normal" Foreground="#5B6478"/>
         <TextBlock x:Name="txtReceivedIp" Text="—" FlowDirection="LeftToRight" FontSize="11.5" Foreground="#5B6478" ToolTip="آی‌پی عمومی در دسترس نیست" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"/>
       </StackPanel>
     </StackPanel>
