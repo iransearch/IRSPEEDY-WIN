@@ -145,7 +145,7 @@ namespace IRSpeedyVPN.Common
                     case "schema": valid = value == "core-network-v2"; break;
                     case "event": valid = new[] { "hy2-created", "hy2-reset", "hy2-close", "box-created", "box-start", "box-close",
                         "default-interface", "rpc-start", "rpc-stop", "rpc-stoptest", "tests-cancel", "test-environment", "test-return",
-                        "test-begin", "test-end", "probe-begin", "probe-end" }.Contains(value); break;
+                        "test-begin", "test-end", "probe-begin", "probe-end", "pool-probes-ready" }.Contains(value); break;
                     case "reason": valid = new[] { "interface-update", "power-event", "network-manager-reset", "other-caller", "outbound-close", "stop-test" }.Contains(value); break;
                     case "context": valid = new[] { "active", "canceled", "deadline" }.Contains(value); break;
                     case "error": valid = new[] { "none", "network-changed", "canceled", "timeout", "closed", "other", "no-result" }.Contains(value); break;

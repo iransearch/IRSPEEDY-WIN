@@ -11,6 +11,8 @@ internal static class Program
         string safe;
         const string core = "[CoreDiagnostic] schema=core-network-v2 event=hy2-reset pid=7 seq=1 box=2 reason=interface-update";
         Require(CoreDiagnosticMetadata.TryParse(core, out safe) && safe.Contains("reason=interface-update"), "Structured Core reset metadata missing.");
+        Require(CoreDiagnosticMetadata.TryParse("[CoreDiagnostic] schema=core-network-v2 event=pool-probes-ready pid=7 seq=2 monoMs=40 box=2 dropped=0", out safe)
+            && safe.Contains("event=pool-probes-ready"), "Pool startup readiness must survive Core diagnostic filtering.");
         Require(!CoreDiagnosticMetadata.TryParse(core + " password=PRIVATE_VALUE", out safe), "Unknown sensitive field accepted.");
         Require(!CoreDiagnosticMetadata.TryParse(core + " tag=private.example", out safe), "Raw tag accepted.");
         Require(!CoreDiagnosticMetadata.TryParse(core + " reason=power-event", out safe), "Duplicate field accepted.");
