@@ -80,7 +80,7 @@ internal static class PoolDnsChecks
 
         var box = JObject.Parse(IRSpeedyVPN.Services.SingBox.Samples.sg_clientSample);
         var direct = box["dns"]["servers"].Single(s => (string)s["tag"] == "dns-direct");
-        Check((string)direct["type"] == "udp" && (string)direct["server"] == "8.8.8.8"
+        Check((string)direct["type"] == "udp" && (string)direct["server"] == "1.1.1.1"
             && direct["detour"] == null, "Pool bootstrap DNS now depends on the proxy");
         Check((string)box["route"]["default_domain_resolver"]["server"] == "dns-direct"
             && (bool)box["route"]["auto_detect_interface"], "Direct DNS lost physical-interface routing");

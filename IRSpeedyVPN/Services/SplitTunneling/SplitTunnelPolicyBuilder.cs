@@ -61,7 +61,7 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 outbounds.Add(new JObject { ["tag"] = "split-direct", ["type"] = "direct",
                     ["domain_resolver"] = "split-dns-direct" });
                 ((JArray)dns["servers"]).Add(new JObject { ["tag"] = "split-dns-direct", ["type"] = "udp",
-                    ["server"] = "8.8.8.8", ["detour"] = "split-direct" });
+                    ["server"] = "1.1.1.1", ["detour"] = "split-direct" });
                 var traffic = ScopedMatcher(matcher, scope);
                 traffic["action"] = "route";
                 traffic["outbound"] = "split-direct";

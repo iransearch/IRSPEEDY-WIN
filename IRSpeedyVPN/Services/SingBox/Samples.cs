@@ -29,13 +29,13 @@ namespace IRSpeedyVPN.Services.SingBox
         ""servers"":[
             {
                 ""type"":""udp"",
-                ""server"":""8.8.8.8"",
+                ""server"":""1.1.1.1"",
                 ""detour"":""proxy"",
                 ""tag"":""dns-remote""
             },
             {
                 ""type"":""udp"",
-                ""server"":""8.8.8.8"",
+                ""server"":""1.1.1.1"",
                 ""tag"":""dns-direct""
             }
         ]
