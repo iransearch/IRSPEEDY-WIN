@@ -72,6 +72,7 @@ namespace IRSpeedyVPN
         private Stopwatch loginUiStopwatch;
         private readonly SemaphoreSlim connectionRequestGate = new SemaphoreSlim(1, 1);
         private long connectionRequestVersion;
+        private int pendingConnectionRequests;
         private IVPNService registeredVpnService;
         private IRSpeedyVPN.Events.OnConnectDisconnect registeredVpnHandler;
         public MainWindow()
@@ -458,6 +459,7 @@ namespace IRSpeedyVPN
             Func<IVPNService> prepareService = null)
         {
             uCServerList.PauseServerChecks();
+            pendingConnectionRequests++;
             await connectionRequestGate.WaitAsync();
             try
             {
@@ -512,6 +514,7 @@ namespace IRSpeedyVPN
             }
             finally
             {
+                pendingConnectionRequests--;
                 connectionRequestGate.Release();
                 if (version == Interlocked.Read(ref connectionRequestVersion) && gInfo.CurrentService == null && IsUserLogin)
                     uCServerList.ResumeServerChecksAfterCleanup();
@@ -1310,7 +1313,10 @@ namespace IRSpeedyVPN
             new SettingsHub { Owner = this, Service = service,
                 ChangePasswordAsync = ChangeAccountPasswordAsync,
                 PasswordChangeAccepted = password => BeginPasswordChangeLogin(username, password, remember),
-                IsConnected = () => ReferenceEquals(TransitionBox.Content, uCUserInfo) }.ShowDialog();
+                IsConnectionBusy = () => pendingConnectionRequests != 0
+                    || (gInfo.CurrentService is TunnelPlusService current && !current.IsTunnelConnected),
+                IsConnected = () => gInfo.CurrentService is TunnelPlusService tunnel
+                    ? tunnel.IsTunnelConnected : ReferenceEquals(TransitionBox.Content, uCUserInfo) }.ShowDialog();
         }
 
         public void LogoutFromSettings() => Logout("");

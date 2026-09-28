@@ -31,3 +31,17 @@ missing, partial and complete runtime payloads with the production fallback.
 This check runs before every Core start, including reconnects; missing filenames
 are logged once per attempted start. It does not validate corrupt geo data or
 replace a live Windows connection test. The embedded runtime remains single-file.
+# AI preference lifecycle
+
+The harness also rebuilds a Smart configuration through repeated AI on/off
+transitions in one process, changes the supplied AI members, and verifies that
+old rules, balancers and members do not survive. It checks the unset preference
+default, ShowIP rule priority, the captured startup preference and unchanged
+15-minute/sampling-2 probe settings. Registry access is represented by the
+fixture; this does not execute the Windows registry, WPF or the packaged Core.
+
+On Windows, disconnect, save AI off, reconnect, then disconnect, save AI on and
+reconnect without exiting the app. Test a new request to `https://showip.net/ip`
+after each connection and correlate the route records with the configuration ID.
+Settings must remain locked during startup and teardown, including the period
+after `Connect()` queues its background task and returns to the UI.

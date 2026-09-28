@@ -58,6 +58,41 @@ class Program
         Check(members == 7 && hysteriaMembers == 7 && !ai, "Smart pool membership changed");
         Check(ContainsXrayGeo(smart), "Prior-commit Xray geo routing was not restored");
 
+        // Rebuild repeatedly in one process, with unchanged main pool and changed
+        // AI members. This catches lifetime caching and accumulation of old rules.
+        IRSpeedyVPN.Resource.RegHelper.AiSetting = "";
+        Check(SmartIpRouting.IsEnabled(), "Unset AI differs from the UI default");
+        for (int round = 0; round < 6; round++)
+        {
+            bool enabled = round % 2 == 0;
+            SmartIpRouting.SetEnabled(enabled);
+            var aiLinks = new[] { round < 2 ? "hy2://fixture" : "vless://reality" };
+            var rebuilt = JObject.Parse(ConfigGenerator.GetSmartBalancerConfig(links, 19002,
+                "test-user", "test-pass", aiLinks, out ai, out members, out hysteriaMembers));
+            var aiRules = ((JArray)rebuilt["routing"]["rules"]).Where(r => (string)r["balancerTag"] == "ai-balancer").ToArray();
+            var aiMembers = ((JArray)rebuilt["outbounds"]).Where(o => ((string)o["tag"]).StartsWith("ai-proxy-")).ToArray();
+            Check(ai == enabled && aiRules.Length == (enabled ? 1 : 0) && aiMembers.Length == (enabled ? 1 : 0),
+                "AI toggle was cached, or old AI rules/members survived the next build");
+            Check(((JArray)rebuilt["routing"]["balancers"]).Count == (enabled ? 2 : 1), "Stale AI balancer remained");
+            if (enabled)
+            {
+                Check(((JArray)rebuilt["routing"]["rules"]).IndexOf(aiRules[0]) == 1
+                    && aiRules[0]["domain"].Values<string>().Contains("domain:showip.net"), "ShowIP AI rule lost priority");
+                Check((string)aiMembers[0]["protocol"] == (round < 2 ? "hysteria2" : "vless"), "Stale AI API member retained");
+            }
+            Check((string)rebuilt["burstObservatory"]["pingConfig"]["interval"] == "15m"
+                && (int)rebuilt["burstObservatory"]["pingConfig"]["sampling"] == 2, "Probe policy changed");
+            Check((string)rebuilt["log"]["loglevel"] == "info", "Runtime route decisions remain hidden");
+        }
+        // One startup uses the captured setting even if a later registry read changes.
+        SmartIpRouting.SetEnabled(false);
+        ConfigGenerator.GetSmartBalancerConfig(links, 19002, "test-user", "test-pass",
+            new[] { "hy2://fixture" }, out ai, out members, out hysteriaMembers, true);
+        Check(ai, "Startup did not use its AI/VOD preference snapshot");
+        Check(IRSpeedyVPN.Common.ConnectionDiagnostics.Lines.Any(l => l.Contains("ai-setting-saved"))
+            && IRSpeedyVPN.Common.ConnectionDiagnostics.Lines.Any(l => l.Contains("accepted=1")), "Toggle/member diagnosis missing");
+        Console.WriteLine("PASS: repeated AI on/off, current members, ShowIP rule, shared startup snapshot and preserved probe policy.");
+
         var singBox = IRSpeedyVPN.Services.SingBox.Samples.sg_clientSample;
         var runtime = Path.Combine(Path.GetTempPath(), "IRSpeedy-GeoRouting-" + Guid.NewGuid().ToString("N"));
         var geoDir = Path.Combine(runtime, "geo");

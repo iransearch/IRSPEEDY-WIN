@@ -8,10 +8,20 @@ namespace v2rayN.Base { }
 namespace IRSpeedyVPN.Common
 {
     public static class LogHelper { public static void WriteLog(Exception error) { throw new Exception("Generator log", error); } }
+    internal static class ConnectionDiagnostics
+    {
+        internal static readonly List<string> Lines = new List<string>();
+        internal static void Write(string stage, string details) { Lines.Add(stage + " " + details); }
+    }
 }
 namespace IRSpeedyVPN.Resource
 {
-    public static class RegHelper { public static string GetSettingValue(string key) { return "0"; } }
+    public static class RegHelper
+    {
+        public static string AiSetting = "0";
+        public static string GetSettingValue(string key) { return key == "VGAURDVodService" ? AiSetting : "0"; }
+        public static void SetSettingValue(string key, string value) { if (key == "VGAURDVodService") AiSetting = value; }
+    }
 }
 namespace v2rayN
 {

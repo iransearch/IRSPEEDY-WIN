@@ -85,12 +85,22 @@ namespace IRSpeedyVPN.Services.Xray
         {
             try
             {
-                return RegHelper.GetSettingValue(SettingKey) == "1";
+                // Match the settings UI: an unset preference defaults to enabled.
+                // Read on every connection; never cache this for the app lifetime.
+                return RegHelper.GetSettingValue(SettingKey) != "0";
             }
             catch
             {
                 return false;
             }
+        }
+
+        public static void SetEnabled(bool enabled)
+        {
+            bool previous = IsEnabled();
+            RegHelper.SetSettingValue(SettingKey, enabled ? "1" : "0");
+            ConnectionDiagnostics.Write("ai-setting-saved", "previous=" + previous
+                + " requested=" + enabled + " stored=" + IsEnabled());
         }
 
         /// <summary>
@@ -106,6 +116,7 @@ namespace IRSpeedyVPN.Services.Xray
         {
             var outbounds = new JArray();
             fallbackTag = null;
+            int inputCount = 0, parseFailed = 0, refused = 0;
 
             if (links == null)
                 return outbounds;
@@ -114,6 +125,7 @@ namespace IRSpeedyVPN.Services.Xray
             {
                 if (string.IsNullOrWhiteSpace(link))
                     continue;
+                inputCount++;
 
                 var tag = tagPrefix + (outbounds.Count + 1);
 
@@ -135,19 +147,27 @@ namespace IRSpeedyVPN.Services.Xray
                 }
 
                 if (proxy == null || proxy.protocol == null)
+                {
+                    parseFailed++;
                     continue;
+                }
 
                 // The core refuses to build the whole config over one bad outbound,
                 // which would take the smart connection down with it. Drop the link
                 // instead and let the remaining ones carry the service.
                 if (CoreRefusalReason(proxy) != null)
+                {
+                    refused++;
                     continue;
+                }
 
                 outbounds.Add(JObject.FromObject(proxy, serializer));
                 if (fallbackTag == null)
                     fallbackTag = tag;
             }
 
+            ConnectionDiagnostics.Write("ai-members-built", "inputs=" + inputCount + " accepted=" + outbounds.Count
+                + " parseFailed=" + parseFailed + " coreRefused=" + refused);
             return outbounds;
         }
 

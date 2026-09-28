@@ -195,7 +195,8 @@ namespace IRSpeedyVPN.Services
             }
             try
             {
-                bool isVodEnabled = RegHelper.GetSettingValue("VGAURDVodService") == "1";
+                bool isVodEnabled = Xray.SmartIpRouting.IsEnabled();
+                Diagnostic("ai-setting-read", "enabled=" + isVodEnabled + " inputMembers=" + GetAiLinks().Count);
                 if (serviceController.CheckUserPermission(gInfo.Username, gInfo.Password))
                 // if (ServiceHelper.CheckAvailabilty(gInfo.Username,gInfo.Password))
                 {
@@ -322,7 +323,8 @@ namespace IRSpeedyVPN.Services
                             GetAiLinks(),
                             out aiRoutingEnabled,
                             out poolMemberCount,
-                            out hysteriaMemberCount);
+                            out hysteriaMemberCount,
+                            isVodEnabled);
                         if (string.IsNullOrWhiteSpace(xrayConfig))
                         {
                             if (_xraySocksPort > 0)
@@ -508,7 +510,19 @@ namespace IRSpeedyVPN.Services
                 error = "تنظیمات تقسیم تونل معتبر نیست؛ تنظیمات برنامه‌ها را بررسی کنید.";
                 return false;
             }
-            Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData) + " needXray=" + needXray);
+            Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData)
+                + " xrayConfigId=" + ConnectionDiagnostics.Fingerprint(xrayConfig) + " needXray=" + needXray);
+            if (needXray && !string.IsNullOrEmpty(xrayConfig))
+            {
+                var plan = JObject.Parse(xrayConfig);
+                var planRules = plan["routing"]?["rules"] as JArray;
+                var aiRule = planRules?.FirstOrDefault(r => (string)r["balancerTag"] == Xray.SmartIpRouting.AiBalancerTag);
+                var planOutbounds = plan["outbounds"] as JArray;
+                Diagnostic("ai-config-apply", "xrayConfigId=" + ConnectionDiagnostics.Fingerprint(xrayConfig)
+                    + " aiRuleIndex=" + (aiRule == null ? -1 : planRules.IndexOf(aiRule))
+                    + " aiMembers=" + (planOutbounds?.Count(o => ((string)o["tag"] ?? "").StartsWith(Xray.SmartIpRouting.AiProxyPrefix, StringComparison.Ordinal)) ?? 0)
+                    + " settingEnabled=" + Xray.SmartIpRouting.IsEnabled());
+            }
             if (userCancelRequested)
             {
                 error = "Connection canceled.";
@@ -563,6 +577,8 @@ namespace IRSpeedyVPN.Services
             }
             Diagnostic("core-start-rpc-complete");
             Diagnostic("config-apply-result", "success=" + string.IsNullOrEmpty(startResp.Error));
+            if (string.IsNullOrEmpty(startResp.Error))
+                diagnosticXrayConfigId = needXray ? ConnectionDiagnostics.Fingerprint(xrayConfig) : "none";
             if (!string.IsNullOrEmpty(startResp.Error))
             {
                 error = startResp.Error;

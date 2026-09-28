@@ -324,12 +324,16 @@ namespace IRSpeedyVPN.Services.Xray
             IEnumerable<string> aiLinks,
             out bool aiRoutingEnabled,
             out int poolMemberCount,
-            out int hysteriaMemberCount)
+            out int hysteriaMemberCount,
+            bool? serviceRoutingEnabled = null)
         {
             aiRoutingEnabled = false;
             poolMemberCount = 0;
             hysteriaMemberCount = 0;
             var root = JObject.Parse(Samples.BalancerConfig);
+            // The sample has no log section, so Xray otherwise defaults to warning
+            // and hides routing decisions and empty leastLoad selections.
+            root["log"] = new JObject { ["access"] = "none", ["loglevel"] = "info" };
             var serializer = new JsonSerializer { NullValueHandling = NullValueHandling.Ignore };
 
             var inbounds = root["inbounds"] as JArray ?? new JArray();
@@ -405,7 +409,8 @@ namespace IRSpeedyVPN.Services.Xray
                 return null;
 
             poolMemberCount = idx;
-            aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer);
+            aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer,
+                serviceRoutingEnabled ?? SmartIpRouting.IsEnabled());
 
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
             outbounds.Add(JObject.FromObject(new Outbound
@@ -433,9 +438,9 @@ namespace IRSpeedyVPN.Services.Xray
         /// public IP, which the core refuses to build as an Xray outbound, so VOD
         /// stays on its sing-box outbound instead.
         /// </summary>
-        private static bool ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer)
+        private static bool ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer, bool enabled)
         {
-            if (!SmartIpRouting.IsEnabled())
+            if (!enabled)
                 return false;
 
             string aiFallbackTag;
@@ -456,9 +461,10 @@ namespace IRSpeedyVPN.Services.Xray
                 outbounds.Add(outbound);
             balancers.Add(SmartIpRouting.AiBalancer(aiFallbackTag));
 
-            // The AI rule runs ahead of the geoip/geosite checks and the catch-all so
-            // its traffic never reaches the main balancer. The first rule is the
-            // UDP/443 block, which must stay first.
+            // The AI rule runs ahead of geoip/geosite and the main catch-all.
+            // This establishes rule priority, not successful pool selection:
+            // an empty leastLoad selection can still reach Xray's default handler.
+            // The first rule is the UDP/443 block, which must stay first.
             rules.Insert(rules.Count > 0 ? 1 : 0, SmartIpRouting.AiRule());
             return true;
         }
@@ -765,4 +771,3 @@ namespace IRSpeedyVPN.Services.Xray
         }
     }
 }
-

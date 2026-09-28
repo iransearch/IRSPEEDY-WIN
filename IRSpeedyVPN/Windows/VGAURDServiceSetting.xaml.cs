@@ -9,12 +9,12 @@ namespace IRSpeedyVPN.Windows
     public partial class VGAURDServiceSetting : Window
     {
         private bool _isUpdating;
+        public Func<bool> CanSavePreferences { get; set; }
 
         private const string KEY_VPN = "VGAURDVPNMode";
         private const string KEY_GLOBAL_PROXY = "VGAURDGlobalProxy";
         private const string KEY_SYSTEM_PROXY = "VGAURDSystemProxy";
         private const string KEY_TELEGRAM_PROXY = "ProxifierTelegramRoute"; // 1 = on, 0 = off
-        private const string KEY_VOD = "VGAURDVodService";
         private const string KEY_GAME = "VGAURDGameMode";
 
         public VGAURDServiceSetting()
@@ -37,13 +37,14 @@ namespace IRSpeedyVPN.Windows
 
         private void btnOK_Click(object sender, RoutedEventArgs e)
         {
+            if (CanSavePreferences?.Invoke() == false) return;
             RegHelper.SetSettingValue(KEY_VPN, IsOn(VPNMode) ? "1" : "0");
             RegHelper.SetSettingValue(KEY_GLOBAL_PROXY, IsOn(GlobalProxy) ? "1" : "0");
             RegHelper.SetSettingValue(KEY_SYSTEM_PROXY, IsOn(SystemProxy) ? "1" : "0");
             RegHelper.SetSettingValue(KEY_TELEGRAM_PROXY, IsOn(TelegramRouteProxy) ? "1" : "0");
 
             // VOD/AI is independent
-            RegHelper.SetSettingValue(KEY_VOD, IsOn(VodService) ? "1" : "0");
+            Services.Xray.SmartIpRouting.SetEnabled(IsOn(VodService));
 
             // Game Mode is independent, but forces VPN mode (persisted above as VPN=1).
             RegHelper.SetSettingValue(KEY_GAME, IsOn(GameMode) ? "1" : "0");
@@ -82,7 +83,7 @@ namespace IRSpeedyVPN.Windows
                 SetChecked(GlobalProxy, RegHelper.GetSettingValue(KEY_GLOBAL_PROXY) == "1");
                 SetChecked(SystemProxy, RegHelper.GetSettingValue(KEY_SYSTEM_PROXY) == "1");
                 SetChecked(TelegramRouteProxy, RegHelper.GetSettingValue(KEY_TELEGRAM_PROXY) == "1");
-                SetChecked(VodService, RegHelper.GetSettingValue(KEY_VOD) != "0");
+                SetChecked(VodService, Services.Xray.SmartIpRouting.IsEnabled());
                 SetChecked(GameMode, RegHelper.GetSettingValue(KEY_GAME) == "1");
             }
             finally

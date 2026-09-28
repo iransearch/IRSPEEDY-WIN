@@ -34,12 +34,25 @@ internal static class Program
         Require(!output.Contains("PRIVATE_VALUE") && !output.Contains("example.com") && !output.Contains("secret://"), "Core output disclosed private data.");
         Require(output.Contains("activeConnected=True") && output.Contains("activeProxyRequested=True"), "Active state must not come from idle core reader.");
         Require(output.Contains("serviceConnected=False") && output.Contains("activeService="), "Reader and active state must remain separate.");
+        Require(output.Contains("category=showip-route") && output.Contains("outbound=ai-proxy-2") && output.Contains("target=showip"), "Routing signal was redacted or starved by unrelated route chatter.");
         Require(output.Contains("connection refused") && output.Contains("context deadline exceeded"), "Useful error causes were lost.");
         string scrubbed = ConnectionDiagnostics.SafeCoreText("error password=PRIVATE_VALUE token=abcdef12345 https://user:pass@private.example/path 203.0.113.8 uuid=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee connection refused context deadline exceeded");
         Require(!scrubbed.Contains("PRIVATE_VALUE") && !scrubbed.Contains("abcdef") && !scrubbed.Contains("203.0.113") && !scrubbed.Contains("aaaa"), "Sensitive tokens leaked.");
         Require(ConnectionDiagnostics.IsLoopbackProxy("http://127.0.0.1:10808") && !ConnectionDiagnostics.IsLoopbackProxy("http://127.0.0.1:10808@private.example"), "Proxy classification must anchor whole value.");
         Require(ConnectionDiagnostics.Fingerprint("one") == ConnectionDiagnostics.Fingerprint("one"), "Session fingerprints must be stable.");
         Require(ConnectionDiagnostics.Fingerprint("one") != ConnectionDiagnostics.Fingerprint("two"), "Different members need distinct fingerprints.");
+        string routeCategory, routeDetails;
+        Require(CoreRoutingSignal.TryRead("[Info] [1234] app/dispatcher: taking detour [ai-proxy-2] for [tcp:showip.net:443]", out routeCategory, out routeDetails)
+            && routeCategory == "showip-route" && routeDetails.Contains("outbound=ai-proxy-2") && routeDetails.Contains("request=1234"), "AI route selection lost");
+        Require(CoreRoutingSignal.TryRead("[Info] [1234] app/dispatcher: default route for tcp:showip.net:443", out routeCategory, out routeDetails)
+            && routeCategory == "showip-route" && routeDetails.Contains("decision=default-route"), "Implicit default route hidden");
+        Require(CoreRoutingSignal.TryRead("[Info] app/router: least load: no qualified outbound", out routeCategory, out routeDetails)
+            && routeCategory == "pool-selection-error", "Empty pool selection hidden");
+        Require(CoreRoutingSignal.TryRead("[Info] [9] app/dispatcher: taking detour [ai-proxy-1] for [tcp:private.example:443]", out routeCategory, out routeDetails)
+            && !routeDetails.Contains("private.example"), "Route metadata leaked a destination");
+        Require(CoreRoutingSignal.TryRead("[Info] app/dispatcher: taking detour [smart-proxy-0] for [tcp:showip.net.evil.example:443]", out routeCategory, out routeDetails)
+            && routeCategory != "showip-route", "Unrelated domain classified as ShowIP");
+        Require(!CoreRoutingSignal.TryRead("[Info] app/dispatcher: taking detour [PRIVATE_VALUE] for [tcp:private.example:443]", out routeCategory, out routeDetails), "Unknown tag accepted");
         using (var entered = new System.Threading.ManualResetEventSlim())
         using (var release = new System.Threading.ManualResetEventSlim())
         {

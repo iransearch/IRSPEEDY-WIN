@@ -34,3 +34,18 @@ and retain `log.txt` through the failure and at least 15 seconds afterwards. Not
 and whether the UI still shows connected. Do not delete the log before collecting it.
 A proxy change with no matching application mutation can identify an external/unobserved
 change, but these passive logs alone cannot name the external process responsible.
+# AI routing diagnostics
+
+Smart configurations now enable Xray info messages (access logging stays off).
+The application extracts generated outbound tags and request IDs before redacting
+core text. ShowIP routes, AI routes, failed AI probes and empty pool selections
+have separate log budgets, so ordinary route chatter cannot exhaust them.
+Other destinations are represented only by session fingerprints.
+
+Read `ai-setting-saved`, `ai-setting-read`, `ai-members-built`,
+`ai-config-apply`, the matching `config-apply-result`, and `core-output` together.
+`activeXrayConfigId` identifies the last successful Xray configuration for the
+active service, even when an idle service owns Core's output reader.
+An AI rule in the configuration is not evidence that a request selected an AI
+member. `decision=default-route target=showip` identifies use of Xray's default
+handler; a nearby empty-pool message alone cannot identify which pool failed.

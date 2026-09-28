@@ -287,9 +287,11 @@ namespace IRSpeedyVPN.Common
             text = Regex.Replace(text, @"[a-zA-Z][a-zA-Z0-9+.-]*://\S+|[\w.+-]+@[\w.-]+|[\w.-]+\.[a-zA-Z]{2,}[^\s]*", " REDACTED ");
             text = Regex.Replace(text, @"(?i)(password|token|authorization|uuid|secret|user|username|id|key)\s*[:=]\s*[^\s,;]+", " REDACTED ");
             var tokens = Regex.Matches(text, @"[a-zA-Z][a-zA-Z0-9_/-]*|[^\sA-Za-z]+").Cast<Match>()
-                .Select(m => CoreWords.Contains(m.Value) ? m.Value : "[redacted]");
+                .Select(m => CoreWords.Contains(m.Value) || RoutingWords.Contains(m.Value) ? m.Value : "[redacted]");
             return Regex.Replace(string.Join(" ", tokens), @"(?:\[redacted\] ?){2,}", "[redacted] ").Trim();
         }
+        private static readonly HashSet<string> RoutingWords = new HashSet<string>(
+            "least load default detour taking strategy returns tag observation observer nil get ping health check".Split(' '), StringComparer.OrdinalIgnoreCase);
         // Read-only IPv4 default route table, including route metrics. No gateway/address plaintext.
         private static string DefaultRoutes()
         {

@@ -11,6 +11,7 @@ namespace IRSpeedyVPN.Services
     {
         private readonly string diagnosticServiceId = Guid.NewGuid().ToString("N");
         private string diagnosticConnectionId = "none";
+        private string diagnosticXrayConfigId = "none";
         private long diagnosticOutputWindow;
         private int diagnosticOutputCount;
         private readonly Dictionary<string, int> diagnosticCategoryCounts = new Dictionary<string, int>();
@@ -23,6 +24,7 @@ namespace IRSpeedyVPN.Services
             var active = gInfo?.CurrentService as TunnelPlusService;
             if (active == null) return "activeService=none activeConnected=False";
             return "activeService=" + active.diagnosticServiceId + " activeConnection=" + active.diagnosticConnectionId
+                + " activeXrayConfigId=" + active.diagnosticXrayConfigId
                 + " activeCountryId=" + active.ID + " activeCountryIndex=" + active.CountryIndex
                 + " activeConnected=" + active.IsConnected + " activeProxyRequested=" + active.useSystemProxy
                 + " activeListenPort=" + active.lastListenPort + " activeAppliedMode=" + (active.IsConnected ? (active.lastVpnMode ? "TUN" : "Proxy") : "not-connected")
@@ -67,7 +69,10 @@ namespace IRSpeedyVPN.Services
                     return;
                 }
                 string lower = line.ToLowerInvariant();
+                string routingCategory, routingDetails;
+                bool routingSignal = CoreRoutingSignal.TryRead(line, out routingCategory, out routingDetails);
                 string category = lower.Contains("panic") ? "panic" : lower.Contains("fatal") ? "fatal"
+                    : routingSignal ? routingCategory
                     : lower.Contains("error") || lower.Contains("failed") || lower.Contains("timeout") ? "error"
                     : lower.Contains("warn") ? "warning" : lower.Contains("network changed") ? "network-changed"
                     : lower.Contains("interface") ? "interface" : lower.Contains("route") ? "route"
@@ -92,6 +97,7 @@ namespace IRSpeedyVPN.Services
                 // Keep diagnostic vocabulary only; URLs, identifiers, credentials and configs are removed.
                 Diagnostic("core-output", "pid=" + DiagnosticPid(process) + " source=" + source
                     + " category=" + category + " messageId=" + ConnectionDiagnostics.Fingerprint(line)
+                    + (routingSignal ? " " + routingDetails : "")
                     + " text=\"" + safeText + "\"");
                 if (category == "network-changed" || category == "interface" || category == "fatal" || category == "panic")
                     ConnectionDiagnostics.RequestSnapshot();
