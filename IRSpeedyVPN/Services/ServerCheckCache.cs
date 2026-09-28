@@ -17,7 +17,9 @@ namespace IRSpeedyVPN.Services
         private readonly string path;
         private State state;
         private Dictionary<Url, string> bound = new Dictionary<Url, string>();
-        private string[] countries = new string[0];
+        private readonly Random random;
+        private Dictionary<IVPNService, string> rowKeys = new Dictionary<IVPNService, string>();
+        private Dictionary<string, IVPNService> rows = new Dictionary<string, IVPNService>();
 
         internal sealed class Result
         {
@@ -28,18 +30,20 @@ namespace IRSpeedyVPN.Services
         }
         internal sealed class State
         {
-            public int Version { get; set; } = 1;
-            public string NextCountry { get; set; }
+            public int Version { get; set; } = 2;
             public bool InitialScanCompleted { get; set; }
-            // Null identifies caches from the earlier rotating-only implementation.
-            public List<string> InitialCountries { get; set; }
+            // A persisted permutation: consume the head, never choose a random row per tick.
+            // Null also identifies old country-based caches for migration.
+            public List<string> PendingRows { get; set; }
+            public List<string> CompletedRows { get; set; }
             public Dictionary<string, Result> Results { get; set; } = new Dictionary<string, Result>();
         }
 
-        internal ServerCheckCache(string account, string scope, string directory = null)
+        internal ServerCheckCache(string account, string scope, string directory = null, Random random = null)
         {
             directory = directory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IRSpeedy", "ServerChecks");
             path = Path.Combine(directory, Hash(account + "\n" + scope) + ".json");
+            this.random = random ?? new Random();
             state = Load();
         }
 
@@ -68,7 +72,6 @@ namespace IRSpeedyVPN.Services
             lock (gate)
             {
                 var items = services.Where(s => s.IsUrlTestSupported).ToArray();
-                countries = items.Select(CountryKey).Distinct().OrderBy(c => c, StringComparer.Ordinal).ToArray();
                 bound = new Dictionary<Url, string>();
                 foreach (var service in items)
                     foreach (var url in service.GetServerUrls() ?? new List<Url>())
@@ -88,32 +91,81 @@ namespace IRSpeedyVPN.Services
                     }
                 var live = new HashSet<string>(bound.Values);
                 foreach (string key in state.Results.Keys.Where(k => !live.Contains(k)).ToArray()) state.Results.Remove(key);
-                if (state.InitialCountries == null)
+                rowKeys = new Dictionary<IVPNService, string>();
+                rows = new Dictionary<string, IVPNService>();
+                foreach (var service in items)
                 {
-                    state.InitialCountries = items.GroupBy(CountryKey)
-                        .Where(g => g.All(service => (service.GetServerUrls() ?? new List<Url>())
-                            .Where(u => u != null && !string.IsNullOrWhiteSpace(u.url))
-                            .All(u => bound.TryGetValue(u, out string key) && state.Results.ContainsKey(key))))
-                        .Select(g => g.Key).ToList();
+                    // Include the configuration identity, so changed links get a new turn.
+                    // Sorting fingerprints makes an API-only URL reorder harmless.
+                    var configs = (service.GetServerUrls() ?? new List<Url>())
+                        .Where(u => u != null && bound.ContainsKey(u)).Select(u => bound[u])
+                        .Distinct().OrderBy(k => k, StringComparer.Ordinal).ToArray();
+                    string row = Hash(JsonConvert.SerializeObject(new object[] { service.ID, service.Name, configs }));
+                    rowKeys[service] = row;
+                    rows[row] = service;
                 }
-                if (!state.InitialScanCompleted)
+                if (state.Version == 1 || state.PendingRows == null || state.CompletedRows == null)
                 {
-                    // A config changed during bootstrap must be checked before bootstrap ends.
-                    state.InitialCountries.RemoveAll(c => !countries.Contains(c) || items.Where(s => CountryKey(s) == c)
-                        .SelectMany(s => s.GetServerUrls() ?? new List<Url>())
-                        .Where(u => u != null && !string.IsNullOrWhiteSpace(u.url))
-                        .Any(u => !bound.TryGetValue(u, out string key) || !state.Results.ContainsKey(key)));
-                    state.InitialScanCompleted = countries.Length > 0 && countries.All(state.InitialCountries.Contains);
+                    // Preserve old results, and resume only missing rows during bootstrap.
+                    state.CompletedRows = state.InitialScanCompleted ? new List<string>() : rowKeys
+                        .Where(p => HasRecordedResults(p.Key)).Select(p => p.Value).Distinct().ToList();
+                    state.PendingRows = Shuffle(rows.Keys.Except(state.CompletedRows));
+                    state.Version = 2;
                 }
-                if (!countries.Contains(state.NextCountry)) state.NextCountry = countries.FirstOrDefault();
-                if (!state.InitialScanCompleted && state.InitialCountries.Contains(state.NextCountry))
-                    state.NextCountry = countries.FirstOrDefault(c => !state.InitialCountries.Contains(c));
+                else
+                {
+                    state.CompletedRows = state.CompletedRows.Where(rows.ContainsKey).Distinct().ToList();
+                    state.PendingRows = state.PendingRows.Where(rows.ContainsKey)
+                        .Except(state.CompletedRows).Distinct().ToList();
+                    // Preserve an unfinished turn and the order of all surviving rows.
+                    state.PendingRows.AddRange(Shuffle(rows.Keys.Except(state.PendingRows).Except(state.CompletedRows)));
+                }
+                if (state.PendingRows.Count == 0 && rows.Count > 0)
+                {
+                    state.InitialScanCompleted = true;
+                    StartNextRound();
+                }
             }
+        }
+
+        private bool HasRecordedResults(IVPNService service)
+        {
+            var urls = (service.GetServerUrls() ?? new List<Url>())
+                .Where(u => u != null && !string.IsNullOrWhiteSpace(u.url)).ToArray();
+            return urls.Length > 0 && urls.All(u => bound.TryGetValue(u, out string key) && state.Results.ContainsKey(key));
+        }
+
+        private List<string> Shuffle(IEnumerable<string> keys)
+        {
+            var result = keys.ToList();
+            for (int i = result.Count - 1; i > 0; i--)
+            {
+                int j = random.Next(i + 1);
+                string swap = result[i]; result[i] = result[j]; result[j] = swap;
+            }
+            return result;
+        }
+
+        private void StartNextRound()
+        {
+            state.CompletedRows.Clear();
+            state.PendingRows = Shuffle(rows.Keys);
         }
 
         internal bool InitialScanCompleted { get { lock (gate) return state.InitialScanCompleted; } }
 
-        internal string NextCountry { get { lock (gate) return state.NextCountry; } }
+        internal IVPNService NextService
+        {
+            get
+            {
+                lock (gate)
+                    return state.PendingRows != null && state.PendingRows.Count > 0
+                        && rows.TryGetValue(state.PendingRows[0], out var service) ? service : null;
+            }
+        }
+
+        // Called on the worker before testing; no new disk write on the UI thread.
+        internal void PersistQueue() { lock (gate) Save(); }
 
         // Called only after a completed, non-canceled service test, on the probe worker.
         internal void Record(IVPNService service, DateTime startedLocal)
@@ -151,20 +203,20 @@ namespace IRSpeedyVPN.Services
                     }
         }
 
-        internal void CompleteCountry(string country)
+        internal void CompleteService(IVPNService service)
         {
             lock (gate)
             {
-                int index = Array.IndexOf(countries, country);
-                if (index < 0) return;
-                if (!state.InitialScanCompleted)
+                // An obsolete API row or canceled test cannot consume a replacement row.
+                if (!rowKeys.TryGetValue(service, out string row) || state.PendingRows.Count == 0
+                    || state.PendingRows[0] != row) return;
+                state.PendingRows.RemoveAt(0);
+                state.CompletedRows.Add(row);
+                if (state.PendingRows.Count == 0)
                 {
-                    if (!state.InitialCountries.Contains(country)) state.InitialCountries.Add(country);
-                    state.InitialScanCompleted = countries.All(state.InitialCountries.Contains);
+                    state.InitialScanCompleted = true;
+                    StartNextRound();
                 }
-                state.NextCountry = countries[(index + 1) % countries.Length];
-                if (!state.InitialScanCompleted)
-                    state.NextCountry = countries.First(c => !state.InitialCountries.Contains(c));
                 Save();
             }
         }
@@ -184,7 +236,9 @@ namespace IRSpeedyVPN.Services
             {
                 if (!File.Exists(path) || new FileInfo(path).Length > 4 * 1024 * 1024) return new State();
                 var value = JsonConvert.DeserializeObject<State>(File.ReadAllText(path), new JsonSerializerSettings { MaxDepth = 8 });
-                if (value == null || value.Version != 1 || value.Results == null || value.Results.Count > 20000) return new State();
+                if (value == null || (value.Version != 1 && value.Version != 2) || value.Results == null || value.Results.Count > 20000) return new State();
+                if (new[] { value.PendingRows, value.CompletedRows }.Any(list => list != null
+                    && (list.Count > 20000 || list.Any(key => key == null || key.Length != 64)))) return new State();
                 if (value.Results.Any(p => p.Key == null || p.Key.Length != 64 || p.Value == null
                     || p.Value.CheckedUtc == default(DateTime) || p.Value.CheckedUtc > DateTime.UtcNow.AddMinutes(5)
                     || p.Value.Latency < -1 || p.Value.LastSuccess < 0)) return new State();

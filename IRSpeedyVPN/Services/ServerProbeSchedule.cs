@@ -2,7 +2,7 @@ using System;
 
 namespace IRSpeedyVPN.Services
 {
-    internal sealed class CountryProbeSchedule
+    internal sealed class ServerProbeSchedule
     {
         private DateTime dueUtc = DateTime.MinValue;
         internal void RestartNow() { dueUtc = DateTime.MinValue; }

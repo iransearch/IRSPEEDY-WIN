@@ -226,7 +226,7 @@ namespace IRSpeedyVPN.UserControls
         private bool probeWakeRequested;
         private ServerCheckCache probeCache;
         private string probeCacheContext;
-        private readonly CountryProbeSchedule probeSchedule = new CountryProbeSchedule();
+        private readonly ServerProbeSchedule probeSchedule = new ServerProbeSchedule();
 
         internal void PauseServerChecks()
         {
@@ -245,7 +245,7 @@ namespace IRSpeedyVPN.UserControls
         internal void PrepareServerChecksForLogin()
         {
             // Called on the UI thread after successful login and connection cleanup,
-            // before Loaded restores this account's saved results and resumes its country turn.
+            // before Loaded restores this account's saved results and resumes its server turn.
             probeTimer.Stop();
             probeSchedule.RestartNow();
             probesPaused = false;
@@ -279,10 +279,8 @@ namespace IRSpeedyVPN.UserControls
                 return;
             }
             var cache = probeCache;
-            string country = cache.NextCountry;
-            var group = services.Where(s => s.IsUrlTestSupported && ServerCheckCache.CountryKey(s) == country)
-                .OrderBy(s => s.ID).ToArray();
-            if (group.Length == 0) return;
+            var service = cache.NextService;
+            if (service == null || !services.Contains(service)) return;
             _urlTestCts?.Dispose();
             _urlTestCts = new CancellationTokenSource();
             var token = _urlTestCts.Token;
@@ -290,9 +288,9 @@ namespace IRSpeedyVPN.UserControls
             probeWakeRequested = false;
             UrlTestCoordinator.BeginBatch();
             bool completed = false;
-            var countryTask = CheckCountryAsync(services, group, cache, country, token);
-            probeTask = countryTask;
-            try { completed = await countryTask; }
+            var serverTask = CheckServerAsync(services, service, cache, token);
+            probeTask = serverTask;
+            try { completed = await serverTask; }
             catch (Exception ex) { LogHelper.WriteLog(ex); }
             finally { probeRunning = false; }
             if (completed && !token.IsCancellationRequested && ReferenceEquals(services, _currentServices))
@@ -312,64 +310,63 @@ namespace IRSpeedyVPN.UserControls
             probeTimer.Start();
         }
 
-        private async Task<bool> CheckCountryAsync(IVPNService[] services, IVPNService[] group,
-            ServerCheckCache cache, string country, CancellationToken token)
+        private async Task<bool> CheckServerAsync(IVPNService[] services, IVPNService service,
+            ServerCheckCache cache, CancellationToken token)
         {
-            foreach (var service in group)
+            if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
+            int acceptingProgress = 1;
+            countryPicker.SetGroupChecking(service, true);
+            try
             {
-                if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
-                int acceptingProgress = 1;
-                countryPicker.SetGroupChecking(service, true);
-                try
+                await Task.Run(() =>
                 {
-                    await Task.Run(() =>
+                    cache.PersistQueue();
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return;
+                    DateTime started = DateTime.Now;
+                    try
                     {
-                        DateTime started = DateTime.Now;
-                        try
-                        {
-                            if (service is TunnelPlusService tunnel)
-                                tunnel.UrlTestFull(null, false, latency =>
+                        if (service is TunnelPlusService tunnel)
+                            tunnel.UrlTestFull(null, false, latency =>
+                            {
+                                Dispatcher.BeginInvoke(new Action(() =>
                                 {
-                                    Dispatcher.BeginInvoke(new Action(() =>
-                                    {
-                                        // A queued partial result must not overwrite a final/rolled-back
-                                        // result, a replacement API row, or a newly connected session.
-                                        if (Volatile.Read(ref acceptingProgress) != 0
-                                            && !token.IsCancellationRequested && !probesPaused
-                                            && !UrlTestCoordinator.AbortRequested
-                                            && ReferenceEquals(services, _currentServices)
-                                            && globalInfo?.CurrentService == null)
-                                            countryPicker.ShowGroupProgress(service, latency);
-                                    }));
-                                }, () => token.IsCancellationRequested, token);
-                            else service.UrlTest();
-                        }
-                        catch (Exception ex) { LogHelper.WriteLog(ex); }
-                        finally { Interlocked.Exchange(ref acceptingProgress, 0); }
+                                    // A queued partial result must not overwrite a final/rolled-back
+                                    // result, a replacement API row, or a newly connected session.
+                                    if (Volatile.Read(ref acceptingProgress) != 0
+                                        && !token.IsCancellationRequested && !probesPaused
+                                        && !UrlTestCoordinator.AbortRequested
+                                        && ReferenceEquals(services, _currentServices)
+                                        && globalInfo?.CurrentService == null)
+                                        countryPicker.ShowGroupProgress(service, latency);
+                                }));
+                            }, () => token.IsCancellationRequested, token);
+                        else service.UrlTest();
+                    }
+                    catch (Exception ex) { LogHelper.WriteLog(ex); }
+                    finally { Interlocked.Exchange(ref acceptingProgress, 0); }
 
-                        if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
-                            cache.Restore(service);
-                        else
-                            cache.Record(service, started);
-                    });
-                }
-                finally
-                {
-                    // Always stop the indicator, including cancellation and cache/write errors.
-                    countryPicker.SetGroupChecking(service, false);
-                }
-
-                // This continuation runs on the UI thread. Apply the committed result
-                // (or restored cache on cancellation) before advancing/draining the worker.
-                // Cancellation must not discard this refresh as it did in the queued path.
-                if (ReferenceEquals(services, _currentServices))
-                    countryPicker.RefreshGroup(service);
-                if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
+                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
+                        cache.Restore(service);
+                    else
+                        cache.Record(service, started);
+                });
             }
+            finally
+            {
+                // Always stop the indicator, including cancellation and cache/write errors.
+                countryPicker.SetGroupChecking(service, false);
+            }
+
+            // This continuation runs on the UI thread. Apply the committed result
+            // (or restored cache on cancellation) before advancing/draining the worker.
+            // Cancellation must not discard this refresh as it did in the queued path.
+            if (ReferenceEquals(services, _currentServices))
+                countryPicker.RefreshGroup(service);
+            if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
             await Task.Run(() =>
             {
                 if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
-                    cache.CompleteCountry(country);
+                    cache.CompleteService(service);
             });
             return !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested;
         }
