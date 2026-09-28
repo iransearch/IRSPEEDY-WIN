@@ -252,6 +252,11 @@ namespace IRSpeedyVPN.UserControls
             var connectedAt = globalInfo.ConnectionTime;
             var request = new CancellationTokenSource();
             publicIpRequest = request;
+            string diagnosticRequest = Guid.NewGuid().ToString("N");
+            string diagnosticService = (service as IRSpeedyVPN.Services.TunnelPlusService)?.DiagnosticIdentity ?? "service=other";
+            var diagnosticClock = System.Diagnostics.Stopwatch.StartNew();
+            ConnectionDiagnostics.Write("public-ip-begin", diagnosticService + " request=" + diagnosticRequest
+                + " route=explicit-loopback-proxy port=" + port.Value + " directFallback=False");
             txtReceivedIp.ToolTip = "در حال دریافت آی‌پی خروجی اتصال";
             try
             {
@@ -272,18 +277,30 @@ namespace IRSpeedyVPN.UserControls
                 })
                 using (var response = await client.GetAsync("https://api.ipify.org", request.Token))
                 {
+                    ConnectionDiagnostics.Write("public-ip-http", diagnosticService + " request=" + diagnosticRequest
+                        + " status=" + (int)response.StatusCode + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds);
                     response.EnsureSuccessStatusCode();
                     var text = (await response.Content.ReadAsStringAsync()).Trim();
                     IPAddress address;
-                    if (!IPAddress.TryParse(text, out address)) return;
+                    if (!IPAddress.TryParse(text, out address))
+                    { ConnectionDiagnostics.Write("public-ip-invalid", "request=" + diagnosticRequest); return; }
                     if (request.IsCancellationRequested || publicIpRequest != request || !IsVisible
                         || globalInfo.CurrentService != service || globalInfo.ConnectionTime != connectedAt) return;
+                    ConnectionDiagnostics.Write("public-ip-displayed", diagnosticService + " request=" + diagnosticRequest
+                        + " ipId=" + ConnectionDiagnostics.Fingerprint(address.ToString()) + " family=" + address.AddressFamily
+                        + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds);
                     txtReceivedIp.Text = address.ToString();
                     txtReceivedIp.ToolTip = "آی‌پی خروجی مشاهده‌شده برای این اتصال";
                 }
             }
-            catch (OperationCanceledException) { }
-            catch (HttpRequestException) { }
+            catch (OperationCanceledException)
+            { ConnectionDiagnostics.Write("public-ip-canceled", diagnosticService + " request=" + diagnosticRequest
+                + " requested=" + request.IsCancellationRequested + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds); }
+            catch (HttpRequestException ex)
+            { ConnectionDiagnostics.Write("public-ip-error", diagnosticService + " request=" + diagnosticRequest
+                + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds + " exception=" + ex.GetType().Name
+                + " inner=" + ex.InnerException?.GetType().Name + " hresult=" + ex.HResult
+                + " text=\"" + ConnectionDiagnostics.SafeCoreText(ex.Message) + "\""); }
             finally
             {
                 if (publicIpRequest == request)

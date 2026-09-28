@@ -1,4 +1,4 @@
-﻿using System.Windows.Forms;
+using System.Windows.Forms;
 using Microsoft.Win32;
 using System;
 using System.Collections.Generic;
@@ -64,7 +64,7 @@ namespace Shadowsocks.Controller
 
     /// <summary>
     /// Constants used in INTERNET_PER_CONN_OPTON struct.
-    /// Windows 7 and later:  
+    /// Windows 7 and later:
     /// Clients that support Internet Explorer 8 should query the connection type using INTERNET_PER_CONN_FLAGS_UI.
     /// If this query fails, then the system is running a previous version of Internet Explorer and the client should
     /// query again with INTERNET_PER_CONN_FLAGS.
@@ -273,6 +273,10 @@ namespace Shadowsocks.Controller
                 (int)INTERNET_OPTION.INTERNET_OPTION_PER_CONNECTION_OPTION,
                 intptrStruct, optionListSize);
 
+            int setError = bReturn ? 0 : Marshal.GetLastWin32Error();
+            ConnectionDiagnostics.Write("proxy-native-result", "success=" + bReturn + " win32Error=" + setError
+                + " scope=" + (string.IsNullOrEmpty(connName) ? "LAN" : ConnectionDiagnostics.Fingerprint(connName))
+                + " requestedEnable=" + enable);
             // Free the allocated memory.
             Marshal.FreeCoTaskMem(buffer);
             Marshal.FreeCoTaskMem(intptrStruct);
@@ -280,7 +284,7 @@ namespace Shadowsocks.Controller
             // Throw an exception if this operation failed.
             if (!bReturn)
             {
-                throw new Exception("InternetSetOption failed.", new Win32Exception());
+                throw new Exception("InternetSetOption failed.", new Win32Exception(setError));
             }
 
             // Notify the system that the registry settings have been changed and cause
@@ -291,7 +295,7 @@ namespace Shadowsocks.Controller
                 IntPtr.Zero, 0);
             if (!bReturn)
             {
-                
+
             }
 
             bReturn = Win32.InternetSetOption(
@@ -300,30 +304,33 @@ namespace Shadowsocks.Controller
                 IntPtr.Zero, 0);
             if (!bReturn)
             {
-                
+
             }
         }
 
         public static void SetIEProxy(bool enable, bool global, string proxyServer, string pacURL)
         {
-            string[] allConnections = null;
-            var ret = RemoteAccessService.GetAllConns(ref allConnections);
-
-            if (ret == 2)
-                throw new Exception("Cannot get all connections");
-
-            if (ret == 1)
+            using (ConnectionDiagnostics.ProxyMutation("SetIEProxy-enable:" + enable + "-global:" + global))
             {
-                // no entries, only set LAN
-                SetIEProxy(enable, global, proxyServer, pacURL, null);
-            }
-            else if (ret == 0)
-            {
-                // found entries, set LAN and each connection
-                SetIEProxy(enable, global, proxyServer, pacURL, null);
-                foreach (string connName in allConnections)
+                string[] allConnections = null;
+                var ret = RemoteAccessService.GetAllConns(ref allConnections);
+
+                if (ret == 2)
+                    throw new Exception("Cannot get all connections");
+
+                if (ret == 1)
                 {
-                    SetIEProxy(enable, global, proxyServer, pacURL, connName);
+                    // no entries, only set LAN
+                    SetIEProxy(enable, global, proxyServer, pacURL, null);
+                }
+                else if (ret == 0)
+                {
+                    // found entries, set LAN and each connection
+                    SetIEProxy(enable, global, proxyServer, pacURL, null);
+                    foreach (string connName in allConnections)
+                    {
+                        SetIEProxy(enable, global, proxyServer, pacURL, connName);
+                    }
                 }
             }
         }
@@ -481,7 +488,7 @@ namespace Shadowsocks.Controller
 
         public static void NotifyIE()
         {
-            // These lines implement the Interface in the beginning of program 
+            // These lines implement the Interface in the beginning of program
             // They cause the OS to refresh the settings, causing IP to realy update
             _settingsReturn = NativeMethods.InternetSetOption(IntPtr.Zero, (int)INTERNET_OPTION.INTERNET_OPTION_SETTINGS_CHANGED, IntPtr.Zero, 0);
             _refreshReturn = NativeMethods.InternetSetOption(IntPtr.Zero, (int)INTERNET_OPTION.INTERNET_OPTION_REFRESH, IntPtr.Zero, 0);
@@ -495,7 +502,8 @@ namespace Shadowsocks.Controller
             }
             catch (Exception e)
             {
-
+                ConnectionDiagnostics.Write("proxy-registry-write-error", "fieldId=" + ConnectionDiagnostics.Fingerprint(name)
+                    + " exception=" + e.GetType().Name + " hresult=" + e.HResult);
             }
         }
         public static RegistryKey OpenUserRegKey(string name, bool writable)
@@ -516,45 +524,48 @@ namespace Shadowsocks.Controller
 
         public static void Disable()
         {
-
-            ;
-            Version win8 = new Version("6.2");
-            if (Environment.OSVersion.Version.CompareTo(win8) < 0)
+            using (ConnectionDiagnostics.ProxyMutation("Disable"))
             {
-                using (RegistryKey registry = OpenUserRegKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings", true))
+                ;
+                Version win8 = new Version("6.2");
+                if (Environment.OSVersion.Version.CompareTo(win8) < 0)
+                {
+                    using (RegistryKey registry = OpenUserRegKey(@"Software\Microsoft\Windows\CurrentVersion\Internet Settings", true))
+                    {
+                        try
+                        {
+
+                            {
+                                RegistrySetValue(registry, "ProxyEnable", 0);
+                                RegistrySetValue(registry, "ProxyServer", "");
+                                RegistrySetValue(registry, "AutoConfigURL", "");
+                            }
+
+                            SystemProxy.NotifyIE();
+                            //Must Notify IE first, or the connections do not chanage
+                            CopyProxySettingFromLan();
+                        }
+                        catch (Exception e)
+                        {
+                            ConnectionDiagnostics.Write("proxy-disable-error", "exception=" + e.GetType().Name + " hresult=" + e.HResult);
+                            // TODO this should be moved into views
+                            //MessageBox.Show(I18N.GetString("Failed to update registry"));
+                        }
+                    }
+                }
+                if (Environment.OSVersion.Version.CompareTo(win8) >= 0)
                 {
                     try
                     {
 
                         {
-                            RegistrySetValue(registry, "ProxyEnable", 0);
-                            RegistrySetValue(registry, "ProxyServer", "");
-                            RegistrySetValue(registry, "AutoConfigURL", "");
+                            WinINet.SetIEProxy(false, false, "", "");
                         }
-
-                        SystemProxy.NotifyIE();
-                        //Must Notify IE first, or the connections do not chanage
-                        CopyProxySettingFromLan();
                     }
-                    catch (Exception e)
+                    catch (Exception ex)
                     {
-                        // TODO this should be moved into views
-                        //MessageBox.Show(I18N.GetString("Failed to update registry"));
+                        ConnectionDiagnostics.Write("proxy-disable-error", "exception=" + ex.GetType().Name + " hresult=" + ex.HResult);
                     }
-                }
-            }
-            if (Environment.OSVersion.Version.CompareTo(win8) >= 0)
-            {
-                try
-                {
-
-                    {
-                        WinINet.SetIEProxy(false, false, "", "");
-                    }
-                }
-                catch (Exception ex)
-                {
-
                 }
             }
         }

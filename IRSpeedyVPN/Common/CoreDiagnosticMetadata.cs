@@ -31,6 +31,68 @@ namespace IRSpeedyVPN.Common
             catch { }
             return -1;
         }
+        internal static int ProxyPort = 10808;
+        internal static string ProcessState(int port)
+        {
+            try
+            {
+                lock (Gate)
+                {
+                    Process p;
+                    if (!Processes.TryGetValue(port, out p)) return "trackedCore=none";
+                    bool exited = p.HasExited;
+                    return "trackedCorePid=" + p.Id + " trackedCoreExited=" + exited
+                        + (exited ? " trackedExitCode=" + p.ExitCode + " trackedExitHex=" + unchecked((uint)p.ExitCode).ToString("X8") : "");
+                }
+            }
+            catch (Exception ex) { return "trackedCoreError=" + ex.GetType().Name; }
+        }
+        internal static string ListenerState()
+        {
+            return TcpState(2) + " " + TcpState(23);
+        }
+        private static string TcpState(int family)
+        {
+            IntPtr buffer = IntPtr.Zero;
+            string label = family == 2 ? "tcp4" : "tcp6";
+            try
+            {
+                int size = 0;
+                uint status = GetExtendedTcpTable(IntPtr.Zero, ref size, false, family, 5, 0);
+                if (status != 122 || size < 4 || size > 8 * 1024 * 1024) return label + "QueryStatus=" + status;
+                buffer = Marshal.AllocHGlobal(size);
+                status = GetExtendedTcpTable(buffer, ref size, false, family, 5, 0);
+                if (status != 0) return label + "ReadStatus=" + status;
+                int stride = family == 2 ? 24 : 56;
+                int count = Math.Min(Marshal.ReadInt32(buffer), (size - 4) / stride);
+                int pid = Pid(19810), proxyPort = System.Threading.Volatile.Read(ref ProxyPort);
+                var listeners = new List<string>();
+                var states = new Dictionary<int,int>();
+                for (int i = 0; i < count; i++)
+                {
+                    int offset = 4 + i * stride;
+                    int state = Marshal.ReadInt32(buffer, offset + (family == 2 ? 0 : 48));
+                    int owner = Marshal.ReadInt32(buffer, offset + stride - 4);
+                    int portOffset = offset + (family == 2 ? 8 : 20);
+                    int port = Marshal.ReadByte(buffer, portOffset) * 256 + Marshal.ReadByte(buffer, portOffset + 1);
+                    if (state == 2 && (port == 19810 || port == proxyPort))
+                    {
+                        // The bind address is crucial (loopback versus wildcard), never log remote endpoints.
+                        byte[] bytes = new byte[family == 2 ? 4 : 16];
+                        Marshal.Copy(IntPtr.Add(buffer, offset + (family == 2 ? 4 : 0)), bytes, 0, bytes.Length);
+                        var address = new System.Net.IPAddress(bytes);
+                        string bind = System.Net.IPAddress.IsLoopback(address) ? "loopback"
+                            : bytes.All(b => b == 0) ? "any" : "other";
+                        listeners.Add("port:" + port + ":pid:" + owner + ":bind:" + bind);
+                    }
+                    if (owner == pid) { int value; states.TryGetValue(state, out value); states[state] = value + 1; }
+                }
+                return label + "Listeners={" + string.Join("|", listeners.OrderBy(x=>x))
+                    + "} " + label + "CoreStates={" + string.Join("|", states.OrderBy(x=>x.Key).Select(x=>x.Key+":"+x.Value)) + "}";
+            }
+            catch (Exception ex) { return label + "Error=" + ex.GetType().Name; }
+            finally { if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer); }
+        }
         // Read-only lookup: never grants lifecycle ownership to another service.
         internal static void ObserveListener(int port)
         {

@@ -24,19 +24,39 @@ internal static class Program
         var lines = new ConcurrentQueue<string>();
         LogHelper.Sink = lines.Enqueue;
         TunnelPlusService.Exercise();
+        ConnectionDiagnostics.Flush();
         var output = string.Join("\n", lines.ToArray());
         Require(output.Contains("selectedMode=Proxy") && output.Contains("appliedMode=TUN"), "Selected/applied mode must be distinguished.");
         Require(output.Contains("appliedMode=Proxy"), "Established proxy mode must be explicit.");
         Require(output.Contains("appliedMode=not-connected"), "Do not label an idle service as connected.");
-        Require(output.Contains("schema=network-core-v1") && output.Contains("appMvid="), "Build/session identification missing.");
+        Require(output.Contains("schema=network-core-v2") && output.Contains("appMvid="), "Build/session identification missing.");
         Require(output.Contains("category=network-changed"), "Core signal missing.");
         Require(!output.Contains("PRIVATE_VALUE") && !output.Contains("example.com") && !output.Contains("secret://"), "Core output disclosed private data.");
+        Require(output.Contains("activeConnected=True") && output.Contains("activeProxyRequested=True"), "Active state must not come from idle core reader.");
+        Require(output.Contains("serviceConnected=False") && output.Contains("activeService="), "Reader and active state must remain separate.");
+        Require(output.Contains("connection refused") && output.Contains("context deadline exceeded"), "Useful error causes were lost.");
+        string scrubbed = ConnectionDiagnostics.SafeCoreText("error password=PRIVATE_VALUE token=abcdef12345 https://user:pass@private.example/path 203.0.113.8 uuid=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee connection refused context deadline exceeded");
+        Require(!scrubbed.Contains("PRIVATE_VALUE") && !scrubbed.Contains("abcdef") && !scrubbed.Contains("203.0.113") && !scrubbed.Contains("aaaa"), "Sensitive tokens leaked.");
+        Require(ConnectionDiagnostics.IsLoopbackProxy("http://127.0.0.1:10808") && !ConnectionDiagnostics.IsLoopbackProxy("http://127.0.0.1:10808@private.example"), "Proxy classification must anchor whole value.");
         Require(ConnectionDiagnostics.Fingerprint("one") == ConnectionDiagnostics.Fingerprint("one"), "Session fingerprints must be stable.");
         Require(ConnectionDiagnostics.Fingerprint("one") != ConnectionDiagnostics.Fingerprint("two"), "Different members need distinct fingerprints.");
+        using (var entered = new System.Threading.ManualResetEventSlim())
+        using (var release = new System.Threading.ManualResetEventSlim())
+        {
+            LogHelper.Sink = s => { entered.Set(); release.Wait(3000); };
+            ConnectionDiagnostics.Write("slow-disk", "first");
+            Require(entered.Wait(2000), "Async writer did not start.");
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < 100; i++) ConnectionDiagnostics.Write("slow-disk", "queued=" + i);
+            bool nonblocking = clock.ElapsedMilliseconds < 1000;
+            release.Set(); ConnectionDiagnostics.Flush();
+            Require(nonblocking, "Slow diagnostic sink blocked its caller.");
+        }
         LogHelper.Sink = s => throw new InvalidOperationException("simulated disk failure");
         TunnelPlusService.Exercise();
         ConnectionDiagnostics.Write("check", "disk-failure");
-        Console.WriteLine("PASS: mode distinction, build identity, core-output privacy, member correlation, and logging failure isolation.");
+        ConnectionDiagnostics.Flush();
+        Console.WriteLine("PASS: active/reader separation, error budget under route flood, proxy wrapper compilation, privacy, asynchronous slow/failing sink isolation, build identity and correlation.");
     }
     private static void Require(bool valid, string message) { if (!valid) throw new Exception(message); }
 }

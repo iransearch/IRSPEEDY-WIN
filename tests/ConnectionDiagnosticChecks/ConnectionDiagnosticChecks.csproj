@@ -4,6 +4,8 @@
   <Compile Include="../../IRSpeedyVPN/Common/CoreDiagnosticMetadata.cs" Link="CoreDiagnosticMetadata.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/ConnectionDiagnostics.cs" Link="ConnectionDiagnostics.cs"/>
   <Compile Include="../../IRSpeedyVPN/Services/TunnelPlusService.Diagnostics.cs" Link="TunnelPlusService.Diagnostics.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Services/SystemProxy.cs" Link="SystemProxy.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Common/Win32.cs" Link="Win32.cs"/>
  </ItemGroup>
 </Project>
 

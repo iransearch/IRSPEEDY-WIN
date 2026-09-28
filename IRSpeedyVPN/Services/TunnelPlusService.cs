@@ -761,7 +761,7 @@ namespace IRSpeedyVPN.Services
                     throw new InvalidOperationException("پاک‌سازی اشتراک‌گذاری مستقیم کامل نشد؛ دوباره تلاش کنید.");
                 return;
             }
-            Diagnostic("disconnect-request", "userCanceled=" + userCanceled + " checkProcess=" + chkprocess + " silent=" + silent);
+            Diagnostic("disconnect-request", "userCanceled=" + userCanceled + " checkProcess=" + chkprocess + " silent=" + silent + " caller=" + ConnectionDiagnostics.Caller());
             // Keep the explicit local proxy during automatic recovery. Removing it
             // here would send browser traffic direct while Core is restarting.
             if (useSystemProxy && !silent)
@@ -1728,7 +1728,7 @@ namespace IRSpeedyVPN.Services
                 PauseSharingBeforeCoreRestart();
             try
             {
-                Diagnostic("core-stop-rpc-begin");
+                Diagnostic("core-stop-rpc-begin", "caller=" + ConnectionDiagnostics.Caller());
                 var response = client.Stop();
                 if (!string.IsNullOrEmpty(response?.Error))
                     throw new IOException("Core Stop returned an error.");
@@ -1765,7 +1765,7 @@ namespace IRSpeedyVPN.Services
             {
                 if (!process.HasExited)
                 {
-                    Diagnostic("process-kill-request", "pid=" + DiagnosticPid(process));
+                    Diagnostic("process-kill-request", "pid=" + DiagnosticPid(process) + " caller=" + ConnectionDiagnostics.Caller());
                     process.Kill();
                     if (waitForExitMs == Timeout.Infinite)
                         process.WaitForExit();
@@ -2080,7 +2080,7 @@ namespace IRSpeedyVPN.Services
         private void CoreProcess_Exited(object sender, EventArgs e)
         {
             DiagnosticExit(sender as Process);
-            if (suppressCoreExit) return;
+            if (suppressCoreExit) { Diagnostic("core-exit-decision", "action=ignore reason=suppressed"); return; }
             long generation = Interlocked.Read(ref connectionGeneration);
             // Never block Process.Exited on a lifecycle lock held by a process wait.
             Task.Run(() =>
@@ -2090,12 +2090,19 @@ namespace IRSpeedyVPN.Services
                     if (suppressCoreExit || userCancelRequested ||
                         generation != Interlocked.Read(ref connectionGeneration) ||
                         !ReferenceEquals(sender, coreProcess) || !IsConnected)
+                    {
+                        Diagnostic("core-exit-decision", "action=ignore suppressed=" + suppressCoreExit
+                            + " canceled=" + userCancelRequested + " generationMatches=" + (generation == Interlocked.Read(ref connectionGeneration))
+                            + " processMatches=" + ReferenceEquals(sender, coreProcess) + " connected=" + IsConnected);
                         return;
+                    }
                     if (!ShouldRetryCoreExit())
                     {
+                        Diagnostic("core-exit-decision", "action=disconnect reason=retry-policy");
                         DisconnectLocked(true, false, false);
                         return;
                     }
+                    Diagnostic("core-exit-decision", "action=reconnect");
                     TryReconnect();
                 }
             });

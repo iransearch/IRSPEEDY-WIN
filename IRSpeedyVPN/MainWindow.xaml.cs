@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.WebServices;
+using IRSpeedyVPN.WebServices;
 using IRSpeedyVPN.UserControls;
 using IRSpeedyVPN.Windows;
 using System;
@@ -532,8 +532,18 @@ namespace IRSpeedyVPN
         private void CurrentService_onConnectDisconnect(IVPNService service, bool connected,
             int listenPort, string message, long version)
         {
+            string diagnosticSource = (service as TunnelPlusService)?.DiagnosticIdentity ?? "service=other";
+            var diagnosticQueue = System.Diagnostics.Stopwatch.StartNew();
+            ConnectionDiagnostics.Write("ui-connection-callback", diagnosticSource + " connected=" + connected
+                + " requestVersion=" + version + " currentVersion=" + Interlocked.Read(ref connectionRequestVersion)
+                + " currentServiceMatches=" + ReferenceEquals(service, gInfo.CurrentService)
+                + " messageId=" + ConnectionDiagnostics.Fingerprint(message));
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                ConnectionDiagnostics.Write("ui-connection-dispatch", diagnosticSource + " connected=" + connected
+                    + " queuedMs=" + diagnosticQueue.ElapsedMilliseconds + " requestVersion=" + version
+                    + " currentVersion=" + Interlocked.Read(ref connectionRequestVersion)
+                    + " currentServiceMatches=" + ReferenceEquals(service, gInfo.CurrentService));
                 // Check on the dispatcher as well: an old callback may already be queued.
                 if (version != Interlocked.Read(ref connectionRequestVersion) ||
                     !ReferenceEquals(service, gInfo.CurrentService))
@@ -588,6 +598,8 @@ namespace IRSpeedyVPN
         }
         void ShowControl(object ctrl)
         {
+            ConnectionDiagnostics.Write("ui-navigation", "screen=" + (ctrl?.GetType().Name ?? "none")
+                + " requestVersion=" + Interlocked.Read(ref connectionRequestVersion) + " " + ConnectionDiagnostics.ActiveState);
             // Navigation to an error/update/login page cancels a queued login result.
             loginServerListPending = false;
             txtVersion.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
