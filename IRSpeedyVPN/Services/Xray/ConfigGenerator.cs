@@ -443,17 +443,22 @@ namespace IRSpeedyVPN.Services.Xray
             if (!enabled)
                 return false;
 
+            var balancers = root["routing"]?["balancers"] as JArray;
+            var rules = root["routing"]?["rules"] as JArray;
+            if (balancers == null || rules == null)
+                throw new InvalidOperationException("Smart routing template cannot enforce the AI policy.");
+
             string aiFallbackTag;
             var aiOutbounds = SmartIpRouting.BuildOutbounds(
                 aiLinks, SmartIpRouting.AiProxyPrefix, "AI", serializer, out aiFallbackTag);
 
             if (aiOutbounds.Count == 0 || aiFallbackTag == null)
-                return false;
-
-            var balancers = root["routing"]?["balancers"] as JArray;
-            var rules = root["routing"]?["rules"] as JArray;
-            if (balancers == null || rules == null)
-                return false;
+            {
+                // AI is enabled but has no usable configuration. Keep its domain
+                // rule ahead of direct/main routes and fail closed for AI only.
+                rules.Insert(rules.Count > 0 ? 1 : 0, SmartIpRouting.AiBlockRule());
+                return true; // AI policy is active, with traffic blocked.
+            }
 
             SmartIpRouting.ExtendObservatorySelector(root);
 
@@ -462,8 +467,7 @@ namespace IRSpeedyVPN.Services.Xray
             balancers.Add(SmartIpRouting.AiBalancer(aiFallbackTag));
 
             // The AI rule runs ahead of geoip/geosite and the main catch-all.
-            // This establishes rule priority, not successful pool selection:
-            // an empty leastLoad selection can still reach Xray's default handler.
+            // Selection failure stays inside AI via its explicit member fallback.
             // The first rule is the UDP/443 block, which must stay first.
             rules.Insert(rules.Count > 0 ? 1 : 0, SmartIpRouting.AiRule());
             return true;

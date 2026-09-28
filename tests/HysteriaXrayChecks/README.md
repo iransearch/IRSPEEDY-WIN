@@ -45,3 +45,22 @@ reconnect without exiting the app. Test a new request to `https://showip.net/ip`
 after each connection and correlate the route records with the configuration ID.
 Settings must remain locked during startup and teardown, including the period
 after `Connect()` queues its background task and returns to the UI.
+
+# AI pool isolation
+
+With AI enabled, a nonempty AI balancer explicitly falls back to its first
+accepted `ai-proxy-*` member, matching Android. An empty leastLoad selection
+must not fall through to Xray's first main-pool outbound. If no AI links are
+available or all are rejected, the same AI domains route to `block` before
+direct/main rules. AI off removes both the pool and blocking policy.
+
+The regression cases cover mixed accepted/rejected inputs, null/empty inputs,
+all-rejected inputs, and repeated state transitions, while retaining the main
+pool and 15-minute/sampling-2 probe settings. They compile the production
+generator, not a simulated balancer. Live Windows testing should additionally
+fail AI probes with a working main pool and confirm that `showip.net` either
+uses an AI member or fails; it must never use the main/default route.
+
+`ai-config-apply` now reports `aiPolicy=pool|blocked-empty-pool|disabled` and
+`aiFallback`. `aiRoutingEnabled=True` means the AI policy is installed; use
+`aiPolicy` to distinguish a usable pool from intentional empty-pool blocking.

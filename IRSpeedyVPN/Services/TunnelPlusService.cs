@@ -516,11 +516,15 @@ namespace IRSpeedyVPN.Services
             {
                 var plan = JObject.Parse(xrayConfig);
                 var planRules = plan["routing"]?["rules"] as JArray;
-                var aiRule = planRules?.FirstOrDefault(r => (string)r["balancerTag"] == Xray.SmartIpRouting.AiBalancerTag);
+                var aiRule = planRules?.FirstOrDefault(r => (string)r["ruleTag"] == Xray.SmartIpRouting.AiRuleTag);
+                var aiBalancer = (plan["routing"]?["balancers"] as JArray)?.FirstOrDefault(
+                    b => (string)b["tag"] == Xray.SmartIpRouting.AiBalancerTag);
                 var planOutbounds = plan["outbounds"] as JArray;
                 Diagnostic("ai-config-apply", "xrayConfigId=" + ConnectionDiagnostics.Fingerprint(xrayConfig)
                     + " aiRuleIndex=" + (aiRule == null ? -1 : planRules.IndexOf(aiRule))
                     + " aiMembers=" + (planOutbounds?.Count(o => ((string)o["tag"] ?? "").StartsWith(Xray.SmartIpRouting.AiProxyPrefix, StringComparison.Ordinal)) ?? 0)
+                    + " aiPolicy=" + (aiRule == null ? "disabled" : (string)aiRule["outboundTag"] == "block" ? "blocked-empty-pool" : "pool")
+                    + " aiFallback=" + ((string)aiBalancer?["fallbackTag"] ?? "none")
                     + " settingEnabled=" + Xray.SmartIpRouting.IsEnabled());
             }
             if (userCancelRequested)

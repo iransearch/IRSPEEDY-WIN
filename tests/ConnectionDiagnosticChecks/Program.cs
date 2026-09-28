@@ -46,6 +46,8 @@ internal static class Program
             && routeCategory == "showip-route" && routeDetails.Contains("outbound=ai-proxy-2") && routeDetails.Contains("request=1234"), "AI route selection lost");
         Require(CoreRoutingSignal.TryRead("[Info] [1234] app/dispatcher: default route for tcp:showip.net:443", out routeCategory, out routeDetails)
             && routeCategory == "showip-route" && routeDetails.Contains("decision=default-route"), "Implicit default route hidden");
+        Require(CoreRoutingSignal.TryRead("[Info] [1234] app/dispatcher: Hit route rule: [ai-routing] so taking detour [block] for [tcp:showip.net:443]", out routeCategory, out routeDetails)
+            && routeCategory == "showip-route" && routeDetails.Contains("outbound=block"), "Empty AI blocking was hidden from routing diagnostics");
         Require(CoreRoutingSignal.TryRead("[Info] app/router: least load: no qualified outbound", out routeCategory, out routeDetails)
             && routeCategory == "pool-selection-error", "Empty pool selection hidden");
         Require(CoreRoutingSignal.TryRead("[Info] [9] app/dispatcher: taking detour [ai-proxy-1] for [tcp:private.example:443]", out routeCategory, out routeDetails)

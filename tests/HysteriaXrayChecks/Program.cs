@@ -92,6 +92,7 @@ class Program
         Check(IRSpeedyVPN.Common.ConnectionDiagnostics.Lines.Any(l => l.Contains("ai-setting-saved"))
             && IRSpeedyVPN.Common.ConnectionDiagnostics.Lines.Any(l => l.Contains("accepted=1")), "Toggle/member diagnosis missing");
         Console.WriteLine("PASS: repeated AI on/off, current members, ShowIP rule, shared startup snapshot and preserved probe policy.");
+        CheckAiIsolation(links);
 
         var singBox = IRSpeedyVPN.Services.SingBox.Samples.sg_clientSample;
         var runtime = Path.Combine(Path.GetTempPath(), "IRSpeedy-GeoRouting-" + Guid.NewGuid().ToString("N"));
@@ -148,6 +149,60 @@ class Program
         }
         finally { Directory.Delete(runtime, true); }
         Console.WriteLine("PASS: restored Smart routing; missing/partial geo skips dependent rules and preserves the connection.");
+    }
+
+    static void CheckAiIsolation(List<string> mainLinks)
+    {
+        ShareHandler.Nodes["vless://refused-ai"] = new VmessItem {
+            configType = EConfigType.VLESS, address = "public.example", port = 443, network = "tcp"
+        };
+        // Repeated valid/empty/rejected/off transitions must never retain a stale
+        // service route. Include rejected links before the first valid member.
+        var inputs = new string[][] {
+            new[] { "invalid", "vless://refused-ai", "hy2://fixture", "vless://reality" },
+            null, new string[0], new[] { " ", "invalid", "vless://refused-ai" },
+            new[] { "vless://reality" }, null
+        };
+        var baseline = JObject.Parse(ConfigGenerator.GetSmartBalancerConfig(mainLinks, 19002,
+            "test-user", "test-pass", null, out _, out _, out _, false));
+        for (int i = 0; i < inputs.Length; i++)
+        {
+            bool enabled = i != inputs.Length - 1;
+            bool policyActive;
+            var config = JObject.Parse(ConfigGenerator.GetSmartBalancerConfig(mainLinks, 19002,
+                "test-user", "test-pass", inputs[i], out policyActive, out _, out _, enabled));
+            var outbounds = (JArray)config["outbounds"];
+            var rules = (JArray)config["routing"]["rules"];
+            var members = outbounds.Where(o => ((string)o["tag"]).StartsWith("ai-proxy-")).ToArray();
+            var aiRules = rules.Where(r => r["domain"]?.Values<string>().Contains("domain:showip.net") == true).ToArray();
+            var balancer = config["routing"]["balancers"].FirstOrDefault(b => (string)b["tag"] == "ai-balancer");
+            Check(policyActive == enabled && aiRules.Length == (enabled ? 1 : 0), "Empty AI pool silently removed its policy");
+            if (enabled)
+            {
+                Check(rules.IndexOf(aiRules[0]) == 1, "AI policy lost priority over direct/main rules");
+                Check(aiRules[0]["domain"].Values<string>().SequenceEqual(SmartIpRouting.AiDomains.Select(d => "domain:" + d)),
+                    "Empty AI protection lost service domains");
+                if (members.Length > 0)
+                {
+                    Check(balancer != null && (string)balancer["fallbackTag"] == (string)members[0]["tag"],
+                        "AI selection failure can escape to the main/default outbound");
+                    Check((string)aiRules[0]["balancerTag"] == "ai-balancer" && aiRules[0]["outboundTag"] == null,
+                        "Nonempty AI pool did not use its dedicated balancer");
+                    Check(balancer["selector"].Values<string>().SequenceEqual(new[] { "ai-proxy-" }), "AI selector includes another pool");
+                }
+                else
+                {
+                    Check(balancer == null && (string)aiRules[0]["outboundTag"] == "block" && aiRules[0]["balancerTag"] == null,
+                        "Empty/rejected AI traffic can escape to the main pool or Direct");
+                    Check(outbounds.Any(o => (string)o["tag"] == "block" && (string)o["protocol"] == "blackhole"),
+                        "AI block rule references no blackhole");
+                }
+            }
+            else Check(balancer == null && members.Length == 0, "AI off retained blocking/pool state");
+            Check(JToken.DeepEquals(config["routing"]["balancers"][0], baseline["routing"]["balancers"][0]), "Main pool policy changed");
+            Check(JToken.DeepEquals(config["burstObservatory"]["pingConfig"], baseline["burstObservatory"]["pingConfig"]), "Internal probe policy changed");
+        }
+        Console.WriteLine("PASS: AI-only fallback, empty/rejected AI blocking, policy transitions, unchanged main pool/probes.");
     }
 
     static bool ContainsCountryRule(string json) => JObject.Parse(json)["route"]["rules"]

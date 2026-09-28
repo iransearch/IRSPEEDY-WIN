@@ -30,6 +30,7 @@ namespace IRSpeedyVPN.Services.Xray
 
         public const string AiProxyPrefix = "ai-proxy-";
         public const string AiBalancerTag = "ai-balancer";
+        public const string AiRuleTag = "ai-routing";
 
         private const string SettingKey = "VGAURDVodService";
 
@@ -273,6 +274,9 @@ namespace IRSpeedyVPN.Services.Xray
         {
             return new JObject
             {
+                // Without an explicit fallback, an empty leastLoad selection uses
+                // Xray's default handler (the first MAIN pool member).
+                ["fallbackTag"] = fallbackTag,
                 ["selector"] = new JArray { selectorPrefix },
                 ["strategy"] = new JObject
                 {
@@ -313,7 +317,17 @@ namespace IRSpeedyVPN.Services.Xray
 
         public static JObject AiRule()
         {
-            return DomainRule(AiBalancerTag, AiDomains);
+            var rule = DomainRule(AiBalancerTag, AiDomains);
+            rule["ruleTag"] = AiRuleTag;
+            return rule;
+        }
+
+        public static JObject AiBlockRule()
+        {
+            var rule = AiRule();
+            rule.Remove("balancerTag");
+            rule["outboundTag"] = "block";
+            return rule;
         }
 
     }
