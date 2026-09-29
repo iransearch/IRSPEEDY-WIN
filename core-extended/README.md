@@ -130,3 +130,13 @@ connection reuse, exclusion of an injected 300ms first response from the reporte
 latency, one request for connected tests, warm-up failure and StopTest during
 either stage. The Pool's independent 15m/sampling=2 HEAD probes are unchanged.
 This fixes measurement semantics; no percentage reduction is applied to results.
+
+### Pool diagnostics (irspeedy.3)
+
+Pool probes now report success or failure with elapsed time, HTTP status and a
+fixed reason code. Failed probes distinguish outbound dialing, target TLS and
+HTTP response phases. TCP/UDP pool dial failures also report a fixed reason.
+The app preserves only allowlisted diagnostic values, never raw errors or
+destinations. Build both the core and app to receive the new fields. This is a
+diagnostic change, not a confirmed fix for the reported Hysteria2 outage; Pool
+membership, fallback, sampling, DNS and connection behavior are unchanged.

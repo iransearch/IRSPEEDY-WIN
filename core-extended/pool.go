@@ -7,8 +7,10 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/http/httptrace"
 	"sort"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sagernet/sing-box/adapter"
@@ -141,6 +143,7 @@ func (p *Pool) observe(o adapter.Outbound) {
 func (p *Pool) probe(o adapter.Outbound) {
 	ctx, cancel := context.WithTimeout(p.ctx, poolTimeout)
 	defer cancel()
+	var phase atomic.Int32 // 0: outbound dial, 1: TLS, 2: HTTP response
 	transport := &http.Transport{Proxy: nil, DialContext: func(c context.Context, n, a string) (net.Conn, error) {
 		return o.DialContext(c, n, M.ParseSocksaddr(a))
 	}, DisableKeepAlives: true}
@@ -150,11 +153,20 @@ func (p *Pool) probe(o adapter.Outbound) {
 	if target == "" {
 		target = probeURL
 	}
-	req, _ := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
 	start := time.Now()
-	res, err := client.Do(req)
+	ctx = httptrace.WithClientTrace(ctx, &httptrace.ClientTrace{
+		TLSHandshakeStart: func() { phase.Store(1) },
+		GotConn:           func(httptrace.GotConnInfo) { phase.Store(2) },
+	})
+	req, err := http.NewRequestWithContext(ctx, http.MethodHead, target, nil)
+	var res *http.Response
+	if err == nil {
+		res, err = client.Do(req)
+	}
 	failed := err != nil
+	status := 0
 	if res != nil {
+		status = res.StatusCode
 		failed = failed || res.StatusCode < 200 || res.StatusCode >= 400
 		res.Body.Close()
 	}
@@ -163,7 +175,13 @@ func (p *Pool) probe(o adapter.Outbound) {
 	}
 	p.record(o.Tag(), sample{time.Now(), time.Since(start), failed})
 	if failed {
-		p.logger.Warn("pool probe failed member=", o.Tag())
+		reason := poolErrorReason(err)
+		if err == nil {
+			reason = "http-status"
+		}
+		p.logger.Warn("pool probe failed member=", o.Tag(), " phase=", []string{"dial", "tls", "http"}[phase.Load()], " reason=", reason, " elapsed_ms=", time.Since(start).Milliseconds(), " status=", status)
+	} else {
+		p.logger.Info("pool probe ok member=", o.Tag(), " elapsed_ms=", time.Since(start).Milliseconds(), " status=", status)
 	}
 }
 func (p *Pool) record(tag string, s sample) {
@@ -266,7 +284,12 @@ func (p *Pool) DialContext(ctx context.Context, n string, d M.Socksaddr) (net.Co
 		return nil, e
 	}
 	p.logger.InfoContext(ctx, "pool-route outbound=", o.Tag())
-	return o.DialContext(ctx, n, d)
+	start := time.Now()
+	conn, err := o.DialContext(ctx, n, d)
+	if err != nil {
+		p.logger.WarnContext(ctx, "pool dial failed member=", o.Tag(), " reason=", poolErrorReason(err), " elapsed_ms=", time.Since(start).Milliseconds())
+	}
+	return conn, err
 }
 func (p *Pool) ListenPacket(ctx context.Context, d M.Socksaddr) (net.PacketConn, error) {
 	o, e := p.pick(N.NetworkUDP)
@@ -274,5 +297,10 @@ func (p *Pool) ListenPacket(ctx context.Context, d M.Socksaddr) (net.PacketConn,
 		return nil, e
 	}
 	p.logger.InfoContext(ctx, "pool-route outbound=", o.Tag())
-	return o.ListenPacket(ctx, d)
+	start := time.Now()
+	conn, err := o.ListenPacket(ctx, d)
+	if err != nil {
+		p.logger.WarnContext(ctx, "pool dial failed member=", o.Tag(), " reason=", poolErrorReason(err), " elapsed_ms=", time.Since(start).Milliseconds())
+	}
+	return conn, err
 }

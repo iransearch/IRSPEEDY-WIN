@@ -12,13 +12,28 @@ namespace IRSpeedyVPN.Common
             category = details = null;
             if (string.IsNullOrEmpty(line) || line.Length > 4096) return false;
             var nativeRoute = Regex.Match(line, @"\bpool-route outbound=extended/((?:ai|smart)-proxy-[0-9]{1,5})(?:\s|$)");
-            var nativeProbe = Regex.Match(line, @"\bpool probe failed member=extended/((?:ai|smart)-proxy-[0-9]{1,5})(?:\s|$)");
+            var nativeProbe = Regex.Match(line, @"\bpool (probe failed|probe ok|dial failed) member=extended/((?:ai|smart)-proxy-[0-9]{1,5})(?:\s|$)");
             if (nativeRoute.Success || nativeProbe.Success)
             {
-                string member = (nativeRoute.Success ? nativeRoute : nativeProbe).Groups[1].Value;
+                string member = nativeRoute.Success ? nativeRoute.Groups[1].Value : nativeProbe.Groups[2].Value;
                 bool ai = member.StartsWith("ai-proxy-", StringComparison.Ordinal);
                 category = nativeRoute.Success ? (ai ? "ai-route" : "pool-route") : (ai ? "ai-probe-error" : "pool-probe-error");
                 details = "engine=sing-box-extended outbound=" + member;
+                if (nativeProbe.Success)
+                {
+                    string action = nativeProbe.Groups[1].Value;
+                    category = (ai ? "ai-" : "pool-") + (action == "probe ok" ? "probe-ok" : action == "dial failed" ? "dial-error" : "probe-error");
+                    // Copy only enumerated codes and bounded numbers, never raw error text.
+                    foreach (string pattern in new[] {
+                        @"\bphase=(?:dial|tls|http)(?=\s|$)",
+                        @"\breason=(?:none|network-changed|quic-timeout|tls-error|certificate-error|authentication-error|resolver-missing|dns-not-found|dns-error|network-unreachable|connection-refused|connection-reset|unsupported|udp-disabled|canceled|timeout|connection-closed|invalid-operation|eof|http-status|other)(?=\s|$)",
+                        @"\belapsed_ms=[0-9]{1,10}(?=\s|$)",
+                        @"\bstatus=[0-9]{1,3}(?=\s|$)" })
+                    {
+                        var field = Regex.Match(line, pattern);
+                        if (field.Success) details += " " + field.Value;
+                    }
+                }
                 return true;
             }
             var route = Regex.Match(line,

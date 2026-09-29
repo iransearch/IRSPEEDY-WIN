@@ -48,6 +48,15 @@ internal static class Program
             && routeCategory == "ai-route" && !routeDetails.Contains("private.example"), "Native AI route metadata missing or unsafe");
         Require(CoreRoutingSignal.TryRead("pool probe failed member=extended/smart-proxy-1", out routeCategory, out routeDetails)
             && routeCategory == "pool-probe-error", "Native pool probe failure missing");
+        Require(CoreRoutingSignal.TryRead("pool probe failed member=extended/smart-proxy-1 phase=dial reason=network-changed elapsed_ms=16 status=0 private.example password=secret", out routeCategory, out routeDetails)
+            && routeDetails.Contains("reason=network-changed") && routeDetails.Contains("phase=dial")
+            && routeDetails.Contains("elapsed_ms=16") && !routeDetails.Contains("private.example") && !routeDetails.Contains("secret"), "Pool diagnostic fields missing or unsafe");
+        Require(CoreRoutingSignal.TryRead("pool dial failed member=extended/ai-proxy-2 reason=timeout elapsed_ms=5000", out routeCategory, out routeDetails)
+            && routeCategory == "ai-dial-error" && routeDetails.Contains("reason=timeout"), "AI dial failure missing");
+        Require(CoreRoutingSignal.TryRead("pool probe ok member=extended/smart-proxy-0 elapsed_ms=123 status=204", out routeCategory, out routeDetails)
+            && routeCategory == "pool-probe-ok" && routeDetails.Contains("status=204"), "Successful pool probe missing");
+        Require(CoreRoutingSignal.TryRead("pool probe failed member=extended/smart-proxy-1 phase=private.example reason=secret elapsed_ms=123secret status=204secret", out routeCategory, out routeDetails)
+            && !routeDetails.Contains("phase=") && !routeDetails.Contains("reason=") && !routeDetails.Contains("elapsed_ms=") && !routeDetails.Contains("status="), "Unexpected diagnostic values accepted");
         Require(CoreRoutingSignal.TryRead("[Info] [1234] app/dispatcher: taking detour [ai-proxy-2] for [tcp:showip.net:443]", out routeCategory, out routeDetails)
             && routeCategory == "showip-route" && routeDetails.Contains("outbound=ai-proxy-2") && routeDetails.Contains("request=1234"), "AI route selection lost");
         Require(CoreRoutingSignal.TryRead("[Info] [1234] app/dispatcher: default route for tcp:showip.net:443", out routeCategory, out routeDetails)

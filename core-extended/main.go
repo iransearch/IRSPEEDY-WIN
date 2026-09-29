@@ -21,7 +21,7 @@ import (
 	sjson "github.com/sagernet/sing/common/json"
 )
 
-const coreVersion = "sing-box-extended/v1.14.1-extended-2.7.2+irspeedy.2"
+const coreVersion = "sing-box-extended/v1.14.1-extended-2.7.2+irspeedy.3"
 
 var instanceSequence atomic.Uint64
 
