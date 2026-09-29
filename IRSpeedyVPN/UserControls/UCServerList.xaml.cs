@@ -48,7 +48,6 @@ namespace IRSpeedyVPN.UserControls
         public UCServerList()
         {
             InitializeComponent();
-            probeTimer.Tick += (s, e) => RunBackgroundUrlTests(_currentServices);
             countryPicker.ServerSelected += svc =>
             {
                 selectedService = svc;
@@ -162,7 +161,6 @@ namespace IRSpeedyVPN.UserControls
             {
                 probeCache = new ServerCheckCache(globalInfo?.Username ?? "", _selectedServiceName + "\n" + (protocol ?? ""));
                 probeCacheContext = context;
-                probeSchedule.RestartNow();
             }
             probeCache.Bind(services);
             countryPicker.Load(services, _isUrlTestSupported);
@@ -218,44 +216,60 @@ namespace IRSpeedyVPN.UserControls
 
         #region Background URL tests
 
-        private readonly System.Windows.Threading.DispatcherTimer probeTimer =
-            new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMinutes(3) };
         private Task probeTask = Task.CompletedTask;
         private bool probesPaused;
         private bool probeRunning;
         private bool probeWakeRequested;
+        private bool probesRequireDisconnect;
+        private bool probeRestartRequested;
         private ServerCheckCache probeCache;
         private string probeCacheContext;
-        private readonly ServerProbeSchedule probeSchedule = new ServerProbeSchedule();
 
         internal void PauseServerChecks()
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(PauseServerChecks); return; }
             probesPaused = true;
-            probeTimer.Stop();
             StopUrlTests();
+        }
+
+        internal void PauseServerChecksForConnection()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(PauseServerChecksForConnection); return; }
+            // Failed/canceled connection cleanup and navigation must not resume
+            // this scan. Only the next explicit disconnect can start a new round.
+            probesRequireDisconnect = true;
+            PauseServerChecks();
         }
 
         internal async Task DrainServerChecksAsync()
         {
             PauseServerChecks();
             await probeTask;
+            if (probesRequireDisconnect && probeCache != null)
+            {
+                var cache = probeCache;
+                await Task.Run(() => cache.StopRound());
+            }
         }
 
         internal void PrepareServerChecksForLogin()
         {
             // Called on the UI thread after successful login and connection cleanup,
-            // before Loaded restores this account's saved results and resumes its server turn.
-            probeTimer.Stop();
-            probeSchedule.RestartNow();
+            // before Loaded restores this account's results and unfinished bootstrap.
+            probesRequireDisconnect = false;
+            probeRestartRequested = false;
             probesPaused = false;
         }
 
-        internal void ResumeServerChecksAfterCleanup()
+        internal void ResumeServerChecksAfterCleanup(bool restartRound = false)
         {
-            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(ResumeServerChecksAfterCleanup); return; }
+            if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(() => ResumeServerChecksAfterCleanup(restartRound)); return; }
+            if (restartRound)
+            {
+                probesRequireDisconnect = false;
+                probeRestartRequested = true;
+            }
             probesPaused = false;
-            probeSchedule.RestartNow();
             RunBackgroundUrlTests(_currentServices);
         }
 
@@ -267,18 +281,16 @@ namespace IRSpeedyVPN.UserControls
 
         private async void RunBackgroundUrlTests(IVPNService[] services)
         {
-            if (probesPaused || services == null || probeCache == null
+            if (probesPaused || probesRequireDisconnect || services == null || probeCache == null
                 || globalInfo?.CurrentService != null) return;
             if (probeRunning) { probeWakeRequested = true; return; }
-            probeTimer.Stop();
-            var remaining = probeSchedule.Remaining(DateTime.UtcNow);
-            if (remaining > TimeSpan.Zero)
-            {
-                probeTimer.Interval = remaining;
-                probeTimer.Start();
-                return;
-            }
             var cache = probeCache;
+            if (probeRestartRequested)
+            {
+                // The old worker has drained before its queue can be reset.
+                cache.RestartFromFirstCountry();
+                probeRestartRequested = false;
+            }
             var service = cache.NextService;
             if (service == null || !services.Contains(service)) return;
             _urlTestCts?.Dispose();
@@ -293,21 +305,13 @@ namespace IRSpeedyVPN.UserControls
             try { completed = await serverTask; }
             catch (Exception ex) { LogHelper.WriteLog(ex); }
             finally { probeRunning = false; }
-            if (completed && !token.IsCancellationRequested && ReferenceEquals(services, _currentServices))
+            if (probesPaused || probesRequireDisconnect || globalInfo?.CurrentService != null) return;
+            if (probeWakeRequested || token.IsCancellationRequested || completed)
             {
-                if (cache.InitialScanCompleted) probeSchedule.Completed(DateTime.UtcNow);
-                else probeSchedule.RestartNow();
-            }
-            if (probesPaused || globalInfo?.CurrentService != null) return;
-            if (probeWakeRequested || token.IsCancellationRequested || (completed && !cache.InitialScanCompleted))
-            {
-                // A reload/resume arrived while the previous canceled worker was draining.
+                // Continue immediately. An empty queue ends the round without a timer.
+                // Reload/resume may also have replaced the canceled worker's list.
                 RunBackgroundUrlTests(_currentServices);
-                return;
             }
-            probeTimer.Interval = probeSchedule.Remaining(DateTime.UtcNow);
-            if (probeTimer.Interval <= TimeSpan.Zero) probeTimer.Interval = TimeSpan.FromMinutes(3);
-            probeTimer.Start();
         }
 
         private async Task<bool> CheckServerAsync(IVPNService[] services, IVPNService service,
@@ -326,7 +330,7 @@ namespace IRSpeedyVPN.UserControls
                     try
                     {
                         if (service is TunnelPlusService tunnel)
-                            tunnel.UrlTestFull(null, false, latency =>
+                            tunnel.UrlTestFull(null, false, cache.ShowInitialProgress ? (Action<long>)(latency =>
                             {
                                 Dispatcher.BeginInvoke(new Action(() =>
                                 {
@@ -339,7 +343,7 @@ namespace IRSpeedyVPN.UserControls
                                         && globalInfo?.CurrentService == null)
                                         countryPicker.ShowGroupProgress(service, latency);
                                 }));
-                            }, () => token.IsCancellationRequested, token);
+                            }) : null, () => token.IsCancellationRequested, token);
                         else service.UrlTest();
                     }
                     catch (Exception ex) { LogHelper.WriteLog(ex); }

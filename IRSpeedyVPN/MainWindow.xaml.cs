@@ -428,7 +428,7 @@ namespace IRSpeedyVPN
                 ShowMessage("");
             }
             uCServerList.PauseServerChecks();
-            await ApplyConnectionRequestAsync(null, null, version);
+            await ApplyConnectionRequestAsync(null, null, version, restartServerChecks: true);
         }
 
         private void UCUserInfo_OnChangeServerRequest(object sender, EventArgs e)
@@ -446,6 +446,7 @@ namespace IRSpeedyVPN
             }
 
             long version = Interlocked.Increment(ref connectionRequestVersion);
+            uCServerList.PauseServerChecksForConnection();
             if (gInfo.CurrentService is TunnelPlusService previousTunnel)
                 previousTunnel.CancelPendingConnection();
             UnRegiserVpnService();
@@ -456,7 +457,7 @@ namespace IRSpeedyVPN
         }
 
         private async Task ApplyConnectionRequestAsync(IVPNService next, string protocol, long version,
-            Func<IVPNService> prepareService = null)
+            Func<IVPNService> prepareService = null, bool restartServerChecks = false)
         {
             uCServerList.PauseServerChecks();
             pendingConnectionRequests++;
@@ -517,7 +518,7 @@ namespace IRSpeedyVPN
                 pendingConnectionRequests--;
                 connectionRequestGate.Release();
                 if (version == Interlocked.Read(ref connectionRequestVersion) && gInfo.CurrentService == null && IsUserLogin)
-                    uCServerList.ResumeServerChecksAfterCleanup();
+                    uCServerList.ResumeServerChecksAfterCleanup(restartServerChecks);
             }
         }
 

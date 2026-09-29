@@ -30,10 +30,12 @@ namespace IRSpeedyVPN.Services
         }
         internal sealed class State
         {
-            public int Version { get; set; } = 2;
+            public int Version { get; set; } = 3;
             public bool InitialScanCompleted { get; set; }
-            // A persisted permutation: consume the head, never choose a random row per tick.
-            // Null also identifies old country-based caches for migration.
+            public bool RoundInProgress { get; set; } = true;
+            public bool SequentialRound { get; set; }
+            // Bootstrap retains its existing shuffled order. Disconnect rounds use
+            // country/ID order and end with an empty queue until explicitly restarted.
             public List<string> PendingRows { get; set; }
             public List<string> CompletedRows { get; set; }
             public Dictionary<string, Result> Results { get; set; } = new Dictionary<string, Result>();
@@ -104,13 +106,24 @@ namespace IRSpeedyVPN.Services
                     rowKeys[service] = row;
                     rows[row] = service;
                 }
-                if (state.Version == 1 || state.PendingRows == null || state.CompletedRows == null)
+                if (state.Version < 3)
+                {
+                    // Version 2 pre-created an endless next round. Do not run that
+                    // periodic queue after upgrading a completed initial scan.
+                    state.RoundInProgress = !state.InitialScanCompleted;
+                    state.SequentialRound = false;
+                }
+                if (!state.RoundInProgress)
+                {
+                    state.PendingRows = new List<string>();
+                    state.CompletedRows = new List<string>();
+                }
+                else if (state.Version == 1 || state.PendingRows == null || state.CompletedRows == null)
                 {
                     // Preserve old results, and resume only missing rows during bootstrap.
                     state.CompletedRows = state.InitialScanCompleted ? new List<string>() : rowKeys
                         .Where(p => HasRecordedResults(p.Key)).Select(p => p.Value).Distinct().ToList();
                     state.PendingRows = Shuffle(rows.Keys.Except(state.CompletedRows));
-                    state.Version = 2;
                 }
                 else
                 {
@@ -118,12 +131,14 @@ namespace IRSpeedyVPN.Services
                     state.PendingRows = state.PendingRows.Where(rows.ContainsKey)
                         .Except(state.CompletedRows).Distinct().ToList();
                     // Preserve an unfinished turn and the order of all surviving rows.
-                    state.PendingRows.AddRange(Shuffle(rows.Keys.Except(state.PendingRows).Except(state.CompletedRows)));
+                    var added = rows.Keys.Except(state.PendingRows).Except(state.CompletedRows);
+                    state.PendingRows.AddRange(state.SequentialRound ? OrderRows(added) : Shuffle(added));
                 }
-                if (state.PendingRows.Count == 0 && rows.Count > 0)
+                state.Version = 3;
+                if (state.RoundInProgress && state.PendingRows.Count == 0 && rows.Count > 0)
                 {
                     state.InitialScanCompleted = true;
-                    StartNextRound();
+                    state.RoundInProgress = false;
                 }
             }
         }
@@ -146,13 +161,39 @@ namespace IRSpeedyVPN.Services
             return result;
         }
 
-        private void StartNextRound()
+        private List<string> OrderRows(IEnumerable<string> keys)
         {
-            state.CompletedRows.Clear();
-            state.PendingRows = Shuffle(rows.Keys);
+            return keys.OrderBy(key => rows[key].Country, StringComparer.CurrentCulture)
+                .ThenBy(key => CountryKey(rows[key]), StringComparer.Ordinal)
+                .ThenBy(key => rows[key].ID).ToList();
+        }
+
+        internal void RestartFromFirstCountry()
+        {
+            lock (gate)
+            {
+                state.RoundInProgress = true;
+                state.SequentialRound = true;
+                state.CompletedRows = new List<string>();
+                state.PendingRows = OrderRows(rows.Keys);
+            }
+        }
+
+        // A connection consumes the current scan opportunity. Persist this only
+        // after its worker drains, so login/reload cannot revive an aborted round.
+        internal void StopRound()
+        {
+            lock (gate)
+            {
+                state.RoundInProgress = false;
+                state.PendingRows = new List<string>();
+                state.CompletedRows = new List<string>();
+                Save();
+            }
         }
 
         internal bool InitialScanCompleted { get { lock (gate) return state.InitialScanCompleted; } }
+        internal bool ShowInitialProgress { get { lock (gate) return !state.InitialScanCompleted && !state.SequentialRound; } }
 
         internal IVPNService NextService
         {
@@ -215,7 +256,7 @@ namespace IRSpeedyVPN.Services
                 if (state.PendingRows.Count == 0)
                 {
                     state.InitialScanCompleted = true;
-                    StartNextRound();
+                    state.RoundInProgress = false;
                 }
                 Save();
             }
@@ -236,7 +277,7 @@ namespace IRSpeedyVPN.Services
             {
                 if (!File.Exists(path) || new FileInfo(path).Length > 4 * 1024 * 1024) return new State();
                 var value = JsonConvert.DeserializeObject<State>(File.ReadAllText(path), new JsonSerializerSettings { MaxDepth = 8 });
-                if (value == null || (value.Version != 1 && value.Version != 2) || value.Results == null || value.Results.Count > 20000) return new State();
+                if (value == null || (value.Version < 1 || value.Version > 3) || value.Results == null || value.Results.Count > 20000) return new State();
                 if (new[] { value.PendingRows, value.CompletedRows }.Any(list => list != null
                     && (list.Count > 20000 || list.Any(key => key == null || key.Length != 64)))) return new State();
                 if (value.Results.Any(p => p.Key == null || p.Key.Length != 64 || p.Value == null
