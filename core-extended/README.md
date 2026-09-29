@@ -16,7 +16,8 @@ there is no second core process. Unsupported conversion returns a clear failure
 - Main and AI least-load pools: expected 5, main max RTT 3s / AI 5s,
   failure tolerance 0.2, random choice among the qualified top candidates sorted
   by RTT deviation then average. One sample uses half the average as deviation.
-- Initial probes only after successful Box.Start. Interval 15m, sampling 2:
+- Initial probes only after successful Box.Start, refreshed after network resets
+  have finished closing protocol connections and resetting DNS. Interval 15m, sampling 2:
   one initial HEAD, then two samples spread across each 30-minute window;
   last two samples, validity 60m. No external health/restart timer.
 - AI fallback must be an AI member. An empty/rejected AI pool has a blocking
@@ -91,7 +92,7 @@ Wi-Fi loss/recovery and application exit. Direct hotspot has the existing OS
 limitations; this migration does not add a Windows 7 hotspot implementation.
 
 For Linux development clone the pinned upstream into `core-extended/upstream`,
-apply `patches/certificate-pin.patch`, then run:
+apply `patches/certificate-pin.patch` and `patches/pool-network-reset.patch`, then run:
 
 ```
 go test -race -tags with_quic,with_utls,with_wireguard,with_clash_api,with_v2ray_api .
@@ -140,3 +141,21 @@ The app preserves only allowlisted diagnostic values, never raw errors or
 destinations. Build both the core and app to receive the new fields. This is a
 diagnostic change, not a confirmed fix for the reported Hysteria2 outage; Pool
 membership, fallback, sampling, DNS and connection behavior are unchanged.
+
+### Pool recovery after a network reset (irspeedy.4)
+
+Windows startup logs confirmed that all Hysteria2 probes were interrupted by
+`network-changed` after 15-17ms. The Pool retained these failures until its next
+scheduled sample, so it kept routing through the first-member fallback.
+A small upstream hook now notifies native Pools after both protocol and DNS
+resets complete. Each Pool cancels obsolete probes, clears stale observations,
+and queues a coalesced refresh for each member. Results from an older network
+generation cannot enter the new history. A caller that joins an old shared QUIC
+handshake as it finishes gets one retry within the same five-second budget.
+Normal server failures retain the existing scoring and sampling policy.
+
+This does not restart the core, change public-IP checks, or introduce an external
+health timer. Suspended/offline probes wait for the normal network lifecycle.
+Tests reproduce interrupted probes and the retiring shared handshake, verify
+recovery of both members, and cover readiness/close races. Windows connection
+and Wi-Fi recovery still require a device test.

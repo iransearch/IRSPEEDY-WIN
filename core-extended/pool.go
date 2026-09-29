@@ -19,6 +19,7 @@ import (
 	M "github.com/sagernet/sing/common/metadata"
 	N "github.com/sagernet/sing/common/network"
 	"github.com/sagernet/sing/service"
+	"github.com/sagernet/sing/service/pause"
 )
 
 const poolInterval = 15 * time.Minute
@@ -43,17 +44,22 @@ type Pool struct {
 	closed      bool
 	probeTarget string
 	outbound.Adapter
-	ctx     context.Context
-	cancel  context.CancelFunc
-	manager adapter.OutboundManager
-	logger  log.ContextLogger
-	options PoolOptions
-	members []adapter.Outbound
-	mu      sync.RWMutex
-	history map[string][]sample
-	once    sync.Once
-	workers sync.WaitGroup
-	maxRTT  time.Duration
+	ctx         context.Context
+	cancel      context.CancelFunc
+	manager     adapter.OutboundManager
+	logger      log.ContextLogger
+	options     PoolOptions
+	members     []adapter.Outbound
+	mu          sync.RWMutex
+	history     map[string][]sample
+	probeCtx    context.Context
+	probeCancel context.CancelFunc
+	generation  uint64
+	refresh     []chan struct{}
+	pause       pause.Manager
+	once        sync.Once
+	workers     sync.WaitGroup
+	maxRTT      time.Duration
 }
 
 func registerPool(r *outbound.Registry) { outbound.Register[PoolOptions](r, "irspeedy-pool", newPool) }
@@ -76,7 +82,7 @@ func newPool(ctx context.Context, _ adapter.Router, l log.ContextLogger, t strin
 		o.Expected = 1
 	}
 	ctx, cancel := context.WithCancel(ctx)
-	return &Pool{Adapter: outbound.NewAdapter("irspeedy-pool", t, []string{N.NetworkTCP, N.NetworkUDP}, o.Outbounds), ctx: ctx, cancel: cancel, manager: service.FromContext[adapter.OutboundManager](ctx), logger: l, options: o, history: map[string][]sample{}, maxRTT: max}, nil
+	return &Pool{Adapter: outbound.NewAdapter("irspeedy-pool", t, []string{N.NetworkTCP, N.NetworkUDP}, o.Outbounds), ctx: ctx, cancel: cancel, manager: service.FromContext[adapter.OutboundManager](ctx), logger: l, options: o, history: map[string][]sample{}, maxRTT: max, pause: service.FromContext[pause.Manager](ctx)}, nil
 }
 func (p *Pool) Start(stage adapter.StartStage) error {
 	if stage != adapter.StartStateStart {
@@ -109,43 +115,110 @@ func (p *Pool) Ready() {
 	}
 	p.once.Do(func() {
 		for _, o := range p.members {
+			refresh := make(chan struct{}, 1)
+			p.refresh = append(p.refresh, refresh)
 			p.workers.Add(1)
-			go p.observe(o)
+			go p.observe(o, refresh)
 		}
 	})
 }
-func (p *Pool) observe(o adapter.Outbound) {
+
+// Called by the core only AFTER protocol connections and DNS transports reset.
+// The callback never dials, waits for tests, or restarts the running instance.
+func (p *Pool) NetworkResetCompleted(ctx context.Context) {
+	if ctx.Err() != nil {
+		return
+	}
+	p.lifecycle.Lock()
+	defer p.lifecycle.Unlock()
+	if p.closed {
+		return
+	}
+	p.mu.Lock()
+	if p.probeCancel != nil {
+		p.probeCancel()
+	}
+	p.probeCtx, p.probeCancel = context.WithCancel(p.ctx)
+	p.generation++
+	p.history = map[string][]sample{}
+	p.mu.Unlock()
+	for _, refresh := range p.refresh {
+		select {
+		case refresh <- struct{}{}:
+		default:
+		}
+	}
+}
+
+func (p *Pool) observe(o adapter.Outbound, refresh <-chan struct{}) {
 	defer p.workers.Done()
-	p.probe(o)
+	probe := func() {
+		// Coalesce changes already received. A change during the test cancels
+		// that generation and leaves another notification for the worker.
+		select {
+		case <-refresh:
+		default:
+		}
+		p.probe(o)
+	}
+	probe()
+	waitUntil := func(deadline time.Time) bool {
+		timer := time.NewTimer(time.Until(deadline))
+		defer timer.Stop()
+		for {
+			select {
+			case <-p.ctx.Done():
+				return false
+			case <-refresh:
+				probe()
+			case <-timer.C:
+				return true
+			}
+		}
+	}
 	for { // two samples uniformly spread through each 30 minute sampling window
 		offsets := []time.Duration{time.Duration(rand.Int64N(int64(poolInterval * poolSamples))), time.Duration(rand.Int64N(int64(poolInterval * poolSamples)))}
 		sort.Slice(offsets, func(i, j int) bool { return offsets[i] < offsets[j] })
 		start := time.Now()
 		for _, off := range offsets {
-			timer := time.NewTimer(time.Until(start.Add(off)))
-			select {
-			case <-p.ctx.Done():
-				timer.Stop()
+			if !waitUntil(start.Add(off)) {
 				return
-			case <-timer.C:
-				p.probe(o)
 			}
+			probe()
 		}
-		timer := time.NewTimer(time.Until(start.Add(poolInterval * poolSamples)))
-		select {
-		case <-p.ctx.Done():
-			timer.Stop()
+		if !waitUntil(start.Add(poolInterval * poolSamples)) {
 			return
-		case <-timer.C:
 		}
 	}
 }
 func (p *Pool) probe(o adapter.Outbound) {
-	ctx, cancel := context.WithTimeout(p.ctx, poolTimeout)
+	if p.pause != nil && (p.pause.IsDevicePaused() || p.pause.IsNetworkPaused()) {
+		return
+	}
+	p.mu.Lock()
+	if p.probeCtx == nil {
+		p.probeCtx, p.probeCancel = context.WithCancel(p.ctx)
+	}
+	base, generation := p.probeCtx, p.generation
+	p.mu.Unlock()
+	ctx, cancel := context.WithTimeout(base, poolTimeout)
 	defer cancel()
+	for attempt := 0; attempt < 2; attempt++ {
+		// A just-cancelled shared QUIC offer may finish after the network-reset
+		// callback. Once it reports network-changed it has been retired: retry
+		// once in the SAME budget, without scoring that obsolete handshake.
+		if !p.probeAttempt(ctx, generation, o, attempt == 0) {
+			return
+		}
+	}
+}
+
+func (p *Pool) probeAttempt(ctx context.Context, generation uint64, o adapter.Outbound, retryNetworkChange bool) bool {
 	var phase atomic.Int32 // 0: outbound dial, 1: TLS, 2: HTTP response
-	transport := &http.Transport{Proxy: nil, DialContext: func(c context.Context, n, a string) (net.Conn, error) {
-		return o.DialContext(c, n, M.ParseSocksaddr(a))
+	transport := &http.Transport{Proxy: nil, DialContext: func(_ context.Context, n, a string) (net.Conn, error) {
+		// net/http detaches dial cancellation from individual requests. Pool
+		// dials must instead stop with this network generation and probe budget.
+		return o.DialContext(ctx, n, M.ParseSocksaddr(a))
 	}, DisableKeepAlives: true}
 	defer transport.CloseIdleConnections()
 	client := http.Client{Transport: transport, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -170,10 +243,17 @@ func (p *Pool) probe(o adapter.Outbound) {
 		failed = failed || res.StatusCode < 200 || res.StatusCode >= 400
 		res.Body.Close()
 	}
-	if p.ctx.Err() != nil {
-		return
+	p.mu.Lock()
+	if p.ctx.Err() != nil || generation != p.generation {
+		p.mu.Unlock()
+		return false
 	}
-	p.record(o.Tag(), sample{time.Now(), time.Since(start), failed})
+	if retryNetworkChange && ctx.Err() == nil && poolErrorReason(err) == "network-changed" {
+		p.mu.Unlock()
+		return true
+	}
+	p.recordLocked(o.Tag(), sample{time.Now(), time.Since(start), failed})
+	p.mu.Unlock()
 	if failed {
 		reason := poolErrorReason(err)
 		if err == nil {
@@ -183,10 +263,14 @@ func (p *Pool) probe(o adapter.Outbound) {
 	} else {
 		p.logger.Info("pool probe ok member=", o.Tag(), " elapsed_ms=", time.Since(start).Milliseconds(), " status=", status)
 	}
+	return false
 }
 func (p *Pool) record(tag string, s sample) {
 	p.mu.Lock()
 	defer p.mu.Unlock()
+	p.recordLocked(tag, s)
+}
+func (p *Pool) recordLocked(tag string, s sample) {
 	a := append(p.history[tag], s)
 	if len(a) > poolSamples {
 		a = a[len(a)-poolSamples:]

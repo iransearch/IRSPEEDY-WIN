@@ -1,0 +1,20 @@
+diff --git a/route/network.go b/route/network.go
+--- a/route/network.go
++++ b/route/network.go
+@@ -507,6 +507,16 @@ func (r *NetworkManager) ResetNetwork(ctx context.Context) {
+ 	}
+ 
+ 	r.router.ResetNetwork()
++	// IRSPEEDY: refresh native groups only after protocol and DNS resets finish.
++	// Ordinary InterfaceUpdated callbacks run before DNS.ResetNetwork and can
++	// otherwise start probes against transports that are about to be closed.
++	for _, outbound := range r.outbound.Outbounds() {
++		if listener, ok := outbound.(interface {
++			NetworkResetCompleted(context.Context)
++		}); ok {
++			listener.NetworkResetCompleted(ctx)
++		}
++	}
+ }
+ 
+ func (r *NetworkManager) notifyInterfaceUpdate(defaultInterface *control.Interface, flags int) {

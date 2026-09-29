@@ -38,13 +38,16 @@ if (-not (Test-Path $source)) {
 $head = (& git -C $source rev-parse HEAD).Trim()
 if ($LASTEXITCODE -ne 0 -or $head -ne $commit) { throw 'Unexpected upstream checkout; use a fresh core-extended/upstream directory' }
 $patch = Join-Path $core 'patches\certificate-pin.patch'
-$oldPreference = $ErrorActionPreference
-try {
-    $ErrorActionPreference = 'Continue'
-    & git -C $source apply --reverse --check $patch 2>$null
-    $alreadyPatched = $LASTEXITCODE -eq 0
-} finally { $ErrorActionPreference = $oldPreference }
-if (-not $alreadyPatched) { Run 'git' @('-C',$source,'apply','--check',$patch); Run 'git' @('-C',$source,'apply',$patch) }
+$networkPatch = Join-Path $core 'patches\pool-network-reset.patch'
+foreach ($sourcePatch in @($patch, $networkPatch)) {
+    $oldPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        & git -C $source apply --reverse --check $sourcePatch 2>$null
+        $alreadyPatched = $LASTEXITCODE -eq 0
+    } finally { $ErrorActionPreference = $oldPreference }
+    if (-not $alreadyPatched) { Run 'git' @('-C',$source,'apply','--check',$sourcePatch); Run 'git' @('-C',$source,'apply',$sourcePatch) }
+}
 $previous = @{}
 foreach ($key in @('GOOS','GOARCH','CGO_ENABLED','GOTOOLCHAIN','GOAMD64','GO386','GOPROXY')) { $previous[$key] = [Environment]::GetEnvironmentVariable($key,'Process') }
 Push-Location $core
@@ -69,7 +72,7 @@ try {
         Assert-Pe (Join-Path $dist $name) $(if ($arch -eq '386') {0x14c} else {0x8664})
         Copy-Item (Join-Path $dist $name) (Join-Path $dist "SGuard$suffix.exe") -Force
     }
-    $manifest = [ordered]@{ engine='sing-box-extended'; version=$tag; source=$commit; go=$goTag; patchSha256=(Get-FileHash $patch -Algorithm SHA256).Hash; files=@{} }
+    $manifest = [ordered]@{ engine='sing-box-extended'; version=$tag; source=$commit; go=$goTag; patchSha256=(Get-FileHash $patch -Algorithm SHA256).Hash; networkPatchSha256=(Get-FileHash $networkPatch -Algorithm SHA256).Hash; files=@{} }
     foreach($name in @('SGuard32.exe','SGuard64.exe','SGuard732.exe','SGuard764.exe')) { $manifest.files[$name]=(Get-FileHash (Join-Path $dist $name) -Algorithm SHA256).Hash }
     $manifest | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $dist 'extended-core.json') -Encoding UTF8
 } finally {
