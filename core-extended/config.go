@@ -237,7 +237,8 @@ func mergeConfig(native, legacy string) ([]byte, error) {
 				fmt.Printf("extended candidate rejected tag=%s reason=unsupported-or-invalid-config\n", name)
 				continue
 			}
-			return nil, fmt.Errorf("outbound %s: %w", name, e)
+			// Preserve the app's exact candidate-isolation error contract.
+			return nil, fmt.Errorf("failed to build outbound config with tag %s > %w", name, e)
 		}
 		if nativeTags[str(o["tag"])] {
 			return nil, fmt.Errorf("duplicate outbound tag")

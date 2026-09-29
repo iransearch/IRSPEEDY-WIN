@@ -28,7 +28,14 @@ there is no second core process. Unsupported conversion returns a clear failure
   Certificate DER SHA256 pins use a small upstream patch for Go TLS and uTLS;
   they are never substituted with public-key pins or silently disabled.
 - Standalone Test has its own instance, cancellation and incremental results.
-  StopTest cannot stop the connected VPN instance.
+  It sends a warm-up GET then measures a second GET with the same HTTP client,
+  matching the previous Throne latency contract. Connected-instance tests send
+  one GET. Each request retains its configured timeout; warm-up failure ends
+  that candidate. StopTest cancels either stage without stopping the VPN.
+- Conversion failures name the exact candidate using the app's existing
+  `failed to build outbound config with tag xray-N` contract. The Windows runner
+  removes that candidate and rebuilds the remaining test batch. Invalid pins
+  stay rejected; certificate verification is not bypassed.
 
 Legacy TCP HTTP-header camouflage, old XTLS and legacy Xray QUIC camouflage
 are explicitly refused; these are not native equivalents of XHTTP or Hysteria2.
@@ -113,3 +120,13 @@ strategy; only native sing-box dialers are used.
   pass. The existing Newtonsoft.Json 12.0.2 dependency reports NU1903.
 - Full WPF/Costura packaging has not run here: it requires Windows and the existing
   complete runtime Files.zip. The build script performs packaging on that machine.
+
+### URL test parity correction (irspeedy.2)
+
+The migration initially used native sing-box HEAD URLTest, which did not preserve
+Throne's warm-up behavior for ordinary/SOCKS-wrapped outbounds. The dedicated
+initial URL test now uses GET twice and measures the second request. Tests verify
+connection reuse, exclusion of an injected 300ms first response from the reported
+latency, one request for connected tests, warm-up failure and StopTest during
+either stage. The Pool's independent 15m/sampling=2 HEAD probes are unchanged.
+This fixes measurement semantics; no percentage reduction is applied to results.

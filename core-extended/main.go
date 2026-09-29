@@ -16,13 +16,12 @@ import (
 	"github.com/chai2010/protorpc"
 	box "github.com/sagernet/sing-box"
 	"github.com/sagernet/sing-box/adapter"
-	"github.com/sagernet/sing-box/common/urltest"
 	"github.com/sagernet/sing-box/include"
 	"github.com/sagernet/sing-box/option"
 	sjson "github.com/sagernet/sing/common/json"
 )
 
-const coreVersion = "sing-box-extended/v1.14.1-extended-2.7.2+irspeedy.1"
+const coreVersion = "sing-box-extended/v1.14.1-extended-2.7.2+irspeedy.2"
 
 var instanceSequence atomic.Uint64
 
@@ -219,13 +218,11 @@ func (s *Server) Test(in *TestReq, out *TestResp) error {
 			if !ok {
 				r.Error = "outbound not found"
 			} else {
-				tc, done := context.WithTimeout(ctx, timeout)
-				ms, e := urltest.URLTest(tc, in.Url, o)
-				done()
+				duration, e := initialURLTest(ctx, in.Url, o, !in.TestCurrent, timeout)
 				if e != nil {
 					r.Error = e.Error()
 				} else {
-					r.LatencyMs = int32(ms)
+					r.LatencyMs = int32(duration.Milliseconds())
 				}
 			}
 			s.testMu.Lock()

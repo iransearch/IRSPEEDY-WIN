@@ -170,3 +170,16 @@ func TestDownloadTLSOptionsValidate(t *testing.T) {
 	}
 	i.close()
 }
+
+// The Windows batch runner removes only the exact xray-N candidate named in
+// this error and rebuilds the remaining batch. Returning a generic error here
+// previously failed all twelve links when one certificate pin was malformed.
+func TestInvalidPinPreservesCandidateIsolationContract(t *testing.T) {
+	base, legacy := sampleConfig()
+	legacy = strings.ReplaceAll(legacy, "smart-proxy-0", "xray-0")
+	legacy = strings.Replace(legacy, `"security":"none"`, `"security":"tls","tlsSettings":{"pinnedPeerCertSha256":"invalid-pin"}`, 1)
+	_, err := mergeConfig(base, legacy)
+	if err == nil || err.Error() != "failed to build outbound config with tag xray-0 > invalid certificate SHA256 pin" {
+		t.Fatalf("candidate isolation contract lost: %v", err)
+	}
+}
