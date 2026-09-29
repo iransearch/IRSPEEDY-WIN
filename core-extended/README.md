@@ -53,6 +53,20 @@ The app resolves only EGuard names, preventing fallback to a cached Throne binar
 Costura and the embedded Files.zip keep the app a single distributed EXE.
 For Core-only output: `Build-SingBox-Extended.cmd -CoreOnly`.
 
+If the public Go mirror returns HTTP 403, the builder changes Go's standard
+`https://proxy.golang.org,direct` to `https://proxy.golang.org|direct` for this
+build only. The pipe allows direct-source fallback on all download errors;
+custom proxy/off settings are retained. `go.sum` and checksum database verification
+remain enabled. Git access to upstream repositories is required for direct mode.
+For an older builder, set this in the same PowerShell window before running it:
+
+```powershell
+$env:GOPROXY = 'https://proxy.golang.org|direct'
+.\Build-SingBox-Extended.cmd -CoreOnly
+```
+
+There is no need to delete the module cache or download the compiler again.
+
 The builder verifies the checksum of XTLS Go `patched-1.26.6`, applies the pinned
 certificate patch, tests on Windows, builds both 386 and amd64 with CGO disabled,
 and checks PE architecture/subsystem <= 6.1. The compatibility binaries also run

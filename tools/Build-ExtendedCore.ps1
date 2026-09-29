@@ -46,10 +46,18 @@ try {
 } finally { $ErrorActionPreference = $oldPreference }
 if (-not $alreadyPatched) { Run 'git' @('-C',$source,'apply','--check',$patch); Run 'git' @('-C',$source,'apply',$patch) }
 $previous = @{}
-foreach ($key in @('GOOS','GOARCH','CGO_ENABLED','GOTOOLCHAIN','GOAMD64','GO386')) { $previous[$key] = [Environment]::GetEnvironmentVariable($key,'Process') }
+foreach ($key in @('GOOS','GOARCH','CGO_ENABLED','GOTOOLCHAIN','GOAMD64','GO386','GOPROXY')) { $previous[$key] = [Environment]::GetEnvironmentVariable($key,'Process') }
 Push-Location $core
 try {
     $env:GOTOOLCHAIN='local';$env:CGO_ENABLED='0';$env:GOOS='windows';$env:GOARCH='amd64';$env:GOAMD64='v1';$env:GO386='sse2'
+    # The Go default uses a comma and stops on HTTP 403. Only adjust the public
+    # default; retain explicit custom/off settings and all checksum verification.
+    $moduleProxy = (& $go env GOPROXY)
+    if ($LASTEXITCODE -ne 0) { throw 'Could not read Go module proxy configuration' }
+    if ($moduleProxy.Trim() -eq 'https://proxy.golang.org,direct') {
+        $env:GOPROXY = 'https://proxy.golang.org|direct'
+        Write-Host 'Public Go module mirror: direct-source fallback enabled for download errors.'
+    }
     Run $go @('version')
     # Windows executes the integration test that restricted Linux cannot run.
     Run $go @('test','-mod=readonly','-tags',$tags,'.')
