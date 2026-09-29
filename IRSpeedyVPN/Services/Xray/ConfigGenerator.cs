@@ -1,4 +1,4 @@
-using IRSpeedyVPN.Common;
+﻿using IRSpeedyVPN.Common;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -26,7 +26,9 @@ namespace IRSpeedyVPN.Services.Xray
         {
             if (item == null)
                 return false;
-            if (string.Equals(item.GetNetwork(), "xhttp", StringComparison.OrdinalIgnoreCase))
+            if (!string.IsNullOrWhiteSpace(item.certSha256)
+                || (item.configType == EConfigType.VLESS && !string.IsNullOrEmpty(item.security) && item.security != "none")
+                || string.Equals(item.GetNetwork(), "xhttp", StringComparison.OrdinalIgnoreCase))
                 return true;
             return string.Equals(item.streamSecurity, Global.RealitySecurity, StringComparison.OrdinalIgnoreCase);
         }

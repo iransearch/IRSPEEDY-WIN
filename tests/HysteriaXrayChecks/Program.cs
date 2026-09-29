@@ -155,7 +155,7 @@ class Program
     static void CheckAiIsolation(List<string> mainLinks)
     {
         ShareHandler.Nodes["vless://refused-ai"] = new VmessItem {
-            configType = EConfigType.VLESS, address = "public.example", port = 443, network = "tcp"
+            configType = EConfigType.VLESS, address = "public.example", port = 443, network = "tcp", streamSecurity = "xtls"
         };
         // Repeated valid/empty/rejected/off transitions must never retain a stale
         // service route. Include rejected links before the first valid member.

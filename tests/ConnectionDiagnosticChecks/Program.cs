@@ -44,6 +44,10 @@ internal static class Program
         Require(ConnectionDiagnostics.Fingerprint("one") == ConnectionDiagnostics.Fingerprint("one"), "Session fingerprints must be stable.");
         Require(ConnectionDiagnostics.Fingerprint("one") != ConnectionDiagnostics.Fingerprint("two"), "Different members need distinct fingerprints.");
         string routeCategory, routeDetails;
+        Require(CoreRoutingSignal.TryRead("pool-route outbound=extended/ai-proxy-2 private.example", out routeCategory, out routeDetails)
+            && routeCategory == "ai-route" && !routeDetails.Contains("private.example"), "Native AI route metadata missing or unsafe");
+        Require(CoreRoutingSignal.TryRead("pool probe failed member=extended/smart-proxy-1", out routeCategory, out routeDetails)
+            && routeCategory == "pool-probe-error", "Native pool probe failure missing");
         Require(CoreRoutingSignal.TryRead("[Info] [1234] app/dispatcher: taking detour [ai-proxy-2] for [tcp:showip.net:443]", out routeCategory, out routeDetails)
             && routeCategory == "showip-route" && routeDetails.Contains("outbound=ai-proxy-2") && routeDetails.Contains("request=1234"), "AI route selection lost");
         Require(CoreRoutingSignal.TryRead("[Info] [1234] app/dispatcher: default route for tcp:showip.net:443", out routeCategory, out routeDetails)

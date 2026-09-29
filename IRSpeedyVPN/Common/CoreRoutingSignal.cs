@@ -11,6 +11,16 @@ namespace IRSpeedyVPN.Common
         {
             category = details = null;
             if (string.IsNullOrEmpty(line) || line.Length > 4096) return false;
+            var nativeRoute = Regex.Match(line, @"\bpool-route outbound=extended/((?:ai|smart)-proxy-[0-9]{1,5})(?:\s|$)");
+            var nativeProbe = Regex.Match(line, @"\bpool probe failed member=extended/((?:ai|smart)-proxy-[0-9]{1,5})(?:\s|$)");
+            if (nativeRoute.Success || nativeProbe.Success)
+            {
+                string member = (nativeRoute.Success ? nativeRoute : nativeProbe).Groups[1].Value;
+                bool ai = member.StartsWith("ai-proxy-", StringComparison.Ordinal);
+                category = nativeRoute.Success ? (ai ? "ai-route" : "pool-route") : (ai ? "ai-probe-error" : "pool-probe-error");
+                details = "engine=sing-box-extended outbound=" + member;
+                return true;
+            }
             var route = Regex.Match(line,
                 @"app/dispatcher: (?:Hit route rule: \[[^\]\r\n]*\] so )?taking detour \[((?:ai|smart)-proxy-[0-9]{1,5}|direct|block)\] for \[([^\]\r\n]+)\]");
             var defaultRoute = Regex.Match(line, @"app/dispatcher: default route for ([^\s\r\n]+)");

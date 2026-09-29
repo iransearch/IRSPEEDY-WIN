@@ -425,8 +425,8 @@ namespace IRSpeedyVPN.Services.SingBox
                 {
                     var serilizer = new JavaScriptSerializer();
                     var wgOutbound = serilizer.Deserialize<Outbound>(Samples.sg_wgOutbound);
-                    outbound.server = wgOutbound.server;
-                    outbound.server_port = wgOutbound.server_port;
+                    outbound.server = node.address;
+                    outbound.server_port = node.port;
                     outbound.type = wgOutbound.type;
                     outbound.tag = wgOutbound.tag;
                     outbound.private_key = node.privateKey;

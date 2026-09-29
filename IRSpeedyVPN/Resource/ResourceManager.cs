@@ -887,7 +887,7 @@ namespace IRSpeedyVPN.Resource
         private string GetCorePath(string runtimePath)
         {
             if (string.IsNullOrWhiteSpace(runtimePath)) return null;
-            var coreName = (Tools.IsWin7OrLower() ? "SGuard7" : "SGuard")
+            var coreName = (Tools.IsWin7OrLower() ? "EGuard7" : "EGuard")
                 + (Environment.Is64BitOperatingSystem ? "64.exe" : "32.exe");
             return Path.Combine(runtimePath, "V-Guard", coreName);
         }

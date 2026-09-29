@@ -1,4 +1,4 @@
-using IRSpeedyVPN.Common;
+﻿using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Events;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
@@ -338,12 +338,12 @@ namespace IRSpeedyVPN.Services
 
                         singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
                         LogHelper.WriteExLog(
-                            "Smart config prepared. mode=xray-leastload"
+                            "Smart config prepared. mode=sing-box-extended-leastload"
                             + " inputCandidates=" + smartUrls.Count
                             + " poolMembers=" + poolMemberCount
                             + " hysteriaMembers=" + hysteriaMemberCount
                             + " droppedCandidates=" + (smartUrls.Count - poolMemberCount)
-                            + " xrayEnabled=True"
+                            + " coreEngine=sing-box-extended"
                             + " aiRoutingEnabled=" + aiRoutingEnabled);
                         _singboxLinkOverride = null;
                     }
@@ -2180,7 +2180,7 @@ namespace IRSpeedyVPN.Services
         private string ResolveCorePath()
         {
 
-            var filepath = Path.Combine(gInfo.TempPath, "V-Guard", (Tools.IsWin7OrLower() ? "SGuard7" : "SGuard") + (Environment.Is64BitOperatingSystem ? "64.exe" : "32.exe"));
+            var filepath = Path.Combine(gInfo.TempPath, "V-Guard", (Tools.IsWin7OrLower() ? "EGuard7" : "EGuard") + (Environment.Is64BitOperatingSystem ? "64.exe" : "32.exe"));
             if (!File.Exists(filepath))
             {
                 return null;

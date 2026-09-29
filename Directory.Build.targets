@@ -1,4 +1,8 @@
 <Project>
+  <Target Name="ValidateExtendedCorePayload" BeforeTargets="GenerateFilesZipIntegritySource"
+          Condition="Exists('$(MSBuildProjectDirectory)\Resource\ResourceManager.cs') and '$(OS)' == 'Windows_NT'">
+    <Exec Command="powershell.exe -NoProfile -File &quot;$(MSBuildThisFileDirectory)tools\Test-ExtendedRuntime.ps1&quot; -Archive &quot;$(MSBuildProjectDirectory)\Resources\Files.zip&quot;" />
+  </Target>
   <Target Name="GenerateFilesZipIntegritySource"
           BeforeTargets="CoreCompile"
           Condition="Exists('$(MSBuildProjectDirectory)\Resource\ResourceManager.cs')">

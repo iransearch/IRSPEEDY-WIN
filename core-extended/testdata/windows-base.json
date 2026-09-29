@@ -1,0 +1,83 @@
+{
+  "dns": {
+    "rules": [
+      {
+        "action": "predefined",
+        "answer": "localhost. IN A 127.0.0.1",
+        "domain": "localhost",
+        "query_type": "A",
+        "rcode": "NOERROR"
+      },
+      {
+        "action": "predefined",
+        "answer": "localhost. IN AAAA ::1",
+        "domain": "localhost",
+        "query_type": "AAAA",
+        "rcode": "NOERROR"
+      }
+    ],
+    "servers": [
+      {
+        "type": "udp",
+        "server": "1.1.1.1",
+        "detour": "proxy",
+        "tag": "dns-remote"
+      },
+      {
+        "type": "udp",
+        "server": "1.1.1.1",
+        "tag": "dns-direct"
+      }
+    ]
+  },
+  "log": {
+    "level": "info"
+  },
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "type": "socks",
+      "server": "127.0.0.1",
+      "server_port": 19232
+    },
+    {
+      "tag": "direct",
+      "type": "direct"
+    },
+    {
+      "tag": "block",
+      "type": "block"
+    }
+  ],
+  "route": {
+    "auto_detect_interface": true,
+    "default_domain_resolver": {
+      "server": "dns-direct",
+      "strategy": "prefer_ipv4"
+    },
+    "final": "proxy",
+    "find_process": false,
+    "rules": [
+      {
+        "inbound": [
+          "mixed-in",
+          "tun-in"
+        ],
+        "action": "sniff"
+      },
+      {
+        "protocol": "dns",
+        "action": "hijack-dns"
+      }
+    ],
+    "rule_set": []
+  },
+  "inbounds": [
+    {
+      "type": "mixed",
+      "tag": "mixed-in",
+      "listen": "127.0.0.1",
+      "listen_port": 10808
+    }
+  ]
+}

@@ -12,3 +12,9 @@ Throne/obj
 UpdateHelper/bin
 UpdateHelper/publish/
 UpdateHelper/obj
+/core-extended/upstream/
+/core-extended/dist/
+/core-extended/toolchains/
+
+/tests/**/bin/
+/tests/**/obj/

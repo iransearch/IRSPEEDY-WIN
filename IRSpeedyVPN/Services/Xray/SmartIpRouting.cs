@@ -188,29 +188,15 @@ namespace IRSpeedyVPN.Services.Xray
             if (proxy == null)
                 return null;
 
-            var security = proxy.streamSettings == null ? null : proxy.streamSettings.security;
-            var hasTransportSecurity = !string.IsNullOrWhiteSpace(security)
-                && !string.Equals(security, "none", StringComparison.OrdinalIgnoreCase);
-            if (hasTransportSecurity)
-                return null;
-
-            var address = proxy.settings == null ? null : proxy.settings.address;
-            if (!RequiresTransportSecurity(address))
-                return null;
-
-            if (string.Equals(proxy.protocol, "vless", StringComparison.OrdinalIgnoreCase))
-            {
-                var encryption = proxy.settings == null ? null : proxy.settings.encryption;
-                var hasEncryption = !string.IsNullOrWhiteSpace(encryption)
-                    && !string.Equals(encryption, "none", StringComparison.OrdinalIgnoreCase);
-                if (!hasEncryption)
-                    return "vless without TLS, Reality or encryption";
-            }
-            else if (string.Equals(proxy.protocol, "trojan", StringComparison.OrdinalIgnoreCase))
-            {
-                return "trojan without TLS";
-            }
-
+            // This branch converts the compatibility JSON into native sing-box
+            // transports. Unlike the previous Xray core, public cleartext XHTTP
+            // is supported. Reject only transports the adapter cannot preserve.
+            if (proxy.streamSettings?.tcpSettings?.header?.type == "http")
+                return "legacy TCP HTTP camouflage is unsupported by the extended adapter";
+            if (proxy.streamSettings?.security == "xtls")
+                return "legacy XTLS is unsupported; use TLS/Reality with Vision";
+            if (proxy.streamSettings?.network == "quic")
+                return "legacy Xray QUIC camouflage is unsupported";
             return null;
         }
 
