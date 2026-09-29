@@ -2180,7 +2180,7 @@ namespace IRSpeedyVPN.Services
         private string ResolveCorePath()
         {
 
-            var filepath = Path.Combine(gInfo.TempPath, "V-Guard", (Tools.IsWin7OrLower() ? "EGuard7" : "EGuard") + (Environment.Is64BitOperatingSystem ? "64.exe" : "32.exe"));
+            var filepath = Path.Combine(gInfo.TempPath, "V-Guard", (Tools.IsWin7OrLower() ? "SGuard7" : "SGuard") + (Environment.Is64BitOperatingSystem ? "64.exe" : "32.exe"));
             if (!File.Exists(filepath))
             {
                 return null;

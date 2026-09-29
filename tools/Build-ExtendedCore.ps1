@@ -64,13 +64,13 @@ try {
     foreach ($arch in @('386','amd64')) {
         $env:GOARCH=$arch
         $suffix = if ($arch -eq '386') { '32' } else { '64' }
-        $name = "EGuard7$suffix.exe"
+        $name = "SGuard7$suffix.exe"
         Run $go @('build','-mod=readonly','-trimpath','-tags',$tags,'-ldflags=-s -w','-o',(Join-Path $dist $name),'.')
         Assert-Pe (Join-Path $dist $name) $(if ($arch -eq '386') {0x14c} else {0x8664})
-        Copy-Item (Join-Path $dist $name) (Join-Path $dist "EGuard$suffix.exe") -Force
+        Copy-Item (Join-Path $dist $name) (Join-Path $dist "SGuard$suffix.exe") -Force
     }
     $manifest = [ordered]@{ engine='sing-box-extended'; version=$tag; source=$commit; go=$goTag; patchSha256=(Get-FileHash $patch -Algorithm SHA256).Hash; files=@{} }
-    foreach($file in Get-ChildItem $dist -Filter '*.exe') { $manifest.files[$file.Name]=(Get-FileHash $file.FullName -Algorithm SHA256).Hash }
+    foreach($name in @('SGuard32.exe','SGuard64.exe','SGuard732.exe','SGuard764.exe')) { $manifest.files[$name]=(Get-FileHash (Join-Path $dist $name) -Algorithm SHA256).Hash }
     $manifest | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $dist 'extended-core.json') -Encoding UTF8
 } finally {
     Pop-Location
@@ -92,7 +92,7 @@ try {
         $dest=$outputZip.CreateEntry($name,[IO.Compression.CompressionLevel]::Optimal)
         if($entry.Name -ne '') { $srcStream=$entry.Open();$dstStream=$dest.Open();try{$srcStream.CopyTo($dstStream)}finally{$srcStream.Dispose();$dstStream.Dispose()} }
     }
-    foreach($name in @('EGuard32.exe','EGuard64.exe','EGuard732.exe','EGuard764.exe','extended-core.json')) {
+    foreach($name in @('SGuard32.exe','SGuard64.exe','SGuard732.exe','SGuard764.exe','extended-core.json')) {
         [IO.Compression.ZipFileExtensions]::CreateEntryFromFile($outputZip,(Join-Path $dist $name),"V-Guard/$name",[IO.Compression.CompressionLevel]::Optimal) | Out-Null
     }
 } finally { $inputZip.Dispose();$outputZip.Dispose() }

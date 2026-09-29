@@ -48,8 +48,10 @@ Build-SingBox-Extended.cmd -RuntimeZip C:\path\to\existing\Files.zip
 
 The existing complete runtime archive is required (not committed to this repo).
 All unrelated runtime assets are preserved. The builder removes the old SGuard
-entries and embeds EGuard32/EGuard64/EGuard732/EGuard764 plus a hash manifest.
-The app resolves only EGuard names, preventing fallback to a cached Throne binary.
+entries and embeds SGuard32/SGuard64/SGuard732/SGuard764 plus a hash manifest.
+The app requires the extended-core.json engine marker and matching executable
+entry before accepting a cached runtime, preventing reuse of a legacy Throne
+runtime that has the same SGuard names. Keep the manifest beside the four EXEs.
 Costura and the embedded Files.zip keep the app a single distributed EXE.
 For Core-only output: `Build-SingBox-Extended.cmd -CoreOnly`.
 

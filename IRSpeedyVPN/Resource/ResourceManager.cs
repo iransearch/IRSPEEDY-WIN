@@ -57,6 +57,12 @@ namespace IRSpeedyVPN.Resource
             public string activatedAtUtc { get; set; }
         }
 
+        private sealed class ExtendedCoreManifest
+        {
+            public string engine { get; set; }
+            public Dictionary<string, string> files { get; set; }
+        }
+
         public ResourceManager()
         {
             runtimeRoot = Path.Combine(Path.GetTempPath(), "IRSpeedy");
@@ -881,13 +887,27 @@ namespace IRSpeedyVPN.Resource
             if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path))
                 return false;
             var core = GetCorePath(path);
-            return !string.IsNullOrWhiteSpace(core) && File.Exists(core);
+            if (string.IsNullOrWhiteSpace(core) || !File.Exists(core)) return false;
+            // SGuard names are retained for packaging compatibility. A legacy
+            // Throne runtime with the same executable names must not be reused.
+            try
+            {
+                var manifestPath = Path.Combine(path, "V-Guard", "extended-core.json");
+                if (!File.Exists(manifestPath)) return false;
+                var manifest = new JavaScriptSerializer().Deserialize<ExtendedCoreManifest>(File.ReadAllText(manifestPath));
+                string expectedHash;
+                return manifest != null && manifest.engine == "sing-box-extended"
+                    && manifest.files != null
+                    && manifest.files.TryGetValue(Path.GetFileName(core), out expectedHash)
+                    && IsSha256(expectedHash);
+            }
+            catch { return false; }
         }
 
         private string GetCorePath(string runtimePath)
         {
             if (string.IsNullOrWhiteSpace(runtimePath)) return null;
-            var coreName = (Tools.IsWin7OrLower() ? "EGuard7" : "EGuard")
+            var coreName = (Tools.IsWin7OrLower() ? "SGuard7" : "SGuard")
                 + (Environment.Is64BitOperatingSystem ? "64.exe" : "32.exe");
             return Path.Combine(runtimePath, "V-Guard", coreName);
         }
