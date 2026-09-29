@@ -7,6 +7,7 @@ using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 using IRSpeedyVPN.Resource;
+using IRSpeedyVPN.Common;
 
 namespace IRSpeedyVPN.Services.Hotspot
 {
