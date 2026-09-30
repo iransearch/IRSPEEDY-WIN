@@ -327,7 +327,7 @@ namespace IRSpeedyVPN.UserControls
             if (host == null) return;
 
 
-            host.SetHeaderIcons(this, new[] { new HeaderIconRegistration("", "تنظیمات سرویس", () => host.OpenSettings(globalInfo?.CurrentService)) });
+            host.SetHeaderIcons(this, new[] { new HeaderIconRegistration("", "تنظیمات سرویس", () => host.OpenSettings(globalInfo?.CurrentService), isPrimary: true) });
         }
 
         private void ClearHeaderIcons()

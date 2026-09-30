@@ -683,8 +683,13 @@ namespace IRSpeedyVPN
 
         private void RenderHeaderIcons(List<HeaderIconRegistration> icons)
         {
-            panelHeaderIcons.Children.Clear();
+            panelHeaderPrimaryIcons.Children.Clear();
+            panelHeaderSecondaryIcons.Children.Clear();
             if (icons == null || icons.Count == 0) return;
+
+            // Page-specific actions cannot move the primary settings button or
+            // the wordmark. Older registrations retain the last action as primary.
+            var primaryIcon = icons.FirstOrDefault(icon => icon.IsPrimary) ?? icons[icons.Count - 1];
 
             foreach (var icon in icons)
             {
@@ -720,7 +725,9 @@ namespace IRSpeedyVPN
                     label.Click += (s, e) => handler();
                 }
 
-                panelHeaderIcons.Children.Add(label);
+                var target = ReferenceEquals(icon, primaryIcon)
+                    ? panelHeaderPrimaryIcons : panelHeaderSecondaryIcons;
+                target.Children.Add(label);
             }
         }
         void ShowNotifiy(string Title, string Message)

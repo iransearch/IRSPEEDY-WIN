@@ -462,7 +462,7 @@ namespace IRSpeedyVPN.UserControls
             if (!string.IsNullOrWhiteSpace(TunnelPlusService.selectedChain))
                 icons.Add(new HeaderIconRegistration("", "حذف سرویس پایه", RemoveBaseService));
             icons.Add(new HeaderIconRegistration("\uf2f5", "خروج از حساب", () => host.LogoutFromSettings()));
-            icons.Add(new HeaderIconRegistration("", "تنظیمات سرویس", OpenServiceSettings));
+            icons.Add(new HeaderIconRegistration("", "تنظیمات سرویس", OpenServiceSettings, isPrimary: true));
 
             host.SetHeaderIcons(this, icons);
         }
