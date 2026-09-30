@@ -4,25 +4,19 @@ using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
+using System.Windows.Media.Media3D;
 
 namespace IRSpeedyVPN.UserControls
 {
     public partial class UCUserInfo
     {
-        private const double TrafficClosedOffset = -416;
-        private readonly BlurEffect trafficBackgroundBlur = new BlurEffect
-        {
-            Radius = 0,
-            RenderingBias = RenderingBias.Performance
-        };
         private Storyboard trafficMotion;
         private bool trafficPanelOpen;
+        private double TrafficClosedOffset => -Math.Max(420, ActualWidth + 30);
 
-        private void TrafficToggleButton_Click(object sender, RoutedEventArgs e)
-        {
+        private void TrafficToggleButton_Click(object sender, RoutedEventArgs e) =>
             SetTrafficPanelOpen(TrafficToggleButton.IsChecked == true);
-        }
 
         private void TrafficBackdrop_MouseDown(object sender, MouseButtonEventArgs e)
         {
@@ -34,115 +28,146 @@ namespace IRSpeedyVPN.UserControls
 
         private void Connected_PreviewKeyDown(object sender, KeyEventArgs e)
         {
-            // Consume Escape before the existing IsCancel disconnect button sees it.
             if (e.Key != Key.Escape || (!trafficPanelOpen && trafficMotion == null)) return;
             e.Handled = true;
+            if (TrafficPanel.DismissReset()) return;
             SetTrafficPanelOpen(false);
             TrafficToggleButton.Focus();
         }
 
         private void SetTrafficPanelOpen(bool open)
         {
-            if (!IsLoaded || !IsVisible)
-            {
-                ResetTrafficPanel();
-                return;
-            }
+            if (!IsLoaded || !IsVisible) { ResetTrafficPanel(); return; }
             if (trafficPanelOpen == open && trafficMotion == null) return;
+            TrafficPanel.DismissReset();
 
-            // Capture the currently displayed values before removing the old clocks.
-            // This lets a second click reverse a partially opened/closed panel smoothly.
-            var nextMotion = new Storyboard();
-            AddTrafficAnimation(nextMotion, TrafficPanelTranslate, TranslateTransform.XProperty, open ? 0 : TrafficClosedOffset);
-            AddTrafficAnimation(nextMotion, TrafficPanelScale, ScaleTransform.ScaleXProperty, open ? 1 : 0.78);
-            AddTrafficAnimation(nextMotion, TrafficPanelSkew, SkewTransform.AngleYProperty, open ? 0 : -4);
-            AddTrafficAnimation(nextMotion, TrafficPanelContainer, UIElement.OpacityProperty, open ? 1 : 0);
-            AddTrafficAnimation(nextMotion, TrafficFoldShade, UIElement.OpacityProperty, open ? 0 : 0.55);
-            AddTrafficAnimation(nextMotion, TrafficArrowRotation, RotateTransform.AngleProperty, open ? 180 : 0);
-            AddTrafficAnimation(nextMotion, TrafficBackdrop, UIElement.OpacityProperty, open ? 1 : 0);
-            AddTrafficAnimation(nextMotion, ConnectedContent, UIElement.OpacityProperty, open ? 0.6 : 1);
-            AddTrafficAnimation(nextMotion, TrafficBackgroundScale, ScaleTransform.ScaleXProperty, open ? 0.975 : 1);
-            AddTrafficAnimation(nextMotion, TrafficBackgroundScale, ScaleTransform.ScaleYProperty, open ? 0.975 : 1);
-            AddTrafficAnimation(nextMotion, TrafficBackgroundTranslate, TranslateTransform.XProperty, open ? 10 : 0);
-            AddTrafficAnimation(nextMotion, trafficBackgroundBlur, BlurEffect.RadiusProperty, open ? 6 : 0);
+            // Only capture at an endpoint. Reversing mid-motion reuses the texture and
+            // current clocks, so rapid clicks never flash the live panel or restart it.
+            if (trafficMotion == null)
+            {
+                if (open)
+                {
+                    PauseConnectedMotion();
+                    TrafficBlurredBackground.Source = CaptureTrafficVisual(ConnectedContent);
+                    TrafficBlurredBackground.Visibility = Visibility.Visible;
+                    TrafficPanel.RefreshTraffic();
+                }
+                TrafficPanelContainer.Visibility = Visibility.Visible;
+                TrafficPanelContainer.UpdateLayout();
+                PrepareTrafficFold();
+            }
 
+            var duration = TimeSpan.FromMilliseconds(open ? 520 : 400);
+            var next = new Storyboard();
+            AddTrafficAnimation(next, TrafficPanelTranslate, TranslateTransform.XProperty, open ? 0 : TrafficClosedOffset, duration);
+            AddTrafficAnimation(next, TrafficHinge, AxisAngleRotation3D.AngleProperty, open ? 0 : 64, duration);
+            AddTrafficAnimation(next, TrafficBlurredBackground, UIElement.OpacityProperty, open ? 1 : 0, duration);
+            AddTrafficAnimation(next, ConnectedContent, UIElement.OpacityProperty, open ? 0 : 1, duration);
+            AddTrafficAnimation(next, TrafficBackdrop, UIElement.OpacityProperty, open ? 1 : 0, duration);
+            AddTrafficAnimation(next, TrafficArrowRotation, RotateTransform.AngleProperty, open ? 180 : 0, duration);
             StopTrafficMotion();
-            StopConnectedMotion();
             trafficPanelOpen = open;
             UpdateTrafficToggle(open);
-            TrafficPanelContainer.Visibility = Visibility.Visible;
-            TrafficPanelContainer.IsEnabled = open;
+            TrafficPanel.SetUpdatesEnabled(false);
+            TrafficPanelLayer.IsHitTestVisible = false;
+            TrafficPanelContainer.Visibility = Visibility.Hidden;
+            TrafficFoldViewport.Visibility = Visibility.Visible;
             TrafficBackdrop.Visibility = Visibility.Visible;
-            ConnectedContent.IsEnabled = false;
-            ConnectedContent.Effect = trafficBackgroundBlur;
+            ConnectedContent.IsHitTestVisible = false;
 
-            if (!SystemParameters.ClientAreaAnimation)
+            // This small disclosure remains animated even when Windows disables general
+            // client-area animations; the prior instant branch obscured its direction.
+            trafficMotion = next;
+            next.Completed += (sender, args) =>
             {
-                ApplyTrafficState(open);
-                if (!open) UpdateConnectedMotion();
-                return;
-            }
-
-            trafficMotion = nextMotion;
-            nextMotion.Completed += (sender, args) =>
-            {
-                if (!ReferenceEquals(trafficMotion, nextMotion)) return;
+                if (!ReferenceEquals(trafficMotion, next)) return;
                 StopTrafficMotion();
                 ApplyTrafficState(open);
-                if (!open) UpdateConnectedMotion();
+                if (!open) ResumeConnectedMotion();
             };
-            nextMotion.Begin(this, HandoffBehavior.SnapshotAndReplace, true);
+            next.Begin(this, HandoffBehavior.SnapshotAndReplace, true);
         }
 
-        private static void AddTrafficAnimation(Storyboard motion, DependencyObject target,
-            DependencyProperty property, double destination)
+        private static BitmapSource CaptureTrafficVisual(FrameworkElement visual)
         {
-            var animation = new DoubleAnimation((double)target.GetValue(property), destination,
-                TimeSpan.FromMilliseconds(620))
+            var dpi = VisualTreeHelper.GetDpi(visual);
+            var bounds = new Rect(0, 0, Math.Max(1, visual.ActualWidth), Math.Max(1, visual.ActualHeight));
+            var bitmap = new RenderTargetBitmap(
+                Math.Max(1, (int)Math.Ceiling(bounds.Width * dpi.DpiScaleX)),
+                Math.Max(1, (int)Math.Ceiling(bounds.Height * dpi.DpiScaleY)),
+                dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
+            // Draw in local coordinates: Render(visual) directly can include its layout
+            // offset/margin and crop or shift the snapshot at the live/texture handoff.
+            var drawing = new DrawingVisual();
+            using (var context = drawing.RenderOpen())
+                context.DrawRectangle(new VisualBrush(visual)
+                { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = bounds, Stretch = Stretch.Fill }, null, bounds);
+            bitmap.Render(drawing);
+            bitmap.Freeze();
+            return bitmap;
+        }
+
+        private void PrepareTrafficFold()
+        {
+            double width = Math.Max(1, TrafficPanelContainer.ActualWidth);
+            double height = Math.Max(1, TrafficPanelContainer.ActualHeight);
+            var texture = new ImageBrush(CaptureTrafficVisual(TrafficPanelContainer)) { Stretch = Stretch.Fill };
+            texture.Freeze();
+            var material = new DiffuseMaterial(texture);
+            material.Freeze();
+            var mesh = new MeshGeometry3D
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                Positions = new Point3DCollection { new Point3D(0, 0, 0), new Point3D(width, 0, 0), new Point3D(width, height, 0), new Point3D(0, height, 0) },
+                TextureCoordinates = new PointCollection { new Point(0, 1), new Point(1, 1), new Point(1, 0), new Point(0, 0) },
+                TriangleIndices = new Int32Collection { 0, 1, 2, 0, 2, 3 }
             };
+            mesh.Freeze();
+            TrafficFoldModel.Geometry = mesh;
+            TrafficFoldModel.Material = TrafficFoldModel.BackMaterial = material;
+            TrafficFoldCamera.Position = new Point3D(width / 2, height / 2, width / (2 * Math.Tan(Math.PI / 12)));
+            TrafficHingeTransform.CenterY = height / 2;
+        }
+
+        private static void AddTrafficAnimation(Storyboard storyboard, DependencyObject target,
+            DependencyProperty property, double value, TimeSpan duration)
+        {
+            var animation = new DoubleAnimation((double)target.GetValue(property), value, duration)
+            { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
             Storyboard.SetTarget(animation, target);
             Storyboard.SetTargetProperty(animation, new PropertyPath(property));
-            motion.Children.Add(animation);
+            storyboard.Children.Add(animation);
         }
 
         private void StopTrafficMotion()
         {
-            var motion = trafficMotion;
+            var current = trafficMotion;
             trafficMotion = null;
-            motion?.Remove(this);
+            current?.Remove(this);
         }
 
         private void UpdateTrafficToggle(bool open)
         {
             TrafficToggleButton.IsChecked = open;
             TrafficToggleButton.ToolTip = open ? "بستن آمار مصرف" : "آمار مصرف برنامه‌ها";
-            AutomationProperties.SetName(TrafficToggleButton,
-                open ? "بستن آمار مصرف برنامه‌ها" : "باز کردن آمار مصرف برنامه‌ها");
-            // Keep the existing Escape-to-disconnect behavior only while the panel is closed.
+            AutomationProperties.SetName(TrafficToggleButton, TrafficToggleButton.ToolTip.ToString());
             btnDisConnect.IsCancel = !open;
         }
 
         private void ApplyTrafficState(bool open)
         {
             TrafficPanelTranslate.X = open ? 0 : TrafficClosedOffset;
-            TrafficPanelScale.ScaleX = open ? 1 : 0.78;
-            TrafficPanelSkew.AngleY = open ? 0 : -4;
-            TrafficPanelContainer.Opacity = open ? 1 : 0;
-            TrafficPanelContainer.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-            TrafficPanelContainer.IsEnabled = open;
-            TrafficFoldShade.Opacity = open ? 0 : 0.55;
+            TrafficHinge.Angle = open ? 0 : 64;
             TrafficArrowRotation.Angle = open ? 180 : 0;
-            TrafficBackdrop.Opacity = open ? 1 : 0;
-            TrafficBackdrop.Visibility = open ? Visibility.Visible : Visibility.Collapsed;
-            ConnectedContent.Opacity = open ? 0.6 : 1;
-            ConnectedContent.IsEnabled = !open;
-            TrafficBackgroundScale.ScaleX = TrafficBackgroundScale.ScaleY = open ? 0.975 : 1;
-            TrafficBackgroundTranslate.X = open ? 10 : 0;
-            trafficBackgroundBlur.Radius = open ? 6 : 0;
-            // Remove the effect entirely when closed so normal text stays crisp.
-            ConnectedContent.Effect = open ? trafficBackgroundBlur : null;
+            TrafficBlurredBackground.Opacity = TrafficBackdrop.Opacity = open ? 1 : 0;
+            TrafficBlurredBackground.Visibility = TrafficBackdrop.Visibility = open ? Visibility.Visible : Visibility.Hidden;
+            TrafficFoldViewport.Visibility = Visibility.Hidden;
+            TrafficPanelContainer.Visibility = open ? Visibility.Visible : Visibility.Hidden;
+            TrafficPanelLayer.IsHitTestVisible = open;
+            ConnectedContent.IsHitTestVisible = !open;
+            ConnectedContent.Opacity = open ? 0 : 1;
+            TrafficPanel.SetUpdatesEnabled(open);
+            TrafficFoldModel.Material = TrafficFoldModel.BackMaterial = null;
+            if (!open) TrafficBlurredBackground.Source = null;
         }
 
         private void ResetTrafficPanel()
@@ -151,7 +176,9 @@ namespace IRSpeedyVPN.UserControls
             StopTrafficMotion();
             trafficPanelOpen = false;
             UpdateTrafficToggle(false);
+            TrafficPanel.DismissReset();
             ApplyTrafficState(false);
+            ResumeConnectedMotion();
         }
     }
 }

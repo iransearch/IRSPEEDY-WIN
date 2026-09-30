@@ -5,7 +5,7 @@ using System.Text;
 
 namespace IRSpeedyVPN.Services.Libcore
 {
-    internal static class LibcoreProto
+    internal static partial class LibcoreProto
     {
         private const int WireVarint = 0;
         private const int WireLengthDelimited = 2;

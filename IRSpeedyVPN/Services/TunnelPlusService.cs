@@ -502,6 +502,7 @@ namespace IRSpeedyVPN.Services
                 configData = SingBox.TunBrowserCompatibility.Apply(configData);
                 var split = SplitTunneling.SplitTunnelStore.Load();
                 configData = SplitTunneling.SplitTunnelPolicyBuilder.Apply(configData, split, System.Windows.Forms.Application.ExecutablePath);
+                configData = Traffic.TrafficConfiguration.Enable(configData);
                 if (split.Enabled)
                     Diagnostic("split-tunnel", "policy=selected-only selected=" + split.Apps.Count
                         + " mode=" + (lastVpnMode ? "TUN+local-proxy" : "local-proxy")
@@ -594,6 +595,8 @@ namespace IRSpeedyVPN.Services
                 TryStopCore();
                 return false;
             }
+            Traffic.TrafficUsageService.Instance.StartSession(timeout =>
+                new LibcoreServiceClient("127.0.0.1", CorePort, timeout).QueryConnections(timeout));
             return true;
         }
 
@@ -1444,6 +1447,7 @@ namespace IRSpeedyVPN.Services
 
         internal static void StopOwnedProcessesForExit()
         {
+            Traffic.TrafficUsageService.Instance.StopSession();
             Process[] processes;
             lock (ownedExitGate) processes = ownedExitProcesses.ToArray();
             // References are registered only at our own successful Process.Start.
@@ -1646,6 +1650,7 @@ namespace IRSpeedyVPN.Services
 
         private void StopCoreForDisconnect()
         {
+            Traffic.TrafficUsageService.Instance.StopSession();
             // TUN and shared listeners must not wait for the normal graceful Stop RPC.
             // Hotspot cleanup has already run before this point. Terminate only our owned
             // Core, with a bounded wait; reused external Cores get a short graceful deadline.
@@ -1706,6 +1711,7 @@ namespace IRSpeedyVPN.Services
 
         private void TryStopCore(bool sharingAlreadyPaused = false)
         {
+            Traffic.TrafficUsageService.Instance.StopSession();
             if (!sharingAlreadyPaused)
                 PauseSharingBeforeCoreRestart();
             try
@@ -1758,6 +1764,7 @@ namespace IRSpeedyVPN.Services
 
         private bool SafeStopCore(LibcoreServiceClient client, bool sharingAlreadyPaused = false)
         {
+            Traffic.TrafficUsageService.Instance.StopSession();
             if (!sharingAlreadyPaused)
                 PauseSharingBeforeCoreRestart();
             try

@@ -3,4 +3,6 @@
 <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs"/>
 <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="LibcoreProto.cs"/>
 <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="LibcoreMessages.cs"/>
+<Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreTraffic.cs" Link="LibcoreTraffic.cs"/>
 </ItemGroup></Project>
+

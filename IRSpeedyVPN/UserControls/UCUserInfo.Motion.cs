@@ -8,6 +8,27 @@ namespace IRSpeedyVPN.UserControls
     public partial class UCUserInfo
     {
         private Storyboard glowMotion, ringMotion, exhaustMotion, cardMotion;
+        private bool connectedMotionPaused;
+
+        private void PauseConnectedMotion()
+        {
+            if (connectedMotionPaused) return;
+            connectedMotionPaused = true;
+            glowMotion?.Pause(this);
+            ringMotion?.Pause(this);
+            exhaustMotion?.Pause(this);
+            cardMotion?.Pause(this);
+        }
+
+        private void ResumeConnectedMotion()
+        {
+            if (!connectedMotionPaused) return;
+            connectedMotionPaused = false;
+            glowMotion?.Resume(this);
+            ringMotion?.Resume(this);
+            exhaustMotion?.Resume(this);
+            cardMotion?.Resume(this);
+        }
 
         private Storyboard StartMotion(string key)
         {
@@ -33,6 +54,7 @@ namespace IRSpeedyVPN.UserControls
             exhaustMotion?.Remove(this);
             cardMotion?.Remove(this);
             glowMotion = ringMotion = exhaustMotion = cardMotion = null;
+            connectedMotionPaused = false;
         }
 
         private void Connected_Unloaded(object sender, RoutedEventArgs e)

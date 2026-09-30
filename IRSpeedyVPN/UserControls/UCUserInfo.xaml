@@ -43,13 +43,7 @@
       <RowDefinition Height="*"/>
       <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
-    <StackPanel x:Name="ConnectedContent" FlowDirection="RightToLeft" RenderTransformOrigin="1,0.5">
-      <StackPanel.RenderTransform>
-        <TransformGroup>
-          <ScaleTransform x:Name="TrafficBackgroundScale"/>
-          <TranslateTransform x:Name="TrafficBackgroundTranslate"/>
-        </TransformGroup>
-      </StackPanel.RenderTransform>
+    <StackPanel x:Name="ConnectedContent" FlowDirection="RightToLeft">
       <Grid Width="336" Height="336" HorizontalAlignment="Center" Margin="0,2,0,8" ToolTip="برای ابزارهای اتصال راست‌کلیک کنید" FlowDirection="LeftToRight">
         <Grid.ContextMenu>
           <ContextMenu>
@@ -226,40 +220,45 @@
         <TextBlock x:Name="txtReceivedIp" Text="—" FlowDirection="LeftToRight" FontSize="11.5" Foreground="#5B6478" ToolTip="آی‌پی عمومی در دسترس نیست" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"/>
       </StackPanel>
     </StackPanel>
-    <!-- Sibling layers keep the header, disclosure button and disconnect action sharp. -->
+    <!-- The original page never moves/scales. Only this frozen, blurred copy fades. -->
+    <Image x:Name="TrafficBlurredBackground" Grid.Row="0" Stretch="Fill" Opacity="0"
+           Visibility="Hidden" IsHitTestVisible="False" Panel.ZIndex="1">
+      <Image.Effect><BlurEffect Radius="6" RenderingBias="Performance"/></Image.Effect>
+    </Image>
     <Border x:Name="TrafficBackdrop" Grid.Row="0" Margin="-22,-4,-22,0" Background="#14273B57"
-            Visibility="Collapsed" Opacity="0" Panel.ZIndex="1" MouseLeftButtonDown="TrafficBackdrop_MouseDown"/>
-    <Grid x:Name="TrafficPanelContainer" Grid.Row="0" Margin="-4,46,-4,12"
-          Visibility="Collapsed" IsEnabled="False" Opacity="0" Panel.ZIndex="2" RenderTransformOrigin="0,0.5">
-      <Grid.RenderTransform>
-        <TransformGroup>
-          <ScaleTransform x:Name="TrafficPanelScale" ScaleX="0.78"/>
-          <SkewTransform x:Name="TrafficPanelSkew" AngleY="-4"/>
-          <TranslateTransform x:Name="TrafficPanelTranslate" X="-416"/>
-        </TransformGroup>
-      </Grid.RenderTransform>
-      <Grid.Effect><DropShadowEffect Color="#1E3A8A" BlurRadius="28" ShadowDepth="8" Direction="270" Opacity="0.20" RenderingBias="Performance"/></Grid.Effect>
-      <local:ConnectionTrafficPanel/>
-      <Border x:Name="TrafficFoldShade" Width="34" HorizontalAlignment="Center" Opacity="0.55" IsHitTestVisible="False">
-        <Border.Background>
-          <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-            <GradientStop Color="#001E3A8A" Offset="0"/>
-            <GradientStop Color="#351E3A8A" Offset="0.5"/>
-            <GradientStop Color="#001E3A8A" Offset="1"/>
-          </LinearGradientBrush>
-        </Border.Background>
-      </Border>
+            Visibility="Hidden" Opacity="0" Panel.ZIndex="2" MouseLeftButtonDown="TrafficBackdrop_MouseDown"/>
+    <Grid Grid.Row="0" Margin="-22,-4,-22,0" Panel.ZIndex="3" ClipToBounds="True" IsHitTestVisible="False" x:Name="TrafficPanelLayer">
+      <!-- Hidden keeps the panel measured; collapse would force layout on every click. -->
+      <Grid x:Name="TrafficPanelContainer" Margin="34,24,12,14" Visibility="Hidden">
+        <local:ConnectionTrafficPanel x:Name="TrafficPanel"/>
+      </Grid>
+      <Viewport3D x:Name="TrafficFoldViewport" Margin="34,24,12,14" Visibility="Hidden" IsHitTestVisible="False">
+        <Viewport3D.RenderTransform><TranslateTransform x:Name="TrafficPanelTranslate"/></Viewport3D.RenderTransform>
+        <Viewport3D.Camera><PerspectiveCamera x:Name="TrafficFoldCamera" FieldOfView="30" LookDirection="0,0,-1" UpDirection="0,1,0"/></Viewport3D.Camera>
+        <ModelVisual3D><ModelVisual3D.Content><AmbientLight Color="White"/></ModelVisual3D.Content></ModelVisual3D>
+        <ModelVisual3D>
+          <ModelVisual3D.Content>
+            <GeometryModel3D x:Name="TrafficFoldModel">
+              <GeometryModel3D.Transform>
+                <RotateTransform3D x:Name="TrafficHingeTransform">
+                  <RotateTransform3D.Rotation><AxisAngleRotation3D x:Name="TrafficHinge" Axis="0,1,0"/></RotateTransform3D.Rotation>
+                </RotateTransform3D>
+              </GeometryModel3D.Transform>
+            </GeometryModel3D>
+          </ModelVisual3D.Content>
+        </ModelVisual3D>
+      </Viewport3D>
     </Grid>
-    <ToggleButton x:Name="TrafficToggleButton" Grid.Row="0" Panel.ZIndex="3"
-                  Width="34" Height="34" Margin="0,6,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+    <ToggleButton x:Name="TrafficToggleButton" Grid.Row="0" Panel.ZIndex="4"
+                  Width="26" Height="60" Margin="-22,0,0,0" HorizontalAlignment="Left" VerticalAlignment="Center"
                   Click="TrafficToggleButton_Click" Cursor="Hand" ToolTip="آمار مصرف برنامه‌ها"
                   AutomationProperties.Name="باز کردن آمار مصرف برنامه‌ها"
                   Foreground="{StaticResource AccentBrush}" Background="{StaticResource SmartLocationBackgroundBrush}"
-                  BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="1">
+                  BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="0,1,1,1">
       <ToggleButton.Template>
         <ControlTemplate TargetType="ToggleButton">
           <Border x:Name="TrafficToggleSurface" Background="{TemplateBinding Background}"
-                  BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
+                  BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="0,11,11,0">
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Border>
           <ControlTemplate.Triggers>
@@ -268,11 +267,10 @@
           </ControlTemplate.Triggers>
         </ControlTemplate>
       </ToggleButton.Template>
-      <Viewbox Width="17" Height="17" FlowDirection="LeftToRight">
+      <Viewbox Width="10" Height="10" FlowDirection="LeftToRight">
         <Canvas Width="16" Height="16" RenderTransformOrigin="0.5,0.5">
           <Canvas.RenderTransform><RotateTransform x:Name="TrafficArrowRotation"/></Canvas.RenderTransform>
-          <Path Data="{StaticResource IconArrowRight}" Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5"
-                StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+          <Path Data="M5,2 L11,8 L5,14 Z" Fill="{StaticResource AccentBrush}"/>
         </Canvas>
       </Viewbox>
     </ToggleButton>
