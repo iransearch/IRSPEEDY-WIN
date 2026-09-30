@@ -18,7 +18,7 @@ namespace IRSpeedyVPN.UserControls
         private readonly FrameworkElement connectionAnchor;
         private HwndSource ownerSource, drawerSource;
         private bool placing, placementQueued, disposed, prepared, preparing;
-        private bool motionAttached, motionPrimed, motionOpening;
+        private bool motionAttached, motionOpening;
         private double motionFrom, motionTo;
         private int motionDurationMs;
         private long motionStartTicks;
@@ -117,16 +117,18 @@ namespace IRSpeedyVPN.UserControls
                 return;
             }
 
-            // Do not queue or reverse repeated clicks. One transition owns the drawer
-            // until it reaches its endpoint; the toggle is disabled by the host meanwhile.
-            if (IsTransitioning)
-            {
-                Log("click-ignored transition=True");
+            // A repeated request for the current target is a no-op. The opposite request
+            // is allowed while moving: SetOpen captures the current X and reverses from
+            // that exact rendered position, so rapid clicks never queue competing motion.
+            if ((open && (state == DrawerState.Open || state == DrawerState.Opening))
+                || (!open && (state == DrawerState.Closed || state == DrawerState.Closing)))
                 return;
-            }
-            if ((open && state == DrawerState.Open) || (!open && state == DrawerState.Closed)) return;
 
-            if (open && !prepared) Prepare();
+            if (open && !prepared)
+            {
+                Log("preload-miss fallback=True");
+                Prepare();
+            }
             TrafficPanel.DismissReset();
             TrafficPanel.SetUpdatesEnabled(false);
 
@@ -153,7 +155,7 @@ namespace IRSpeedyVPN.UserControls
 
             DrawerSurface.IsHitTestVisible = false;
             DrawerSurface.IsEnabled = false;
-            StartSlide(open, from, target, (int)Math.Round((open ? 460 : 360) * fraction));
+            StartSlide(open, from, target, (int)Math.Round((open ? 280 : 240) * fraction));
         }
 
         private void StartSlide(bool open, double from, double target, int durationMs)
@@ -163,11 +165,11 @@ namespace IRSpeedyVPN.UserControls
             motionFrom = from;
             motionTo = target;
             motionDurationMs = Math.Max(1, durationMs);
-            motionPrimed = false;
+            motionStartTicks = Stopwatch.GetTimestamp();
             motionAttached = true;
             DrawerTranslation.X = from;
             CompositionTarget.Rendering += MotionFrame;
-            Log("animation-armed from=" + Math.Round(from, 1) + " target=" + target
+            Log("animation-start from=" + Math.Round(from, 1) + " target=" + target
                 + " durationMs=" + motionDurationMs);
         }
 
@@ -175,17 +177,8 @@ namespace IRSpeedyVPN.UserControls
         {
             if (!motionAttached || disposed) { StopMotion(); return; }
 
-            // Frame zero establishes the hidden start position after Show(). This is
-            // what makes the drawer visibly emerge from the connection window edge.
-            if (!motionPrimed)
-            {
-                motionPrimed = true;
-                motionStartTicks = Stopwatch.GetTimestamp();
-                DrawerTranslation.X = motionFrom;
-                Log("animation-first-frame x=" + Math.Round(motionFrom, 1));
-                return;
-            }
-
+            // Preload already established the clipped start position. Move on the first
+            // composition frame instead of burning a priming frame before motion starts.
             double elapsedMs = (Stopwatch.GetTimestamp() - motionStartTicks) * 1000.0 / Stopwatch.Frequency;
             double progress = Math.Min(1, elapsedMs / motionDurationMs);
             // Cubic ease-out: fast response at the edge, soft landing at the endpoint.
@@ -253,7 +246,6 @@ namespace IRSpeedyVPN.UserControls
             if (motionAttached)
                 CompositionTarget.Rendering -= MotionFrame;
             motionAttached = false;
-            motionPrimed = false;
         }
 
         private void SetState(DrawerState value)
