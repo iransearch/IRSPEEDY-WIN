@@ -36,7 +36,9 @@ namespace IRSpeedyVPN.UserControls
             {
                 if (!ReferenceEquals(trafficDrawer, drawer)) return;
                 UpdateTrafficToggle(drawer.IsOpeningOrOpen, true);
-                TrafficToggleButton.IsEnabled = !drawer.IsTransitioning;
+                // Keep the edge toggle interactive while the drawer is moving. SetOpen
+                // reverses from the current rendered X, so fast repeated clicks are safe.
+                TrafficToggleButton.IsEnabled = true;
                 btnDisConnect.IsCancel = false;
             };
             drawer.DrawerClosed += (sender, args) =>
