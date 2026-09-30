@@ -63,12 +63,14 @@ namespace IRSpeedyVPN.UserControls
         }
         private void btn_ChangeServer_Click(object sender, RoutedEventArgs e)
         {
+            ResetTrafficPanel();
             if (OnChangeServerRequest != null)
                 OnChangeServerRequest.Invoke(sender, e);
         }
 
         private void btnDisConnect_Click(object sender, RoutedEventArgs e)
         {
+            ResetTrafficPanel();
             CancelPublicIpRequest();
             uiTimer.Change(int.MaxValue, int.MaxValue);
             if (OnDisconnectRequest != null)
@@ -144,6 +146,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
+            ResetTrafficPanel();
             UpdateConnectedMotion();
 
             globalInfo = AppServices.GlobalInfo;
@@ -219,6 +222,7 @@ namespace IRSpeedyVPN.UserControls
             UpdateConnectedMotion();
             if (!IsVisible)
             {
+                ResetTrafficPanel();
                 uiTimer?.Change(Timeout.Infinite, Timeout.Infinite);
                 CancelPublicIpRequest();
                 ClearHeaderIcons();

@@ -1,4 +1,4 @@
-<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" x:Class="IRSpeedyVPN.UserControls.UCUserInfo" FontFamily="{StaticResource AppFontFamily}" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" FlowDirection="RightToLeft" Loaded="UserControl_Loaded" IsVisibleChanged="UserControl_IsVisibleChanged" Unloaded="Connected_Unloaded">
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:local="clr-namespace:IRSpeedyVPN.UserControls" x:Class="IRSpeedyVPN.UserControls.UCUserInfo" FontFamily="{StaticResource AppFontFamily}" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" FlowDirection="RightToLeft" Loaded="UserControl_Loaded" IsVisibleChanged="UserControl_IsVisibleChanged" Unloaded="Connected_Unloaded" PreviewKeyDown="Connected_PreviewKeyDown">
   <UserControl.Resources>
     <Storyboard x:Key="ConnectedGlowMotion" RepeatBehavior="Forever">
       <DoubleAnimation Storyboard.TargetName="ConnectedGlow" Storyboard.TargetProperty="Opacity" From="0.55" To="1" Duration="0:0:1.3" AutoReverse="True">
@@ -38,12 +38,18 @@
       <DoubleAnimation Storyboard.TargetName="ExhaustLight" Storyboard.TargetProperty="(Shape.Fill).(Brush.Transform).(TranslateTransform.Y)" From="0" To="-2516.8" Duration="0:0:0.42"/>
     </Storyboard>
   </UserControl.Resources>
-  <Grid Margin="22,4,22,18">
+  <Grid Margin="22,4,22,18" FlowDirection="LeftToRight">
     <Grid.RowDefinitions>
       <RowDefinition Height="*"/>
       <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
-    <StackPanel>
+    <StackPanel x:Name="ConnectedContent" FlowDirection="RightToLeft" RenderTransformOrigin="1,0.5">
+      <StackPanel.RenderTransform>
+        <TransformGroup>
+          <ScaleTransform x:Name="TrafficBackgroundScale"/>
+          <TranslateTransform x:Name="TrafficBackgroundTranslate"/>
+        </TransformGroup>
+      </StackPanel.RenderTransform>
       <Grid Width="336" Height="336" HorizontalAlignment="Center" Margin="0,2,0,8" ToolTip="برای ابزارهای اتصال راست‌کلیک کنید" FlowDirection="LeftToRight">
         <Grid.ContextMenu>
           <ContextMenu>
@@ -220,6 +226,56 @@
         <TextBlock x:Name="txtReceivedIp" Text="—" FlowDirection="LeftToRight" FontSize="11.5" Foreground="#5B6478" ToolTip="آی‌پی عمومی در دسترس نیست" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold"/>
       </StackPanel>
     </StackPanel>
+    <!-- Sibling layers keep the header, disclosure button and disconnect action sharp. -->
+    <Border x:Name="TrafficBackdrop" Grid.Row="0" Margin="-22,-4,-22,0" Background="#14273B57"
+            Visibility="Collapsed" Opacity="0" Panel.ZIndex="1" MouseLeftButtonDown="TrafficBackdrop_MouseDown"/>
+    <Grid x:Name="TrafficPanelContainer" Grid.Row="0" Margin="-4,46,-4,12"
+          Visibility="Collapsed" IsEnabled="False" Opacity="0" Panel.ZIndex="2" RenderTransformOrigin="0,0.5">
+      <Grid.RenderTransform>
+        <TransformGroup>
+          <ScaleTransform x:Name="TrafficPanelScale" ScaleX="0.78"/>
+          <SkewTransform x:Name="TrafficPanelSkew" AngleY="-4"/>
+          <TranslateTransform x:Name="TrafficPanelTranslate" X="-416"/>
+        </TransformGroup>
+      </Grid.RenderTransform>
+      <Grid.Effect><DropShadowEffect Color="#1E3A8A" BlurRadius="28" ShadowDepth="8" Direction="270" Opacity="0.20" RenderingBias="Performance"/></Grid.Effect>
+      <local:ConnectionTrafficPanel/>
+      <Border x:Name="TrafficFoldShade" Width="34" HorizontalAlignment="Center" Opacity="0.55" IsHitTestVisible="False">
+        <Border.Background>
+          <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+            <GradientStop Color="#001E3A8A" Offset="0"/>
+            <GradientStop Color="#351E3A8A" Offset="0.5"/>
+            <GradientStop Color="#001E3A8A" Offset="1"/>
+          </LinearGradientBrush>
+        </Border.Background>
+      </Border>
+    </Grid>
+    <ToggleButton x:Name="TrafficToggleButton" Grid.Row="0" Panel.ZIndex="3"
+                  Width="34" Height="34" Margin="0,6,0,0" HorizontalAlignment="Left" VerticalAlignment="Top"
+                  Click="TrafficToggleButton_Click" Cursor="Hand" ToolTip="آمار مصرف برنامه‌ها"
+                  AutomationProperties.Name="باز کردن آمار مصرف برنامه‌ها"
+                  Foreground="{StaticResource AccentBrush}" Background="{StaticResource SmartLocationBackgroundBrush}"
+                  BorderBrush="{StaticResource SmartLocationBorderBrush}" BorderThickness="1">
+      <ToggleButton.Template>
+        <ControlTemplate TargetType="ToggleButton">
+          <Border x:Name="TrafficToggleSurface" Background="{TemplateBinding Background}"
+                  BorderBrush="{TemplateBinding BorderBrush}" BorderThickness="{TemplateBinding BorderThickness}" CornerRadius="10">
+            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+          </Border>
+          <ControlTemplate.Triggers>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="TrafficToggleSurface" Property="BorderBrush" Value="{StaticResource AccentBrush}"/></Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="TrafficToggleSurface" Property="BorderBrush" Value="{StaticResource AccentBrush}"/></Trigger>
+          </ControlTemplate.Triggers>
+        </ControlTemplate>
+      </ToggleButton.Template>
+      <Viewbox Width="17" Height="17" FlowDirection="LeftToRight">
+        <Canvas Width="16" Height="16" RenderTransformOrigin="0.5,0.5">
+          <Canvas.RenderTransform><RotateTransform x:Name="TrafficArrowRotation"/></Canvas.RenderTransform>
+          <Path Data="{StaticResource IconArrowRight}" Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5"
+                StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+        </Canvas>
+      </Viewbox>
+    </ToggleButton>
     <Button x:Name="btnDisConnect" Grid.Row="1" Height="46" Margin="0,8,0,0" Background="{StaticResource DisconnectGradientBrush}" Style="{StaticResource DesignActionButton}" IsCancel="True" Click="btnDisConnect_Click" FontSize="15" FontWeight="Bold">
       <Button.Effect>
         <DropShadowEffect Color="#B91C1C" BlurRadius="14" ShadowDepth="5" Direction="270" Opacity="0.32"/>

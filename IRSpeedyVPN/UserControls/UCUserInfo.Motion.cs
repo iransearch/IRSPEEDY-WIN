@@ -19,7 +19,7 @@ namespace IRSpeedyVPN.UserControls
         private void UpdateConnectedMotion()
         {
             StopConnectedMotion();
-            if (!IsLoaded || !IsVisible) return;
+            if (!IsLoaded || !IsVisible || trafficPanelOpen || trafficMotion != null) return;
             glowMotion = StartMotion("ConnectedGlowMotion");
             ringMotion = StartMotion("ConnectedRingMotion");
             exhaustMotion = StartMotion("ConnectedExhaustMotion");
@@ -37,6 +37,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void Connected_Unloaded(object sender, RoutedEventArgs e)
         {
+            ResetTrafficPanel();
             CancelPublicIpRequest();
             StopConnectedMotion();
         }
@@ -47,7 +48,7 @@ namespace IRSpeedyVPN.UserControls
             if (ServerCardShine == null || ConnectedServerCard == null) return;
             cardMotion?.Remove(this);
             cardMotion = null;
-            if (!IsLoaded || !IsVisible) return;
+            if (!IsLoaded || !IsVisible || trafficPanelOpen || trafficMotion != null) return;
             double thickness = ServerCardShine.StrokeThickness;
             double inset = thickness / 2;
             double width = ConnectedServerCard.ActualWidth - thickness;
