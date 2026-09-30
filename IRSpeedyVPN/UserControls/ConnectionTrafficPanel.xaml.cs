@@ -8,6 +8,7 @@ using System.Linq;
 using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
 
@@ -25,6 +26,13 @@ namespace IRSpeedyVPN.UserControls
         {
             InitializeComponent();
             TrafficTable.ItemsSource = liveRows;
+            var view = CollectionViewSource.GetDefaultView(liveRows);
+            view.SortDescriptions.Add(new SortDescription(nameof(TrafficRowView.TotalBytes), ListSortDirection.Descending));
+            TrafficTable.Columns.First(column => column.SortMemberPath == nameof(TrafficRowView.TotalBytes))
+                .SortDirection = ListSortDirection.Descending;
+            // Keep the active sort current as counters change, without resetting the table.
+            if (view is ICollectionViewLiveShaping liveView && liveView.CanChangeLiveSorting)
+                liveView.IsLiveSorting = true;
             refreshTimer = new DispatcherTimer(DispatcherPriority.Background) { Interval = TimeSpan.FromSeconds(1) };
             refreshTimer.Tick += (sender, args) => RefreshTraffic();
             RefreshTraffic();
@@ -141,7 +149,9 @@ namespace IRSpeedyVPN.UserControls
                 if (DownloadBytes == row.Download && UploadBytes == row.Upload) return;
                 DownloadBytes = row.Download;
                 UploadBytes = row.Upload;
-                PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(""));
+                foreach (var property in new[] { nameof(DownloadBytes), nameof(UploadBytes), nameof(TotalBytes),
+                    nameof(Download), nameof(Upload), nameof(Total) })
+                    PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(property));
             }
         }
 
