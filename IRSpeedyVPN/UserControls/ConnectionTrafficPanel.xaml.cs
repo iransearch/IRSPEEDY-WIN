@@ -155,7 +155,7 @@ namespace IRSpeedyVPN.UserControls
                 var units = new[] { "B", "KiB", "MiB", "GiB", "TiB", "PiB", "EiB" };
                 int index = 0;
                 while (bytes >= 1024m && index < units.Length - 1) { bytes /= 1024m; index++; }
-                return new TrafficAmount { ValueText = bytes.ToString(index == 0 ? "0" : "0.00", CultureInfo.InvariantCulture), Unit = units[index] };
+                return new TrafficAmount { ValueText = bytes.ToString(index == 0 ? "0" : "0.##", CultureInfo.InvariantCulture), Unit = units[index] };
             }
         }
     }

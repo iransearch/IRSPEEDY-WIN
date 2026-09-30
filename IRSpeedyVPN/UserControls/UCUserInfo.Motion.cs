@@ -8,28 +8,6 @@ namespace IRSpeedyVPN.UserControls
     public partial class UCUserInfo
     {
         private Storyboard glowMotion, ringMotion, exhaustMotion, cardMotion;
-        private bool connectedMotionPaused;
-
-        private void PauseConnectedMotion()
-        {
-            if (connectedMotionPaused) return;
-            connectedMotionPaused = true;
-            glowMotion?.Pause(this);
-            ringMotion?.Pause(this);
-            exhaustMotion?.Pause(this);
-            cardMotion?.Pause(this);
-        }
-
-        private void ResumeConnectedMotion()
-        {
-            if (!connectedMotionPaused) return;
-            connectedMotionPaused = false;
-            glowMotion?.Resume(this);
-            ringMotion?.Resume(this);
-            exhaustMotion?.Resume(this);
-            cardMotion?.Resume(this);
-        }
-
         private Storyboard StartMotion(string key)
         {
             var motion = ((Storyboard)FindResource(key)).Clone();
@@ -40,7 +18,7 @@ namespace IRSpeedyVPN.UserControls
         private void UpdateConnectedMotion()
         {
             StopConnectedMotion();
-            if (!IsLoaded || !IsVisible || trafficPanelOpen || trafficMotion != null) return;
+            if (!IsLoaded || !IsVisible) return;
             glowMotion = StartMotion("ConnectedGlowMotion");
             ringMotion = StartMotion("ConnectedRingMotion");
             exhaustMotion = StartMotion("ConnectedExhaustMotion");
@@ -54,7 +32,6 @@ namespace IRSpeedyVPN.UserControls
             exhaustMotion?.Remove(this);
             cardMotion?.Remove(this);
             glowMotion = ringMotion = exhaustMotion = cardMotion = null;
-            connectedMotionPaused = false;
         }
 
         private void Connected_Unloaded(object sender, RoutedEventArgs e)
@@ -70,7 +47,7 @@ namespace IRSpeedyVPN.UserControls
             if (ServerCardShine == null || ConnectedServerCard == null) return;
             cardMotion?.Remove(this);
             cardMotion = null;
-            if (!IsLoaded || !IsVisible || trafficPanelOpen || trafficMotion != null) return;
+            if (!IsLoaded || !IsVisible) return;
             double thickness = ServerCardShine.StrokeThickness;
             double inset = thickness / 2;
             double width = ConnectedServerCard.ActualWidth - thickness;

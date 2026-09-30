@@ -1,31 +1,29 @@
 # Connected application traffic
 
-The middle-left edge tab opens the stats overlay on the connected screen. Its
-colors, font, cards and controls use the existing IRSpeedy theme. Motion follows
-the approved `irspeedy-fold-stats-blur.html` reference:
+The middle-left edge tab opens a separate, owned drawer directly **beside the
+left edge** of the connection window. The connection page and header retain their
+layout and live animations. The drawer uses the existing IRSpeedy theme and the
+real `ConnectionTrafficPanel`; it adds no taskbar entry or independent application.
 
-| Effect | Reference and native target |
-| --- | --- |
-| Panel bounds | Left/right 18, top 50, bottom 84 in the full connection scene |
-| Perspective | 1300 logical pixels; origin at the full scene center |
-| Closed transform | Translate X by `-(panelWidth + 28)`, rotate Y by -68 degrees around the left edge |
-| Transform timing | 620 ms in both directions; KeySpline(.22,1,.36,1) |
-| Panel opacity | 0 to 1 over 480 ms with CSS ease (.25,.1,.25,1) |
-| Crease | 34px band at 48%; opacity .55 to 0 over 600 ms, scale X 1.7 to .2 over 620 ms |
-| Background | Translate X 10, scale .975, opacity .6, blur radius 6; transform/blur 620 ms, opacity 520 ms |
-| Shadow | Offset Y 12, blur 34, color #1e3a8a35 |
+Opening slides the panel outward from the connection edge over 680 ms; closing
+slides it back over 520 ms. Both use KeySpline(.22,1,.36,1). A clipped render
+translation moves the panel without resizing the main window, rebuilding the
+connection page, capturing its image, or projecting the table into a 3D viewport.
+Rapid toggles reverse from the current position. The UI refresh timer pauses only
+while the panel moves; background traffic collection continues throughout.
 
-A full-scene viewport performs rotation then translation **before** perspective;
-a panel-sized viewport or a 2D viewport translation would clip/distort this effect.
-The texture includes 48px padding for the shadow. Emissive materials preserve the
-captured UI colors. The native table replaces the texture at the open endpoint.
+The drawer follows the main window when dragged and closes when the app is hidden,
+minimized, disconnected, or leaves the connected page. Escape dismisses a reset
+confirmation first, then closes the drawer. Normal closing retains the table's
+scroll and sorting state. Placement uses monitor working-area and screen-pixel
+coordinates, including the app's presentation scale. If there is insufficient
+space on the left when opening, the main window is moved only as far right as
+needed to make space; its size and internal layout do not change.
 
-The connected illustration pauses/resumes its existing animation clocks. Only a
-frozen image of the connected content moves/scales/blurs; the original layout and
-header remain fixed. At the closed endpoint the image returns to identity before
-the original is restored, avoiding a jump. Background controls are disabled while
-the overlay is open, including keyboard activation. Rapid reversals reuse current
-animated values and textures instead of recapturing or resetting to an endpoint.
+Each download/upload/total cell keeps its value and unit on one line (`533 MiB`).
+The narrow, rounded scrollbar uses the server-list appearance, fades out when
+idle, and does not change column widths as it appears or disappears. The units
+remain accurate binary units (KiB, MiB, GiB); values are not relabeled as decimal MB.
 
 ## Source and counting
 
@@ -83,17 +81,20 @@ Windows runtime/performance check is still required; Linux cannot execute WPF.
 
 Windows acceptance checks (same single-file builder, no new package dependencies):
 
-1. Connect; open/close the middle-left tab repeatedly, including reversal mid-motion.
-   The title, rocket position and connection card must remain fixed, and the rocket
-   animation must resume from its paused phase. Escape/outside click close the panel.
-2. Check at 100%, 125%, 150% and 200% DPI, including moving between monitors. The
-   moving texture must align with the live panel without a final jump or clipped text.
-3. Generate traffic with the panel closed and the app minimized. Open it and confirm
+1. Connect; toggle the middle-left tab repeatedly, including reversal mid-motion.
+   The panel must slide beside the window, with the title, rocket and connection
+   card retaining their positions and continuing their animations.
+2. Check at 100%, 125%, 150% and 200% DPI, including moving between monitors and
+   opening near screen edges. The drawer must remain beside the connection window,
+   fit the working area and follow dragging without covering the connection page.
+3. Close and reopen after scrolling/sorting. Values and units must stay on one
+   line; the thin scrollbar should appear on interaction and fade when idle.
+4. Minimize/hide the app or disconnect while the drawer is moving. No orphan drawer
+   may remain. Escape must cancel a reset confirmation before closing the drawer.
+5. Generate traffic with the panel closed and the app minimized. Open it and confirm
    real per-app download/upload values, then close the source app: totals must remain.
-4. Disconnect/reconnect and restart IRSpeedy. Totals must accumulate, including a
+6. Disconnect/reconnect and restart IRSpeedy. Totals must accumulate, including a
    fresh session whose core counters start at zero. Removing Temp must not reset them.
-5. Reset while a download is active. Old bytes must not return on the next poll;
-   the tunnel remains connected. Cancel/Escape must preserve totals.
-6. Sort, select and scroll. Close or disconnect during an animation/reset
-   confirmation; no overlay should remain on the next page. The sample toggle
-   must not be present, and Tab must not reach the hidden connection controls.
+7. Reset while a download is active. Old bytes must not return on the next poll;
+   the tunnel remains connected. Cancel/Escape must preserve totals. The sample
+   toggle must not be present.

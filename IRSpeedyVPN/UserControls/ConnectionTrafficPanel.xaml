@@ -37,15 +37,78 @@
       <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
       <Setter Property="HorizontalAlignment" Value="Center"/>
       <Setter Property="FlowDirection" Value="LeftToRight"/>
+      <Setter Property="TextWrapping" Value="NoWrap"/>
     </Style>
     <Style x:Key="TrafficNumber" TargetType="TextBlock">
       <Setter Property="FontSize" Value="12"/>
       <Setter Property="Foreground" Value="{StaticResource RowTitleBrush}"/>
       <Setter Property="HorizontalAlignment" Value="Center"/>
       <Setter Property="FlowDirection" Value="LeftToRight"/>
+      <Setter Property="TextWrapping" Value="NoWrap"/>
     </Style>
     <Style x:Key="TrafficUnit" TargetType="TextBlock" BasedOn="{StaticResource TrafficSummaryLabel}">
       <Setter Property="FlowDirection" Value="LeftToRight"/>
+      <Setter Property="TextWrapping" Value="NoWrap"/>
+    </Style>
+    <!-- Match the server list's transparent rail and rounded 6-DIP thumb.
+         Fade only the drawing, so hiding the rail never resizes the columns. -->
+    <Style x:Key="TrafficScrollPage" TargetType="RepeatButton">
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <Setter.Value><ControlTemplate TargetType="RepeatButton"><Border Background="Transparent"/></ControlTemplate></Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="TrafficScrollThumb" TargetType="Thumb">
+      <Setter Property="MinHeight" Value="28"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="Thumb">
+            <Grid Background="Transparent">
+              <Border x:Name="Grip" Width="6" CornerRadius="3" Background="#D7DBE3"/>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Grip" Property="Opacity" Value="0.8"/></Trigger>
+              <Trigger Property="IsDragging" Value="True"><Setter TargetName="Grip" Property="Opacity" Value="1"/></Trigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
+    </Style>
+    <Style x:Key="TrafficScrollBar" TargetType="ScrollBar">
+      <Setter Property="Width" Value="6"/>
+      <Setter Property="Orientation" Value="Vertical"/>
+      <Setter Property="Focusable" Value="False"/>
+      <Setter Property="Template">
+        <Setter.Value>
+          <ControlTemplate TargetType="ScrollBar">
+            <Grid x:Name="Rail" Background="Transparent" Opacity="1">
+              <Track x:Name="PART_Track" Orientation="Vertical" IsDirectionReversed="True"
+                     Minimum="{TemplateBinding Minimum}" Maximum="{TemplateBinding Maximum}"
+                     Value="{Binding Value, RelativeSource={RelativeSource TemplatedParent}, Mode=TwoWay}"
+                     ViewportSize="{TemplateBinding ViewportSize}">
+                <Track.DecreaseRepeatButton><RepeatButton Command="ScrollBar.PageUpCommand" Style="{StaticResource TrafficScrollPage}"/></Track.DecreaseRepeatButton>
+                <Track.Thumb><Thumb Style="{StaticResource TrafficScrollThumb}"/></Track.Thumb>
+                <Track.IncreaseRepeatButton><RepeatButton Command="ScrollBar.PageDownCommand" Style="{StaticResource TrafficScrollPage}"/></Track.IncreaseRepeatButton>
+              </Track>
+            </Grid>
+            <ControlTemplate.Triggers>
+              <MultiDataTrigger>
+                <MultiDataTrigger.Conditions>
+                  <Condition Binding="{Binding IsMouseOver, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="False"/>
+                  <Condition Binding="{Binding IsKeyboardFocusWithin, RelativeSource={RelativeSource AncestorType=DataGrid}}" Value="False"/>
+                  <Condition Binding="{Binding IsMouseCaptureWithin, RelativeSource={RelativeSource TemplatedParent}}" Value="False"/>
+                </MultiDataTrigger.Conditions>
+                <MultiDataTrigger.EnterActions><BeginStoryboard><Storyboard>
+                  <DoubleAnimation Storyboard.TargetName="Rail" Storyboard.TargetProperty="Opacity" To="0" BeginTime="0:0:0.65" Duration="0:0:0.25"/>
+                </Storyboard></BeginStoryboard></MultiDataTrigger.EnterActions>
+                <MultiDataTrigger.ExitActions><BeginStoryboard><Storyboard>
+                  <DoubleAnimation Storyboard.TargetName="Rail" Storyboard.TargetProperty="Opacity" To="1" Duration="0:0:0.12"/>
+                </Storyboard></BeginStoryboard></MultiDataTrigger.ExitActions>
+              </MultiDataTrigger>
+            </ControlTemplate.Triggers>
+          </ControlTemplate>
+        </Setter.Value>
+      </Setter>
     </Style>
     <Style x:Key="TrafficColumnHeader" TargetType="DataGridColumnHeader">
       <Setter Property="Foreground" Value="{StaticResource IconStrokeBrush}"/>
@@ -53,7 +116,7 @@
       <Setter Property="FontSize" Value="11"/>
       <Setter Property="FontWeight" Value="Normal"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
-      <Setter Property="Padding" Value="3,0"/>
+      <Setter Property="Padding" Value="2,0"/>
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderBrush" Value="{StaticResource StatCardBorderBrush}"/>
       <Setter Property="BorderThickness" Value="0,0,0,1"/>
@@ -101,7 +164,7 @@
       <Setter Property="Background" Value="Transparent"/>
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="1"/>
-      <Setter Property="Padding" Value="3,0"/>
+      <Setter Property="Padding" Value="2,0"/>
       <Setter Property="Foreground" Value="{StaticResource RowTitleBrush}"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -177,36 +240,52 @@
                 AutoGenerateColumns="False" IsReadOnly="True" CanUserAddRows="False" CanUserDeleteRows="False"
                 CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False"
                 SelectionMode="Single" SelectionUnit="FullRow" HeadersVisibility="Column" RowHeaderWidth="0"
-                RowHeight="43" ColumnHeaderHeight="34" BorderThickness="0" Background="Transparent"
+                RowHeight="36" ColumnHeaderHeight="34" BorderThickness="0" Background="Transparent"
                 GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource StatCardDividerBrush}"
                 RowStyle="{StaticResource TrafficRow}" CellStyle="{StaticResource TrafficCell}"
                 ColumnHeaderStyle="{StaticResource TrafficColumnHeader}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                 ScrollViewer.VerticalScrollBarVisibility="Auto" EnableRowVirtualization="True"
                 AutomationProperties.Name="دانلود، آپلود و مجموع مصرف هر برنامه">
+        <DataGrid.Resources>
+          <Style TargetType="ScrollBar" BasedOn="{StaticResource TrafficScrollBar}"/>
+        </DataGrid.Resources>
         <DataGrid.Columns>
-          <DataGridTextColumn Header="برنامه" Binding="{Binding Name}" SortMemberPath="Name" Width="1.65*">
+          <DataGridTextColumn Header="برنامه" Binding="{Binding Name}" SortMemberPath="Name" Width="1.3*" MinWidth="72">
             <DataGridTextColumn.ElementStyle>
               <Style TargetType="TextBlock">
                 <Setter Property="FontSize" Value="11"/>
                 <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+                <Setter Property="TextWrapping" Value="NoWrap"/>
                 <Setter Property="ToolTip" Value="{Binding Name}"/>
                 <Setter Property="VerticalAlignment" Value="Center"/>
               </Style>
             </DataGridTextColumn.ElementStyle>
           </DataGridTextColumn>
-          <DataGridTemplateColumn Header="دانلود" SortMemberPath="DownloadBytes" Width="*">
+          <DataGridTemplateColumn Header="دانلود" SortMemberPath="DownloadBytes" Width="*" MinWidth="80">
             <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate><StackPanel><TextBlock Text="{Binding Download.ValueText}" Style="{StaticResource TrafficNumber}"/><TextBlock Text="{Binding Download.Unit}" Style="{StaticResource TrafficUnit}"/></StackPanel></DataTemplate>
+              <DataTemplate>
+                <TextBlock Style="{StaticResource TrafficNumber}">
+                  <TextBlock.Text><MultiBinding StringFormat="{}{0} {1}"><Binding Path="Download.ValueText"/><Binding Path="Download.Unit"/></MultiBinding></TextBlock.Text>
+                </TextBlock>
+              </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="آپلود" SortMemberPath="UploadBytes" Width="*">
+          <DataGridTemplateColumn Header="آپلود" SortMemberPath="UploadBytes" Width="*" MinWidth="80">
             <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate><StackPanel><TextBlock Text="{Binding Upload.ValueText}" Style="{StaticResource TrafficNumber}"/><TextBlock Text="{Binding Upload.Unit}" Style="{StaticResource TrafficUnit}"/></StackPanel></DataTemplate>
+              <DataTemplate>
+                <TextBlock Style="{StaticResource TrafficNumber}">
+                  <TextBlock.Text><MultiBinding StringFormat="{}{0} {1}"><Binding Path="Upload.ValueText"/><Binding Path="Upload.Unit"/></MultiBinding></TextBlock.Text>
+                </TextBlock>
+              </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
-          <DataGridTemplateColumn Header="مجموع" SortMemberPath="TotalBytes" Width="*">
+          <DataGridTemplateColumn Header="مجموع" SortMemberPath="TotalBytes" Width="*" MinWidth="80">
             <DataGridTemplateColumn.CellTemplate>
-              <DataTemplate><StackPanel><TextBlock Text="{Binding Total.ValueText}" Style="{StaticResource TrafficNumber}"/><TextBlock Text="{Binding Total.Unit}" Style="{StaticResource TrafficUnit}"/></StackPanel></DataTemplate>
+              <DataTemplate>
+                <TextBlock Style="{StaticResource TrafficNumber}">
+                  <TextBlock.Text><MultiBinding StringFormat="{}{0} {1}"><Binding Path="Total.ValueText"/><Binding Path="Total.Unit"/></MultiBinding></TextBlock.Text>
+                </TextBlock>
+              </DataTemplate>
             </DataGridTemplateColumn.CellTemplate>
           </DataGridTemplateColumn>
         </DataGrid.Columns>
