@@ -1,14 +1,31 @@
 # Connected application traffic
 
-The left-edge tab opens a stats overlay only on the connected screen. Its colors,
-font, cards and controls use the existing IRSpeedy theme. The original header and
-connection layout stay fixed. Opening/closing animates a frozen panel texture with
-a left-hinged PerspectiveCamera/RotateTransform3D plus translation. The real table
-is shown at the open endpoint. The connected illustration pauses/resumes its
-existing storyboard clocks; it is never restarted by the tab. Background blur is
-a constant effect on a frozen snapshot, cross-faded without animating its radius.
-Snapshots use local coordinates and the current monitor DPI. Interrupted motion
-reuses the same texture and current animation values.
+The middle-left edge tab opens the stats overlay on the connected screen. Its
+colors, font, cards and controls use the existing IRSpeedy theme. Motion follows
+the approved `irspeedy-fold-stats-blur.html` reference:
+
+| Effect | Reference and native target |
+| --- | --- |
+| Panel bounds | Left/right 18, top 50, bottom 84 in the full connection scene |
+| Perspective | 1300 logical pixels; origin at the full scene center |
+| Closed transform | Translate X by `-(panelWidth + 28)`, rotate Y by -68 degrees around the left edge |
+| Transform timing | 620 ms in both directions; KeySpline(.22,1,.36,1) |
+| Panel opacity | 0 to 1 over 480 ms with CSS ease (.25,.1,.25,1) |
+| Crease | 34px band at 48%; opacity .55 to 0 over 600 ms, scale X 1.7 to .2 over 620 ms |
+| Background | Translate X 10, scale .975, opacity .6, blur radius 6; transform/blur 620 ms, opacity 520 ms |
+| Shadow | Offset Y 12, blur 34, color #1e3a8a35 |
+
+A full-scene viewport performs rotation then translation **before** perspective;
+a panel-sized viewport or a 2D viewport translation would clip/distort this effect.
+The texture includes 48px padding for the shadow. Emissive materials preserve the
+captured UI colors. The native table replaces the texture at the open endpoint.
+
+The connected illustration pauses/resumes its existing animation clocks. Only a
+frozen image of the connected content moves/scales/blurs; the original layout and
+header remain fixed. At the closed endpoint the image returns to identity before
+the original is restored, avoiding a jump. Background controls are disabled while
+the overlay is open, including keyboard activation. Rapid reversals reuse current
+animated values and textures instead of recapturing or resetting to an endpoint.
 
 ## Source and counting
 
@@ -47,10 +64,10 @@ bytes. A failed baseline query or save does not clear current totals. Reset remo
 the old recovery backup so pre-reset usage cannot return through recovery. It does
 not stop/start the core or disconnect the tunnel.
 
-The `نمونه` button retains the seven original fixture rows in release builds. The
-preview is explicitly labeled and cannot reset or contaminate the live ledger.
-`زنده` returns to actual usage. Table refresh changes existing rows rather than
-replacing ItemsSource, preserving selection and scroll position.
+The connected UI always shows real traffic. The sample toggle was removed at the
+user's request; the original fixture source is retained only for design reference
+and is never bound by the connected screen. Table refresh changes existing rows
+rather than replacing ItemsSource, preserving selection and scroll position.
 
 ## Validation
 
@@ -77,5 +94,6 @@ Windows acceptance checks (same single-file builder, no new package dependencies
    fresh session whose core counters start at zero. Removing Temp must not reset them.
 5. Reset while a download is active. Old bytes must not return on the next poll;
    the tunnel remains connected. Cancel/Escape must preserve totals.
-6. Switch between sample/live modes, sort, select and scroll. Close or disconnect
-   during an animation/reset confirmation; no overlay should remain on the next page.
+6. Sort, select and scroll. Close or disconnect during an animation/reset
+   confirmation; no overlay should remain on the next page. The sample toggle
+   must not be present, and Tab must not reach the hidden connection controls.

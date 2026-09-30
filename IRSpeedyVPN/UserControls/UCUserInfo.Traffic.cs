@@ -11,9 +11,12 @@ namespace IRSpeedyVPN.UserControls
 {
     public partial class UCUserInfo
     {
+        // Approved HTML: perspective:1300px; translateX(-100% - 28px) rotateY(-68deg).
+        private const double TrafficPerspective = 1300;
+        private const double TrafficShadowPadding = 48;
         private Storyboard trafficMotion;
         private bool trafficPanelOpen;
-        private double TrafficClosedOffset => -Math.Max(420, ActualWidth + 30);
+        private double TrafficClosedOffset => -(TrafficPanelContainer.ActualWidth + 28);
 
         private void TrafficToggleButton_Click(object sender, RoutedEventArgs e) =>
             SetTrafficPanelOpen(TrafficToggleButton.IsChecked == true);
@@ -41,30 +44,43 @@ namespace IRSpeedyVPN.UserControls
             if (trafficPanelOpen == open && trafficMotion == null) return;
             TrafficPanel.DismissReset();
 
-            // Only capture at an endpoint. Reversing mid-motion reuses the texture and
-            // current clocks, so rapid clicks never flash the live panel or restart it.
             if (trafficMotion == null)
             {
                 if (open)
                 {
                     PauseConnectedMotion();
+                    // Identity handoff, then transform/blur only the bitmap. The original
+                    // illustration keeps its layout and paused clock phase throughout.
                     TrafficBlurredBackground.Source = CaptureTrafficVisual(ConnectedContent);
                     TrafficBlurredBackground.Visibility = Visibility.Visible;
+                    TrafficBlurredBackground.Opacity = 1;
+                    ConnectedContent.Opacity = 0;
                     TrafficPanel.RefreshTraffic();
                 }
                 TrafficPanelContainer.Visibility = Visibility.Visible;
                 TrafficPanelContainer.UpdateLayout();
                 PrepareTrafficFold();
+                if (open) TrafficPanelTranslate.OffsetX = TrafficClosedOffset;
             }
 
-            var duration = TimeSpan.FromMilliseconds(open ? 520 : 400);
+            // These are the independent transitions from the approved preview, including
+            // CSS 'ease' for alpha. CubicEase is NOT cubic-bezier(.22,1,.36,1).
             var next = new Storyboard();
-            AddTrafficAnimation(next, TrafficPanelTranslate, TranslateTransform.XProperty, open ? 0 : TrafficClosedOffset, duration);
-            AddTrafficAnimation(next, TrafficHinge, AxisAngleRotation3D.AngleProperty, open ? 0 : 64, duration);
-            AddTrafficAnimation(next, TrafficBlurredBackground, UIElement.OpacityProperty, open ? 1 : 0, duration);
-            AddTrafficAnimation(next, ConnectedContent, UIElement.OpacityProperty, open ? 0 : 1, duration);
-            AddTrafficAnimation(next, TrafficBackdrop, UIElement.OpacityProperty, open ? 1 : 0, duration);
-            AddTrafficAnimation(next, TrafficArrowRotation, RotateTransform.AngleProperty, open ? 180 : 0, duration);
+            AddTrafficAnimation(next, TrafficPanelTranslate, TranslateTransform3D.OffsetXProperty, TrafficClosedOffset, 0, open, 620);
+            AddTrafficAnimation(next, TrafficHinge, AxisAngleRotation3D.AngleProperty, -68, 0, open, 620);
+            AddTrafficAnimation(next, TrafficFoldViewport, UIElement.OpacityProperty, 0, 1, open, 480, true);
+            AddTrafficAnimation(next, TrafficCreaseBrush, Brush.OpacityProperty, 0.55, 0, open, 600, true);
+            AddTrafficAnimation(next, TrafficCreaseScale, ScaleTransform3D.ScaleXProperty, 1.7, 0.2, open, 620);
+            AddTrafficAnimation(next, TrafficBackgroundScale, ScaleTransform.ScaleXProperty, 1, 0.975, open, 620);
+            AddTrafficAnimation(next, TrafficBackgroundScale, ScaleTransform.ScaleYProperty, 1, 0.975, open, 620);
+            AddTrafficAnimation(next, TrafficBackgroundTranslate, TranslateTransform.XProperty, 0, 10, open, 620);
+            AddTrafficAnimation(next, TrafficBlurredBackground, UIElement.OpacityProperty, 1, 0.6, open, 520, true);
+            AddTrafficAnimation(next, TrafficBackgroundBlur, System.Windows.Media.Effects.BlurEffect.RadiusProperty, 0, 6, open, 620);
+            AddTrafficAnimation(next, TrafficBackdrop, UIElement.OpacityProperty, 0, 1, open, 620, true);
+            AddTrafficAnimation(next, TrafficArrowRotation, RotateTransform.AngleProperty, 0, 180, open, 620);
+
+            // Capture all current animated values before replacing clocks. Reversal never
+            // re-captures the panel/background or briefly paints their endpoint states.
             StopTrafficMotion();
             trafficPanelOpen = open;
             UpdateTrafficToggle(open);
@@ -74,9 +90,7 @@ namespace IRSpeedyVPN.UserControls
             TrafficFoldViewport.Visibility = Visibility.Visible;
             TrafficBackdrop.Visibility = Visibility.Visible;
             ConnectedContent.IsHitTestVisible = false;
-
-            // This small disclosure remains animated even when Windows disables general
-            // client-area animations; the prior instant branch obscured its direction.
+            ConnectedContent.IsEnabled = false;
             trafficMotion = next;
             next.Completed += (sender, args) =>
             {
@@ -88,20 +102,20 @@ namespace IRSpeedyVPN.UserControls
             next.Begin(this, HandoffBehavior.SnapshotAndReplace, true);
         }
 
-        private static BitmapSource CaptureTrafficVisual(FrameworkElement visual)
+        private static BitmapSource CaptureTrafficVisual(FrameworkElement visual, double padding = 0)
         {
             var dpi = VisualTreeHelper.GetDpi(visual);
-            var bounds = new Rect(0, 0, Math.Max(1, visual.ActualWidth), Math.Max(1, visual.ActualHeight));
+            var source = new Rect(-padding, -padding,
+                Math.Max(1, visual.ActualWidth) + 2 * padding, Math.Max(1, visual.ActualHeight) + 2 * padding);
             var bitmap = new RenderTargetBitmap(
-                Math.Max(1, (int)Math.Ceiling(bounds.Width * dpi.DpiScaleX)),
-                Math.Max(1, (int)Math.Ceiling(bounds.Height * dpi.DpiScaleY)),
+                Math.Max(1, (int)Math.Ceiling(source.Width * dpi.DpiScaleX)),
+                Math.Max(1, (int)Math.Ceiling(source.Height * dpi.DpiScaleY)),
                 dpi.PixelsPerInchX, dpi.PixelsPerInchY, PixelFormats.Pbgra32);
-            // Draw in local coordinates: Render(visual) directly can include its layout
-            // offset/margin and crop or shift the snapshot at the live/texture handoff.
             var drawing = new DrawingVisual();
             using (var context = drawing.RenderOpen())
                 context.DrawRectangle(new VisualBrush(visual)
-                { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = bounds, Stretch = Stretch.Fill }, null, bounds);
+                { ViewboxUnits = BrushMappingMode.Absolute, Viewbox = source, Stretch = Stretch.Fill },
+                    null, new Rect(0, 0, source.Width, source.Height));
             bitmap.Render(drawing);
             bitmap.Freeze();
             return bitmap;
@@ -109,30 +123,57 @@ namespace IRSpeedyVPN.UserControls
 
         private void PrepareTrafficFold()
         {
+            double sceneWidth = Math.Max(1, TrafficPanelLayer.ActualWidth);
+            double sceneHeight = Math.Max(1, TrafficPanelLayer.ActualHeight);
+            var origin = TrafficPanelContainer.TranslatePoint(new Point(0, 0), TrafficPanelLayer);
             double width = Math.Max(1, TrafficPanelContainer.ActualWidth);
             double height = Math.Max(1, TrafficPanelContainer.ActualHeight);
-            var texture = new ImageBrush(CaptureTrafficVisual(TrafficPanelContainer)) { Stretch = Stretch.Fill };
+            double left = origin.X, top = sceneHeight - origin.Y, bottom = top - height;
+            var texture = new ImageBrush(CaptureTrafficVisual(TrafficPanelContainer, TrafficShadowPadding)) { Stretch = Stretch.Fill };
             texture.Freeze();
-            var material = new DiffuseMaterial(texture);
+            // Emissive material reproduces the captured UI colors without scene lighting.
+            var material = new EmissiveMaterial(texture);
             material.Freeze();
+            TrafficFoldModel.Geometry = TrafficQuad(left - TrafficShadowPadding, bottom - TrafficShadowPadding,
+                left + width + TrafficShadowPadding, top + TrafficShadowPadding);
+            TrafficFoldModel.Material = TrafficFoldModel.BackMaterial = material;
+            double creaseLeft = left + width * 0.48;
+            TrafficCreaseModel.Geometry = TrafficQuad(creaseLeft, bottom, creaseLeft + 34, top, 0.01);
+            TrafficCreaseScale.CenterX = creaseLeft + 17;
+            TrafficCreaseModel.BackMaterial = TrafficCreaseModel.Material;
+
+            // WPF's FieldOfView is horizontal. Using the whole scene and a fixed 1300px
+            // distance matches CSS parent perspective-origin:center and avoids crop/zoom.
+            TrafficFoldCamera.Position = new Point3D(sceneWidth / 2, sceneHeight / 2, TrafficPerspective);
+            TrafficFoldCamera.FieldOfView = 2 * Math.Atan(sceneWidth / (2 * TrafficPerspective)) * 180 / Math.PI;
+            TrafficHingeTransform.CenterX = left;
+            TrafficHingeTransform.CenterY = bottom + height / 2;
+        }
+
+        private static MeshGeometry3D TrafficQuad(double left, double bottom, double right, double top, double z = 0)
+        {
             var mesh = new MeshGeometry3D
             {
-                Positions = new Point3DCollection { new Point3D(0, 0, 0), new Point3D(width, 0, 0), new Point3D(width, height, 0), new Point3D(0, height, 0) },
+                Positions = new Point3DCollection { new Point3D(left, bottom, z), new Point3D(right, bottom, z), new Point3D(right, top, z), new Point3D(left, top, z) },
                 TextureCoordinates = new PointCollection { new Point(0, 1), new Point(1, 1), new Point(1, 0), new Point(0, 0) },
                 TriangleIndices = new Int32Collection { 0, 1, 2, 0, 2, 3 }
             };
             mesh.Freeze();
-            TrafficFoldModel.Geometry = mesh;
-            TrafficFoldModel.Material = TrafficFoldModel.BackMaterial = material;
-            TrafficFoldCamera.Position = new Point3D(width / 2, height / 2, width / (2 * Math.Tan(Math.PI / 12)));
-            TrafficHingeTransform.CenterY = height / 2;
+            return mesh;
         }
 
-        private static void AddTrafficAnimation(Storyboard storyboard, DependencyObject target,
-            DependencyProperty property, double value, TimeSpan duration)
+        private void AddTrafficAnimation(Storyboard storyboard, DependencyObject target,
+            DependencyProperty property, double closed, double opened, bool open, int milliseconds, bool cssEase = false)
         {
-            var animation = new DoubleAnimation((double)target.GetValue(property), value, duration)
-            { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut } };
+            double from = (double)target.GetValue(property);
+            double value = open ? opened : closed;
+            // CSS shortens a reversing transition by its remaining value fraction.
+            // A quick second click must not leave a nearly closed overlay running 620ms.
+            double fraction = trafficMotion == null ? 1 : Math.Min(1, Math.Abs((value - from) / (opened - closed)));
+            var animation = new DoubleAnimationUsingKeyFrames();
+            animation.KeyFrames.Add(new LinearDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            animation.KeyFrames.Add(new SplineDoubleKeyFrame(value, KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds(milliseconds * fraction)),
+                cssEase ? new KeySpline(0.25, 0.1, 0.25, 1) : new KeySpline(0.22, 1, 0.36, 1)));
             Storyboard.SetTarget(animation, target);
             Storyboard.SetTargetProperty(animation, new PropertyPath(property));
             storyboard.Children.Add(animation);
@@ -155,15 +196,23 @@ namespace IRSpeedyVPN.UserControls
 
         private void ApplyTrafficState(bool open)
         {
-            TrafficPanelTranslate.X = open ? 0 : TrafficClosedOffset;
-            TrafficHinge.Angle = open ? 0 : 64;
+            TrafficPanelTranslate.OffsetX = open ? 0 : TrafficClosedOffset;
+            TrafficHinge.Angle = open ? 0 : -68;
             TrafficArrowRotation.Angle = open ? 180 : 0;
-            TrafficBlurredBackground.Opacity = TrafficBackdrop.Opacity = open ? 1 : 0;
+            TrafficFoldViewport.Opacity = open ? 1 : 0;
+            TrafficCreaseBrush.Opacity = open ? 0 : 0.55;
+            TrafficCreaseScale.ScaleX = open ? 0.2 : 1.7;
+            TrafficBackgroundScale.ScaleX = TrafficBackgroundScale.ScaleY = open ? 0.975 : 1;
+            TrafficBackgroundTranslate.X = open ? 10 : 0;
+            TrafficBackgroundBlur.Radius = open ? 6 : 0;
+            TrafficBlurredBackground.Opacity = open ? 0.6 : 1;
+            TrafficBackdrop.Opacity = open ? 1 : 0;
             TrafficBlurredBackground.Visibility = TrafficBackdrop.Visibility = open ? Visibility.Visible : Visibility.Hidden;
             TrafficFoldViewport.Visibility = Visibility.Hidden;
             TrafficPanelContainer.Visibility = open ? Visibility.Visible : Visibility.Hidden;
             TrafficPanelLayer.IsHitTestVisible = open;
             ConnectedContent.IsHitTestVisible = !open;
+            ConnectedContent.IsEnabled = !open;
             ConnectedContent.Opacity = open ? 0 : 1;
             TrafficPanel.SetUpdatesEnabled(open);
             TrafficFoldModel.Material = TrafficFoldModel.BackMaterial = null;

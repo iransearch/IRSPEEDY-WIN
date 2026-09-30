@@ -6,8 +6,8 @@ namespace IRSpeedyVPN.UserControls
 {
     public partial class ConnectionTrafficPanel
     {
-        // Keep the supplied screenshot fixture available through the explicit preview
-        // button in release builds. It never enters the live ledger or saved totals.
+        // Retain the supplied screenshot fixture for design previews. The connected
+        // screen displays live traffic only; fixtures never enter its ledger or totals.
         private static List<TrafficPreviewRow> CreatePreviewRows()
         {
             return new List<TrafficPreviewRow>

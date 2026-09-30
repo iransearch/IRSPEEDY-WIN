@@ -18,7 +18,7 @@ namespace IRSpeedyVPN.UserControls
         private readonly ObservableCollection<TrafficRowView> liveRows = new ObservableCollection<TrafficRowView>();
         private readonly Dictionary<string, TrafficRowView> rowIndex = new Dictionary<string, TrafficRowView>(StringComparer.OrdinalIgnoreCase);
         private readonly DispatcherTimer refreshTimer;
-        private bool preview, resetting;
+        private bool resetting;
         private long revision = -1;
 
         public ConnectionTrafficPanel()
@@ -40,7 +40,6 @@ namespace IRSpeedyVPN.UserControls
 
         internal void RefreshTraffic()
         {
-            if (preview) return;
             var snapshot = TrafficUsageService.Instance.Snapshot; // already detached; no IO/lock
             if (revision == snapshot.Revision) return;
             revision = snapshot.Revision;
@@ -85,31 +84,6 @@ namespace IRSpeedyVPN.UserControls
             DownloadSummary.Text = download.ValueText; DownloadSummaryUnit.Text = download.Unit;
             UploadSummary.Text = upload.ValueText; UploadSummaryUnit.Text = upload.Unit;
             TotalSummary.Text = total.ValueText; TotalSummaryUnit.Text = total.Unit;
-        }
-
-        private void Preview_Click(object sender, RoutedEventArgs e)
-        {
-            preview = !preview;
-            PreviewButton.Content = preview ? "زنده" : "نمونه";
-            PreviewButton.ToolTip = preview ? "بازگشت به آمار واقعی" : "نمایش داده‌های نمونه";
-            ResetTrafficButton.IsEnabled = !preview;
-            if (preview)
-            {
-                var rows = CreatePreviewRows();
-                TrafficTable.ItemsSource = rows;
-                TrafficSubtitle.Text = "دادهٔ نمایشی؛ مصرف واقعی نیست";
-                TrafficSubtitle.ToolTip = null;
-                TrafficCount.Text = "۷ برنامه · نمونه";
-                TrafficStatus.Text = "پیش‌نمایش";
-                EmptyTrafficText.Visibility = Visibility.Collapsed;
-                SetSummary(rows.Sum(row => row.DownloadBytes), rows.Sum(row => row.UploadBytes));
-            }
-            else
-            {
-                TrafficTable.ItemsSource = liveRows;
-                revision = -1;
-                RefreshTraffic();
-            }
         }
 
         private void Reset_Click(object sender, RoutedEventArgs e)

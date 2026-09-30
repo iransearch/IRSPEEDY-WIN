@@ -135,8 +135,6 @@
           <TextBlock x:Name="TrafficSubtitle" Text="مصرف ثبت‌شده از آخرین ریست" FontSize="11" Margin="0,2,0,0" Foreground="{StaticResource IconStrokeBrush}"/>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-          <Button x:Name="PreviewButton" Content="نمونه" Style="{StaticResource TrafficSmallButton}" Padding="7,5" FontSize="10"
-                  Margin="0,0,6,0" Click="Preview_Click" ToolTip="نمایش داده‌های نمونه"/>
           <Button x:Name="ResetTrafficButton" Width="30" Height="30" Style="{StaticResource TrafficSmallButton}"
                   Click="Reset_Click" ToolTip="ریست آمار مصرف" AutomationProperties.Name="ریست آمار مصرف">
             <Viewbox Width="15" Height="15"><Canvas Width="16" Height="16">
