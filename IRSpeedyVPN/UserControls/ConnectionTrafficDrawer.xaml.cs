@@ -16,9 +16,12 @@ namespace IRSpeedyVPN.UserControls
         private const double DesignWidth = 440;
         private readonly Window connectionWindow;
         private readonly FrameworkElement connectionAnchor;
-        private Storyboard motion;
         private HwndSource ownerSource, drawerSource;
         private bool placing, placementQueued, disposed, prepared, preparing;
+        private bool motionAttached, motionPrimed, motionOpening;
+        private double motionFrom, motionTo;
+        private int motionDurationMs;
+        private long motionStartTicks;
         private DrawerState state = DrawerState.Closed;
 
         private enum DrawerState
@@ -32,6 +35,7 @@ namespace IRSpeedyVPN.UserControls
         internal ConnectionTrafficPanel Panel => TrafficPanel;
         internal bool IsDisposed => disposed;
         internal bool IsOpeningOrOpen => state == DrawerState.Opening || state == DrawerState.Open;
+        internal bool IsTransitioning => state == DrawerState.Opening || state == DrawerState.Closing;
         internal event EventHandler DrawerClosed;
         internal event EventHandler OpenStateChanged;
 
@@ -112,15 +116,20 @@ namespace IRSpeedyVPN.UserControls
                 Log("open-rejected ownerUnavailable=True");
                 return;
             }
-            if ((open && (state == DrawerState.Open || state == DrawerState.Opening))
-                || (!open && (state == DrawerState.Closed || state == DrawerState.Closing))) return;
+
+            // Do not queue or reverse repeated clicks. One transition owns the drawer
+            // until it reaches its endpoint; the toggle is disabled by the host meanwhile.
+            if (IsTransitioning)
+            {
+                Log("click-ignored transition=True");
+                return;
+            }
+            if ((open && state == DrawerState.Open) || (!open && state == DrawerState.Closed)) return;
 
             if (open && !prepared) Prepare();
             TrafficPanel.DismissReset();
             TrafficPanel.SetUpdatesEnabled(false);
 
-            // Read the animated value before removing its clock. A rapid reversal
-            // therefore continues from the exact visible position instead of jumping.
             double from = DrawerTranslation.X;
             StopMotion();
             DrawerTranslation.X = from;
@@ -128,8 +137,11 @@ namespace IRSpeedyVPN.UserControls
 
             if (open && !IsVisible)
             {
-                DrawerTranslation.X = DesignWidth;
+                // The first rendered frame is intentionally fully clipped. Motion starts
+                // on the following CompositionTarget frame, so Show() can never reveal
+                // the completed panel in one jump.
                 from = DesignWidth;
+                DrawerTranslation.X = DesignWidth;
                 if (!PlaceBesideConnection()) { HideDrawer("placement-failed"); return; }
                 Show();
             }
@@ -141,27 +153,50 @@ namespace IRSpeedyVPN.UserControls
 
             DrawerSurface.IsHitTestVisible = false;
             DrawerSurface.IsEnabled = false;
-            // No BitmapCache, blur, shadow construction, refresh or IO is allowed here.
-            // The click path only changes state and starts the render transform.
-            var animation = new DoubleAnimationUsingKeyFrames();
-            animation.KeyFrames.Add(new LinearDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.Zero)));
-            animation.KeyFrames.Add(new SplineDoubleKeyFrame(target,
-                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds((open ? 420 : 340) * fraction)),
-                new KeySpline(0.22, 1, 0.36, 1)));
-            Storyboard.SetTarget(animation, DrawerTranslation);
-            Storyboard.SetTargetProperty(animation, new PropertyPath(TranslateTransform.XProperty));
-            var next = new Storyboard();
-            next.Children.Add(animation);
-            next.Completed += (sender, args) =>
+            StartSlide(open, from, target, (int)Math.Round((open ? 460 : 360) * fraction));
+        }
+
+        private void StartSlide(bool open, double from, double target, int durationMs)
+        {
+            StopMotion();
+            motionOpening = open;
+            motionFrom = from;
+            motionTo = target;
+            motionDurationMs = Math.Max(1, durationMs);
+            motionPrimed = false;
+            motionAttached = true;
+            DrawerTranslation.X = from;
+            CompositionTarget.Rendering += MotionFrame;
+            Log("animation-armed from=" + Math.Round(from, 1) + " target=" + target
+                + " durationMs=" + motionDurationMs);
+        }
+
+        private void MotionFrame(object sender, EventArgs e)
+        {
+            if (!motionAttached || disposed) { StopMotion(); return; }
+
+            // Frame zero establishes the hidden start position after Show(). This is
+            // what makes the drawer visibly emerge from the connection window edge.
+            if (!motionPrimed)
             {
-                if (disposed || !ReferenceEquals(motion, next)) return;
-                StopMotion();
-                FinishMotion(open);
-            };
-            motion = next;
-            Log("animation-start from=" + Math.Round(from, 1) + " target=" + target
-                + " durationMs=" + Math.Round((open ? 420 : 340) * fraction));
-            next.Begin(this, HandoffBehavior.SnapshotAndReplace, true);
+                motionPrimed = true;
+                motionStartTicks = Stopwatch.GetTimestamp();
+                DrawerTranslation.X = motionFrom;
+                Log("animation-first-frame x=" + Math.Round(motionFrom, 1));
+                return;
+            }
+
+            double elapsedMs = (Stopwatch.GetTimestamp() - motionStartTicks) * 1000.0 / Stopwatch.Frequency;
+            double progress = Math.Min(1, elapsedMs / motionDurationMs);
+            // Cubic ease-out: fast response at the edge, soft landing at the endpoint.
+            double eased = 1 - Math.Pow(1 - progress, 3);
+            DrawerTranslation.X = motionFrom + (motionTo - motionFrom) * eased;
+
+            if (progress < 1) return;
+            bool open = motionOpening;
+            DrawerTranslation.X = motionTo;
+            StopMotion();
+            FinishMotion(open);
         }
 
         private void FinishMotion(bool open)
@@ -215,9 +250,10 @@ namespace IRSpeedyVPN.UserControls
 
         private void StopMotion()
         {
-            var previous = motion;
-            motion = null;
-            previous?.Remove(this);
+            if (motionAttached)
+                CompositionTarget.Rendering -= MotionFrame;
+            motionAttached = false;
+            motionPrimed = false;
         }
 
         private void SetState(DrawerState value)

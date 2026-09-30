@@ -36,12 +36,14 @@ namespace IRSpeedyVPN.UserControls
             {
                 if (!ReferenceEquals(trafficDrawer, drawer)) return;
                 UpdateTrafficToggle(drawer.IsOpeningOrOpen, true);
+                TrafficToggleButton.IsEnabled = !drawer.IsTransitioning;
                 btnDisConnect.IsCancel = false;
             };
             drawer.DrawerClosed += (sender, args) =>
             {
                 if (!ReferenceEquals(trafficDrawer, drawer)) return;
                 UpdateTrafficToggle(false, true);
+                TrafficToggleButton.IsEnabled = true;
                 btnDisConnect.IsCancel = true;
                 if (owner.IsActive && IsVisible) TrafficToggleButton.Focus();
             };
@@ -106,6 +108,7 @@ namespace IRSpeedyVPN.UserControls
             drawer?.CloseImmediately();
             if (TrafficToggleButton == null || btnDisConnect == null) return;
             UpdateTrafficToggle(false, false);
+            TrafficToggleButton.IsEnabled = true;
             btnDisConnect.IsCancel = true;
         }
     }
