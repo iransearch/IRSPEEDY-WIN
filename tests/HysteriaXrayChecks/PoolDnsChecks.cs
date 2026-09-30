@@ -66,7 +66,7 @@ internal static class PoolDnsChecks
         }
 
         // Pool-only normalization must not mutate parsed nodes or the separate
-        // single-server/probe paths, even after reusing the same XHTTP extras.
+        // single-server paths, even after reusing the same XHTTP extras.
         var single = JObject.Parse(ConfigGenerator.GetConfig("vless://pool-xhttp", 19004, "user", "pass"));
         var singleStream = single["outbounds"][0]["streamSettings"];
         Check((string)singleStream["sockopt"]["domainStrategy"] == "UseIP"
@@ -76,7 +76,25 @@ internal static class PoolDnsChecks
             new ConfigGenerator.XraySocksInfo { Link = "vless://pool-grpc", Tag = "probe", Port = 19005, User = "user", Pass = "pass" }
         }));
         Check((string)probe["outbounds"][0]["streamSettings"]["sockopt"]["domainStrategy"] == "UseIP",
-            "Pool DNS normalization changed the separate probe path");
+            "DNS normalization changed a probe without the Core DNS opt-in");
+
+        var coreProbe = JObject.Parse(ConfigGenerator.GetUrlTestXrayConfig(links.Select((link, index) =>
+            new ConfigGenerator.XraySocksInfo { Link = link, Tag = "probe-" + index,
+                Port = 19010 + index, User = "user", Pass = "pass" }).ToList(), useCoreDns: true));
+        var probeMembers = ((JArray)coreProbe["outbounds"]).OfType<JObject>()
+            .Where(o => ((string)o["tag"]).StartsWith("probe-")).ToArray();
+        Check(probeMembers.Length == members, "Core DNS changed probe membership");
+        for (int index = 0; index < probeMembers.Length; index++)
+        {
+            var live = poolMembers.Single(o => (string)o["tag"] == "smart-proxy-" + index);
+            Check(JToken.DeepEquals(live["settings"], probeMembers[index]["settings"])
+                && JToken.DeepEquals(live["streamSettings"], probeMembers[index]["streamSettings"]),
+                "Probe DNS/socket/transport differs from live Pool member " + index);
+            Check(!probeMembers[index].SelectTokens("$..sockopt.domainStrategy").Any(),
+                "Probe socket bypassed the direct Core resolver");
+            Check((string)coreProbe["routing"]["rules"][index]["outboundTag"] == "probe-" + index,
+                "Probe was routed to another member");
+        }
 
         var box = JObject.Parse(IRSpeedyVPN.Services.SingBox.Samples.sg_clientSample);
         var direct = box["dns"]["servers"].Single(s => (string)s["tag"] == "dns-direct");
@@ -85,8 +103,21 @@ internal static class PoolDnsChecks
         Check((string)box["route"]["default_domain_resolver"]["server"] == "dns-direct"
             && (bool)box["route"]["auto_detect_interface"], "Direct DNS lost physical-interface routing");
 
+        var remote = box["dns"]["servers"].Single(s => (string)s["tag"] == "dns-remote");
+        Check((string)remote["type"] == "https" && (string)remote["server"] == "1.1.1.1"
+            && (string)remote["path"] == "/dns-query" && (string)remote["detour"] == "proxy",
+            "Website DNS is not Cloudflare DoH inside the VPN");
+        var serializedRemote = JObject.FromObject(remote.ToObject<IRSpeedyVPN.Services.SingBox.DnsServer>());
+        Check((string)serializedRemote["path"] == "/dns-query"
+            && (string)serializedRemote["detour"] == "proxy", "DNS model discarded DoH path or VPN detour");
+        var probeBox = JObject.Parse(IRSpeedyVPN.Services.SingBox.Samples.sg_UrlTest);
+        Check(JToken.DeepEquals(direct, probeBox["dns"]["servers"].Single(s => (string)s["tag"] == "dns-direct"))
+            && JToken.DeepEquals(box["route"]["default_domain_resolver"], probeBox["route"]["default_domain_resolver"])
+            && (bool)probeBox["route"]["auto_detect_interface"], "Probe and live bootstrap DNS differ");
+
         CheckStartWire(config.ToString());
-        Console.WriteLine("PASS: Pool DNS RPC field 13, main/AI socket inheritance, Hysteria/gRPC/XHTTP/IP endpoints, isolated single-server/probe paths.");
+        CheckProbeWire(coreProbe.ToString());
+        Console.WriteLine("PASS: Cloudflare DoH/VPN detour, matching probe/live direct DNS, RPC fields 13/14, main/AI and probe socket inheritance, isolated single-server path.");
     }
 
     private static VmessItem Node(string network, string address)
@@ -108,5 +139,17 @@ internal static class PoolDnsChecks
         var field13 = new byte[] { 0x6a, 0x07 }.Concat(Encoding.ASCII.GetBytes("ForceIP"));
         Check(LibcoreProto.EncodeLoadConfigReq(request).SequenceEqual(unwired.Concat(field13)),
             "Start did not transmit the strict DNS strategy under Core's field 13");
+    }
+
+    private static void CheckProbeWire(string config)
+    {
+        var request = new TestReq { Config = "{\"dns\":{}}", NeedXray = true, XrayConfig = config };
+        var unwired = LibcoreProto.EncodeTestReq(request);
+        request.XrayOutboundDnsStrategy = "";
+        Check(unwired.SequenceEqual(LibcoreProto.EncodeTestReq(request)), "Unwired test RPC bytes changed");
+        request.XrayOutboundDnsStrategy = SmartIpRouting.OutboundDnsStrategy;
+        var field14 = new byte[] { 0x72, 0x07 }.Concat(Encoding.ASCII.GetBytes("ForceIP"));
+        Check(LibcoreProto.EncodeTestReq(request).SequenceEqual(unwired.Concat(field14)),
+            "Test did not transmit the live Pool DNS strategy under Core's field 14");
     }
 }

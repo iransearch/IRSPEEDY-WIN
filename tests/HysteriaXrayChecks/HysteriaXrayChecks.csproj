@@ -8,6 +8,7 @@
     <Compile Include="../../IRSpeedyVPN/Services/Xray/*.cs" Link="Xray/%(Filename)%(Extension)" />
     <Compile Include="../../IRSpeedyVPN/Services/GeoRoutingFallback.cs" Link="GeoRoutingFallback.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/SingBox/Samples.cs" Link="SingBox/Samples.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/SingBox/DnsServer.cs" Link="SingBox/DnsServer.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="Libcore/LibcoreMessages.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="Libcore/LibcoreProto.cs" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />

@@ -78,14 +78,14 @@ The Smart generator removes `sockopt.domainStrategy` from main and AI members,
 including nested XHTTP download settings, because an explicit socket strategy
 overrides the resolver supplied by Core. Other socket/transport settings remain
 intact. Hysteria2 has no stream override and inherits the same instance resolver.
-Single-server and URL-test configurations retain their existing DNS behavior.
+Single-server configurations retain their existing server DNS behavior.
 Every Smart start, including reconnect and sharing reconfiguration, passes the
 strategy anew. `config-apply-begin` records `xrayDnsStrategy=ForceIP`; this records
 the requested policy, not confirmation that an old Core binary honored it.
 
 The harness verifies exact protobuf field-13 encoding, main/AI Hysteria2 and gRPC
 members, XHTTP upload/download settings, literal-IP preservation, and isolation
-from single-server/probe configs. Existing AI fallback/block and 15m/sampling-2
+from single-server configs. Existing AI fallback/block and 15m/sampling-2
 checks run alongside it. These checks do not simulate Windows DNS or QUIC.
 
 Core compatibility was reviewed against `iransearch/Throne-G` commit
@@ -101,3 +101,27 @@ remaining connected. Correlate the requested DNS strategy with resolver logs
 and successful new connections. Include DNS failure: it must return an error,
 not recursively resolve through the proxy. Recheck AI-only fallback and empty-AI
 blocking. No periodic health check or network-triggered Core restart is added.
+
+# DNS transport and initial-probe parity
+
+Website DNS (`dns-remote`) uses `https://1.1.1.1/dns-query` through the `proxy`
+detour, matching Throne's HTTPS conversion for DNS carried by Xray. The DNS model
+retains `/dns-query` during serialization. Bootstrap DNS (`dns-direct`) remains
+UDP `1.1.1.1` through the physical network, without a proxy dependency.
+
+Initial server tests and their alternate passes use the same direct DNS transport
+and native `prefer_ipv4` default resolver as live connections. Xray-backed normal
+and VOD tests explicitly pass `ForceIP` in `TestReq` field 14 and opt into the
+same socket normalization as live main/AI Pools, including XHTTP download
+settings. A DNS error must fail the test rather than fall back to the OS resolver.
+This aligns DNS while preserving existing native/Xray protocol selection.
+
+The checks compare live and probe transport settings for Hysteria2, gRPC, XHTTP
+and literal IPs, verify exact field-14 bytes, and preserve unrelated socket
+settings. `UrlTestRetryChecks` verifies the alternate pass retains `ForceIP`.
+Core support is present at `iransearch/Throne-G` commit
+`c0fa2071bda243762b6387e56355f8a4242bcad5`; these changes require an application
+rebuild, not a new Core build. Older cores may ignore field 14.
+
+Windows acceptance still needs a real DNS failure and network interruption test
+with the packaged Core; these deterministic checks do not prove outage recovery.

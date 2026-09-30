@@ -93,6 +93,10 @@ namespace IRSpeedyVPN.Services.Libcore
         public bool NeedXray { get; set; }
 
         public string XrayConfig { get; set; }
+
+        // TestReq field 14: use the probe box's dns-direct for server domains,
+        // with the same strict strategy as a live Pool.
+        public string XrayOutboundDnsStrategy { get; set; }
     }
 
     internal class TestResp

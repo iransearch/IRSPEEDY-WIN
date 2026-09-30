@@ -28,8 +28,9 @@ namespace IRSpeedyVPN.Services.SingBox
 ],
         ""servers"":[
             {
-                ""type"":""udp"",
+                ""type"":""https"",
                 ""server"":""1.1.1.1"",
+                ""path"":""/dns-query"",
                 ""detour"":""proxy"",
                 ""tag"":""dns-remote""
             },
@@ -274,7 +275,36 @@ namespace IRSpeedyVPN.Services.SingBox
     }
 }";
 
-		public static string sg_UrlTest = "{  \r\n    \"dns\": {\r\n        \"rules\": [\r\n        ],\r\n        \"servers\": [\r\n            {\r\n                \"domain_resolver\": \"dns-local\",\r\n                \"tag\": \"dns-direct\",\r\n                \"type\": \"local\"\r\n            },\r\n            {\r\n                \"tag\": \"dns-local\",\r\n                \"type\": \"local\"\r\n            }\r\n        ]\r\n    },\r\n    \"endpoints\": [\r\n    ],\r\n    \"log\": {\r\n        \"level\": \"info\"\r\n    },\r\n    \"outbounds\": [\r\n        \r\n        {\r\n            \"tag\": \"direct\",\r\n            \"type\": \"direct\"\r\n        }\r\n    ],\r\n    \"route\": {\r\n        \"auto_detect_interface\": true,\r\n        \"default_domain_resolver\": {\r\n            \"server\": \"dns-direct\",\r\n            \"strategy\": \"\"\r\n        }\r\n    }\r\n}";
+        // Server probes use the same physical-network resolver as live Pools.
+        public static string sg_UrlTest = @"{
+    ""dns"": {
+        ""rules"": [],
+        ""servers"": [
+            {
+                ""tag"": ""dns-direct"",
+                ""type"": ""udp"",
+                ""server"": ""1.1.1.1""
+            }
+        ]
+    },
+    ""endpoints"": [],
+    ""log"": {
+        ""level"": ""info""
+    },
+    ""outbounds"": [
+        {
+            ""tag"": ""direct"",
+            ""type"": ""direct""
+        }
+    ],
+    ""route"": {
+        ""auto_detect_interface"": true,
+        ""default_domain_resolver"": {
+            ""server"": ""dns-direct"",
+            ""strategy"": ""prefer_ipv4""
+        }
+    }
+}";
 
 		public static string sg_httpheaders=@"{
 						

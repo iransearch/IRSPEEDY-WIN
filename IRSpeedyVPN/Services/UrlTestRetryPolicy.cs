@@ -74,6 +74,7 @@ namespace IRSpeedyVPN.Services
                 var retry = new TestReq
                 {
                     Config = primary.Config, XrayConfig = primary.XrayConfig,
+                    XrayOutboundDnsStrategy = primary.XrayOutboundDnsStrategy,
                     NeedXray = primary.NeedXray, UseDefaultOutbound = primary.UseDefaultOutbound,
                     TestCurrent = primary.TestCurrent, MaxConcurrency = primary.MaxConcurrency,
                     TestTimeoutMs = primary.TestTimeoutMs, Url = RetryUrl, OutboundTags = retryTags

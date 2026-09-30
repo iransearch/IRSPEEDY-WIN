@@ -85,6 +85,8 @@ namespace IRSpeedyVPN.Services.Libcore
             w.WriteVarintField(7, (ulong)(req?.TestTimeoutMs ?? 0));
             w.WriteBoolField(8, req?.NeedXray ?? false);
             w.WriteStringField(9, req?.XrayConfig ?? "");
+            if (!string.IsNullOrEmpty(req?.XrayOutboundDnsStrategy))
+                w.WriteStringField(14, req.XrayOutboundDnsStrategy);
             return w.ToArray();
         }
 

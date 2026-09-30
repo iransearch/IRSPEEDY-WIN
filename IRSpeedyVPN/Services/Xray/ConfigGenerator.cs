@@ -91,7 +91,7 @@ namespace IRSpeedyVPN.Services.Xray
         /// <summary>
         /// Generate Xray config for URL test — returns Xray JSON with SOCKS inbounds + vless outbounds
         /// </summary>
-        public static string GetUrlTestXrayConfig(List<XraySocksInfo> socksInfos)
+        public static string GetUrlTestXrayConfig(List<XraySocksInfo> socksInfos, bool useCoreDns = false)
         {
             if (socksInfos == null || socksInfos.Count == 0)
                 return "{}";
@@ -154,7 +154,24 @@ namespace IRSpeedyVPN.Services.Xray
                 protocol = "freedom"
             });
 
-            return Utils.ToJson(cfg);
+            var json = Utils.ToJson(cfg);
+            if (!useCoreDns) return json;
+            var root = JObject.Parse(json);
+            InheritCoreDns(((JArray)root["outbounds"]).OfType<JObject>());
+            return root.ToString(Formatting.None);
+        }
+
+        private static void InheritCoreDns(IEnumerable<JObject> outbounds)
+        {
+            // Explicit socket strategies replace the instance resolver, including
+            // the separate XHTTP download connection. Retain all other options.
+            foreach (var outbound in outbounds)
+            {
+                var stream = outbound["streamSettings"] as JObject;
+                if (stream == null) continue;
+                foreach (var socket in stream.SelectTokens("$..sockopt").OfType<JObject>())
+                    socket.Remove("domainStrategy");
+            }
         }
 
         private static XrayConfig GenerateConfig(VmessItem item, int port, string authUser = null, string authPass = null)
@@ -416,14 +433,8 @@ namespace IRSpeedyVPN.Services.Xray
             // resolver. An explicit sockopt.domainStrategy would override it
             // with Xray's own DNS client (the OS resolver in this Pool config).
             // Include AI members and XHTTP downloadSettings; retain all other
-            // socket/transport options and the single-server/probe policy.
-            foreach (var member in outbounds.OfType<JObject>())
-            {
-                var stream = member["streamSettings"] as JObject;
-                if (stream == null) continue;
-                foreach (var socket in stream.SelectTokens("$..sockopt").OfType<JObject>())
-                    socket.Remove("domainStrategy");
-            }
+            // socket/transport options and the separate single-server policy.
+            InheritCoreDns(outbounds.OfType<JObject>());
 
             // routing rules in the balancer sample reference the "direct" and "block" outbounds
             outbounds.Add(JObject.FromObject(new Outbound

@@ -1059,7 +1059,7 @@ namespace IRSpeedyVPN.Services
                                 if (tagToUrl.Count == 0) return;
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
-                                    ? Xray.ConfigGenerator.GetUrlTestXrayConfig(activeXray) : "";
+                                    ? Xray.ConfigGenerator.GetUrlTestXrayConfig(activeXray, useCoreDns: true) : "";
                                 int diagnosticAttempt = 0;
                                 resp = UrlTestRetryPolicy.Run(new TestReq
                                 {
@@ -1069,7 +1069,8 @@ namespace IRSpeedyVPN.Services
                                     MaxConcurrency = 15,
                                     TestTimeoutMs = 5000,
                                     NeedXray = needXray,
-                                    XrayConfig = xrayConfig
+                                    XrayConfig = xrayConfig,
+                                    XrayOutboundDnsStrategy = needXray ? Xray.SmartIpRouting.OutboundDnsStrategy : ""
                                 }, (request, report) =>
                                 {
                                     string phase = ++diagnosticAttempt == 1 ? "primary" : "alternate";
@@ -1376,7 +1377,7 @@ namespace IRSpeedyVPN.Services
                         return;
 
                     bool needVodXray = vodXhttpInfos.Count > 0;
-                    string vodXrayConfig = needVodXray ? Xray.ConfigGenerator.GetUrlTestXrayConfig(vodXhttpInfos) : "";
+                    string vodXrayConfig = needVodXray ? Xray.ConfigGenerator.GetUrlTestXrayConfig(vodXhttpInfos, useCoreDns: true) : "";
 
                     var vodResp = ExecuteCoreCall(client => client.Test(new TestReq
                     {
@@ -1386,7 +1387,8 @@ namespace IRSpeedyVPN.Services
                         MaxConcurrency = 10,
                         TestTimeoutMs = 3000,
                         NeedXray = needVodXray,
-                        XrayConfig = vodXrayConfig
+                        XrayConfig = vodXrayConfig,
+                        XrayOutboundDnsStrategy = needVodXray ? Xray.SmartIpRouting.OutboundDnsStrategy : ""
                     }));
 
                     if (vodResp?.Results != null)
