@@ -13,10 +13,10 @@ namespace IRSpeedyVPN.Interfaces { interface IVPNService { int ID {get;} string 
 class TunnelPlusService : IVPNService {
  public int ID {get;set;} public string Name=>"xfast"; public string CountryCode {get;set;} public string Country=>CountryCode; public bool IsUrlTestSupported=>true;
  public List<Url> urls=new List<Url>(); public List<Url> GetServerUrls()=>urls;
- public static ConcurrentQueue<string> Calls=new ConcurrentQueue<string>(); public static volatile bool Hold,Fail; public static string HoldCountry;
+ public static ConcurrentQueue<string> Calls=new ConcurrentQueue<string>(); public static ConcurrentQueue<bool> FailedPriorityCalls=new ConcurrentQueue<bool>(); public static volatile bool Hold,Fail; public static string HoldCountry;
  public static Action<TunnelPlusService,Action<long>,Func<bool>> Probe;
- public void UrlTest(){} public void UrlTestFull(object a,bool b,Action<long> progress,Func<bool> cancel,CancellationToken cancellation){
- Calls.Enqueue(CountryCode+ID); Probe?.Invoke(this,progress,cancel);
+ public void UrlTest(){} public void UrlTestFull(object a,bool b,Action<long> progress,Func<bool> cancel,CancellationToken cancellation,bool prioritizeFailed=false){
+ Calls.Enqueue(CountryCode+ID); FailedPriorityCalls.Enqueue(prioritizeFailed); Probe?.Invoke(this,progress,cancel);
  while((Hold || HoldCountry==CountryCode) && !cancel()) Thread.Sleep(1);
  if(!cancel()) foreach(var u in urls){u.latency=Fail?-1:100+ID;u.latencychkTime=DateTime.Now;}
  }
@@ -54,6 +54,15 @@ class Program {
 tests = r'''
  static void Check(bool value,string name){if(!value)throw new Exception(name); Console.WriteLine("PASS "+name);}
  static TunnelPlusService S(string country,int id,string config=null){return new TunnelPlusService{ID=id,CountryCode=country,urls=new List<Url>{new Url{url=config??("vless://secret-"+id+"@host"),extra_field_1="config"}}};}
+ static void RecordResults(ServerCheckCache cache,TunnelPlusService service,params long[] latencies){
+  if(service.urls.Count!=latencies.Length)throw new Exception("result count does not match row");
+  DateTime started=DateTime.Now;
+  for(int i=0;i<latencies.Length;i++){service.urls[i].latency=latencies[i];service.urls[i].latencychkTime=DateTime.Now;}
+  cache.Record(service,started);
+ }
+ static List<int> CompleteQueue(ServerCheckCache cache){
+  var seen=new List<int>();while(cache.NextService!=null){var next=cache.NextService;seen.Add(next.ID);cache.CompleteService(next);}return seen;
+ }
  async Task Settle(){await probeTask;for(int i=0;i<500 && probeRunning;i++)await Task.Delay(2);await Task.Delay(10);Check(!probeRunning,"worker settled");}
  static async Task Until(Func<bool> condition){for(int i=0;i<1000 && !condition();i++)await Task.Delay(2);Check(condition(),"asynchronous condition completed");}
  static void Main(){new UiContext().Run(MainAsync);}
@@ -65,6 +74,7 @@ tests = r'''
  var live=new Program();var liveService=S("DE",21);live._currentServices=new IVPNService[]{liveService};
  live.probeCache=new ServerCheckCache("live","xfast",dir);live.probeCache.Bind(live._currentServices);
  TunnelPlusService.Hold=true;
+ TunnelPlusService.FailedPriorityCalls=new ConcurrentQueue<bool>();
  TunnelPlusService.Probe=(service,progress,cancel)=>{if(!live.countryPicker.Checking)throw new Exception("indicator must start before first result");if(progress==null)throw new Exception("missing live progress callback");progress(750);};
  live.RunBackgroundUrlTests(live._currentServices);
  await Until(()=>live.countryPicker.Progresses==1);
@@ -72,13 +82,16 @@ tests = r'''
  Check(live.probeRunning && live.countryPicker.Updates==0 && live.countryPicker.Displayed==750,"first success reaches UI while remaining server checks are blocked");
  Check(liveService.urls[0].latencychkTime==default(DateTime),"partial progress does not commit incomplete results to cache");
  TunnelPlusService.Hold=false;await live.Settle();
+ Check(TunnelPlusService.FailedPriorityCalls.SequenceEqual(new[]{false}),"initial scan preserves normal server order");
  Check(!live.countryPicker.Checking,"indicator stops when probe completes");
  Check(live.countryPicker.Displayed==121 && live.countryPicker.Updates==1,"final result replaces progress on UI thread before worker completion");
  // Each explicit disconnect starts a fresh full round, including failure/recovery.
  TunnelPlusService.Probe=null;
  for(int cycle=0;cycle<3;cycle++){
  TunnelPlusService.Fail=cycle==1;
+ TunnelPlusService.FailedPriorityCalls=new ConcurrentQueue<bool>();
  live.ResumeServerChecksAfterCleanup(true);await live.Settle();
+ Check(TunnelPlusService.FailedPriorityCalls.SequenceEqual(new[]{true}),"each disconnect round requests failed servers first");
  Check(live.countryPicker.Updates==cycle+2 && live.countryPicker.Displayed==(cycle==1?-1:121),"every disconnect round refreshes UI, including failure and recovery");
  }
  TunnelPlusService.Fail=false;TunnelPlusService.Hold=true;
@@ -135,6 +148,100 @@ tests = r'''
  var completeCache=new ServerCheckCache("bootstrap","xfast",dir);completeCache.Bind(resumed._currentServices);
  Check(completeCache.InitialScanCompleted,"bootstrap completion survives restart");
 
+ // A row is available only when its latest full test had a success. Numbered
+ // rows are independent, and an older success must not hide a newer failure.
+ var mixed=S("DE",11);mixed.urls.Add(new Url{url="vless://secret-mixed@host",extra_field_1="config"});
+ var formerlySuccessful=S("DE",12);var partial=S("BR",35);
+ var priorityInput=new[]{S("US",90),formerlySuccessful,S("AT",61),S("CA",41),mixed,S("BE",30),S("AT",60),partial,S("CA",40)};
+ var priority=new ServerCheckCache("priority","xfast",dir,new Random(73));priority.Bind(priorityInput);
+ Check(!priority.PrioritizeFailedServers,"bootstrap does not request failed server ordering");
+ foreach(var row in priorityInput.Where(s=>s.ID==90 || s.ID==60 || s.ID==61))RecordResults(priority,row,100+row.ID);
+ RecordResults(priority,mixed,-1,211);
+ RecordResults(priority,formerlySuccessful,212);RecordResults(priority,formerlySuccessful,-1);
+ foreach(var row in priorityInput.Where(s=>s.ID==40 || s.ID==41))RecordResults(priority,row,-1);
+ RecordResults(priority,partial,235);
+ // Adding a member makes this a new row configuration without a complete test,
+ // although one member still retains a successful measurement.
+ partial.urls.Add(new Url{url="vless://secret-added@host",extra_field_1="config"});priority.Bind(priorityInput.Reverse());
+ Check(partial.urls[0].latency==235 && partial.urls[1].latency==0,"missing member result does not discard an unchanged member measurement");
+ Check(formerlySuccessful.urls[0].latency==-1 && formerlySuccessful.urls[0].LastSuccessfulLatency==212,"latest failure retains success history separately");
+ CompleteQueue(priority);
+ var expectedPriority=new[]{30,35,40,41,12,60,61,11,90};
+ priority.RestartFromFirstCountry();
+ Check(priority.PrioritizeFailedServers,"disconnect round requests failed server ordering");
+ Check(CompleteQueue(priority).SequenceEqual(expectedPriority),"unknown, incomplete and latest-failed rows precede successful rows in stable country/ID order");
+ var priorityReload=new ServerCheckCache("priority","xfast",dir,new Random(999));priorityReload.Bind(priorityInput.Reverse());
+ Check(priorityReload.NextService==null,"completed priority round stays idle after reload");
+ priorityReload.RestartFromFirstCountry();
+ Check(CompleteQueue(priorityReload).SequenceEqual(expectedPriority),"latest full row outcome and failure priority survive reload");
+
+ // Ordering is chosen once per round. A later result change or API/display
+ // reorder cannot move an already pending row ahead of the saved queue.
+ priorityReload.RestartFromFirstCountry();priorityReload.PersistQueue();
+ var firstPriority=priorityReload.NextService;priorityReload.CompleteService(firstPriority);
+ RecordResults(priorityReload,priorityInput.Single(s=>s.ID==90),-1);
+ priorityReload.Bind(priorityInput.Reverse());
+ Check(priorityReload.NextService.ID==35,"result updates and rebind keep the next pending row stable");
+ var inProgressReload=new ServerCheckCache("priority","xfast",dir,new Random(21));inProgressReload.Bind(priorityInput);
+ Check(CompleteQueue(inProgressReload).SequenceEqual(expectedPriority.Skip(1)),"reload preserves the saved remaining order when outcomes change mid-round");
+ inProgressReload.RestartFromFirstCountry();
+ Check(CompleteQueue(inProgressReload).SequenceEqual(new[]{30,35,40,41,12,90,60,61,11}),"next disconnect incorporates outcomes completed during the prior round");
+
+ // An aborted RPC can mutate live members, but it never becomes the latest
+ // completed result used for the next disconnect's country priority.
+ var canceledPriority=new Program();var failedRow=S("US",102);var successfulRow=S("DE",101);
+ canceledPriority._currentServices=new IVPNService[]{successfulRow,failedRow};
+ canceledPriority.probeCache=new ServerCheckCache("canceled-priority","xfast",dir);canceledPriority.probeCache.Bind(canceledPriority._currentServices);
+ RecordResults(canceledPriority.probeCache,failedRow,-1);RecordResults(canceledPriority.probeCache,successfulRow,201);CompleteQueue(canceledPriority.probeCache);
+ TunnelPlusService.Calls=new ConcurrentQueue<string>();TunnelPlusService.Hold=true;
+ TunnelPlusService.Probe=(service,progress,cancel)=>{service.urls[0].latency=999;service.urls[0].latencychkTime=DateTime.Now;};
+ canceledPriority.ResumeServerChecksAfterCleanup(true);await Until(()=>TunnelPlusService.Calls.Count==1);
+ Check(TunnelPlusService.Calls.Single()=="US102","latest failed row starts ahead of an earlier successful country");
+ canceledPriority.PauseServerChecksForConnection();await canceledPriority.DrainServerChecksAsync();await canceledPriority.Settle();
+ Check(failedRow.urls[0].latency==-1,"canceled partial result restores the previous completed failure");
+ var canceledPriorityReload=new ServerCheckCache("canceled-priority","xfast",dir);var restoredPriority=new[]{S("DE",101),S("US",102)};canceledPriorityReload.Bind(restoredPriority);
+ canceledPriorityReload.RestartFromFirstCountry();
+ Check(CompleteQueue(canceledPriorityReload).SequenceEqual(new[]{102,101}),"canceled partial success cannot change persisted country priority");
+ TunnelPlusService.Hold=false;TunnelPlusService.Probe=null;TunnelPlusService.Calls=new ConcurrentQueue<string>();
+
+ // A core/RPC infrastructure error can return without testing every member.
+ // Even if per-member failures are recorded, priority keeps the last full test.
+ var unfinished=S("US",403);unfinished.urls.Add(new Url{url="vless://secret-stale@host",extra_field_1="config"});
+ var completeFailure=S("DE",402);var completeSuccess=S("AT",401);
+ var incompleteRows=new[]{unfinished,completeFailure,completeSuccess};
+ var incompleteCache=new ServerCheckCache("incomplete-priority","xfast",dir);incompleteCache.Bind(incompleteRows);
+ RecordResults(incompleteCache,unfinished,503,504);RecordResults(incompleteCache,completeFailure,-1);RecordResults(incompleteCache,completeSuccess,501);CompleteQueue(incompleteCache);
+ DateTime laterStart=DateTime.Now.AddSeconds(1);
+ unfinished.urls[0].latency=-1;unfinished.urls[0].latencychkTime=laterStart;
+ Check(unfinished.urls[1].latencychkTime<laterStart,"infrastructure-error fixture leaves one member untested");
+ incompleteCache.Record(unfinished,laterStart);
+ incompleteCache.RestartFromFirstCountry();
+ Check(CompleteQueue(incompleteCache).SequenceEqual(new[]{402,401,403}),"incomplete response preserves the latest full successful row priority");
+ unfinished.urls.Reverse();incompleteCache.Bind(incompleteRows.Reverse());
+ var incompleteReload=new ServerCheckCache("incomplete-priority","xfast",dir);incompleteReload.Bind(incompleteRows);
+ incompleteReload.RestartFromFirstCountry();
+ Check(CompleteQueue(incompleteReload).SequenceEqual(new[]{402,401,403}),"full-row snapshot survives incomplete member results, URL reorder and reload");
+ RecordResults(incompleteReload,unfinished,-1,-1);incompleteReload.RestartFromFirstCountry();
+ Check(CompleteQueue(incompleteReload).SequenceEqual(new[]{402,403,401}),"a subsequent full failed test replaces the previous successful priority");
+
+ // Version 3 has per-member results but no explicit full-row metadata. Empty
+ // CompletedRows is normal after cleanup; derive migration from recorded members
+ // and their current result, never a historical successful latency.
+ string v3Dir=Path.Combine(dir,"v3-priority");Directory.CreateDirectory(v3Dir);
+ var v3Failed=S("US",301);var v3Success=S("DE",302);
+ var v3Seed=new ServerCheckCache("v3-priority","xfast",v3Dir);v3Seed.Bind(new[]{v3Failed,v3Success});
+ RecordResults(v3Seed,v3Failed,401);RecordResults(v3Seed,v3Failed,-1);RecordResults(v3Seed,v3Success,402);
+ CompleteQueue(v3Seed);v3Seed.StopRound();
+ foreach(var file in Directory.GetFiles(v3Dir,"*.json")){
+  var old=Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(file));old["Version"]=3;old.Remove("RowResults");
+  Check(!old["CompletedRows"].Any(),"legacy completed-row list is empty after cleanup");File.WriteAllText(file,old.ToString());
+ }
+ var v3Reload=new ServerCheckCache("v3-priority","xfast",v3Dir);var v3Rows=new[]{S("DE",302),S("US",301)};v3Reload.Bind(v3Rows);
+ Check(v3Reload.InitialScanCompleted && v3Reload.NextService==null,"v3 migration does not revive a completed scan");
+ Check(v3Rows[1].urls[0].latency==-1 && v3Rows[1].urls[0].LastSuccessfulLatency==401,"v3 migration preserves latest failure and historical success");
+ v3Reload.RestartFromFirstCountry();
+ Check(CompleteQueue(v3Reload).SequenceEqual(new[]{301,302}),"v3 migration prioritizes latest failure with empty completed rows");
+
 
  // Bootstrap remains shuffled; each disconnect resets a finite, ordered queue.
  var input=new IVPNService[]{S("US",3),S("DE",2),S("DE",1),S("CA",4),S("AT",5)};
@@ -164,14 +271,16 @@ tests = r'''
  queueReload.Bind(surviving.Concat(new[]{S("FR",7)}));Check(queueReload.NextService==null,"API refresh after completion waits for the next disconnect");
 
  // Drive actual UI scheduling: no timers, immediate next row, full restart after cancel.
- TunnelPlusService.Calls=new ConcurrentQueue<string>();
+ TunnelPlusService.Calls=new ConcurrentQueue<string>();TunnelPlusService.FailedPriorityCalls=new ConcurrentQueue<bool>();
  var p=new Program();p._currentServices=new IVPNService[]{S("US",3),S("DE",2),S("DE",1)};
  p.probeCache=new ServerCheckCache("user","xfast",dir,new Random(11));p.probeCache.Bind(p._currentServices);
  p.RunBackgroundUrlTests(p._currentServices);await p.Settle();
  Check(TunnelPlusService.Calls.Count==3 && TunnelPlusService.Calls.Distinct().Count()==3 && p.probeCache.InitialScanCompleted,"initial scan covers all numbered rows immediately");
- TunnelPlusService.Calls=new ConcurrentQueue<string>();p.countryPicker.Updates=0;
+ Check(TunnelPlusService.FailedPriorityCalls.Count==3 && TunnelPlusService.FailedPriorityCalls.All(flag=>!flag),"all bootstrap rows keep normal server ordering");
+ TunnelPlusService.Calls=new ConcurrentQueue<string>();TunnelPlusService.FailedPriorityCalls=new ConcurrentQueue<bool>();p.countryPicker.Updates=0;
  p.ResumeServerChecksAfterCleanup(true);await p.Settle();
  Check(TunnelPlusService.Calls.SequenceEqual(new[]{"DE1","DE2","US3"}) && p.countryPicker.Updates==3,"disconnect checks every country consecutively without a delay");
+ Check(TunnelPlusService.FailedPriorityCalls.Count==3 && TunnelPlusService.FailedPriorityCalls.All(flag=>flag),"all disconnect rows request failed servers first");
  int count=TunnelPlusService.Calls.Count;
  p.RunBackgroundUrlTests(p._currentServices);p.ResumeServerChecksAfterCleanup();await Task.Delay(20);
  Check(TunnelPlusService.Calls.Count==count,"navigation and ordinary cleanup do not start a new completed round");

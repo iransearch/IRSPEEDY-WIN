@@ -287,7 +287,8 @@ namespace IRSpeedyVPN.UserControls
             var cache = probeCache;
             if (probeRestartRequested)
             {
-                // The old worker has drained before its queue can be reset.
+                // Freeze failed-country priority from completed results after the
+                // old worker drains; later results do not reorder the active queue.
                 cache.RestartFromFirstCountry();
                 probeRestartRequested = false;
             }
@@ -343,7 +344,8 @@ namespace IRSpeedyVPN.UserControls
                                         && globalInfo?.CurrentService == null)
                                         countryPicker.ShowGroupProgress(service, latency);
                                 }));
-                            }) : null, () => token.IsCancellationRequested, token);
+                            }) : null, () => token.IsCancellationRequested, token,
+                                prioritizeFailed: cache.PrioritizeFailedServers);
                         else service.UrlTest();
                     }
                     catch (Exception ex) { LogHelper.WriteLog(ex); }

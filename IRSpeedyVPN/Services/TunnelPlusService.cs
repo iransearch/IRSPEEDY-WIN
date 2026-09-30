@@ -911,7 +911,7 @@ namespace IRSpeedyVPN.Services
         }
         public void UrlTestFull(Url[] urls = null, bool force = false,
             Action<long> progress = null, Func<bool> cancelled = null,
-            CancellationToken cancellation = default(CancellationToken))
+            CancellationToken cancellation = default(CancellationToken), bool prioritizeFailed = false)
         {
             Diagnostic("test-group-enter", "forced=" + force);
             cancelUrlTest = false;
@@ -937,9 +937,13 @@ namespace IRSpeedyVPN.Services
                 var urlTestSniServers = new Dictionary<string, SniRuntime>(StringComparer.OrdinalIgnoreCase);
                 var urlTestOverrides = new Dictionary<string, SingBox.ConfigGenerator.EndpointOverride>(StringComparer.OrdinalIgnoreCase);
                 var defaultChainLink = GetDefaultChainLink();
-                sourceUrls.Randomize()
-                    .Select(u => u.url)
-                    .Where(u => !string.IsNullOrWhiteSpace(u))
+                // Disconnect scans use a stable failed-first partition. Other URL
+                // tests retain their existing randomized candidate order.
+                IEnumerable<Url> orderedUrls = prioritizeFailed
+                    ? (IEnumerable<Url>)sourceUrls.OrderBy(u => u.latency < 0 ? 0 : 1)
+                    : sourceUrls.Randomize();
+                var candidateOrder = orderedUrls.Select(u => u.url).Distinct(StringComparer.Ordinal).ToArray();
+                candidateOrder
                     .ToList()
                     .ForEach(u =>
                     {
@@ -1064,7 +1068,10 @@ namespace IRSpeedyVPN.Services
                                 resp = UrlTestRetryPolicy.Run(new TestReq
                                 {
                                     Config = configData ?? "",
-                                    OutboundTags = tagToUrl.Keys.ToList(),
+                                    // Keep candidate priority explicit rather than
+                                    // relying on Dictionary enumeration order.
+                                    OutboundTags = tagToUrl.OrderBy(pair => Array.IndexOf(candidateOrder, pair.Value))
+                                        .Select(pair => pair.Key).ToList(),
                                     Url = gInfo?.settings?.setting?.url_test ?? "https://www.google.com/generate_204",
                                     MaxConcurrency = 15,
                                     TestTimeoutMs = 5000,

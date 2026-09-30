@@ -30,15 +30,21 @@ namespace IRSpeedyVPN.Services
         }
         internal sealed class State
         {
-            public int Version { get; set; } = 3;
+            public int Version { get; set; } = 4;
             public bool InitialScanCompleted { get; set; }
             public bool RoundInProgress { get; set; } = true;
             public bool SequentialRound { get; set; }
-            // Bootstrap retains its existing shuffled order. Disconnect rounds use
-            // country/ID order and end with an empty queue until explicitly restarted.
+            // Bootstrap retains its shuffled order. Disconnect rounds use stable
+            // country/ID order within unsuccessful and successful row groups.
             public List<string> PendingRows { get; set; }
             public List<string> CompletedRows { get; set; }
             public Dictionary<string, Result> Results { get; set; } = new Dictionary<string, Result>();
+            public Dictionary<string, RowResult> RowResults { get; set; } = new Dictionary<string, RowResult>();
+        }
+        internal sealed class RowResult
+        {
+            public bool HasSuccess { get; set; }
+            public DateTime CheckedUtc { get; set; }
         }
 
         internal ServerCheckCache(string account, string scope, string directory = null, Random random = null)
@@ -106,6 +112,22 @@ namespace IRSpeedyVPN.Services
                     rowKeys[service] = row;
                     rows[row] = service;
                 }
+                if (state.Version == 3)
+                {
+                    // Version 3 committed all member results only after a complete
+                    // test. Preserve that history even when CompletedRows was cleared.
+                    foreach (var row in rowKeys.Where(p => HasRecordedResults(p.Key)))
+                    {
+                        var results = row.Key.GetServerUrls().Where(u => u != null && bound.ContainsKey(u))
+                            .Select(u => state.Results[bound[u]]).ToArray();
+                        state.RowResults[row.Value] = new RowResult {
+                            HasSuccess = results.Any(r => r.Latency > 0),
+                            CheckedUtc = results.Max(r => r.CheckedUtc)
+                        };
+                    }
+                }
+                foreach (string key in state.RowResults.Keys.Where(k => !rows.ContainsKey(k)).ToArray())
+                    state.RowResults.Remove(key);
                 if (state.Version < 3)
                 {
                     // Version 2 pre-created an endless next round. Do not run that
@@ -132,9 +154,9 @@ namespace IRSpeedyVPN.Services
                         .Except(state.CompletedRows).Distinct().ToList();
                     // Preserve an unfinished turn and the order of all surviving rows.
                     var added = rows.Keys.Except(state.PendingRows).Except(state.CompletedRows);
-                    state.PendingRows.AddRange(state.SequentialRound ? OrderRows(added) : Shuffle(added));
+                    state.PendingRows.AddRange(state.SequentialRound ? OrderPriorityRows(added) : Shuffle(added));
                 }
-                state.Version = 3;
+                state.Version = 4;
                 if (state.RoundInProgress && state.PendingRows.Count == 0 && rows.Count > 0)
                 {
                     state.InitialScanCompleted = true;
@@ -168,6 +190,14 @@ namespace IRSpeedyVPN.Services
                 .ThenBy(key => rows[key].ID).ToList();
         }
 
+        private List<string> OrderPriorityRows(IEnumerable<string> keys)
+        {
+            // LINQ OrderBy is stable: retain country/ID order within both groups.
+            // Historical success and in-flight URL values cannot change this queue.
+            return OrderRows(keys).OrderBy(key =>
+                state.RowResults.TryGetValue(key, out var result) && result.HasSuccess ? 1 : 0).ToList();
+        }
+
         internal void RestartFromFirstCountry()
         {
             lock (gate)
@@ -175,7 +205,7 @@ namespace IRSpeedyVPN.Services
                 state.RoundInProgress = true;
                 state.SequentialRound = true;
                 state.CompletedRows = new List<string>();
-                state.PendingRows = OrderRows(rows.Keys);
+                state.PendingRows = OrderPriorityRows(rows.Keys);
             }
         }
 
@@ -194,6 +224,7 @@ namespace IRSpeedyVPN.Services
 
         internal bool InitialScanCompleted { get { lock (gate) return state.InitialScanCompleted; } }
         internal bool ShowInitialProgress { get { lock (gate) return !state.InitialScanCompleted && !state.SequentialRound; } }
+        internal bool PrioritizeFailedServers { get { lock (gate) return state.SequentialRound; } }
 
         internal IVPNService NextService
         {
@@ -213,22 +244,34 @@ namespace IRSpeedyVPN.Services
         {
             lock (gate)
             {
+                // A replaced API object cannot overwrite the replacement row's history.
+                if (!rowKeys.TryGetValue(service, out string row)) return;
+                bool hasSuccess = false;
+                DateTime checkedUtc = DateTime.UtcNow;
                 var groups = (service.GetServerUrls() ?? new List<Url>())
-                    .Where(u => u != null && bound.ContainsKey(u)).GroupBy(u => bound[u]);
+                    .Where(u => u != null && bound.ContainsKey(u)).GroupBy(u => bound[u]).ToArray();
+                bool fullyChecked = groups.Length > 0 && groups.All(group =>
+                    group.Any(u => u.latencychkTime >= startedLocal));
                 foreach (var group in groups)
                 {
                     string key = group.Key;
                     state.Results.TryGetValue(key, out var previous);
                     long latency = group.Where(u => u.latencychkTime >= startedLocal && u.latency > 0)
                         .Select(u => u.latency).DefaultIfEmpty(-1).Min();
+                    hasSuccess |= latency > 0;
                     var result = new Result {
-                        Latency = latency, CheckedUtc = DateTime.UtcNow,
+                        Latency = latency, CheckedUtc = checkedUtc,
                         LastSuccess = latency > 0 ? latency : previous?.LastSuccess ?? 0,
-                        LastSuccessUtc = latency > 0 ? DateTime.UtcNow : previous?.LastSuccessUtc ?? default(DateTime)
+                        LastSuccessUtc = latency > 0 ? checkedUtc : previous?.LastSuccessUtc ?? default(DateTime)
                     };
                     state.Results[key] = result;
                     foreach (var url in group) Apply(url, result);
                 }
+                // The service can return after a Core/RPC error without a full
+                // response. Only a fresh result for every member replaces the
+                // last complete row outcome used for disconnect priority.
+                if (fullyChecked)
+                    state.RowResults[row] = new RowResult { HasSuccess = hasSuccess, CheckedUtc = checkedUtc };
                 Save();
             }
         }
@@ -277,12 +320,15 @@ namespace IRSpeedyVPN.Services
             {
                 if (!File.Exists(path) || new FileInfo(path).Length > 4 * 1024 * 1024) return new State();
                 var value = JsonConvert.DeserializeObject<State>(File.ReadAllText(path), new JsonSerializerSettings { MaxDepth = 8 });
-                if (value == null || (value.Version < 1 || value.Version > 3) || value.Results == null || value.Results.Count > 20000) return new State();
+                if (value == null || (value.Version < 1 || value.Version > 4) || value.Results == null || value.Results.Count > 20000
+                    || value.RowResults == null || value.RowResults.Count > 20000) return new State();
                 if (new[] { value.PendingRows, value.CompletedRows }.Any(list => list != null
                     && (list.Count > 20000 || list.Any(key => key == null || key.Length != 64)))) return new State();
                 if (value.Results.Any(p => p.Key == null || p.Key.Length != 64 || p.Value == null
                     || p.Value.CheckedUtc == default(DateTime) || p.Value.CheckedUtc > DateTime.UtcNow.AddMinutes(5)
                     || p.Value.Latency < -1 || p.Value.LastSuccess < 0)) return new State();
+                if (value.RowResults.Any(p => p.Key == null || p.Key.Length != 64 || p.Value == null
+                    || p.Value.CheckedUtc == default(DateTime) || p.Value.CheckedUtc > DateTime.UtcNow.AddMinutes(5))) return new State();
                 return value;
             }
             catch { return new State(); } // A corrupt cache must not prevent login or tests.
