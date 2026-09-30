@@ -182,6 +182,7 @@ namespace IRSpeedyVPN.UserControls
             txtExpireDate.Text = PersianDigits(txtExpireDate.Text);
             txtRemainedTime.Text = PersianDigits(txtRemainedTime.Text);
             RefreshPublicIp();
+            QueueTrafficDrawerPreload();
 
             
         }
@@ -231,7 +232,11 @@ namespace IRSpeedyVPN.UserControls
             {
                 if (globalInfo != null) uiTimer?.Change(0, 1000);
                 RegisterHeaderIcons();
-                if (IsLoaded) RefreshPublicIp();
+                if (IsLoaded)
+                {
+                    RefreshPublicIp();
+                    QueueTrafficDrawerPreload();
+                }
             }
         }
 

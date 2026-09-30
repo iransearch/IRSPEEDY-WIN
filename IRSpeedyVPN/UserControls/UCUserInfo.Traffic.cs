@@ -4,12 +4,14 @@ using System.Windows.Automation;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 
 namespace IRSpeedyVPN.UserControls
 {
     public partial class UCUserInfo
     {
         private ConnectionTrafficDrawer trafficDrawer;
+        private bool trafficPreloadQueued;
 
         private void TrafficToggleButton_Click(object sender, RoutedEventArgs e) =>
             SetTrafficPanelOpen(TrafficToggleButton.IsChecked == true);
@@ -22,36 +24,64 @@ namespace IRSpeedyVPN.UserControls
             SetTrafficPanelOpen(false);
         }
 
+        private ConnectionTrafficDrawer EnsureTrafficDrawer()
+        {
+            if (trafficDrawer != null && !trafficDrawer.IsDisposed) return trafficDrawer;
+            var owner = Window.GetWindow(this);
+            if (owner == null) return null;
+
+            var drawer = new ConnectionTrafficDrawer(owner, this);
+            trafficDrawer = drawer;
+            drawer.OpenStateChanged += (sender, args) =>
+            {
+                if (!ReferenceEquals(trafficDrawer, drawer)) return;
+                UpdateTrafficToggle(drawer.IsOpeningOrOpen, true);
+                btnDisConnect.IsCancel = false;
+            };
+            drawer.DrawerClosed += (sender, args) =>
+            {
+                if (!ReferenceEquals(trafficDrawer, drawer)) return;
+                UpdateTrafficToggle(false, true);
+                btnDisConnect.IsCancel = true;
+                if (owner.IsActive && IsVisible) TrafficToggleButton.Focus();
+            };
+            drawer.Closed += (sender, args) =>
+            {
+                if (ReferenceEquals(trafficDrawer, drawer)) trafficDrawer = null;
+            };
+            return drawer;
+        }
+
+        private void QueueTrafficDrawerPreload()
+        {
+            if (trafficPreloadQueued || !IsLoaded || !IsVisible) return;
+            trafficPreloadQueued = true;
+            Dispatcher.BeginInvoke(DispatcherPriority.Loaded, new Action(() =>
+            {
+                trafficPreloadQueued = false;
+                if (!IsLoaded || !IsVisible) return;
+                EnsureTrafficDrawer()?.Prepare();
+            }));
+        }
+
         private void SetTrafficPanelOpen(bool open)
         {
             if (!IsLoaded || !IsVisible) { ResetTrafficPanel(); return; }
-            if (open && trafficDrawer == null)
+
+            if (open)
             {
-                var owner = Window.GetWindow(this);
-                if (owner == null) { UpdateTrafficToggle(false, false); return; }
-                var drawer = new ConnectionTrafficDrawer(owner, this);
-                trafficDrawer = drawer;
-                drawer.OpenStateChanged += (sender, args) =>
-                {
-                    if (!ReferenceEquals(trafficDrawer, drawer)) return;
-                    UpdateTrafficToggle(drawer.IsOpeningOrOpen, true);
-                    btnDisConnect.IsCancel = false;
-                };
-                drawer.DrawerClosed += (sender, args) =>
-                {
-                    if (!ReferenceEquals(trafficDrawer, drawer)) return;
-                    UpdateTrafficToggle(false, true);
-                    btnDisConnect.IsCancel = true;
-                    if (owner.IsActive && IsVisible) TrafficToggleButton.Focus();
-                };
-                drawer.Closed += (sender, args) =>
-                {
-                    if (ReferenceEquals(trafficDrawer, drawer)) trafficDrawer = null;
-                };
+                var drawer = EnsureTrafficDrawer();
+                if (drawer == null) { UpdateTrafficToggle(false, false); return; }
+                // Normally this is already complete from QueueTrafficDrawerPreload.
+                // It remains an idempotent safety net for a click during the first frame.
+                drawer.Prepare();
+                btnDisConnect.IsCancel = false;
+                drawer.SetOpen(true);
+                return;
             }
-            // Escape remains reserved until the drawer has finished closing.
+
             btnDisConnect.IsCancel = trafficDrawer == null;
-            trafficDrawer?.SetOpen(open);
+            trafficDrawer?.SetOpen(false);
         }
 
         private void UpdateTrafficToggle(bool open, bool animate)
@@ -64,12 +94,13 @@ namespace IRSpeedyVPN.UserControls
             TrafficArrowRotation.Angle = open ? 180 : 0;
             if (animate)
                 TrafficArrowRotation.BeginAnimation(RotateTransform.AngleProperty,
-                    new DoubleAnimation(from, TrafficArrowRotation.Angle, TimeSpan.FromMilliseconds(320))
+                    new DoubleAnimation(from, TrafficArrowRotation.Angle, TimeSpan.FromMilliseconds(240))
                     { EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }, FillBehavior = FillBehavior.Stop });
         }
 
         private void ResetTrafficPanel()
         {
+            trafficPreloadQueued = false;
             var drawer = trafficDrawer;
             trafficDrawer = null;
             drawer?.CloseImmediately();

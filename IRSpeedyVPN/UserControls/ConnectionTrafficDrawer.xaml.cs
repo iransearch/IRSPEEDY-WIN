@@ -1,4 +1,6 @@
+using IRSpeedyVPN.Common;
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
@@ -16,12 +18,20 @@ namespace IRSpeedyVPN.UserControls
         private readonly FrameworkElement connectionAnchor;
         private Storyboard motion;
         private HwndSource ownerSource, drawerSource;
-        private bool openingOrOpen, placing, placementQueued, disposed;
-        private double cacheScale = 1;
+        private bool placing, placementQueued, disposed, prepared, preparing;
+        private DrawerState state = DrawerState.Closed;
+
+        private enum DrawerState
+        {
+            Closed,
+            Opening,
+            Open,
+            Closing
+        }
 
         internal ConnectionTrafficPanel Panel => TrafficPanel;
         internal bool IsDisposed => disposed;
-        internal bool IsOpeningOrOpen => openingOrOpen;
+        internal bool IsOpeningOrOpen => state == DrawerState.Opening || state == DrawerState.Open;
         internal event EventHandler DrawerClosed;
         internal event EventHandler OpenStateChanged;
 
@@ -42,41 +52,101 @@ namespace IRSpeedyVPN.UserControls
             var ownerHandle = new WindowInteropHelper(owner).Handle;
             ownerSource = HwndSource.FromHwnd(ownerHandle);
             ownerSource?.AddHook(WindowMessage);
+            Log("created");
+        }
+
+        internal void Prepare()
+        {
+            if (disposed || prepared || preparing) return;
+            if (!connectionWindow.IsVisible || !connectionAnchor.IsVisible
+                || connectionWindow.WindowState == WindowState.Minimized) return;
+
+            preparing = true;
+            var clock = Stopwatch.StartNew();
+            Log("preload-start");
+            try
+            {
+                TrafficPanel.SetUpdatesEnabled(false);
+                TrafficPanel.RefreshTraffic();
+                DrawerTranslation.X = DesignWidth;
+                DrawerSurface.IsHitTestVisible = false;
+                DrawerSurface.IsEnabled = false;
+
+                if (!PlaceBesideConnection())
+                {
+                    Log("preload-placement-deferred");
+                    return;
+                }
+
+                // Force the first HWND creation, templates, DataGrid generation and layout
+                // before the user clicks. The zero-opacity show is never user-visible.
+                Opacity = 0;
+                if (!IsVisible) Show();
+                TrafficPanel.ApplyTemplate();
+                UpdateLayout();
+                TrafficPanel.UpdateLayout();
+                Hide();
+                Opacity = 1;
+                prepared = true;
+                Log("preload-ready elapsedMs=" + clock.ElapsedMilliseconds);
+            }
+            catch (Exception ex)
+            {
+                try { if (IsVisible) Hide(); } catch { }
+                Opacity = 1;
+                Log("preload-error exception=" + ex.GetType().Name + " elapsedMs=" + clock.ElapsedMilliseconds);
+            }
+            finally
+            {
+                preparing = false;
+            }
         }
 
         internal void SetOpen(bool open)
         {
-            if (disposed || (openingOrOpen == open && (motion != null || IsVisible == open))) return;
+            Log("click target=" + (open ? "open" : "closed"));
+            if (disposed) return;
             if (open && (!connectionWindow.IsVisible || !connectionAnchor.IsVisible
-                || connectionWindow.WindowState == WindowState.Minimized)) return;
+                || connectionWindow.WindowState == WindowState.Minimized))
+            {
+                Log("open-rejected ownerUnavailable=True");
+                return;
+            }
+            if ((open && (state == DrawerState.Open || state == DrawerState.Opening))
+                || (!open && (state == DrawerState.Closed || state == DrawerState.Closing))) return;
 
+            if (open && !prepared) Prepare();
             TrafficPanel.DismissReset();
             TrafficPanel.SetUpdatesEnabled(false);
+
+            // Read the animated value before removing its clock. A rapid reversal
+            // therefore continues from the exact visible position instead of jumping.
             double from = DrawerTranslation.X;
             StopMotion();
             DrawerTranslation.X = from;
-            SetOpenState(open);
+            SetState(open ? DrawerState.Opening : DrawerState.Closing);
+
             if (open && !IsVisible)
             {
                 DrawerTranslation.X = DesignWidth;
-                if (!PlaceBesideConnection(true)) { HideDrawer(); return; }
-                TrafficPanel.RefreshTraffic();
-                Show();
-                if (!PlaceBesideConnection(false)) { HideDrawer(); return; }
                 from = DesignWidth;
+                if (!PlaceBesideConnection()) { HideDrawer("placement-failed"); return; }
+                Show();
             }
-            if (!IsVisible) { HideDrawer(); return; }
+            if (!IsVisible) { HideDrawer("not-visible"); return; }
 
             double target = open ? 0 : DesignWidth;
             double fraction = Math.Min(1, Math.Abs(target - from) / DesignWidth);
             if (fraction < 0.001) { FinishMotion(open); return; }
+
             DrawerSurface.IsHitTestVisible = false;
             DrawerSurface.IsEnabled = false;
-            DrawerSurface.CacheMode = new BitmapCache { RenderAtScale = cacheScale };
+            // No BitmapCache, blur, shadow construction, refresh or IO is allowed here.
+            // The click path only changes state and starts the render transform.
             var animation = new DoubleAnimationUsingKeyFrames();
             animation.KeyFrames.Add(new LinearDoubleKeyFrame(from, KeyTime.FromTimeSpan(TimeSpan.Zero)));
             animation.KeyFrames.Add(new SplineDoubleKeyFrame(target,
-                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds((open ? 680 : 520) * fraction)),
+                KeyTime.FromTimeSpan(TimeSpan.FromMilliseconds((open ? 420 : 340) * fraction)),
                 new KeySpline(0.22, 1, 0.36, 1)));
             Storyboard.SetTarget(animation, DrawerTranslation);
             Storyboard.SetTargetProperty(animation, new PropertyPath(TranslateTransform.XProperty));
@@ -89,40 +159,58 @@ namespace IRSpeedyVPN.UserControls
                 FinishMotion(open);
             };
             motion = next;
+            Log("animation-start from=" + Math.Round(from, 1) + " target=" + target
+                + " durationMs=" + Math.Round((open ? 420 : 340) * fraction));
             next.Begin(this, HandoffBehavior.SnapshotAndReplace, true);
         }
 
         private void FinishMotion(bool open)
         {
             DrawerTranslation.X = open ? 0 : DesignWidth;
-            DrawerSurface.CacheMode = null;
             DrawerSurface.IsHitTestVisible = open;
             DrawerSurface.IsEnabled = open;
-            if (open) TrafficPanel.SetUpdatesEnabled(true);
-            else HideDrawer();
+            if (open)
+            {
+                SetState(DrawerState.Open);
+                TrafficPanel.SetUpdatesEnabled(true);
+                Log("animation-complete target=open");
+                Dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(() =>
+                {
+                    if (!disposed && state == DrawerState.Open && IsVisible)
+                        Log("render-ready width=" + Math.Round(ActualWidth, 1)
+                            + " height=" + Math.Round(ActualHeight, 1));
+                }));
+            }
+            else
+            {
+                Log("animation-complete target=closed");
+                HideDrawer("animation-complete");
+            }
         }
 
-        private void HideDrawer()
+        private void HideDrawer(string reason)
         {
             StopMotion();
-            SetOpenState(false);
+            SetState(DrawerState.Closed);
             DrawerTranslation.X = DesignWidth;
-            DrawerSurface.CacheMode = null;
             DrawerSurface.IsHitTestVisible = false;
             DrawerSurface.IsEnabled = false;
             TrafficPanel.SetUpdatesEnabled(false);
             TrafficPanel.DismissReset();
             if (IsVisible) Hide();
+            Log("hidden reason=" + reason);
             DrawerClosed?.Invoke(this, EventArgs.Empty);
         }
 
         internal void CloseImmediately()
         {
             if (disposed) return;
+            Log("close-immediate");
             StopMotion();
             TrafficPanel.SetUpdatesEnabled(false);
             TrafficPanel.DismissReset();
-            Close();
+            try { Close(); }
+            catch (InvalidOperationException) { DisposeWithoutWindowClose(); }
         }
 
         private void StopMotion()
@@ -132,10 +220,12 @@ namespace IRSpeedyVPN.UserControls
             previous?.Remove(this);
         }
 
-        private void SetOpenState(bool value)
+        private void SetState(DrawerState value)
         {
-            if (openingOrOpen == value) return;
-            openingOrOpen = value;
+            if (state == value) return;
+            var previous = state;
+            state = value;
+            Log("state from=" + previous + " to=" + value);
             OpenStateChanged?.Invoke(this, EventArgs.Empty);
         }
 
@@ -162,12 +252,10 @@ namespace IRSpeedyVPN.UserControls
         private void Reposition()
         {
             if (disposed || placing || !IsVisible) return;
-            // On a drag towards the monitor edge, keep the drawer adjacent and
-            // readable. Never clamp it on top of the connection page.
-            if (!PlaceBesideConnection(false)) HideDrawer();
+            if (!PlaceBesideConnection()) HideDrawer("reposition-failed");
         }
 
-        private bool PlaceBesideConnection(bool allowOwnerNudge)
+        private bool PlaceBesideConnection()
         {
             if (placing || disposed) return false;
             placing = true;
@@ -176,7 +264,7 @@ namespace IRSpeedyVPN.UserControls
                 var ownerHandle = new WindowInteropHelper(connectionWindow).Handle;
                 if (ownerHandle == IntPtr.Zero || !GetWindowRect(ownerHandle, out var ownerRect)
                     || connectionAnchor.ActualWidth <= 0 || connectionAnchor.ActualHeight <= 0) return false;
-                var monitor = MonitorFromWindow(ownerHandle, 2); // nearest monitor, including negative origins
+                var monitor = MonitorFromWindow(ownerHandle, 2);
                 var info = new MonitorInfo { Size = Marshal.SizeOf(typeof(MonitorInfo)) };
                 if (!GetMonitorInfo(monitor, ref info)) return false;
                 var work = info.Work;
@@ -188,34 +276,16 @@ namespace IRSpeedyVPN.UserControls
                 double designHeight = Math.Max(220, connectionAnchor.ActualHeight - 96);
                 if (scale <= 0 || double.IsInfinity(scale) || double.IsNaN(scale)) return false;
                 double fittedScale = Math.Min(scale, (work.Bottom - work.Top) / designHeight);
-                int ownerWidth = ownerRect.Right - ownerRect.Left;
-                if (allowOwnerNudge)
-                {
-                    // Normal centered windows never move. Only a monitor edge
-                    // requires enough room for the drawer to remain wholly left.
-                    fittedScale = Math.Min(fittedScale,
-                        Math.Max(0, work.Right - work.Left - ownerWidth) / DesignWidth);
-                    if (fittedScale < scale * 0.55) return false;
-                    int requiredWidth = (int)Math.Ceiling(DesignWidth * fittedScale);
-                    int requiredLeft = work.Left + requiredWidth;
-                    if (ownerRect.Left < requiredLeft)
-                    {
-                        if (!SetWindowPos(ownerHandle, IntPtr.Zero, requiredLeft, ownerRect.Top,
-                            0, 0, NoSize | NoZOrder | NoActivate)) return false;
-                        if (!GetWindowRect(ownerHandle, out ownerRect)) return false;
-                        anchorTop = connectionAnchor.PointToScreen(new Point(0, 0));
-                    }
-                }
+
+                // Never move or resize the connection window. If the owner is too close
+                // to the monitor edge, scale the drawer only; the connected layout stays fixed.
                 fittedScale = Math.Min(fittedScale, Math.Max(0, ownerRect.Left - work.Left) / DesignWidth);
-                // Closing is preferable to an unreadably narrow pane or an
-                // overlap when the user drags the main window against the edge.
                 if (fittedScale < scale * 0.55) return false;
                 int width = (int)Math.Floor(DesignWidth * fittedScale);
                 int height = (int)Math.Floor(designHeight * fittedScale);
                 int top = (int)Math.Round(anchorTop.Y + 12 * scale);
                 top = Math.Max(work.Top, Math.Min(top, work.Bottom - height));
                 DrawerSurface.Height = designHeight;
-                cacheScale = Math.Max(1, fittedScale);
                 var handle = new WindowInteropHelper(this).EnsureHandle();
                 return SetWindowPos(handle, IntPtr.Zero, ownerRect.Left - width, top,
                     width, height, NoZOrder | NoActivate);
@@ -231,7 +301,6 @@ namespace IRSpeedyVPN.UserControls
 
         private IntPtr WindowMessage(IntPtr hwnd, int message, IntPtr wParam, IntPtr lParam, ref bool handled)
         {
-            // Recompute after WPF has applied DPI/display/work-area changes.
             if ((message == 0x02E0 || message == 0x007E || message == 0x001A)
                 && !disposed && !placementQueued)
             {
@@ -248,8 +317,14 @@ namespace IRSpeedyVPN.UserControls
         private void Drawer_Closed(object sender, EventArgs e)
         {
             if (disposed) return;
+            DisposeWithoutWindowClose();
+        }
+
+        private void DisposeWithoutWindowClose()
+        {
+            if (disposed) return;
             disposed = true;
-            SetOpenState(false);
+            SetState(DrawerState.Closed);
             StopMotion();
             TrafficPanel.SetUpdatesEnabled(false);
             connectionWindow.LocationChanged -= OwnerGeometryChanged;
@@ -261,10 +336,17 @@ namespace IRSpeedyVPN.UserControls
             ownerSource?.RemoveHook(WindowMessage);
             drawerSource?.RemoveHook(WindowMessage);
             ownerSource = drawerSource = null;
+            Log("disposed");
             DrawerClosed?.Invoke(this, EventArgs.Empty);
         }
 
-        private const uint NoSize = 0x0001, NoZOrder = 0x0004, NoActivate = 0x0010;
+        private void Log(string fields)
+        {
+            ConnectionDiagnostics.Write("stat-panel", "event=" + fields + " state=" + state
+                + " visible=" + IsVisible + " prepared=" + prepared);
+        }
+
+        private const uint NoZOrder = 0x0004, NoActivate = 0x0010;
         [StructLayout(LayoutKind.Sequential)]
         private struct NativeRect { public int Left, Top, Right, Bottom; }
         [StructLayout(LayoutKind.Sequential)]
