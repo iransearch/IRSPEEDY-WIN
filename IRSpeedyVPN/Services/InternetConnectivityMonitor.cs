@@ -1,6 +1,4 @@
 using System;
-using System.Net;
-using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,42 +18,23 @@ namespace IRSpeedyVPN.Services
     }
 
     /// <summary>
-    /// Lightweight connectivity watcher used only for the user-facing toast.
-    /// It never blocks the dispatcher and never changes VPN/Core state.
+    /// User-facing connectivity watcher.
+    /// Every ten minutes it sends four ICMP pings to irancell.ir.
+    /// Any successful reply marks the cycle online. Four failures trigger an
+    /// offline notification on every failed cycle, even if the previous cycle
+    /// was already offline. The watcher never changes VPN/Core state.
     /// </summary>
     internal sealed class InternetConnectivityMonitor : IDisposable
     {
-        private static readonly Uri PrimaryProbe =
-            new Uri("https://connectivitycheck.gstatic.com/generate_204");
-        private static readonly Uri CloudflareProbe =
-            new Uri("https://cp.cloudflare.com/generate_204");
-        private static readonly Uri MicrosoftProbe =
-            new Uri("https://www.msftconnecttest.com/connecttest.txt");
+        private const string PingHost = "irancell.ir";
+        private const int AttemptsPerCycle = 4;
+        private const int PingTimeoutMs = 2500;
 
-        private readonly HttpClient client;
         private readonly SemaphoreSlim checkGate = new SemaphoreSlim(1, 1);
         private readonly CancellationTokenSource lifetime = new CancellationTokenSource();
         private Timer timer;
         private int started;
         private bool? lastOnline;
-
-        internal InternetConnectivityMonitor()
-        {
-            var handler = new HttpClientHandler
-            {
-                AllowAutoRedirect = true,
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-            };
-
-            client = new HttpClient(handler)
-            {
-                Timeout = Timeout.InfiniteTimeSpan
-            };
-            client.DefaultRequestHeaders.TryAddWithoutValidation(
-                "User-Agent", "IRSPEEDY-NetworkMonitor/1.0");
-            client.DefaultRequestHeaders.TryAddWithoutValidation(
-                "Cache-Control", "no-cache");
-        }
 
         internal event EventHandler<InternetAvailabilityChangedEventArgs> AvailabilityChanged;
 
@@ -66,7 +45,13 @@ namespace IRSpeedyVPN.Services
 
             NetworkChange.NetworkAvailabilityChanged += NetworkChange_NetworkAvailabilityChanged;
             NetworkChange.NetworkAddressChanged += NetworkChange_NetworkAddressChanged;
-            timer = new Timer(_ => QueueCheck(), null, TimeSpan.Zero, TimeSpan.FromSeconds(15));
+
+            // Run once at startup, then exactly once every ten minutes.
+            timer = new Timer(
+                _ => QueueCheck(),
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromMinutes(10));
         }
 
         private void NetworkChange_NetworkAvailabilityChanged(
@@ -74,10 +59,12 @@ namespace IRSpeedyVPN.Services
         {
             if (!e.IsAvailable)
             {
-                Publish(false, "windows-network-unavailable");
+                PublishOffline("windows-network-unavailable");
                 return;
             }
 
+            // A network adapter just came back. Verify irancell.ir instead of
+            // assuming that local network availability means internet access.
             QueueCheck();
         }
 
@@ -103,26 +90,29 @@ namespace IRSpeedyVPN.Services
             {
                 if (!NetworkInterface.GetIsNetworkAvailable())
                 {
-                    Publish(false, "no-active-network-interface");
+                    PublishOffline("no-active-network-interface");
                     return;
                 }
 
-                if (await ProbeAsync(PrimaryProbe, lifetime.Token).ConfigureAwait(false))
+                for (var attempt = 1; attempt <= AttemptsPerCycle; attempt++)
                 {
-                    Publish(true, "primary-probe");
-                    return;
+                    if (lifetime.IsCancellationRequested)
+                        return;
+
+                    var success = await PingOnceAsync(attempt).ConfigureAwait(false);
+                    if (success)
+                    {
+                        PublishOnline("irancell-ping-success-" + attempt);
+                        return;
+                    }
+
+                    if (attempt < AttemptsPerCycle)
+                        await Task.Delay(350, lifetime.Token).ConfigureAwait(false);
                 }
 
-                // Do not report one transient HTTP failure as an outage. Let route/DNS
-                // changes settle, then confirm against two independent endpoints.
-                await Task.Delay(1200, lifetime.Token).ConfigureAwait(false);
-
-                var cloudflare = ProbeAsync(CloudflareProbe, lifetime.Token);
-                var microsoft = ProbeAsync(MicrosoftProbe, lifetime.Token);
-                var results = await Task.WhenAll(cloudflare, microsoft).ConfigureAwait(false);
-                var online = results[0] || results[1];
-
-                Publish(online, online ? "fallback-probe" : "confirmed-probe-failure");
+                // Important: unlike normal state-change publishing, a failed
+                // four-ping cycle is intentionally raised every ten minutes.
+                PublishOffline("irancell-ping-4-of-4-failed");
             }
             catch (OperationCanceledException)
             {
@@ -130,7 +120,7 @@ namespace IRSpeedyVPN.Services
             catch (Exception ex)
             {
                 Common.LogHelper.WriteExLog(
-                    "[NetworkMonitor] check exception=" + ex.GetType().Name);
+                    "[NetworkMonitor] cycle exception=" + ex.GetType().Name);
             }
             finally
             {
@@ -138,57 +128,69 @@ namespace IRSpeedyVPN.Services
             }
         }
 
-        private async Task<bool> ProbeAsync(Uri uri, CancellationToken cancellationToken)
+        private static async Task<bool> PingOnceAsync(int attempt)
         {
-            using (var timeout =
-                CancellationTokenSource.CreateLinkedTokenSource(cancellationToken))
+            try
             {
-                timeout.CancelAfter(TimeSpan.FromMilliseconds(2500));
+                using (var ping = new Ping())
+                {
+                    var reply = await ping.SendPingAsync(PingHost, PingTimeoutMs)
+                        .ConfigureAwait(false);
+                    var success = reply != null && reply.Status == IPStatus.Success;
 
-                try
-                {
-                    using (var request = new HttpRequestMessage(HttpMethod.Get, uri))
-                    using (var response = await client.SendAsync(
-                        request,
-                        HttpCompletionOption.ResponseHeadersRead,
-                        timeout.Token).ConfigureAwait(false))
-                    {
-                        var code = (int)response.StatusCode;
-                        return code >= 200 && code < 400;
-                    }
+                    Common.LogHelper.WriteExLog(
+                        "[NetworkMonitor] host=" + PingHost +
+                        " attempt=" + attempt + "/" + AttemptsPerCycle +
+                        " status=" + (reply == null ? "null" : reply.Status.ToString()) +
+                        (success ? " rttMs=" + reply.RoundtripTime : string.Empty));
+
+                    return success;
                 }
-                catch (OperationCanceledException)
-                {
-                    return false;
-                }
-                catch (HttpRequestException)
-                {
-                    return false;
-                }
-                catch
-                {
-                    return false;
-                }
+            }
+            catch (Exception ex)
+            {
+                Common.LogHelper.WriteExLog(
+                    "[NetworkMonitor] host=" + PingHost +
+                    " attempt=" + attempt + "/" + AttemptsPerCycle +
+                    " error=" + ex.GetType().Name);
+                return false;
             }
         }
 
-        private void Publish(bool isOnline, string reason)
+        private void PublishOnline(string reason)
         {
             bool changed;
             lock (this)
             {
-                changed = !lastOnline.HasValue || lastOnline.Value != isOnline;
-                lastOnline = isOnline;
+                changed = !lastOnline.HasValue || !lastOnline.Value;
+                lastOnline = true;
             }
 
-            if (!changed)
-                return;
+            Common.LogHelper.WriteExLog(
+                "[NetworkMonitor] online=true reason=" + reason);
+
+            // Online is state-based: it only needs to close an existing toast once.
+            if (changed)
+            {
+                AvailabilityChanged?.Invoke(
+                    this, new InternetAvailabilityChangedEventArgs(true, reason));
+            }
+        }
+
+        private void PublishOffline(string reason)
+        {
+            lock (this)
+            {
+                lastOnline = false;
+            }
 
             Common.LogHelper.WriteExLog(
-                "[NetworkMonitor] online=" + isOnline + " reason=" + reason);
+                "[NetworkMonitor] online=false reason=" + reason);
 
+            // Offline is cycle-based by request: every confirmed failed cycle
+            // produces a notification, including consecutive failed cycles.
             AvailabilityChanged?.Invoke(
-                this, new InternetAvailabilityChangedEventArgs(isOnline, reason));
+                this, new InternetAvailabilityChangedEventArgs(false, reason));
         }
 
         public void Dispose()
@@ -203,10 +205,6 @@ namespace IRSpeedyVPN.Services
             lifetime.Cancel();
             timer?.Dispose();
             timer = null;
-            // A queued check may still be unwinding after cancellation. Keep the small
-            // synchronization primitives alive until process teardown so its finally
-            // block can release safely without racing ObjectDisposedException.
-            client.Dispose();
         }
     }
 }
