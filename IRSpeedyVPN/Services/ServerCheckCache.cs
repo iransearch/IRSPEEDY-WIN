@@ -198,6 +198,22 @@ namespace IRSpeedyVPN.Services
                 state.RowResults.TryGetValue(key, out var result) && result.HasSuccess ? 1 : 0).ToList();
         }
 
+        internal void RestartForLogin()
+        {
+            lock (gate)
+            {
+                // A real login/app start always gets one fresh bootstrap round.
+                // Keep historical URL/row results for display and later disconnect
+                // priority; only rebuild the work queue in bootstrap (shuffled) order.
+                state.InitialScanCompleted = false;
+                state.RoundInProgress = true;
+                state.SequentialRound = false;
+                state.CompletedRows = new List<string>();
+                state.PendingRows = Shuffle(rows.Keys);
+                Save();
+            }
+        }
+
         internal void RestartFromFirstCountry()
         {
             lock (gate)
