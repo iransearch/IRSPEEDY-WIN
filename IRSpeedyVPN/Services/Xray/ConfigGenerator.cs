@@ -283,6 +283,12 @@ namespace IRSpeedyVPN.Services.Xray
                     new Rule
                     {
                         type = "field",
+                        ip = new List<string> { IRSpeedyVPN.Services.InternetConnectivityMonitor.PingCidr },
+                        outboundTag = "direct"
+                    },
+                    new Rule
+                    {
+                        type = "field",
                         inboundTag = new List<string> { "proxy-inbound" },
                         outboundTag = "proxy"
                     },
@@ -428,6 +434,19 @@ namespace IRSpeedyVPN.Services.Xray
             poolMemberCount = idx;
             aiRoutingEnabled = ApplySmartIpRouting(root, outbounds, aiLinks, serializer,
                 serviceRoutingEnabled ?? SmartIpRouting.IsEnabled());
+
+            // Keep the connectivity probe outside the Smart/AI balancers. The first
+            // template rule is UDP/443 reject, so index 1 keeps that safety rule first
+            // while still placing DIRECT ahead of AI, geo and main catch-all routes.
+            var routingRules = root["routing"]?["rules"] as JArray;
+            if (routingRules == null)
+                throw new InvalidOperationException("Smart routing template has no rules.");
+            routingRules.Insert(Math.Min(1, routingRules.Count), new JObject
+            {
+                ["type"] = "field",
+                ["ip"] = new JArray(IRSpeedyVPN.Services.InternetConnectivityMonitor.PingCidr),
+                ["outboundTag"] = "direct"
+            });
 
             // The matching Start RPC wires Throne's in-process dns-direct
             // resolver. An explicit sockopt.domainStrategy would override it
