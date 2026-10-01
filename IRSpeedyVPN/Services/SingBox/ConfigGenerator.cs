@@ -617,6 +617,24 @@ namespace IRSpeedyVPN.Services.SingBox
                     rule.outbound = "chain-default-1";
                 }
             }
+
+            // The connectivity probe must measure the physical internet, never the
+            // VPN/chain. Insert this after chain rewriting so it remains truly DIRECT.
+            // It is first so ICMP/TCP/UDP to the probe IP cannot be captured by a
+            // broader rule added by the selected mode.
+            if (vpnmode && cfg.route?.rules != null)
+            {
+                cfg.route.rules.Insert(0, new Rule
+                {
+                    ip_cidr = new List<string>
+                    {
+                        IRSpeedyVPN.Services.InternetConnectivityMonitor.PingCidr
+                    },
+                    action = "route",
+                    outbound = "direct"
+                });
+            }
+
             ApplySpeedyShield(cfg, shieldFiles);
 
 
