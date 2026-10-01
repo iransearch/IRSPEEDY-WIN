@@ -941,10 +941,22 @@
       </DrawingGroup>
     </DrawingImage.Drawing>
   </DrawingImage>
+  <Style x:Key="HandoffButtonFocusVisual" TargetType="Control">
+    <Setter Property="Template">
+      <Setter.Value>
+        <ControlTemplate TargetType="Control">
+          <Border Margin="2" CornerRadius="14" BorderThickness="1"
+                  BorderBrush="{DynamicResource FieldFocusBorderBrush}"
+                  Background="Transparent" IsHitTestVisible="False"/>
+        </ControlTemplate>
+      </Setter.Value>
+    </Setter>
+  </Style>
   <Style x:Key="HandoffPlainButton" TargetType="Button">
     <Setter Property="Cursor" Value="Hand"/>
     <Setter Property="Background" Value="Transparent"/>
     <Setter Property="BorderThickness" Value="0"/>
+    <Setter Property="FocusVisualStyle" Value="{StaticResource HandoffButtonFocusVisual}"/>
     <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
     <Setter Property="Template">
       <Setter.Value>
@@ -955,9 +967,6 @@
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
               <Setter Property="Opacity" Value="0.8"/>
-            </Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter Property="Background" Value="{DynamicResource Theme.SettingsSoftBrush}"/>
             </Trigger>
             <Trigger Property="IsEnabled" Value="False">
               <Setter Property="Opacity" Value="0.5"/>
