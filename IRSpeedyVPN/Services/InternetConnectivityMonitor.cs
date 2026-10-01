@@ -203,9 +203,10 @@ namespace IRSpeedyVPN.Services
             lifetime.Cancel();
             timer?.Dispose();
             timer = null;
+            // A queued check may still be unwinding after cancellation. Keep the small
+            // synchronization primitives alive until process teardown so its finally
+            // block can release safely without racing ObjectDisposedException.
             client.Dispose();
-            checkGate.Dispose();
-            lifetime.Dispose();
         }
     }
 }
