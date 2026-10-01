@@ -275,15 +275,21 @@ namespace IRSpeedyVPN.Services.SingBox
     }
 }";
 
-        // Server probes use the same physical-network resolver as live Pools.
+        // Server tests are intentionally isolated from live Pool/AI DNS policy.
+        // Keep their resolver local to the test config so connection DNS changes
+        // cannot alter latency/failure results.
         public static string sg_UrlTest = @"{
     ""dns"": {
         ""rules"": [],
         ""servers"": [
             {
+                ""domain_resolver"": ""dns-local"",
                 ""tag"": ""dns-direct"",
-                ""type"": ""udp"",
-                ""server"": ""1.1.1.1""
+                ""type"": ""local""
+            },
+            {
+                ""tag"": ""dns-local"",
+                ""type"": ""local""
             }
         ]
     },
@@ -301,7 +307,7 @@ namespace IRSpeedyVPN.Services.SingBox
         ""auto_detect_interface"": true,
         ""default_domain_resolver"": {
             ""server"": ""dns-direct"",
-            ""strategy"": ""prefer_ipv4""
+            ""strategy"": """"
         }
     }
 }";

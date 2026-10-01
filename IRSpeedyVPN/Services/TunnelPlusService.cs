@@ -1066,7 +1066,7 @@ namespace IRSpeedyVPN.Services
                                 if (tagToUrl.Count == 0) return;
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
-                                    ? Xray.ConfigGenerator.GetUrlTestXrayConfig(activeXray, useCoreDns: true) : "";
+                                    ? Xray.ConfigGenerator.GetUrlTestXrayConfig(activeXray) : "";
                                 int diagnosticAttempt = 0;
                                 resp = UrlTestRetryPolicy.Run(new TestReq
                                 {
@@ -1079,8 +1079,7 @@ namespace IRSpeedyVPN.Services
                                     MaxConcurrency = 15,
                                     TestTimeoutMs = 5000,
                                     NeedXray = needXray,
-                                    XrayConfig = xrayConfig,
-                                    XrayOutboundDnsStrategy = needXray ? Xray.SmartIpRouting.OutboundDnsStrategy : ""
+                                    XrayConfig = xrayConfig
                                 }, (request, report) =>
                                 {
                                     string phase = ++diagnosticAttempt == 1 ? "primary" : "alternate";
