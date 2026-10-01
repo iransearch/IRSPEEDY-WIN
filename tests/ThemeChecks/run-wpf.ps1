@@ -97,5 +97,73 @@ Check ($login.FindName('txtUsername').Foreground.Color -eq $lightText) 'light fo
 Check ($connected.FindName('ConnectedServerCard').Background.GradientStops[0].Color -eq $lightCard) 'light gradient is restored'
 Check ($toggle.IsChecked -eq $false -and $sun.Visibility -eq 'Visible') 'header toggle and sun icon return to light mode'
 Check ($login.FindName('txtPassword').Password -eq 'retained-input') 'theme changes preserve entered credentials'
+
+# Load and render the device-limit dialog itself, including its row templates.
+# This does not instantiate MainWindow or submit any service request.
+Add-Type @'
+public static class DeviceRemovalRecorder {
+    public static int Requests;
+    public static object Device;
+    public static void Removed(object sender, object device) { Requests++; Device = device; }
+}
+'@
+$app.ShutdownMode = [System.Windows.ShutdownMode]::OnExplicitShutdown
+$deviceType = $assembly.GetType('IRSpeedyVPN.Models.NewService.DeviceInfo', $true)
+$devices = [Array]::CreateInstance($deviceType, 2)
+for ($i=0; $i -lt 2; $i++) {
+    $device = [Activator]::CreateInstance($deviceType)
+    $device.device_name = @('Windows-PC', 'Samsung A54')[$i]
+    $device.device_token = 'test-token-' + $i
+    $devices.SetValue($device, $i)
+}
+function Render-DeviceDialog($window) {
+    $window.UpdateLayout()
+    $content = $window.Content
+    $bitmap = [System.Windows.Media.Imaging.RenderTargetBitmap]::new(
+        [int][Math]::Ceiling($content.ActualWidth), [int][Math]::Ceiling($content.ActualHeight),
+        96, 96, [System.Windows.Media.PixelFormats]::Pbgra32)
+    $bitmap.Render($content)
+    Check ($bitmap.PixelWidth -gt 300 -and $bitmap.PixelHeight -gt 200) 'device dialog renders a complete layout'
+    $card = $window.FindName('DeviceCard')
+    $expected = $app.FindResource('WindowBackgroundBrush')
+    Check ($card.Background.GradientStops[0].Color -eq $expected.GradientStops[0].Color) 'device dialog inherits the current window palette'
+    Check ($window.FindName('WarningNotice').Background.Color -eq $app.FindResource('Theme.WarningSurfaceBrush').Color) 'device warning inherits the current palette'
+    Check ($window.FontFamily.Source.Contains('B Yekan+')) 'device dialog uses the bundled approved Persian font'
+}
+function Click-DeviceButton($window, [string]$method, $button) {
+    $window.GetType().GetMethod($method, [Reflection.BindingFlags]'Instance,NonPublic').Invoke(
+        $window, @($button, [System.Windows.RoutedEventArgs]::new())) | Out-Null
+}
+$dialog = New-View 'IRSpeedyVPN.Windows.DeviceLimitWindow'
+$dialog.SetDevices($devices, $null)
+$dialog.ShowActivated = $false
+$event = $dialog.GetType().GetEvent('OnRemoveRequested')
+$handler = [System.Delegate]::CreateDelegate($event.EventHandlerType, [DeviceRemovalRecorder].GetMethod('Removed'))
+$event.AddEventHandler($dialog, $handler)
+$dialog.Show()
+Render-DeviceDialog $dialog
+Check ($dialog.FindName('txtDeviceCount').Text -eq '۲ دستگاه') 'real dialog counts the server devices'
+$delete = [System.Windows.Controls.Button]::new()
+$delete.DataContext = $devices.GetValue(1)
+Click-DeviceButton $dialog 'RemoveDevice_Click' $delete
+Set-Mode $true
+Render-DeviceDialog $dialog
+Check ($dialog.FindName('ConfirmationBox').Visibility -eq 'Visible' -and [DeviceRemovalRecorder]::Requests -eq 0) 'theme switch retains selection without submitting removal'
+$freshDark = New-View 'IRSpeedyVPN.Windows.DeviceLimitWindow'
+$freshDark.SetDevices($devices, $null)
+$freshDark.ShowActivated = $false
+$freshDark.Show()
+Render-DeviceDialog $freshDark
+$freshDark.Close()
+Click-DeviceButton $dialog 'ConfirmRemoval_Click' $dialog.FindName('btnConfirm')
+Click-DeviceButton $dialog 'ConfirmRemoval_Click' $dialog.FindName('btnConfirm')
+Click-DeviceButton $dialog 'Close_Click' $dialog.FindName('btnClose')
+Check ([DeviceRemovalRecorder]::Requests -eq 1 -and $dialog.IsVisible -and !$dialog.FindName('btnClose').IsEnabled) 'real dialog remains open and blocks duplicate pending removal'
+$dialog.ShowError('خطا در حذف دستگاه؛ دوباره تلاش کنید.')
+Render-DeviceDialog $dialog
+Check ($dialog.FindName('txtError').Visibility -eq 'Visible' -and $dialog.FindName('btnConfirm').IsEnabled) 'real dialog keeps the failed removal visible and permits retry'
+Set-Mode $false
+Render-DeviceDialog $dialog
+$dialog.Close()
 $split.Close()
 $password.Close()

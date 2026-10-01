@@ -1047,62 +1047,59 @@ namespace IRSpeedyVPN
                     deviceLimitWindow.Closed += DeviceLimitWindow_Closed;
                 }
                 deviceLimitWindow.SetDevices(devices, message);
+                uCLogin.IsEnabled = false;
                 deviceLimitWindow.Show();
                 deviceLimitWindow.Activate();
             }));
         }
 
-        private void DeviceLimitWindow_OnRemoveRequested(DeviceLimitWindow sender, DeviceInfo device)
+        private async void DeviceLimitWindow_OnRemoveRequested(DeviceLimitWindow sender, DeviceInfo device)
         {
-            if (device == null)
+            if (device == null || !ReferenceEquals(sender, deviceLimitWindow) || !sender.IsRemovalInProgress)
                 return;
 
+            // Bind this request to the originating login and window, not mutable fields
+            // that a later login or owner shutdown could replace while the network waits.
+            var username = lastLoginUsername;
+            var password = lastLoginPassword;
+            var remember = IsRememberChecked;
+            var controller = serviceController;
             ShowMessage("");
-            RunAsync(() =>
+            try
             {
-                try
+                var res = await Task.Run(() => controller.RemoveToken(
+                    username, password, device.device_name, device.device_token));
+                if (!ReferenceEquals(sender, deviceLimitWindow) || !sender.IsVisible) return;
+                if (res != null && res.StatusCode == System.Net.HttpStatusCode.OK)
                 {
-                    var res = serviceController.RemoveToken(
-                        lastLoginUsername,
-                        lastLoginPassword,
-                        device.device_name,
-                        device.device_token);
-
-                    if (res != null && res.StatusCode == System.Net.HttpStatusCode.OK)
-                    {
-                        Dispatcher.Invoke((Action)(() =>
-                        {
-                            if (deviceLimitWindow != null)
-                                deviceLimitWindow.Close();
-                        }));
-                        Login(lastLoginUsername, lastLoginPassword, IsRememberChecked);
-                    }
-                    else
-                    {
-                        Dispatcher.Invoke((Action)(() =>
-                        {
-                            deviceLimitWindow?.ShowError(res?.ResponseData?.message ?? "خطا در حذف دستگاه");
-                        }));
-                    }
+                    sender.CompleteRemoval();
+                    RunAsync(() => Login(username, password, remember));
                 }
-                catch (Exception ex)
+                else
                 {
-                    Dispatcher.Invoke((Action)(() =>
-                    {
-                        deviceLimitWindow?.ShowError("خطا در حذف دستگاه");
-                    }));
-                    LogHelper.WriteLog(ex);
+                    var message = res?.ResponseData?.message;
+                    sender.ShowError(string.IsNullOrWhiteSpace(message) ? "خطا در حذف دستگاه؛ دوباره تلاش کنید." : message);
                 }
-            });
+            }
+            catch (Exception ex)
+            {
+                if (ReferenceEquals(sender, deviceLimitWindow) && sender.IsVisible)
+                    sender.ShowError("خطا در حذف دستگاه؛ دوباره تلاش کنید.");
+                LogHelper.WriteLog(ex);
+            }
         }
 
         private void DeviceLimitWindow_Closed(object sender, EventArgs e)
         {
-            if (deviceLimitWindow != null)
+            if (sender is DeviceLimitWindow closedWindow)
             {
-                deviceLimitWindow.OnRemoveRequested -= DeviceLimitWindow_OnRemoveRequested;
-                deviceLimitWindow.Closed -= DeviceLimitWindow_Closed;
-                deviceLimitWindow = null;
+                closedWindow.OnRemoveRequested -= DeviceLimitWindow_OnRemoveRequested;
+                closedWindow.Closed -= DeviceLimitWindow_Closed;
+                if (ReferenceEquals(deviceLimitWindow, closedWindow))
+                {
+                    deviceLimitWindow = null;
+                    uCLogin.IsEnabled = true;
+                }
             }
         }
         SettingInfo GetSetting()
