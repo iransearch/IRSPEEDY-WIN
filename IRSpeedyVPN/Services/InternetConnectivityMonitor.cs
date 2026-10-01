@@ -26,7 +26,8 @@ namespace IRSpeedyVPN.Services
     /// </summary>
     internal sealed class InternetConnectivityMonitor : IDisposable
     {
-        private const string PingHost = "185.143.233.200";
+        internal const string PingHost = "185.143.233.200";
+        internal const string PingCidr = "185.143.233.200/32";
         private const int AttemptsPerCycle = 4;
         private const int PingTimeoutMs = 2500;
 
