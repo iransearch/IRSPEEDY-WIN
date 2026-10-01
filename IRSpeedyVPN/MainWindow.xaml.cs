@@ -75,6 +75,8 @@ namespace IRSpeedyVPN
         private int pendingConnectionRequests;
         private IVPNService registeredVpnService;
         private IRSpeedyVPN.Events.OnConnectDisconnect registeredVpnHandler;
+        private InternetConnectivityMonitor internetConnectivityMonitor;
+        private NetworkStatusToastWindow networkStatusToast;
         public MainWindow()
         {
 
@@ -82,6 +84,11 @@ namespace IRSpeedyVPN
             mainTimer = new Timer(mainTimerCallback, null, int.MaxValue, int.MaxValue);
             SetupNotify();
             txtVersion.Text = "v" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
+
+            internetConnectivityMonitor = new InternetConnectivityMonitor();
+            internetConnectivityMonitor.AvailabilityChanged += InternetConnectivityMonitor_AvailabilityChanged;
+            internetConnectivityMonitor.Start();
+            Closed += MainWindow_Closed;
 
             /* double netVersion = 0;                       
             try
@@ -117,6 +124,51 @@ namespace IRSpeedyVPN
             notify.ContextMenuStrip.Items.Add("Show", null, this.Notify_DoubleClick);
             notify.ContextMenuStrip.Items.Add("Exit", null, this.Notify_Exit);
             notify.Visible = true;
+        }
+
+        private void InternetConnectivityMonitor_AvailabilityChanged(
+            object sender, InternetAvailabilityChangedEventArgs e)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (ExitCleanupStarted)
+                    return;
+
+                if (e.IsOnline)
+                {
+                    networkStatusToast?.CloseAnimated();
+                    return;
+                }
+
+                if (networkStatusToast != null && networkStatusToast.IsVisible)
+                    return;
+
+                networkStatusToast = new NetworkStatusToastWindow(this);
+                networkStatusToast.Closed += (s, args) =>
+                {
+                    if (ReferenceEquals(networkStatusToast, s))
+                        networkStatusToast = null;
+                };
+                networkStatusToast.Show();
+            }));
+        }
+
+        private void MainWindow_Closed(object sender, EventArgs e)
+        {
+            if (internetConnectivityMonitor != null)
+            {
+                internetConnectivityMonitor.AvailabilityChanged -=
+                    InternetConnectivityMonitor_AvailabilityChanged;
+                internetConnectivityMonitor.Dispose();
+                internetConnectivityMonitor = null;
+            }
+
+            if (networkStatusToast != null)
+            {
+                try { networkStatusToast.Close(); }
+                catch { }
+                networkStatusToast = null;
+            }
         }
 
         private void Notify_BalloonTipClosed(object sender, EventArgs e)
