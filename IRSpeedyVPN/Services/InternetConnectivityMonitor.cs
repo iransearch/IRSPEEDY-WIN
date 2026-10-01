@@ -19,14 +19,14 @@ namespace IRSpeedyVPN.Services
 
     /// <summary>
     /// User-facing connectivity watcher.
-    /// Every ten minutes it sends four ICMP pings to irancell.ir.
+    /// Every ten minutes it sends four ICMP pings to 185.143.233.200.
     /// Any successful reply marks the cycle online. Four failures trigger an
     /// offline notification on every failed cycle, even if the previous cycle
     /// was already offline. The watcher never changes VPN/Core state.
     /// </summary>
     internal sealed class InternetConnectivityMonitor : IDisposable
     {
-        private const string PingHost = "irancell.ir";
+        private const string PingHost = "185.143.233.200";
         private const int AttemptsPerCycle = 4;
         private const int PingTimeoutMs = 2500;
 
@@ -63,7 +63,7 @@ namespace IRSpeedyVPN.Services
                 return;
             }
 
-            // A network adapter just came back. Verify irancell.ir instead of
+            // A network adapter just came back. Verify 185.143.233.200 instead of
             // assuming that local network availability means internet access.
             QueueCheck();
         }
