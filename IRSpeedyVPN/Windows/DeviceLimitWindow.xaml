@@ -64,15 +64,14 @@
                         BorderBrush="{DynamicResource Theme.WarningBorderBrush}" BorderThickness="1">
                     <Grid>
                         <Grid.ColumnDefinitions><ColumnDefinition Width="17"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                        <Grid Width="17" Height="17" VerticalAlignment="Top" Margin="0,3,0,0" FlowDirection="LeftToRight">
+                        <Grid Width="17" Height="17" VerticalAlignment="Center" FlowDirection="LeftToRight">
                             <Ellipse Stroke="{DynamicResource Theme.WarningTextBrush}" StrokeThickness="1.5"/>
                             <TextBlock Text="!" Foreground="{DynamicResource Theme.WarningTextBrush}" FontFamily="Segoe UI" FontSize="12" HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Grid>
-                        <StackPanel Grid.Column="1" Margin="0,0,9,0">
-                            <TextBlock x:Name="txtMessage" FontSize="13" TextWrapping="Wrap" Foreground="{DynamicResource Theme.WarningTextBrush}"/>
-                            <TextBlock Text="برای ورود با این دستگاه، یکی از ورودهای قبلی را حذف کنید."
-                                       FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" Foreground="{DynamicResource TextBodyBrush}"/>
-                        </StackPanel>
+                        <Viewbox Grid.Column="1" Margin="0,0,9,0" Stretch="Uniform" StretchDirection="DownOnly"
+                                 HorizontalAlignment="Right" VerticalAlignment="Center">
+                            <TextBlock x:Name="txtMessage" FontSize="13" TextWrapping="NoWrap" Foreground="{DynamicResource Theme.WarningTextBrush}"/>
+                        </Viewbox>
                     </Grid>
                 </Border>
                 <Grid Margin="0,0,0,9" FlowDirection="LeftToRight">

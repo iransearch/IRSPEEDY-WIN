@@ -61,7 +61,6 @@ namespace IRSpeedyVPN.Services.Xray
             "ggpht.com",
             "withgoogle.com",
             "openai.com",
-            "chatgpt.com",
             "apple.com",
             "icloud.com",
             "showip.net",
