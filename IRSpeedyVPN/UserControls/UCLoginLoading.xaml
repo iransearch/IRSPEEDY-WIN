@@ -1,4 +1,4 @@
-<UserControl x:Class="IRSpeedyVPN.UserControls.UCLoginLoading" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" FlowDirection="RightToLeft" Background="#FAFBFD" IsVisibleChanged="VisibilityChanged" Unloaded="Control_Unloaded">
+<UserControl x:Class="IRSpeedyVPN.UserControls.UCLoginLoading" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" FlowDirection="RightToLeft" Background="{DynamicResource Theme.LoadingSurfaceBrush}" IsVisibleChanged="VisibilityChanged" Unloaded="Control_Unloaded" Foreground="{DynamicResource TextBodyBrush}">
 <UserControl.Resources><ResourceDictionary><ResourceDictionary.MergedDictionaries><ResourceDictionary Source="/IRSpeedyVPN;component/Themes/ConnectionSplit/Controls.xaml"/></ResourceDictionary.MergedDictionaries>
     <!-- ================= loader motion (all Forever, started on Window.Loaded) ================= -->
     <SineEase x:Key="InOut" EasingMode="EaseInOut" />
@@ -58,8 +58,8 @@
         <!-- connector BEFORE the step (physical right of it in RTL); none before the first step -->
         <Grid Width="34" Height="2" Margin="0,13,0,0" VerticalAlignment="Top"
               Visibility="{Binding HasLine, Converter={StaticResource BoolToVis}}">
-          <Border CornerRadius="1" Background="#E3E8F2" />
-          <Border CornerRadius="1" Background="#22B37A">
+          <Border CornerRadius="1" Background="{DynamicResource Theme.LoadingLineBrush}" />
+          <Border CornerRadius="1" Background="{DynamicResource ToggleOnTopBrush}">
             <Border.Style><Style TargetType="Border">
               <Setter Property="Opacity" Value="0" />
               <Style.Triggers><DataTrigger Binding="{Binding LineDone}" Value="True">
@@ -72,7 +72,7 @@
           </Border>
           <!-- running step: accent fill grows from the done side (physical RIGHT) in a 1.4s loop.
                In an RTL tree, local x=0 is the physical right edge → RenderTransformOrigin 0,0.5 -->
-          <Border CornerRadius="1" Background="{StaticResource Brush.Accent}" RenderTransformOrigin="0,0.5"
+          <Border CornerRadius="1" Background="{DynamicResource Brush.Accent}" RenderTransformOrigin="0,0.5"
                   Visibility="{Binding LineActive, Converter={StaticResource BoolToVis}}">
             <Border.RenderTransform><ScaleTransform ScaleX="0" /></Border.RenderTransform>
             <Border.Triggers>
@@ -111,12 +111,12 @@
               <Ellipse>
                 <Ellipse.Fill>
                   <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                    <GradientStop Color="#22B37A" Offset="0" />
-                    <GradientStop Color="#159A63" Offset="1" />
+                    <GradientStop Color="{DynamicResource ToggleOnTopColor}" Offset="0" />
+                    <GradientStop Color="{DynamicResource Theme.SuccessColor}" Offset="1" />
                   </LinearGradientBrush>
                 </Ellipse.Fill>
                 <Ellipse.Effect>
-                  <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.4" Color="#159A63" />
+                  <DropShadowEffect BlurRadius="10" ShadowDepth="3" Direction="270" Opacity="0.4" Color="{DynamicResource Theme.SuccessColor}" />
                 </Ellipse.Effect>
               </Ellipse>
               <Path FlowDirection="LeftToRight" Data="M1,6 L5,10 12,2" Stroke="White" StrokeThickness="2" Width="13" Height="13" Stretch="Uniform"
@@ -150,7 +150,7 @@
                   </Style.Triggers>
                 </Style>
               </Grid.Style>
-              <Ellipse x:Name="Pulse" Fill="{StaticResource Brush.Accent}" Opacity="0" RenderTransformOrigin="0.5,0.5">
+              <Ellipse x:Name="Pulse" Fill="{DynamicResource Brush.Accent}" Opacity="0" RenderTransformOrigin="0.5,0.5">
                 <Ellipse.RenderTransform><ScaleTransform /></Ellipse.RenderTransform>
                 <Ellipse.Triggers>
                   <EventTrigger RoutedEvent="FrameworkElement.Loaded">
@@ -171,7 +171,7 @@
                   </EventTrigger>
                 </Ellipse.Triggers>
               </Ellipse>
-              <Ellipse Fill="White" Stroke="#C9DBFB" StrokeThickness="1.5" />
+              <Ellipse Fill="{DynamicResource Theme.SurfaceBrush}" Stroke="{DynamicResource ServerCardBorderBrush}" StrokeThickness="1.5" />
               <!-- 18x18 spinner: gray ring + quarter arc, one turn per 0.9s -->
               <Canvas Width="18" Height="18" FlowDirection="LeftToRight" RenderTransformOrigin="0.5,0.5">
                 <Canvas.RenderTransform><RotateTransform /></Canvas.RenderTransform>
@@ -185,10 +185,10 @@
                     </BeginStoryboard>
                   </EventTrigger>
                 </Canvas.Triggers>
-                <Path Stroke="#E3E8F2" StrokeThickness="2">
+                <Path Stroke="{DynamicResource Theme.LoadingLineBrush}" StrokeThickness="2">
                   <Path.Data><EllipseGeometry Center="9,9" RadiusX="7" RadiusY="7" /></Path.Data>
                 </Path>
-                <Path Data="M 9,2 A 7,7 0 0 1 16,9" Stroke="{StaticResource Brush.Accent}" StrokeThickness="2"
+                <Path Data="M 9,2 A 7,7 0 0 1 16,9" Stroke="{DynamicResource Brush.Accent}" StrokeThickness="2"
                       StrokeStartLineCap="Round" StrokeEndLineCap="Round" />
               </Canvas>
             </Grid>
@@ -210,8 +210,8 @@
                   </Style.Triggers>
                 </Style>
               </Grid.Style>
-              <Ellipse Fill="#F3F5F9" Stroke="#E3E8F2" StrokeThickness="1.5" />
-              <Ellipse Width="6" Height="6" Fill="#C7CCD8" />
+              <Ellipse Fill="{DynamicResource RowHoverBrush}" Stroke="{DynamicResource Theme.LoadingLineBrush}" StrokeThickness="1.5" />
+              <Ellipse Width="6" Height="6" Fill="{DynamicResource Theme.MutedDotBrush}" />
             </Grid>
           </Grid>
 
@@ -232,14 +232,14 @@
             <Ellipse.RenderTransform><ScaleTransform x:Name="GlowScale" ScaleX="0.96" ScaleY="0.96" /></Ellipse.RenderTransform>
             <Ellipse.Fill>
               <RadialGradientBrush>
-                <GradientStop Color="#331E3A8A" Offset="0" />
+                <GradientStop Color="{DynamicResource Theme.AccentGlowColor}" Offset="0" />
                 <GradientStop Color="#001E3A8A" Offset="1" />
               </RadialGradientBrush>
             </Ellipse.Fill>
           </Ellipse>
 
           <!-- outer track r139 -->
-          <Path Stroke="#E1E9FA" StrokeThickness="4">
+          <Path Stroke="{DynamicResource Theme.LoadingOrbitBrush}" StrokeThickness="4">
             <Path.Data><EllipseGeometry Center="155,155" RadiusX="139" RadiusY="139" /></Path.Data>
           </Path>
 
@@ -254,13 +254,13 @@
           </Canvas>
 
           <!-- dashed orbit r125 (dash 2px / gap 9px at 1.5px stroke → 1.333 / 6 in WPF units) -->
-          <Path Stroke="#C9DBFB" StrokeThickness="1.5" StrokeDashArray="1.333 6" StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
+          <Path Stroke="{DynamicResource ServerCardBorderBrush}" StrokeThickness="1.5" StrokeDashArray="1.333 6" StrokeDashCap="Round" RenderTransformOrigin="0.5,0.5">
             <Path.RenderTransform><RotateTransform x:Name="OrbitRotate" /></Path.RenderTransform>
             <Path.Data><EllipseGeometry Center="155,155" RadiusX="125" RadiusY="125" /></Path.Data>
           </Path>
 
           <!-- inner track r111 -->
-          <Path Stroke="#EEF1F8" StrokeThickness="3">
+          <Path Stroke="{DynamicResource Theme.TabTrackBrush}" StrokeThickness="3">
             <Path.Data><EllipseGeometry Center="155,155" RadiusX="111" RadiusY="111" /></Path.Data>
           </Path>
 
@@ -281,16 +281,16 @@
             <Ellipse>
               <Ellipse.Fill>
                 <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                  <GradientStop Color="#F7FFFFFF" Offset="0" />
-                  <GradientStop Color="#F7EFF5FF" Offset="1" />
+                  <GradientStop Color="{DynamicResource Theme.LoadingGlassTopColor}" Offset="0" />
+                  <GradientStop Color="{DynamicResource Theme.LoadingGlassBottomColor}" Offset="1" />
                 </LinearGradientBrush>
               </Ellipse.Fill>
               <Ellipse.Effect>
                 <!-- ≈ 0 18px 36px -12px rgba(30,58,138,0.38) -->
-                <DropShadowEffect BlurRadius="30" ShadowDepth="12" Direction="270" Opacity="0.3" Color="#1E3A8A" />
+                <DropShadowEffect BlurRadius="30" ShadowDepth="12" Direction="270" Opacity="0.3" Color="{DynamicResource AccentColor}" />
               </Ellipse.Effect>
             </Ellipse>
-            <Ellipse Stroke="#B3C9DBFB" StrokeThickness="1" />
+            <Ellipse Stroke="{DynamicResource Theme.LoadingGlassBorderBrush}" StrokeThickness="1" />
             <Image Source="/Resources/Irspeedy/Logo/logo-header.png" Width="134" Height="180" Stretch="Uniform"
                    RenderOptions.BitmapScalingMode="HighQuality" />
           </Grid>
@@ -299,16 +299,16 @@
         <!-- title + animated dots -->
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,26,0,0">
           <TextBlock Text="در حال ورود به حساب" VerticalAlignment="Center"
-                     FontFamily="{StaticResource Font.Regular}" FontWeight="Bold" FontSize="16" Foreground="#141B33" />
+                     FontFamily="{StaticResource Font.Regular}" FontWeight="Bold" FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" />
           <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="6,2,0,0">
-            <Ellipse x:Name="Dot1" Width="5" Height="5" Fill="{StaticResource Brush.Accent}" Opacity="0.18" />
-            <Ellipse x:Name="Dot2" Width="5" Height="5" Fill="{StaticResource Brush.Accent}" Opacity="0.18" Margin="3,0,0,0" />
-            <Ellipse x:Name="Dot3" Width="5" Height="5" Fill="{StaticResource Brush.Accent}" Opacity="0.18" Margin="3,0,0,0" />
+            <Ellipse x:Name="Dot1" Width="5" Height="5" Fill="{DynamicResource Brush.Accent}" Opacity="0.18" />
+            <Ellipse x:Name="Dot2" Width="5" Height="5" Fill="{DynamicResource Brush.Accent}" Opacity="0.18" Margin="3,0,0,0" />
+            <Ellipse x:Name="Dot3" Width="5" Height="5" Fill="{DynamicResource Brush.Accent}" Opacity="0.18" Margin="3,0,0,0" />
           </StackPanel>
         </StackPanel>
 
         <TextBlock Text="اطلاعات ورود بررسی و لیست سرورها آماده می‌شود" HorizontalAlignment="Center" Margin="0,8,0,0"
-                   FontFamily="{StaticResource Font.Regular}" FontSize="12.5" Foreground="#9CA3B4" />
+                   FontFamily="{StaticResource Font.Regular}" FontSize="12.5" Foreground="{DynamicResource TextSecondaryBrush}" />
 
         <!-- 3-step indicator (first step = physical right) -->
         <ItemsControl Margin="0,26,0,0" HorizontalAlignment="Center" Focusable="False"

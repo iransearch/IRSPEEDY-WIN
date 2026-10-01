@@ -45,6 +45,8 @@ namespace IRSpeedyVPN
                 catch { LogHelper.WriteLog("[ErrorReporting] SDK could not be loaded"); }
                 var app = new App();
                 app.InitializeComponent();
+                // Restore appearance before MainWindow or any cached page is constructed.
+                Common.ThemeManager.Instance.Initialize();
 
                 // An exception raised inside the dispatcher loop is not covered by the
                 // try/catch around Main, so log it before WPF tears the process down.

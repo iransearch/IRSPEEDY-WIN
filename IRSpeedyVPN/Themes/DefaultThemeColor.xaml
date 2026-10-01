@@ -1,47 +1,47 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
                     xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options">
 
     <Color x:Key="ValidationErrorColor">#f44336</Color>
-    <SolidColorBrush x:Key="ValidationErrorBrush" Color="{StaticResource ValidationErrorColor}" po:Freeze="True" />
+    <SolidColorBrush x:Key="ValidationErrorBrush" Color="{DynamicResource ValidationErrorColor}" />
 
-    <SolidColorBrush x:Key="MaterialDesignBackground" Color="#FFFFFFFF" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignPaper" Color="#FFfafafa" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignCardBackground" Color="#FFFFFFFF" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignToolBarBackground" Color="#FFF5F5F5" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignBody" Color="#DD000000" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignBodyLight" Color="#89000000" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignColumnHeader" Color="#BC000000" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignBackground" Color="{DynamicResource Theme.SurfaceColor}" />
+    <SolidColorBrush x:Key="MaterialDesignPaper" Color="{DynamicResource Theme.SurfaceSoftColor}" />
+    <SolidColorBrush x:Key="MaterialDesignCardBackground" Color="{DynamicResource Theme.SurfaceColor}" />
+    <SolidColorBrush x:Key="MaterialDesignToolBarBackground" Color="{DynamicResource Theme.SurfaceSoftColor}" />
+    <SolidColorBrush x:Key="MaterialDesignBody" Color="{DynamicResource TextBodyColor}" />
+    <SolidColorBrush x:Key="MaterialDesignBodyLight" Color="{DynamicResource MutedTextColor}" />
+    <SolidColorBrush x:Key="MaterialDesignColumnHeader" Color="{DynamicResource TextPrimaryColor}" />
     <!-- 74% -->
 
-    <SolidColorBrush x:Key="MaterialDesignCheckBoxOff" Color="#89000000" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignCheckBoxDisabled" Color="#FFBDBDBD" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignCheckBoxOff" Color="{DynamicResource IconStrokeColor}" />
+    <SolidColorBrush x:Key="MaterialDesignCheckBoxDisabled" Color="{DynamicResource IconMutedColor}" />
 
-    <SolidColorBrush x:Key="MaterialDesignTextBoxBorder" Color="#89000000" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignDivider" Color="#1F000000" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignTextBoxBorder" Color="{DynamicResource FieldBorderColor}" />
+    <SolidColorBrush x:Key="MaterialDesignDivider" Color="{DynamicResource DividerColor}" />
     <!-- 12% -->
-    <SolidColorBrush x:Key="MaterialDesignSelection" Color="#FFDeDeDe" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignSelection" Color="{DynamicResource RowHoverColor}" />
 
-    <SolidColorBrush x:Key="MaterialDesignToolForeground" Color="#616161" po:Freeze="true" />
-    <SolidColorBrush x:Key="MaterialDesignToolBackground" Color="#e0e0e0" po:Freeze="true" />
+    <SolidColorBrush x:Key="MaterialDesignToolForeground" Color="{DynamicResource TextBodyColor}" />
+    <SolidColorBrush x:Key="MaterialDesignToolBackground" Color="{DynamicResource Theme.SurfaceSoftColor}" />
 
-    <SolidColorBrush x:Key="MaterialDesignFlatButtonClick" Color="#FFDeDeDe" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignFlatButtonRipple" Color="#FFB6B6B6" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignFlatButtonClick" Color="{DynamicResource RowHoverColor}" />
+    <SolidColorBrush x:Key="MaterialDesignFlatButtonRipple" Color="{DynamicResource RowHoverColor}" />
 
-    <SolidColorBrush x:Key="MaterialDesignToolTipBackground" Color="#757575" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignChipBackground" Color="#12000000" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignSnackbarBackground" Color="#FF323232" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignSnackbarMouseOver" Color="#FF464642" po:Freeze="True" />
-    <SolidColorBrush x:Key="MaterialDesignSnackbarRipple" Color="#FFB6B6B6" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignToolTipBackground" Color="#757575" />
+    <SolidColorBrush x:Key="MaterialDesignChipBackground" Color="#12000000" />
+    <SolidColorBrush x:Key="MaterialDesignSnackbarBackground" Color="#FF323232" />
+    <SolidColorBrush x:Key="MaterialDesignSnackbarMouseOver" Color="#FF464642" />
+    <SolidColorBrush x:Key="MaterialDesignSnackbarRipple" Color="#FFB6B6B6" />
 
-    <SolidColorBrush x:Key="MaterialDesignTextFieldBoxBackground" Color="#0F000000" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignTextFieldBoxBackground" Color="{DynamicResource Theme.SurfaceColor}" />
     <!-- 6% black -->
-    <SolidColorBrush x:Key="MaterialDesignTextFieldBoxHoverBackground" Color="#14000000" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignTextFieldBoxHoverBackground" Color="{DynamicResource RowHoverColor}" />
     <!-- 8% black -->
-    <SolidColorBrush x:Key="MaterialDesignTextFieldBoxDisabledBackground" Color="#08000000" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignTextFieldBoxDisabledBackground" Color="{DynamicResource Theme.SurfaceDisabledColor}" />
     <!-- 3% black -->
-    <SolidColorBrush x:Key="MaterialDesignTextAreaBorder" Color="#BC000000" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignTextAreaBorder" Color="{DynamicResource FieldBorderColor}" />
     <!-- 74% black -->
-    <SolidColorBrush x:Key="MaterialDesignTextAreaInactiveBorder" Color="#0F000000" po:Freeze="True" />
+    <SolidColorBrush x:Key="MaterialDesignTextAreaInactiveBorder" Color="{DynamicResource DividerColor}" />
     <!-- 6% black -->
 </ResourceDictionary>

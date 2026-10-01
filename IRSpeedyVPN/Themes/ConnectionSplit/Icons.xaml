@@ -1,7 +1,7 @@
 <!--
   IRSPEEDY — icon set used by ConnectionMethods and SplitTunnel.
   Converted 1:1 from the design SVGs (same coordinates, stroke widths, caps, joins).
-  Usage:  <Control Template="{StaticResource Icon.Globe}" Foreground="#1E3A8A" Width="18" Height="18"/>
+  Usage:  <Control Template="{StaticResource Icon.Globe}" Foreground="{DynamicResource AccentBrush}" Width="18" Height="18"/>
   Color comes from Foreground, so the same icon can be tinted per item.
   FlowDirection="LeftToRight" on every Viewbox is REQUIRED: the windows are RightToLeft, and WPF
   mirrors Paths inside an RTL tree. Without it, arrows/chevrons/icons would be drawn flipped.

@@ -51,10 +51,10 @@ namespace IRSpeedyVPN.Windows
             ProxyPanel.Visibility = direct ? Visibility.Collapsed : Visibility.Visible;
             DirectTab.Tag = direct ? "Selected" : null;
             ProxyTab.Tag = direct ? null : "Selected";
-            DirectTab.Background = direct ? Brushes.White : Brushes.Transparent;
-            ProxyTab.Background = direct ? Brushes.Transparent : Brushes.White;
-            DirectTab.Foreground = direct ? new SolidColorBrush(Color.FromRgb(20, 27, 51)) : new SolidColorBrush(Color.FromRgb(156, 163, 180));
-            ProxyTab.Foreground = direct ? new SolidColorBrush(Color.FromRgb(156, 163, 180)) : new SolidColorBrush(Color.FromRgb(20, 27, 51));
+            DirectTab.SetResourceReference(BackgroundProperty, direct ? "Theme.SurfaceBrush" : "Theme.TransparentBrush");
+            ProxyTab.SetResourceReference(BackgroundProperty, direct ? "Theme.TransparentBrush" : "Theme.SurfaceBrush");
+            DirectTab.SetResourceReference(ForegroundProperty, direct ? "TextPrimaryBrush" : "TextSecondaryBrush");
+            ProxyTab.SetResourceReference(ForegroundProperty, direct ? "TextSecondaryBrush" : "TextPrimaryBrush");
             QrPopup.IsOpen = false;
             // Tab selection only changes presentation; network queries run on a worker.
             AnimatePanel(direct ? DirectPanel : ProxyPanel, direct ? -8 : 8);
@@ -125,7 +125,7 @@ namespace IRSpeedyVPN.Windows
             SOCKS5Address.Text = active ? proxyIp + " : " + Service.SocksPort : "";
             ProxyStatus.Text = !ProxyAvailable ? "ابتدا به سرویس سازگار متصل شوید" : proxyError ??
                 (active ? "فعال" : Service.IsShareActive ? "آدرس شبکه یا پراکسی فعال تأیید نشد" : "غیرفعال");
-            ProxyStatus.Foreground = active ? new SolidColorBrush(Color.FromRgb(23, 171, 119)) : Brushes.Gray;
+            ProxyStatus.SetResourceReference(ForegroundProperty, active ? "Theme.StatusGreenBrush" : "TextMutedBrush");
         }
         private async void btnStartStop_Click(object sender, RoutedEventArgs e)
         {

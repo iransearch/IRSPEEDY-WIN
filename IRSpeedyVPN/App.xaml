@@ -1,4 +1,4 @@
-﻿<Application x:Class="IRSpeedyVPN.App"
+<Application x:Class="IRSpeedyVPN.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:sys="clr-namespace:System;assembly=mscorlib"
@@ -6,6 +6,8 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Themes/Palette.Light.xaml"/>
+                <ResourceDictionary Source="Themes/SemanticBrushes.xaml"/>
                 <ResourceDictionary Source="/IRSpeedyVPN;component/Themes/DefaultThemeColor.xaml"/>
                 <ResourceDictionary Source="/IRSpeedyVPN;component/Themes/DefaultTheme.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.Button.xaml"/>
@@ -16,6 +18,8 @@
                 <ResourceDictionary Source="Themes/Theme.TextBlock.xaml"/>
                 <ResourceDictionary Source="Themes/Theme.LabelButton.xaml"/>
                 <ResourceDictionary Source="Themes/IrspeedyTheme.xaml"/>
+                <ResourceDictionary Source="Themes/Theme.AppearanceToggle.xaml"/>
+                <ResourceDictionary Source="Themes/SystemControls.xaml"/>
                 <ResourceDictionary Source="Themes/ServerListFlags.xaml"/>
             </ResourceDictionary.MergedDictionaries>
             <sys:Double x:Key="UiScale">0.905</sys:Double>

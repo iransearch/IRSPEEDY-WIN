@@ -1,4 +1,4 @@
-<Window xmlns:uiScale="clr-namespace:IRSpeedyVPN.Common" uiScale:WindowUiScale.Factor="{StaticResource UiScale}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.SettingsHub" Title="تنظیمات سرویس" Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{StaticResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" SizeToContent="Manual">
+<Window xmlns:uiScale="clr-namespace:IRSpeedyVPN.Common" uiScale:WindowUiScale.Factor="{StaticResource UiScale}" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:controls="clr-namespace:IRSpeedyVPN.Controls" x:Class="IRSpeedyVPN.Windows.SettingsHub" Title="تنظیمات سرویس" Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" Background="{DynamicResource WindowBackgroundBrush}" WindowStartupLocation="CenterOwner" ShowInTaskbar="False" FontFamily="{StaticResource AppFontFamily}" FlowDirection="RightToLeft" UseLayoutRounding="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" SizeToContent="Manual" Foreground="{DynamicResource TextBodyBrush}">
   <WindowChrome.WindowChrome>
     <WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/>
   </WindowChrome.WindowChrome>
@@ -9,13 +9,13 @@
         <RowDefinition Height="*"/>
         <RowDefinition Height="68"/>
       </Grid.RowDefinitions>
-      <Border BorderBrush="#EEF0F4" BorderThickness="0,0,0,1">
+      <Border BorderBrush="{DynamicResource StatCardDividerBrush}" BorderThickness="0,0,0,1">
         <Grid Margin="16,0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
           <StackPanel VerticalAlignment="Center">
-            <TextBlock FontSize="16" Foreground="#141B33" TextAlignment="Right" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center">
+            <TextBlock FontSize="16" Foreground="{DynamicResource TextPrimaryBrush}" TextAlignment="Right" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontWeight="Normal" HorizontalAlignment="Center">
               <Run Text="تنظیمات سرویس" FlowDirection="RightToLeft"/>
             </TextBlock>
-            <TextBlock FontSize="10.5" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Center">
+            <TextBlock FontSize="10.5" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Right" FlowDirection="LeftToRight" HorizontalAlignment="Center">
               <Run Text="شخصی‌سازی رفتار اتصال" FlowDirection="RightToLeft"/>
             </TextBlock>
           </StackPanel>
@@ -34,21 +34,21 @@
           </Grid.RowDefinitions>
           <Grid Grid.Row="0">
             <Button Style="{StaticResource HandoffPlainButton}" x:Name="MethodsButton" Click="Methods_Click">
-              <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+              <Border Height="72" CornerRadius="18" Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource SettingsRowBorderBrush}" BorderThickness="1" Padding="14,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="42"/>
                   </Grid.ColumnDefinitions>
-                  <Border Width="26" Height="26" CornerRadius="13" Background="#F5F6F9" Grid.Column="0">
-                    <Path Data="M15,6 L9,12 L15,18" Stroke="#B7BCC9" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform" FlowDirection="LeftToRight"/>
+                  <Border Width="26" Height="26" CornerRadius="13" Background="{DynamicResource Theme.SettingsSoftBrush}" Grid.Column="0">
+                    <Path Data="M15,6 L9,12 L15,18" Stroke="{DynamicResource IconMutedBrush}" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform" FlowDirection="LeftToRight"/>
                   </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
-                    <TextBlock FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                    <TextBlock FontSize="14.5" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
                       <Run Text="روش‌های اتصال" FlowDirection="RightToLeft"/>
                     </TextBlock>
-                    <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Right" FlowDirection="LeftToRight">
                       <Run Text="وی‌پی‌ان سراسری، پروکسی سیستمی، پروکسی‌فایر" FlowDirection="RightToLeft"/>
                     </TextBlock>
                   </StackPanel>
@@ -61,21 +61,21 @@
           </Grid>
           <Grid Grid.Row="1">
             <Button Style="{StaticResource HandoffPlainButton}" x:Name="ShieldButton" Click="Shield_Click">
-              <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+              <Border Height="72" CornerRadius="18" Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource SettingsRowBorderBrush}" BorderThickness="1" Padding="14,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="42"/>
                   </Grid.ColumnDefinitions>
-                  <Border Width="26" Height="26" CornerRadius="13" Background="#F5F6F9" Grid.Column="0">
-                    <Path Data="M15,6 L9,12 L15,18" Stroke="#B7BCC9" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform" FlowDirection="LeftToRight"/>
+                  <Border Width="26" Height="26" CornerRadius="13" Background="{DynamicResource Theme.SettingsSoftBrush}" Grid.Column="0">
+                    <Path Data="M15,6 L9,12 L15,18" Stroke="{DynamicResource IconMutedBrush}" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform" FlowDirection="LeftToRight"/>
                   </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
-                    <TextBlock FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                    <TextBlock FontSize="14.5" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
                       <Run Text="شیلد" FlowDirection="RightToLeft"/>
                     </TextBlock>
-                    <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Right" FlowDirection="LeftToRight">
                       <Run Text="محافظت در برابر تبلیغات و تهدیدهای آنلاین" FlowDirection="RightToLeft"/>
                     </TextBlock>
                   </StackPanel>
@@ -88,21 +88,21 @@
           </Grid>
           <Grid Grid.Row="2">
             <Button Style="{StaticResource HandoffPlainButton}" x:Name="ShareButton" Click="Share_Click">
-              <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+              <Border Height="72" CornerRadius="18" Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource SettingsRowBorderBrush}" BorderThickness="1" Padding="14,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="42"/>
                   </Grid.ColumnDefinitions>
-                  <Border Width="26" Height="26" CornerRadius="13" Background="#F5F6F9" Grid.Column="0">
-                    <Path Data="M15,6 L9,12 L15,18" Stroke="#B7BCC9" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform" FlowDirection="LeftToRight"/>
+                  <Border Width="26" Height="26" CornerRadius="13" Background="{DynamicResource Theme.SettingsSoftBrush}" Grid.Column="0">
+                    <Path Data="M15,6 L9,12 L15,18" Stroke="{DynamicResource IconMutedBrush}" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform" FlowDirection="LeftToRight"/>
                   </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
-                    <TextBlock FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                    <TextBlock FontSize="14.5" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
                       <Run Text="اشتراک‌گذاری اتصال" FlowDirection="RightToLeft"/>
                     </TextBlock>
-                    <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Right" FlowDirection="LeftToRight">
                       <Run Text="تبدیل این دستگاه به نقطه اتصال VPN" FlowDirection="RightToLeft"/>
                     </TextBlock>
                   </StackPanel>
@@ -114,7 +114,7 @@
             </Button>
           </Grid>
           <Grid Grid.Row="3" x:Name="GameRow">
-            <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+            <Border Height="72" CornerRadius="18" Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource SettingsRowBorderBrush}" BorderThickness="1" Padding="14,0">
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto"/>
@@ -123,10 +123,10 @@
                 </Grid.ColumnDefinitions>
                 <controls:ServiceToggle x:Name="GameMode" AutomationProperties.Name="GameMode" Grid.Column="0" FlowDirection="LeftToRight"/>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
-                  <TextBlock FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                  <TextBlock FontSize="14.5" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
                     <Run Text="حالت بازی" FlowDirection="RightToLeft"/>
                   </TextBlock>
-                  <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight">
+                  <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Right" FlowDirection="LeftToRight">
                     <Run Text="کاهش تاخیر برای بازی‌های آنلاین" FlowDirection="RightToLeft"/>
                   </TextBlock>
                 </StackPanel>
@@ -137,7 +137,7 @@
             </Border>
           </Grid>
           <Grid Grid.Row="4" x:Name="AiRow">
-            <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+            <Border Height="72" CornerRadius="18" Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource SettingsRowBorderBrush}" BorderThickness="1" Padding="14,0">
               <Grid>
                 <Grid.ColumnDefinitions>
                   <ColumnDefinition Width="Auto"/>
@@ -146,10 +146,10 @@
                 </Grid.ColumnDefinitions>
                 <controls:ServiceToggle x:Name="VodService" AutomationProperties.Name="VodService" Grid.Column="0" FlowDirection="LeftToRight"/>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
-                  <TextBlock FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                  <TextBlock FontSize="14.5" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
                     <Run Text="هوش مصنوعی" FlowDirection="RightToLeft"/>
                   </TextBlock>
-                  <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight">
+                  <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Right" FlowDirection="LeftToRight">
                     <Run Text="IP ثابت جهت دسترسی به سرویس هوش مصنوعی" FlowDirection="RightToLeft"/>
                   </TextBlock>
                 </StackPanel>
@@ -161,21 +161,21 @@
           </Grid>
           <Grid Grid.Row="5">
             <Button Style="{StaticResource HandoffPlainButton}" x:Name="PasswordButton" Click="Password_Click">
-              <Border Height="72" CornerRadius="18" Background="White" BorderBrush="#ECEEF3" BorderThickness="1" Padding="14,0">
+              <Border Height="72" CornerRadius="18" Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource SettingsRowBorderBrush}" BorderThickness="1" Padding="14,0">
                 <Grid>
                   <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="Auto"/>
                     <ColumnDefinition Width="*"/>
                     <ColumnDefinition Width="42"/>
                   </Grid.ColumnDefinitions>
-                  <Border Width="26" Height="26" CornerRadius="13" Background="#F5F6F9" Grid.Column="0">
-                    <Path Data="M15,6 L9,12 L15,18" Stroke="#B7BCC9" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform" FlowDirection="LeftToRight"/>
+                  <Border Width="26" Height="26" CornerRadius="13" Background="{DynamicResource Theme.SettingsSoftBrush}" Grid.Column="0">
+                    <Path Data="M15,6 L9,12 L15,18" Stroke="{DynamicResource IconMutedBrush}" StrokeThickness="2" Width="7" Height="12" Stretch="Uniform" FlowDirection="LeftToRight"/>
                   </Border>
                   <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
-                    <TextBlock FontSize="14.5" Foreground="#1B2033" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
+                    <TextBlock FontSize="14.5" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
                       <Run Text="تغییر رمز عبور" FlowDirection="RightToLeft"/>
                     </TextBlock>
-                    <TextBlock FontSize="11" Foreground="#9CA3B4" TextAlignment="Right" FlowDirection="LeftToRight">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Right" FlowDirection="LeftToRight">
                       <Run Text="به‌روزرسانی رمز عبور حساب کاربری" FlowDirection="RightToLeft"/>
                     </TextBlock>
                   </StackPanel>

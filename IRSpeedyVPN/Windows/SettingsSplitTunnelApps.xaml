@@ -1,6 +1,6 @@
 <Window xmlns:uiScale="clr-namespace:IRSpeedyVPN.Common" uiScale:WindowUiScale.Factor="{StaticResource UiScale}" Title="تقسیم تونل" x:Class="IRSpeedyVPN.Windows.SettingsSplitTunnelApps" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ctl="clr-namespace:IRSpeedyVPN.Controls"
  Width="420" Height="700" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" SizeToContent="Manual" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
- Background="{StaticResource WindowBackgroundBrush}" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Loaded="Window_Loaded">
+ Background="{DynamicResource WindowBackgroundBrush}" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Loaded="Window_Loaded" Foreground="{DynamicResource TextBodyBrush}">
  <WindowChrome.WindowChrome><WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/></WindowChrome.WindowChrome>
  <Window.Resources><ResourceDictionary>
  <ResourceDictionary.MergedDictionaries><ResourceDictionary Source="/IRSpeedyVPN;component/Themes/ConnectionSplit/Controls.xaml"/></ResourceDictionary.MergedDictionaries>
@@ -33,7 +33,7 @@
                   Click="RemoveApp_Click"
                   AutomationProperties.Name="حذف از لیست"
                   ToolTip="حذف از لیست">
-            <Control Template="{StaticResource Icon.Trash}" Foreground="{StaticResource Brush.Danger}" Width="13" Height="13" />
+            <Control Template="{StaticResource Icon.Trash}" Foreground="{DynamicResource Brush.Danger}" Width="13" Height="13" />
           </Button>
 
           <ctl:SettingsToggleSwitch Grid.Column="5" Width="40" Height="23"
@@ -52,8 +52,8 @@
       </Style.Triggers>
     </Style>
  </ResourceDictionary></Window.Resources>
-<Viewbox x:Name="DesignViewport" Stretch="Uniform" FlowDirection="LeftToRight">  <Border Width="420" Height="700" FlowDirection="RightToLeft" CornerRadius="20" Background="{StaticResource Brush.WindowBg}"
-          BorderBrush="{StaticResource Brush.WindowEdge}" BorderThickness="1">
+<Viewbox x:Name="DesignViewport" Stretch="Uniform" FlowDirection="LeftToRight">  <Border Width="420" Height="700" FlowDirection="RightToLeft" CornerRadius="20" Background="{DynamicResource Brush.WindowBg}"
+          BorderBrush="{DynamicResource Brush.WindowEdge}" BorderThickness="1">
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height="62" />   <!-- header -->
@@ -63,7 +63,7 @@
 
       <!-- ============ header ============ -->
       <Grid Grid.Row="0" Background="Transparent" MouseLeftButtonDown="Header_DragMove">
-        <Border BorderBrush="{StaticResource Brush.Divider}" BorderThickness="0,0,0,1" />
+        <Border BorderBrush="{DynamicResource Brush.Divider}" BorderThickness="0,0,0,1" />
         <StackPanel VerticalAlignment="Center">
           <TextBlock Text="تقسیم تونل" Style="{StaticResource Text.WindowTitle}" />
           <TextBlock Text="انتخاب برنامه‌هایی که از تونل عبور کنند" Style="{StaticResource Text.WindowSubtitle}" />
@@ -82,7 +82,7 @@
         </Grid.RowDefinitions>
 
         <!-- activation row (moved here from the connection-methods screen) -->
-        <Border Grid.Row="0" CornerRadius="14" Background="{StaticResource Brush.SurfaceSoft}" Padding="14,12">
+        <Border Grid.Row="0" CornerRadius="14" Background="{DynamicResource Brush.SurfaceSoft}" Padding="14,12">
           <Grid>
             <Grid.ColumnDefinitions>
               <ColumnDefinition Width="*" />
@@ -113,19 +113,19 @@
 
           <TextBox x:Name="SearchBox" Grid.Row="0" Style="{StaticResource SearchBoxStyle}" Tag="جستجوی برنامه"
                    TextChanged="Search_Changed"
-                   AutomationProperties.Name="جستجوی برنامه" />
+                   AutomationProperties.Name="جستجوی برنامه"  Foreground="{DynamicResource TextBodyBrush}" CaretBrush="{DynamicResource TextPrimaryBrush}"/>
 
           <!-- "افزودن برنامه" — opens the Windows file picker (*.exe) -->
           <Button Grid.Row="2" Style="{StaticResource AddButtonStyle}" Click="AddExecutable_Click"
                   AutomationProperties.Name="افزودن برنامه">
             <Button.ContextMenu><ContextMenu><MenuItem Header="افزودن پوشه" Click="AddFolder_Click"/><MenuItem x:Name="RefreshButton" Header="تازه‌سازی فهرست" Click="Refresh_Click"/></ContextMenu></Button.ContextMenu>
             <StackPanel Orientation="Horizontal">
-              <Border Width="22" Height="22" CornerRadius="11" Background="{StaticResource Brush.Accent}">
+              <Border Width="22" Height="22" CornerRadius="11" Background="{DynamicResource Brush.Accent}">
                 <Control Template="{StaticResource Icon.Plus}" Foreground="White" Width="11" Height="11" />
               </Border>
               <TextBlock Text="افزودن برنامه" Margin="10,0,0,0" VerticalAlignment="Center"
                          FontFamily="{StaticResource Font.Regular}" FontWeight="Bold" FontSize="13"
-                         Foreground="{StaticResource Brush.Accent}" />
+                         Foreground="{DynamicResource Brush.Accent}" />
             </StackPanel>
           </Button>
 
@@ -160,7 +160,7 @@
 
           <!-- not in the design: empty search result -->
           <TextBlock Grid.Row="6" x:Name="EmptyText" Text="برنامه‌ای پیدا نشد" HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,24,0,0"
-                     Foreground="{StaticResource Brush.TextMuted}" FontSize="12"
+                     Foreground="{DynamicResource Brush.TextMuted}" FontSize="12"
                      Visibility="Collapsed" />
         </Grid>
       </Grid>

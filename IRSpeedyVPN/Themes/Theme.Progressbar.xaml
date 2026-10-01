@@ -1,17 +1,17 @@
-﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"                    
                     xmlns:local="clr-namespace:IRSpeedyVPN.Components">
-    <SolidColorBrush x:Key="ProgressBarBorderBrush" Color="Gray" />
-    <SolidColorBrush x:Key="ProgressBarBackgroundBrush" Color="Gray" />
-    <SolidColorBrush x:Key="ProgressBarTrackBackgroundBrush" Color="#283569" />
+    <SolidColorBrush x:Key="ProgressBarBorderBrush" Color="{DynamicResource Theme.LegacyGrayStatusColor}" />
+    <SolidColorBrush x:Key="ProgressBarBackgroundBrush" Color="{DynamicResource Theme.LegacyGrayStatusColor}" />
+    <SolidColorBrush x:Key="ProgressBarTrackBackgroundBrush" Color="{DynamicResource Theme.LegacyButtonBottomColor}" />
 
     <Style x:Key="{x:Type ProgressBar}" TargetType="{x:Type ProgressBar}">
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type ProgressBar}">
                     <local:ClippingBorder x:Name="BorderBackground" CornerRadius="3" BorderThickness="0"
-                            BorderBrush="{StaticResource ProgressBarBorderBrush}"
-                            Background="{StaticResource ProgressBarBackgroundBrush}">
+                            BorderBrush="{DynamicResource ProgressBarBorderBrush}"
+                            Background="{DynamicResource ProgressBarBackgroundBrush}">
                         <Grid>
                             <VisualStateManager.VisualStateGroups>
                                 <VisualStateGroup x:Name="CommonStates">
@@ -21,7 +21,7 @@
                             </VisualStateManager.VisualStateGroups>
                             <Border x:Name="PART_Track" Margin="0" BorderThickness="0" CornerRadius="3" />
                             <Border x:Name="PART_Indicator" Margin="0" BorderThickness="0" CornerRadius="3" HorizontalAlignment="Left"
-                                    Background="{StaticResource ProgressBarTrackBackgroundBrush}" ClipToBounds="True">
+                                    Background="{DynamicResource ProgressBarTrackBackgroundBrush}" ClipToBounds="True">
                                 <Border x:Name="DiagonalDecorator" Width="5000">
                                     <Border.Background>
                                         <DrawingBrush TileMode="Tile" Stretch="None" Viewbox="0,0,1,1" Viewport="0,0,36,34" ViewportUnits="Absolute">

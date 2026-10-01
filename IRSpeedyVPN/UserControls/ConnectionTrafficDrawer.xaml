@@ -7,7 +7,7 @@
         ShowActivated="False" WindowStartupLocation="Manual" Width="440" Height="548"
         FlowDirection="LeftToRight" UseLayoutRounding="True" SnapsToDevicePixels="True"
         FontFamily="{StaticResource AppFontFamily}" Title="آمار مصرف IRSPEEDY"
-        PreviewKeyDown="Drawer_PreviewKeyDown">
+        PreviewKeyDown="Drawer_PreviewKeyDown" Foreground="{DynamicResource TextBodyBrush}">
   <!-- The clipping surface stays beside the connection window. Only its contents
        move, so opening never resizes or repaints the connection page. -->
   <Grid ClipToBounds="True" Background="Transparent">

@@ -1,4 +1,4 @@
-<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:IRSpeedyVPN.Components.ServerListControl" x:Class="IRSpeedyVPN.UserControls.UCServerList" mc:Ignorable="d" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Loaded="UserControl_Loaded" IsVisibleChanged="UserControl_IsVisibleChanged">
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" xmlns:local="clr-namespace:IRSpeedyVPN.Components.ServerListControl" x:Class="IRSpeedyVPN.UserControls.UCServerList" mc:Ignorable="d" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" Loaded="UserControl_Loaded" IsVisibleChanged="UserControl_IsVisibleChanged" Foreground="{DynamicResource TextBodyBrush}">
   <!--
         DESIGN-SPEC §3 "Content area": the service/protocol pickers (removed —
         the app now connects through a single default service, "xfast") are
@@ -12,15 +12,15 @@
       <RowDefinition Height="Auto"/>
     </Grid.RowDefinitions>
     <!-- Search field -->
-    <Border Grid.Row="0" Height="46" CornerRadius="12" Background="White" BorderBrush="{StaticResource SearchBorderBrush}" BorderThickness="1">
+    <Border Grid.Row="0" Height="46" CornerRadius="12" Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource SearchBorderBrush}" BorderThickness="1">
 
       <Grid Margin="14,0">
         <Grid.ColumnDefinitions>
           <ColumnDefinition Width="Auto"/>
           <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
-        <TextBox x:Name="txtSearch" Grid.Column="1" Background="White" BorderThickness="0" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeBody}" Foreground="{StaticResource TextBodyBrush}" VerticalContentAlignment="Center" HorizontalContentAlignment="Stretch" TextAlignment="Right" TextChanged="txtSearch_TextChanged" Language="fa-IR" AutomationProperties.Name="جستجوی سرورها"/>
-        <TextBlock Grid.Column="1" FontFamily="{StaticResource AppFontFamily}" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" FontSize="{StaticResource FontSizeBody}" Foreground="{StaticResource TextSecondaryBrush}" TextAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False">
+        <TextBox x:Name="txtSearch" Grid.Column="1" Background="{DynamicResource Theme.SurfaceBrush}" BorderThickness="0" FlowDirection="LeftToRight" FontFamily="{StaticResource AppFontFamily}" FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextBodyBrush}" VerticalContentAlignment="Center" HorizontalContentAlignment="Stretch" TextAlignment="Right" TextChanged="txtSearch_TextChanged" Language="fa-IR" AutomationProperties.Name="جستجوی سرورها" CaretBrush="{DynamicResource TextPrimaryBrush}"/>
+        <TextBlock Grid.Column="1" FontFamily="{StaticResource AppFontFamily}" FlowDirection="LeftToRight" HorizontalAlignment="Stretch" FontSize="{StaticResource FontSizeBody}" Foreground="{DynamicResource TextSecondaryBrush}" TextAlignment="Right" VerticalAlignment="Center" IsHitTestVisible="False">
           <TextBlock.Style>
             <Style TargetType="TextBlock">
               <Setter Property="Visibility" Value="Collapsed"/>
@@ -33,7 +33,7 @@
           </TextBlock.Style>
           <Run FlowDirection="RightToLeft" Text="جستجوی سرورها"/>
         </TextBlock>
-        <Path Grid.Column="0" Data="{StaticResource IconSearch}" Stretch="Uniform" Width="16" Height="16" Stroke="{StaticResource TextSecondaryBrush}" StrokeThickness="1.5" VerticalAlignment="Center" Margin="0,0,10,0" FlowDirection="LeftToRight"/>
+        <Path Grid.Column="0" Data="{StaticResource IconSearch}" Stretch="Uniform" Width="16" Height="16" Stroke="{DynamicResource TextSecondaryBrush}" StrokeThickness="1.5" VerticalAlignment="Center" Margin="0,0,10,0" FlowDirection="LeftToRight"/>
       </Grid>
     </Border>
     <!-- Smart Location + server rows -->
@@ -44,9 +44,9 @@
         <ControlTemplate TargetType="Button">
           <Grid x:Name="bd">
           <Grid.RenderTransform><TranslateTransform/></Grid.RenderTransform>
-          <Border CornerRadius="{StaticResource ConnectButtonCornerRadius}" Background="{StaticResource AccentGradientBrush}">
+          <Border CornerRadius="{StaticResource ConnectButtonCornerRadius}" Background="{DynamicResource AccentGradientBrush}">
             <Border.Effect>
-              <DropShadowEffect x:Name="ConnectShadow" Color="#1E3A8A" Opacity="0.5" BlurRadius="22" ShadowDepth="10" Direction="270"/>
+              <DropShadowEffect x:Name="ConnectShadow" Color="{DynamicResource AccentColor}" Opacity="0.5" BlurRadius="22" ShadowDepth="10" Direction="270"/>
             </Border.Effect>
           </Border>
             <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Center" VerticalAlignment="Center">

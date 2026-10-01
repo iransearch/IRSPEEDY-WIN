@@ -12,7 +12,7 @@
         AllowsTransparency="True"
         WindowStartupLocation="CenterOwner"
         ShowInTaskbar="False"
-        FontFamily="{StaticResource BKoodak}">
+        FontFamily="{StaticResource BKoodak}" Foreground="{DynamicResource TextBodyBrush}">
 
     <Window.Resources>
 
@@ -20,8 +20,8 @@
         <Style x:Key="OuterCard" TargetType="Border">
             <Setter Property="CornerRadius" Value="26"/>
             <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="BorderBrush" Value="#FF393F78"/>
-            <Setter Property="Background" Value="#CFFFFFFF"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Theme.LegacyAccentBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource Theme.LegacyOverlayBrush}"/>
             <Setter Property="SnapsToDevicePixels" Value="True"/>
         </Style>
 
@@ -29,8 +29,8 @@
         <Style x:Key="SettingRowBorder" TargetType="Border">
             <Setter Property="CornerRadius" Value="10"/>
             <Setter Property="BorderThickness" Value="1.5"/>
-            <Setter Property="BorderBrush" Value="#FF393F78"/>
-            <Setter Property="Background" Value="White"/>
+            <Setter Property="BorderBrush" Value="{DynamicResource Theme.LegacyAccentBrush}"/>
+            <Setter Property="Background" Value="{DynamicResource Theme.SurfaceBrush}"/>
             <Setter Property="Padding" Value="10,7"/>
             <Setter Property="Margin" Value="10,6,10,0"/>
         </Style>
@@ -47,8 +47,8 @@
             <!-- HEADER (same layout as VGAURDServiceSetting) -->
             <Border Grid.Row="0"
                     CornerRadius="24,24,0,0"
-                    Background="#E9ECF7"
-                    BorderBrush="#FF393F78"
+                    Background="{DynamicResource Theme.LegacySurfaceBrush}"
+                    BorderBrush="{DynamicResource Theme.LegacyAccentBrush}"
                     BorderThickness="0,0,0,1.5" >
                 <Grid Margin="10,0">
                     <Grid.ColumnDefinitions>
@@ -61,7 +61,7 @@
                                Text="Connection Test"
                                FontSize="18"
                                FontWeight="Bold"
-                               Foreground="#FF393F78"
+                               Foreground="{DynamicResource Theme.LegacyAccentBrush}"
                                VerticalAlignment="Center"
                                HorizontalAlignment="Center"/>
 
@@ -70,8 +70,8 @@
                             Width="26"
                             Height="26"
                             CornerRadius="13"
-                            Background="#F6DADA"
-                            BorderBrush="#C94B4B"
+                            Background="{DynamicResource Theme.LegacyDangerSurfaceBrush}"
+                            BorderBrush="{DynamicResource Theme.DangerBorderBrush}"
                             BorderThickness="1"
                             VerticalAlignment="Center"
                             HorizontalAlignment="Right"
@@ -79,7 +79,7 @@
                             MouseDown="btnClose_MouseDown">
                         <TextBlock Text="&#xF00D;"
                                    FontFamily="{StaticResource fa_ProLight}"
-                                   Foreground="#C01616"
+                                   Foreground="{DynamicResource Theme.DangerBrush}"
                                    FontSize="14"
                                    HorizontalAlignment="Center"
                                    VerticalAlignment="Center"/>
@@ -107,7 +107,7 @@
 
                             <TextBlock Text="Google"
                                        FontFamily="Arial"
-                                       Foreground="#FF0000FF"
+                                       Foreground="{DynamicResource Theme.LegacyBlueBrush}"
                                        FontSize="14"
                                        FontWeight="Bold"
                                        VerticalAlignment="Center"/>
@@ -115,7 +115,7 @@
                             <TextBlock x:Name="txtGoogle"
                                        Grid.Column="2"
                                        FontFamily="Arial"
-                                       Foreground="#FF008000"
+                                       Foreground="{DynamicResource Theme.LegacyGreenBrush}"
                                        Text="244ms"
                                        FontSize="14"
                                        FontWeight="Bold"
@@ -135,7 +135,7 @@
 
                             <TextBlock Text="Youtube"
                                        FontFamily="Arial"
-                                       Foreground="#FFFF0000"
+                                       Foreground="{DynamicResource Theme.LegacyRedBrush}"
                                        FontSize="14"
                                        FontWeight="Bold"
                                        VerticalAlignment="Center"/>
@@ -143,7 +143,7 @@
                             <TextBlock x:Name="txtYoutube"
                                        Grid.Column="2"
                                        FontFamily="Arial"
-                                       Foreground="#FF008000"
+                                       Foreground="{DynamicResource Theme.LegacyGreenBrush}"
                                        Text="244ms"
                                        FontSize="14"
                                        FontWeight="Bold"
@@ -171,7 +171,7 @@
                             <TextBlock x:Name="txtInstagram"
                                        Grid.Column="2"
                                        FontFamily="Arial"
-                                       Foreground="#FF008000"
+                                       Foreground="{DynamicResource Theme.LegacyGreenBrush}"
                                        Text="244ms"
                                        FontSize="14"
                                        FontWeight="Bold"
@@ -199,7 +199,7 @@
                             <TextBlock x:Name="txtTelegram"
                                        Grid.Column="2"
                                        FontFamily="Arial"
-                                       Foreground="#FF008000"
+                                       Foreground="{DynamicResource Theme.LegacyGreenBrush}"
                                        Text="244ms"
                                        FontSize="14"
                                        FontWeight="Bold"

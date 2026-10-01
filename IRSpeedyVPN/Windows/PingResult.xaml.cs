@@ -59,12 +59,12 @@ namespace IRSpeedyVPN.Windows
             if (value.HasValue)
             {
                 target.Text = $"{value.Value}ms";
-                target.Foreground = Brushes.Green;
+                target.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "ConnectedGreenBrush");
             }
             else
             {
                 target.Text = "Error";
-                target.Foreground = Brushes.Red;
+                target.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Theme.DangerBrush");
             }
         }
 

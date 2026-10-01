@@ -4,12 +4,12 @@
              FontFamily="{StaticResource AppFontFamily}"
              FlowDirection="RightToLeft" UseLayoutRounding="True"
              TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"
-             Unloaded="Panel_Unloaded" AutomationProperties.Name="آمار مصرف برنامه‌ها">
+             Unloaded="Panel_Unloaded" AutomationProperties.Name="آمار مصرف برنامه‌ها" Foreground="{DynamicResource TextBodyBrush}">
   <UserControl.Resources>
     <Style x:Key="TrafficSmallButton" TargetType="Button">
-      <Setter Property="Background" Value="{StaticResource SmartLocationBackgroundBrush}"/>
-      <Setter Property="Foreground" Value="{StaticResource AccentBrush}"/>
-      <Setter Property="BorderBrush" Value="{StaticResource SmartLocationBorderBrush}"/>
+      <Setter Property="Background" Value="{DynamicResource SmartLocationBackgroundBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource AccentBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource SmartLocationBorderBrush}"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Cursor" Value="Hand"/>
       <Setter Property="Template">
@@ -19,8 +19,8 @@
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
           </Border>
           <ControlTemplate.Triggers>
-            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource AccentBrush}"/></Trigger>
-            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{StaticResource AccentBrush}"/></Trigger>
+            <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger>
+            <Trigger Property="IsKeyboardFocused" Value="True"><Setter TargetName="Surface" Property="BorderBrush" Value="{DynamicResource AccentBrush}"/></Trigger>
             <Trigger Property="IsEnabled" Value="False"><Setter TargetName="Surface" Property="Opacity" Value="0.45"/></Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate></Setter.Value>
@@ -28,20 +28,20 @@
     </Style>
     <Style x:Key="TrafficSummaryLabel" TargetType="TextBlock">
       <Setter Property="FontSize" Value="11"/>
-      <Setter Property="Foreground" Value="{StaticResource IconStrokeBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource IconStrokeBrush}"/>
       <Setter Property="HorizontalAlignment" Value="Center"/>
     </Style>
     <Style x:Key="TrafficSummaryValue" TargetType="TextBlock">
       <Setter Property="FontSize" Value="15"/>
       <Setter Property="FontWeight" Value="Bold"/>
-      <Setter Property="Foreground" Value="{StaticResource TextPrimaryBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}"/>
       <Setter Property="HorizontalAlignment" Value="Center"/>
       <Setter Property="FlowDirection" Value="LeftToRight"/>
       <Setter Property="TextWrapping" Value="NoWrap"/>
     </Style>
     <Style x:Key="TrafficNumber" TargetType="TextBlock">
       <Setter Property="FontSize" Value="12"/>
-      <Setter Property="Foreground" Value="{StaticResource RowTitleBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource RowTitleBrush}"/>
       <Setter Property="HorizontalAlignment" Value="Center"/>
       <Setter Property="FlowDirection" Value="LeftToRight"/>
       <Setter Property="TextWrapping" Value="NoWrap"/>
@@ -64,7 +64,7 @@
         <Setter.Value>
           <ControlTemplate TargetType="Thumb">
             <Grid Background="Transparent">
-              <Border x:Name="Grip" Width="6" CornerRadius="3" Background="#D7DBE3"/>
+              <Border x:Name="Grip" Width="6" CornerRadius="3" Background="{DynamicResource Theme.ScrollThumbBrush}"/>
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="Grip" Property="Opacity" Value="0.8"/></Trigger>
@@ -111,14 +111,14 @@
       </Setter>
     </Style>
     <Style x:Key="TrafficColumnHeader" TargetType="DataGridColumnHeader">
-      <Setter Property="Foreground" Value="{StaticResource IconStrokeBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource IconStrokeBrush}"/>
       <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
       <Setter Property="FontSize" Value="11"/>
       <Setter Property="FontWeight" Value="Normal"/>
       <Setter Property="HorizontalContentAlignment" Value="Center"/>
       <Setter Property="Padding" Value="2,0"/>
       <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="BorderBrush" Value="{StaticResource StatCardBorderBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource StatCardBorderBrush}"/>
       <Setter Property="BorderThickness" Value="0,0,0,1"/>
       <Setter Property="Template">
         <Setter.Value>
@@ -140,7 +140,7 @@
                 <Setter TargetName="SortMark" Property="Visibility" Value="Visible"/>
               </Trigger>
               <Trigger Property="IsMouseOver" Value="True">
-                <Setter Property="Background" Value="{StaticResource RowHoverBrush}"/>
+                <Setter Property="Background" Value="{DynamicResource RowHoverBrush}"/>
               </Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -149,14 +149,14 @@
     </Style>
     <Style x:Key="TrafficRow" TargetType="DataGridRow">
       <Setter Property="Background" Value="Transparent"/>
-      <Setter Property="Foreground" Value="{StaticResource RowTitleBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource RowTitleBrush}"/>
       <Setter Property="BorderThickness" Value="0"/>
       <Style.Triggers>
         <Trigger Property="IsMouseOver" Value="True">
-          <Setter Property="Background" Value="{StaticResource RowHoverBrush}"/>
+          <Setter Property="Background" Value="{DynamicResource RowHoverBrush}"/>
         </Trigger>
         <Trigger Property="IsSelected" Value="True">
-          <Setter Property="Background" Value="{StaticResource SmartLocationBackgroundBrush}"/>
+          <Setter Property="Background" Value="{DynamicResource SmartLocationBackgroundBrush}"/>
         </Trigger>
       </Style.Triggers>
     </Style>
@@ -165,7 +165,7 @@
       <Setter Property="BorderBrush" Value="Transparent"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Padding" Value="2,0"/>
-      <Setter Property="Foreground" Value="{StaticResource RowTitleBrush}"/>
+      <Setter Property="Foreground" Value="{DynamicResource RowTitleBrush}"/>
       <Setter Property="Template">
         <Setter.Value>
           <ControlTemplate TargetType="DataGridCell">
@@ -178,7 +178,7 @@
       </Setter>
       <Style.Triggers>
         <Trigger Property="IsKeyboardFocusWithin" Value="True">
-          <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}"/>
+          <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}"/>
         </Trigger>
       </Style.Triggers>
     </Style>
@@ -194,20 +194,20 @@
       <Grid Margin="16,14,16,10">
         <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="Auto"/></Grid.ColumnDefinitions>
         <StackPanel>
-          <TextBlock Text="مصرف برنامه‌ها" FontSize="15" FontWeight="Bold" Foreground="{StaticResource TextPrimaryBrush}"/>
-          <TextBlock x:Name="TrafficSubtitle" Text="مصرف ثبت‌شده از آخرین ریست" FontSize="11" Margin="0,2,0,0" Foreground="{StaticResource IconStrokeBrush}"/>
+          <TextBlock Text="مصرف برنامه‌ها" FontSize="15" FontWeight="Bold" Foreground="{DynamicResource TextPrimaryBrush}"/>
+          <TextBlock x:Name="TrafficSubtitle" Text="مصرف ثبت‌شده از آخرین ریست" FontSize="11" Margin="0,2,0,0" Foreground="{DynamicResource IconStrokeBrush}"/>
         </StackPanel>
         <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
           <Button x:Name="ResetTrafficButton" Width="30" Height="30" Style="{StaticResource TrafficSmallButton}"
                   Click="Reset_Click" ToolTip="ریست آمار مصرف" AutomationProperties.Name="ریست آمار مصرف">
             <Viewbox Width="15" Height="15"><Canvas Width="16" Height="16">
               <Path Data="M12.6,5.4 A5,5 0 1 0 13,9 M12.6,1.8 L12.6,5.5 L8.9,5.5"
-                    Stroke="{StaticResource AccentBrush}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+                    Stroke="{DynamicResource AccentBrush}" StrokeThickness="1.5" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
             </Canvas></Viewbox>
           </Button>
         </StackPanel>
       </Grid>
-      <Border Grid.Row="1" Margin="16,0,16,10" Padding="2,8" CornerRadius="12" Background="{StaticResource WindowBackgroundFallbackBrush}"
+      <Border Grid.Row="1" Margin="16,0,16,10" Padding="2,8" CornerRadius="12" Background="{DynamicResource WindowBackgroundFallbackBrush}"
               ToolTip="مجموع مصرف ثبت‌شدهٔ برنامه‌هایی که از کور عبور کرده‌اند">
         <Grid>
           <Grid.ColumnDefinitions><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -218,7 +218,7 @@
               <TextBlock x:Name="DownloadSummaryUnit" Text="B" Style="{StaticResource TrafficUnit}" VerticalAlignment="Center" Margin="3,0,0,0"/>
             </StackPanel>
           </StackPanel>
-          <Border Grid.Column="1" BorderBrush="{StaticResource StatCardBorderBrush}" BorderThickness="1,0">
+          <Border Grid.Column="1" BorderBrush="{DynamicResource StatCardBorderBrush}" BorderThickness="1,0">
             <StackPanel>
               <TextBlock Text="آپلود" Style="{StaticResource TrafficSummaryLabel}"/>
               <StackPanel Orientation="Horizontal" FlowDirection="LeftToRight" HorizontalAlignment="Center">
@@ -241,7 +241,7 @@
                 CanUserReorderColumns="False" CanUserResizeColumns="False" CanUserResizeRows="False"
                 SelectionMode="Single" SelectionUnit="FullRow" HeadersVisibility="Column" RowHeaderWidth="0"
                 RowHeight="36" ColumnHeaderHeight="34" BorderThickness="0" Background="Transparent"
-                GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{StaticResource StatCardDividerBrush}"
+                GridLinesVisibility="Horizontal" HorizontalGridLinesBrush="{DynamicResource StatCardDividerBrush}"
                 RowStyle="{StaticResource TrafficRow}" CellStyle="{StaticResource TrafficCell}"
                 ColumnHeaderStyle="{StaticResource TrafficColumnHeader}" ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                 ScrollViewer.VerticalScrollBarVisibility="Auto" EnableRowVirtualization="True"
@@ -291,29 +291,29 @@
         </DataGrid.Columns>
       </DataGrid>
       <TextBlock x:Name="EmptyTrafficText" Grid.Row="2" Text="هنوز مصرفی ثبت نشده است" Margin="20,45,20,0"
-                 VerticalAlignment="Top" HorizontalAlignment="Center" FontSize="12" Foreground="{StaticResource IconStrokeBrush}"
+                 VerticalAlignment="Top" HorizontalAlignment="Center" FontSize="12" Foreground="{DynamicResource IconStrokeBrush}"
                  IsHitTestVisible="False"/>
-      <Border Grid.Row="3" BorderBrush="{StaticResource StatCardDividerBrush}" BorderThickness="0,1,0,0"
-              Background="{StaticResource WindowBackgroundFallbackBrush}" CornerRadius="0,0,18,18" Padding="16,0">
+      <Border Grid.Row="3" BorderBrush="{DynamicResource StatCardDividerBrush}" BorderThickness="0,1,0,0"
+              Background="{DynamicResource WindowBackgroundFallbackBrush}" CornerRadius="0,0,18,18" Padding="16,0">
         <Grid>
-          <TextBlock x:Name="TrafficCount" Text="۰ برنامه" FontSize="11" Foreground="{StaticResource IconStrokeBrush}"
+          <TextBlock x:Name="TrafficCount" Text="۰ برنامه" FontSize="11" Foreground="{DynamicResource IconStrokeBrush}"
                      HorizontalAlignment="Right" VerticalAlignment="Center"/>
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center">
-            <Ellipse x:Name="TrafficStatusDot" Width="5" Height="5" Fill="{StaticResource ConnectedGreenBrush}" Margin="0,0,5,0"/>
-            <TextBlock x:Name="TrafficStatus" Text="در انتظار آمار" FontSize="10" MaxWidth="235" TextTrimming="CharacterEllipsis" Foreground="{StaticResource IconStrokeBrush}"/>
+            <Ellipse x:Name="TrafficStatusDot" Width="5" Height="5" Fill="{DynamicResource ConnectedGreenBrush}" Margin="0,0,5,0"/>
+            <TextBlock x:Name="TrafficStatus" Text="در انتظار آمار" FontSize="10" MaxWidth="235" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource IconStrokeBrush}"/>
           </StackPanel>
         </Grid>
       </Border>
-      <Border x:Name="ResetConfirmation" Grid.RowSpan="4" Visibility="Collapsed" Background="#EFFFFFFF" CornerRadius="18" Padding="22">
+      <Border x:Name="ResetConfirmation" Grid.RowSpan="4" Visibility="Collapsed" Background="{DynamicResource Theme.OverlayBrush}" CornerRadius="18" Padding="22">
         <StackPanel VerticalAlignment="Center">
-          <TextBlock Text="آمار مصرف صفر شود؟" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{StaticResource TextPrimaryBrush}"/>
+          <TextBlock Text="آمار مصرف صفر شود؟" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" Foreground="{DynamicResource TextPrimaryBrush}"/>
           <TextBlock Text="مصرف ذخیره‌شدهٔ همهٔ برنامه‌ها پاک می‌شود و شمارش از همین لحظه ادامه پیدا می‌کند."
-                     TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Margin="0,12,0,18" Foreground="{StaticResource IconStrokeBrush}"/>
+                     TextWrapping="Wrap" TextAlignment="Center" FontSize="12" Margin="0,12,0,18" Foreground="{DynamicResource IconStrokeBrush}"/>
           <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
             <Button x:Name="ConfirmResetButton" Content="ریست آمار" Padding="14,9" Style="{StaticResource TrafficSmallButton}" Click="ConfirmReset_Click"/>
             <Button x:Name="CancelResetButton" Content="انصراف" Padding="14,9" Margin="10,0,0,0" Style="{StaticResource TrafficSmallButton}" Click="CancelReset_Click"/>
           </StackPanel>
-          <TextBlock x:Name="ResetError" TextWrapping="Wrap" TextAlignment="Center" FontSize="11" Margin="0,12,0,0" Foreground="#B91C1C"/>
+          <TextBlock x:Name="ResetError" TextWrapping="Wrap" TextAlignment="Center" FontSize="11" Margin="0,12,0,0" Foreground="{DynamicResource Theme.DangerBrush}"/>
         </StackPanel>
       </Border>
     </Grid>

@@ -1,0 +1,40 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Native control templates and detached popups must follow the app too. -->
+  <SolidColorBrush x:Key="{x:Static SystemColors.WindowBrushKey}" Color="{DynamicResource Theme.SurfaceColor}"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.ControlBrushKey}" Color="{DynamicResource Theme.SurfaceColor}"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.WindowTextBrushKey}" Color="{DynamicResource TextBodyColor}"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.ControlTextBrushKey}" Color="{DynamicResource TextBodyColor}"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.GrayTextBrushKey}" Color="{DynamicResource TextMutedColor}"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.MenuBrushKey}" Color="{DynamicResource Theme.SurfaceColor}"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.MenuTextBrushKey}" Color="{DynamicResource TextBodyColor}"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.HighlightBrushKey}" Color="{DynamicResource AccentGradientTopColor}"/>
+  <SolidColorBrush x:Key="{x:Static SystemColors.HighlightTextBrushKey}" Color="White"/>
+  <Style TargetType="ToolTip">
+    <Setter Property="Background" Value="{DynamicResource Theme.SurfaceBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextBodyBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}"/>
+    <Setter Property="Padding" Value="10,6"/>
+    <Setter Property="Template">
+      <Setter.Value><ControlTemplate TargetType="ToolTip">
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="{TemplateBinding Padding}">
+          <ContentPresenter/>
+        </Border>
+      </ControlTemplate></Setter.Value>
+    </Setter>
+  </Style>
+  <Style TargetType="ContextMenu">
+    <Setter Property="Background" Value="{DynamicResource Theme.SurfaceBrush}"/>
+    <Setter Property="Foreground" Value="{DynamicResource TextBodyBrush}"/>
+    <Setter Property="BorderBrush" Value="{DynamicResource FieldBorderBrush}"/>
+    <Setter Property="Template">
+      <Setter.Value><ControlTemplate TargetType="ContextMenu">
+        <Border Background="{TemplateBinding Background}" BorderBrush="{TemplateBinding BorderBrush}"
+                BorderThickness="1" CornerRadius="8" Padding="4">
+          <ItemsPresenter KeyboardNavigation.DirectionalNavigation="Cycle"/>
+        </Border>
+      </ControlTemplate></Setter.Value>
+    </Setter>
+  </Style>
+</ResourceDictionary>

@@ -607,6 +607,7 @@ namespace IRSpeedyVPN
             // Navigation to an error/update/login page cancels a queued login result.
             loginServerListPending = false;
             txtVersion.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
+            LoginThemeToggle.Visibility = ReferenceEquals(ctrl, uCLogin) ? Visibility.Visible : Visibility.Collapsed;
             btnSettings.Visibility = Visibility.Collapsed;
             accountMenu.IsEnabled = IsUserLogin && !ReferenceEquals(ctrl, uCUserInfo);
             settingsMenu.IsEnabled = IsUserLogin;
@@ -704,7 +705,7 @@ namespace IRSpeedyVPN
                             Width = 17, Height = 17, Stretch = Stretch.Uniform, FlowDirection = FlowDirection.LeftToRight,
                             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round }
                         : icon.Icon,
-                    // Dark icons on the opaque light header.
+                    // The shared brush follows the selected application palette.
                     Foreground = (Brush)FindResource("IconStrokeBrush"),
                     FontFamily = (FontFamily)FindResource("fa_ProLight"),
                     FontSize = 16,
@@ -747,7 +748,8 @@ namespace IRSpeedyVPN
                 
                 if (!string.IsNullOrEmpty(Message))
                 {
-                    lblErrorMessage.Foreground = success ? Brushes.DarkGreen : Brushes.Red;
+                    lblErrorMessage.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty,
+                        success ? "ConnectedGreenBrush" : "Theme.DangerBrush");
                     //ShowNotifiy("Conection Status", Message);
                     if (Message.Contains("The remote name could not be resolved: 'apichcek-p.isdm.ir'"))
                         lblErrorMessage.Text = "وب سرویس اعتبارسنجی در دسترس نیست";

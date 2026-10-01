@@ -26,7 +26,7 @@
     <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
     <Setter Property="FontFamily" Value="{StaticResource Font.ExtraBold}" />
     <Setter Property="FontSize" Value="16" />
-    <Setter Property="Foreground" Value="#141B33" />
+    <Setter Property="Foreground" Value="{DynamicResource TextPrimaryBrush}" />
     <Setter Property="HorizontalAlignment" Value="Center" />
   </Style>
 
@@ -36,7 +36,7 @@
     <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
     <Setter Property="FontFamily" Value="{StaticResource Font.Medium}" />
     <Setter Property="FontSize" Value="10.5" />
-    <Setter Property="Foreground" Value="#9CA3B4" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
     <Setter Property="HorizontalAlignment" Value="Center" />
     <Setter Property="Margin" Value="0,1,0,0" />
   </Style>
@@ -48,7 +48,7 @@
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="FontSize" Value="13.5" />
-    <Setter Property="Foreground" Value="#1B2033" />
+    <Setter Property="Foreground" Value="{DynamicResource RowTitleBrush}" />
     <Setter Property="TextTrimming" Value="CharacterEllipsis" />
   </Style>
 
@@ -58,7 +58,7 @@
     <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
     <Setter Property="FontSize" Value="10.5" />
-    <Setter Property="Foreground" Value="#9CA3B4" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
     <Setter Property="TextTrimming" Value="CharacterEllipsis" />
     <Setter Property="Margin" Value="0,1,0,0" />
   </Style>
@@ -79,7 +79,7 @@
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="FontSize" Value="13" />
-    <Setter Property="Foreground" Value="#1B2033" />
+    <Setter Property="Foreground" Value="{DynamicResource RowTitleBrush}" />
   </Style>
 
   <!-- Activation row status line — 10.5px, 400, color set by binding -->
@@ -99,7 +99,7 @@
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="FontSize" Value="13" />
-    <Setter Property="Foreground" Value="#1B2033" />
+    <Setter Property="Foreground" Value="{DynamicResource RowTitleBrush}" />
     <Setter Property="TextTrimming" Value="CharacterEllipsis" />
   </Style>
   <Style x:Key="Text.AppCategory" TargetType="TextBlock">
@@ -107,7 +107,7 @@
     <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
     <Setter Property="FontSize" Value="10" />
-    <Setter Property="Foreground" Value="#9CA3B4" />
+    <Setter Property="Foreground" Value="{DynamicResource TextSecondaryBrush}" />
     <Setter Property="TextTrimming" Value="CharacterEllipsis" />
   </Style>
 
@@ -117,7 +117,7 @@
     <Setter Property="LineStackingStrategy" Value="BlockLineHeight"/>
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
     <Setter Property="FontSize" Value="11.5" />
-    <Setter Property="Foreground" Value="#6B7280" />
+    <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
     <Setter Property="VerticalAlignment" Value="Center" />
   </Style>
 

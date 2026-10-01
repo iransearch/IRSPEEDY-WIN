@@ -134,7 +134,8 @@ namespace IRSpeedyVPN.UserControls
         public bool LineDone => HasLine && IsDone;
         public bool LineActive => HasLine && IsActive;
         public FontWeight LabelWeight => IsActive ? FontWeights.Bold : FontWeights.Medium;
-        public Brush LabelBrush => (Brush)new BrushConverter().ConvertFromString(IsDone ? "#159A63" : IsActive ? "#141B33" : "#9CA3B4");
+        public Brush LabelBrush => Application.Current?.TryFindResource(
+            IsDone ? "Theme.StatusGreenBrush" : IsActive ? "TextPrimaryBrush" : "TextSecondaryBrush") as Brush ?? Brushes.Gray;
         public event PropertyChangedEventHandler PropertyChanged;
         public void SetState(int value) { if (state == value) return; state = value; PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(null)); }
     }

@@ -1,4 +1,4 @@
-<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker" mc:Ignorable="d" Loaded="Picker_Loaded" Unloaded="Picker_Unloaded" IsVisibleChanged="Picker_IsVisibleChanged" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}">
+<UserControl xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker" mc:Ignorable="d" Loaded="Picker_Loaded" Unloaded="Picker_Unloaded" IsVisibleChanged="Picker_IsVisibleChanged" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" Foreground="{DynamicResource TextBodyBrush}">
   <UserControl.Resources>
   <DrawingImage x:Key="Mosaic.SmartSelection">
     <DrawingImage.Drawing>
@@ -81,7 +81,7 @@
         <Setter.Value>
           <ControlTemplate TargetType="Thumb">
             <Grid Background="Transparent">
-              <Border x:Name="grip" Width="6" CornerRadius="3" Background="#D7DBE3" Opacity="1"/>
+              <Border x:Name="grip" Width="6" CornerRadius="3" Background="{DynamicResource Theme.ScrollThumbBrush}" Opacity="1"/>
             </Grid>
             <ControlTemplate.Triggers>
               <Trigger Property="IsMouseOver" Value="True">
@@ -140,8 +140,8 @@
     <!-- The whole card supports mouse, keyboard and assistive technology. -->
     <Style x:Key="ServerCardButton" TargetType="Button">
       <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
-      <Setter Property="Background" Value="White"/>
-      <Setter Property="BorderBrush" Value="#0D1E2D5A"/>
+      <Setter Property="Background" Value="{DynamicResource Theme.SurfaceBrush}"/>
+      <Setter Property="BorderBrush" Value="{DynamicResource Theme.CardSoftBorderBrush}"/>
       <Setter Property="BorderThickness" Value="1"/>
       <Setter Property="Padding" Value="12,10"/>
       <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
@@ -159,7 +159,7 @@
               </Border>
             </Grid>
             <ControlTemplate.Triggers>
-              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CardSurface" Property="Background" Value="#F3F5F9"/></Trigger>
+              <Trigger Property="IsMouseOver" Value="True"><Setter TargetName="CardSurface" Property="Background" Value="{DynamicResource RowHoverBrush}"/></Trigger>
               <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/></Trigger>
             </ControlTemplate.Triggers>
           </ControlTemplate>
@@ -173,8 +173,8 @@
       <Button x:Name="smartCard" FontFamily="{StaticResource AppFontFamily}" Height="82" FlowDirection="RightToLeft" Cursor="Hand" Click="SmartCard_Click" SizeChanged="SmartCard_SizeChanged" AutomationProperties.Name="انتخاب هوشمند">
         <Button.Template>
           <ControlTemplate TargetType="Button">
-            <Border BorderBrush="#C9DBFB" BorderThickness="1" CornerRadius="14">
-              <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#EFF5FF" Offset="0"/><GradientStop Color="#E6F0FE" Offset="1"/></LinearGradientBrush></Border.Background>
+            <Border BorderBrush="{DynamicResource ServerCardBorderBrush}" BorderThickness="1" CornerRadius="14">
+              <Border.Background><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="{DynamicResource SmartLocationBgTopColor}" Offset="0"/><GradientStop Color="{DynamicResource SmartLocationBgBottomColor}" Offset="1"/></LinearGradientBrush></Border.Background>
               <ContentPresenter Margin="12,0"/>
             </Border>
           </ControlTemplate>
@@ -189,17 +189,17 @@
                 </Grid.ColumnDefinitions>
 
                 <Grid Grid.Column="0" Width="18" Height="18" VerticalAlignment="Center">
-<Ellipse Stroke="#D9DEE7" StrokeThickness="1.5"/>
-<Grid x:Name="smartCheck" Margin="-4" Visibility="Collapsed"><Ellipse Fill="White" Stroke="#C9DBFB" StrokeThickness="1"/><Ellipse Width="18" Height="18" Fill="{StaticResource AccentBrush}"/></Grid>
+<Ellipse Stroke="{DynamicResource Theme.SelectionRingBrush}" StrokeThickness="1.5"/>
+<Grid x:Name="smartCheck" Margin="-4" Visibility="Collapsed"><Ellipse Fill="{DynamicResource Theme.SurfaceBrush}" Stroke="{DynamicResource ServerCardBorderBrush}" StrokeThickness="1"/><Ellipse Width="18" Height="18" Fill="{DynamicResource AccentBrush}"/></Grid>
 </Grid>
 
                 <StackPanel Grid.Column="2" VerticalAlignment="Center">
                   <StackPanel Orientation="Horizontal">
-                    <TextBlock Text="انتخاب هوشمند" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontSize="14" Foreground="#142057" VerticalAlignment="Center" />
+                    <TextBlock Text="انتخاب هوشمند" FontFamily="{StaticResource AppFontFamilyExtraBold}" FontSize="14" Foreground="{DynamicResource SmartLocationTitleBrush}" VerticalAlignment="Center" />
                     <Path Data="M13 2L4.5 13.5H11L9.5 22L19.5 9.5H13L13 2Z" Fill="#F5B301" Width="16" Height="16" Stretch="Uniform" FlowDirection="LeftToRight" Margin="5,0,0,0" VerticalAlignment="Center"/>
                   </StackPanel>
                   <TextBlock Text="بهترین سرور بر اساس موقعیت شما" Margin="0,3,0,0" TextTrimming="CharacterEllipsis"
-                             FontFamily="{StaticResource AppFontFamily}" FontSize="11" Foreground="#5B6BA8" />
+                             FontFamily="{StaticResource AppFontFamily}" FontSize="11" Foreground="{DynamicResource SmartLocationSubtitleBrush}" />
                 </StackPanel>
 
                 <!-- FLAG MOSAIC 140x58: one rounded rectangle cut diagonally into Iran · Turkey · Germany · Netherlands -->
@@ -217,9 +217,9 @@
                   </Grid.Style>
 
                   <!-- shadow + hairline: 0 0 0 1px rgba(16,24,40,.08), 0 8px 16px -8px rgba(30,58,138,.45) -->
-                  <Border CornerRadius="12" Background="White" BorderBrush="#14101828" BorderThickness="1">
+                  <Border CornerRadius="12" Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource Theme.InnerBorderBrush}" BorderThickness="1">
                     <Border.Effect>
-                      <DropShadowEffect BlurRadius="14" ShadowDepth="5" Direction="270" Opacity="0.35" Color="#1E3A8A" />
+                      <DropShadowEffect BlurRadius="14" ShadowDepth="5" Direction="270" Opacity="0.35" Color="{DynamicResource AccentColor}" />
                     </Border.Effect>
                   </Border>
 
@@ -264,20 +264,20 @@
               <Grid FlowDirection="LeftToRight">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
                 <Grid Grid.Column="3" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center">
-                  <Ellipse Stroke="#D9DEE7" StrokeThickness="1.5"/>
+                  <Ellipse Stroke="{DynamicResource Theme.SelectionRingBrush}" StrokeThickness="1.5"/>
                   <Grid Margin="-4">
                     <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsSelectedCountry}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
-                    <Ellipse Fill="White" Stroke="#C9DBFB" StrokeThickness="1"/>
-                    <Ellipse Width="18" Height="18" Fill="{StaticResource AccentBrush}"/>
+                    <Ellipse Fill="{DynamicResource Theme.SurfaceBrush}" Stroke="{DynamicResource ServerCardBorderBrush}" StrokeThickness="1"/>
+                    <Ellipse Width="18" Height="18" Fill="{DynamicResource AccentBrush}"/>
                   </Grid>
                 </Grid>
                 <Grid Grid.Column="2" Width="30" Height="30" FlowDirection="LeftToRight">
-                  <Ellipse Fill="#F3F5F9" Stroke="#0D101828" StrokeThickness="1"/>
+                  <Ellipse Fill="{DynamicResource RowHoverBrush}" Stroke="{DynamicResource Theme.ThinBorderBrush}" StrokeThickness="1"/>
                   <Ellipse>
                     <Ellipse.Fill><ImageBrush ImageSource="{Binding FlagSource}" Stretch="UniformToFill"/></Ellipse.Fill>
                     <Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding HasFlag}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Ellipse.Style>
                   </Ellipse>
-                  <TextBlock Text="{Binding Initials}" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="13" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Initials}" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="13" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible"/><Style.Triggers><DataTrigger Binding="{Binding HasFlag}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                   </TextBlock>
                   <!-- Same diagonal white sheen as the smart flag, only while this row is probing. -->
@@ -295,7 +295,7 @@
                     </Rectangle>
                   </Grid>
                 </Grid>
-                <TextBlock Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="#1B2033" TextAlignment="Right" VerticalAlignment="Center" Margin="10,0" ToolTip="{Binding CountryName}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/></TextBlock>
+                <TextBlock Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" VerticalAlignment="Center" Margin="10,0" ToolTip="{Binding CountryName}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/></TextBlock>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
                   <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                   <StackPanel ToolTip="{Binding SignalToolTip}">
@@ -308,6 +308,6 @@
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </ScrollViewer>
-    <TextBlock x:Name="EmptyResults" Grid.Row="1" Text="سروری پیدا نشد" FontSize="13" Foreground="{StaticResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"/>
+    <TextBlock x:Name="EmptyResults" Grid.Row="1" Text="سروری پیدا نشد" FontSize="13" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"/>
   </Grid>
 </UserControl>

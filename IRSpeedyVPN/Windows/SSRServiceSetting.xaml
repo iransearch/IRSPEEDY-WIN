@@ -7,14 +7,14 @@
         xmlns:ToggleSwitch="clr-namespace:ToggleSwitch"
         mc:Ignorable="d"
         Title="SSRServiceSetting" Height="175.63" Width="250"
-        Background="Transparent"  WindowStyle="None" AllowsTransparency="True" WindowStartupLocation="CenterOwner" FontFamily="{StaticResource BKoodak}" ShowInTaskbar="False">
-    <Border BorderBrush="#FF393F78"
+        Background="Transparent"  WindowStyle="None" AllowsTransparency="True" WindowStartupLocation="CenterOwner" FontFamily="{StaticResource BKoodak}" ShowInTaskbar="False" Foreground="{DynamicResource TextBodyBrush}">
+    <Border BorderBrush="{DynamicResource Theme.LegacyAccentBrush}"
              BorderThickness="1.5"
              CornerRadius="20"
-             Background="#CFFFFFFF"
+             Background="{DynamicResource Theme.LegacyOverlayBrush}"
             >
         <Grid Width="240">
-            <Label Style="{StaticResource LabelButton}" Background="{x:Null}"  Foreground="Red" FontSize="20" Content="&#xF00D;" Width="30" Height="30" FontFamily="{StaticResource fa_ProLight}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,2,5,0" MouseDown="btnClose_MouseDown"
+            <Label Style="{StaticResource LabelButton}" Background="{x:Null}"  Foreground="{DynamicResource Theme.LegacyRedBrush}" FontSize="20" Content="&#xF00D;" Width="30" Height="30" FontFamily="{StaticResource fa_ProLight}" VerticalAlignment="Top" HorizontalAlignment="Right" Margin="0,2,5,0" MouseDown="btnClose_MouseDown"
                 ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="خروج"/>
 
             <StackPanel Background="Transparent" Orientation="Vertical" VerticalAlignment="Stretch" Margin="0 40 0 0">
@@ -34,7 +34,7 @@
                     IsChecked="True" HorizontalAlignment="Left" />
                 </Grid>
 
-                <Button Style="{StaticResource RoundCornerLoading}" x:Name="btnOK" Width="100" Height="30" Foreground="#ff000000" Content="تایید"  Background="#FF172458" BorderBrush="{x:Null}" Click="btnOK_Click" Margin="0 20" Visibility="Visible"/>
+                <Button Style="{StaticResource RoundCornerLoading}" x:Name="btnOK" Width="100" Height="30" Foreground="{DynamicResource Theme.LegacyBlackBrush}" Content="تایید"  Background="{DynamicResource Theme.LegacyButtonTopBrush}" BorderBrush="{x:Null}" Click="btnOK_Click" Margin="0 20" Visibility="Visible"/>
 
             </StackPanel>
         </Grid>

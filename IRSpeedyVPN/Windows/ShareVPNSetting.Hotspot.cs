@@ -33,7 +33,7 @@ namespace IRSpeedyVPN.Windows
                 && (Service as IHotspotSource)?.CaptureTun() != null;
             hotspotToggle.IsChecked = running;
             hotspotStateLabel.Text = active ? "فعال" : starting ? "در حال راه‌اندازی…" : "غیرفعال";
-            hotspotStateLabel.Foreground = active ? System.Windows.Media.Brushes.MediumSeaGreen : System.Windows.Media.Brushes.Gray;
+            hotspotStateLabel.SetResourceReference(ForegroundProperty, active ? "ConnectedGreenBrush" : "TextMutedBrush");
             DirectMotion.Visibility = active ? Visibility.Visible : Visibility.Collapsed;
             DirectOffHint.Visibility = !showCredentials && !editPasswordRequested ? Visibility.Visible : Visibility.Collapsed;
             PasswordEditorPanel.Visibility = view.State == "off" && editPasswordRequested ? Visibility.Visible : Visibility.Collapsed;

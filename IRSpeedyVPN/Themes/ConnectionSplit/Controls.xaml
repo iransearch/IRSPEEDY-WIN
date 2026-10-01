@@ -25,7 +25,7 @@
     <Setter Property="SizeToContent" Value="Manual" />
     <Setter Property="FlowDirection" Value="RightToLeft" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
-    <Setter Property="Foreground" Value="{StaticResource Brush.TextPrimary}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
     <Setter Property="UseLayoutRounding" Value="True" />
     <Setter Property="SnapsToDevicePixels" Value="True" />
     <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
@@ -69,13 +69,13 @@
       <Setter.Value>
         <ControlTemplate TargetType="Button">
           <Grid x:Name="Root" RenderTransformOrigin="0.5,0.5" Background="Transparent">
-            <Ellipse x:Name="Disc" Fill="{StaticResource Brush.CloseGradient}">
+            <Ellipse x:Name="Disc" Fill="{DynamicResource Brush.CloseGradient}">
               <Ellipse.Effect>
-                <DropShadowEffect BlurRadius="12" ShadowDepth="4" Direction="270" Opacity="0.45" Color="#DC2626" />
+                <DropShadowEffect BlurRadius="12" ShadowDepth="4" Direction="270" Opacity="0.45" Color="{DynamicResource DisconnectGradientTopColor}" />
               </Ellipse.Effect>
             </Ellipse>
             <Control Template="{StaticResource Icon.Close}" Foreground="White" Width="12" Height="12" />
-            <Ellipse x:Name="FocusRing" Margin="-3" Stroke="{StaticResource Brush.Accent}" StrokeThickness="2" Visibility="Collapsed" />
+            <Ellipse x:Name="FocusRing" Margin="-3" Stroke="{DynamicResource Brush.Accent}" StrokeThickness="2" Visibility="Collapsed" />
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
@@ -106,12 +106,12 @@
       <Setter.Value>
         <ControlTemplate TargetType="Button">
           <Grid x:Name="Root">
-            <Border x:Name="Body" CornerRadius="14" Background="{StaticResource Brush.PrimaryGradient}">
+            <Border x:Name="Body" CornerRadius="14" Background="{DynamicResource Brush.PrimaryGradient}">
               <Border.Effect>
-                <DropShadowEffect BlurRadius="18" ShadowDepth="6" Direction="270" Opacity="0.35" Color="#1E3A8A" />
+                <DropShadowEffect BlurRadius="18" ShadowDepth="6" Direction="270" Opacity="0.35" Color="{DynamicResource AccentColor}" />
               </Border.Effect>
             </Border>
-            <Border x:Name="FocusRing" CornerRadius="16" Margin="-3" BorderBrush="{StaticResource Brush.Accent}" BorderThickness="2" Opacity="0.5" Visibility="Collapsed" />
+            <Border x:Name="FocusRing" CornerRadius="16" Margin="-3" BorderBrush="{DynamicResource Brush.Accent}" BorderThickness="2" Opacity="0.5" Visibility="Collapsed" />
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Grid>
           <ControlTemplate.Triggers>
@@ -121,7 +121,7 @@
               </Setter>
               <Setter TargetName="Body" Property="Effect">
                 <Setter.Value>
-                  <DropShadowEffect BlurRadius="22" ShadowDepth="7" Direction="270" Opacity="0.45" Color="#1E3A8A" />
+                  <DropShadowEffect BlurRadius="22" ShadowDepth="7" Direction="270" Opacity="0.45" Color="{DynamicResource AccentColor}" />
                 </Setter.Value>
               </Setter>
             </Trigger>
@@ -141,7 +141,7 @@
        Text-only link button — "انتخاب همه"
        ============================================================ -->
   <Style x:Key="LinkButtonStyle" TargetType="Button">
-    <Setter Property="Foreground" Value="{StaticResource Brush.Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
     <Setter Property="FontWeight" Value="Bold" />
     <Setter Property="FontSize" Value="11.5" />
@@ -174,15 +174,15 @@
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="Button">
-          <Border x:Name="Body" CornerRadius="14" Background="White" BorderThickness="1" BorderBrush="{StaticResource Brush.CardBorder}">
+          <Border x:Name="Body" CornerRadius="14" Background="{DynamicResource Theme.SurfaceBrush}" BorderThickness="1" BorderBrush="{DynamicResource Brush.CardBorder}">
             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
           </Border>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Body" Property="Background" Value="{StaticResource Brush.RemoveHoverBg}" />
+              <Setter TargetName="Body" Property="Background" Value="{DynamicResource Brush.RemoveHoverBg}" />
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter TargetName="Body" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+              <Setter TargetName="Body" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -204,19 +204,19 @@
         <ControlTemplate TargetType="Button">
           <Grid>
             <Rectangle x:Name="Outline" RadiusX="12" RadiusY="12"
-                       Fill="{StaticResource Brush.AddBg}"
-                       Stroke="{StaticResource Brush.AddBorder}" StrokeThickness="1.5"
+                       Fill="{DynamicResource Brush.AddBg}"
+                       Stroke="{DynamicResource Brush.AddBorder}" StrokeThickness="1.5"
                        StrokeDashArray="4 3" />
             <ContentPresenter Margin="14,0" VerticalAlignment="Center"
                               HorizontalAlignment="{TemplateBinding HorizontalContentAlignment}" />
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
-              <Setter TargetName="Outline" Property="Fill" Value="{StaticResource Brush.AddBgHover}" />
-              <Setter TargetName="Outline" Property="Stroke" Value="{StaticResource Brush.AddBorderHover}" />
+              <Setter TargetName="Outline" Property="Fill" Value="{DynamicResource Brush.AddBgHover}" />
+              <Setter TargetName="Outline" Property="Stroke" Value="{DynamicResource Brush.AddBorderHover}" />
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
-              <Setter TargetName="Outline" Property="Stroke" Value="{StaticResource Brush.Accent}" />
+              <Setter TargetName="Outline" Property="Stroke" Value="{DynamicResource Brush.Accent}" />
             </Trigger>
           </ControlTemplate.Triggers>
         </ControlTemplate>
@@ -226,30 +226,30 @@
 
   <!-- ============================================================
        Search box (44px) with placeholder in Tag
-       Usage: <TextBox Style="{StaticResource SearchBoxStyle}" Tag="جستجوی برنامه" .../>
+       Usage: <TextBox Style="{StaticResource SearchBoxStyle}" Tag="جستجوی برنامه" ... Foreground="{DynamicResource TextBodyBrush}" CaretBrush="{DynamicResource TextPrimaryBrush}"/>
        ============================================================ -->
   <Style x:Key="SearchBoxStyle" TargetType="TextBox">
     <Setter Property="Height" Value="44" />
     <Setter Property="FontFamily" Value="{StaticResource Font.Regular}" />
     <Setter Property="FontSize" Value="14" />
-    <Setter Property="Foreground" Value="{StaticResource Brush.TextInput}" />
-    <Setter Property="CaretBrush" Value="{StaticResource Brush.Accent}" />
+    <Setter Property="Foreground" Value="{DynamicResource Brush.TextInput}" />
+    <Setter Property="CaretBrush" Value="{DynamicResource Brush.Accent}" />
     <Setter Property="FocusVisualStyle" Value="{x:Null}" />
     <Setter Property="Template">
       <Setter.Value>
         <ControlTemplate TargetType="TextBox">
-          <Border x:Name="Frame" CornerRadius="12" Background="White"
-                  BorderBrush="{StaticResource Brush.FieldBorder}" BorderThickness="1" Padding="14,0">
+          <Border x:Name="Frame" CornerRadius="12" Background="{DynamicResource Theme.SurfaceBrush}"
+                  BorderBrush="{DynamicResource Brush.FieldBorder}" BorderThickness="1" Padding="14,0">
             <Grid>
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="16" />   <!-- icon: first column = physical RIGHT in RTL -->
                 <ColumnDefinition Width="10" />
                 <ColumnDefinition Width="*" />
               </Grid.ColumnDefinitions>
-              <Control Grid.Column="0" Template="{StaticResource Icon.Search}" Foreground="{StaticResource Brush.TextMuted}"
+              <Control Grid.Column="0" Template="{StaticResource Icon.Search}" Foreground="{DynamicResource Brush.TextMuted}"
                        Width="16" Height="16" VerticalAlignment="Center" />
               <TextBlock x:Name="Placeholder" Grid.Column="2" Text="{TemplateBinding Tag}"
-                         Foreground="{StaticResource Brush.TextMuted}" VerticalAlignment="Center"
+                         Foreground="{DynamicResource Brush.TextMuted}" VerticalAlignment="Center"
                          IsHitTestVisible="False" Visibility="Collapsed" />
               <ScrollViewer x:Name="PART_ContentHost" Grid.Column="2" VerticalAlignment="Center"
                             Focusable="False" HorizontalScrollBarVisibility="Hidden" VerticalScrollBarVisibility="Hidden" />
@@ -260,11 +260,11 @@
               <Setter TargetName="Placeholder" Property="Visibility" Value="Visible" />
             </Trigger>
             <Trigger Property="IsKeyboardFocusWithin" Value="True">
-              <Setter TargetName="Frame" Property="BorderBrush" Value="{StaticResource Brush.Accent}" />
+              <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
               <Setter TargetName="Frame" Property="Effect">
                 <Setter.Value>
                   <!-- ≈ CSS box-shadow: 0 0 0 3px rgba(30,58,138,0.12) -->
-                  <DropShadowEffect BlurRadius="6" ShadowDepth="0" Opacity="0.3" Color="#1E3A8A" />
+                  <DropShadowEffect BlurRadius="6" ShadowDepth="0" Opacity="0.3" Color="{DynamicResource AccentColor}" />
                 </Setter.Value>
               </Setter>
             </Trigger>
@@ -290,8 +290,8 @@
         <ControlTemplate TargetType="{x:Type ctl:SettingsToggleSwitch}">
           <Grid>
             <Border x:Name="FocusRing" Margin="-3" CornerRadius="15" BorderThickness="2"
-                    BorderBrush="{StaticResource Brush.Accent}" Opacity="0.5" Visibility="Collapsed" />
-            <Border x:Name="Track" CornerRadius="12" Background="{StaticResource Brush.ToggleOff}" Padding="3">
+                    BorderBrush="{DynamicResource Brush.Accent}" Opacity="0.5" Visibility="Collapsed" />
+            <Border x:Name="Track" CornerRadius="12" Background="{DynamicResource Brush.ToggleOff}" Padding="3">
               <!-- Width and X position of the thumb are set in ToggleSwitch.cs -->
               <Ellipse x:Name="PART_Thumb" Fill="White" HorizontalAlignment="Left" VerticalAlignment="Center">
                 <Ellipse.Effect>
@@ -302,7 +302,7 @@
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsChecked" Value="True">
-              <Setter TargetName="Track" Property="Background" Value="{StaticResource Brush.ToggleOn}" />
+              <Setter TargetName="Track" Property="Background" Value="{DynamicResource Brush.ToggleOn}" />
             </Trigger>
             <Trigger Property="IsKeyboardFocused" Value="True">
               <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
@@ -329,7 +329,7 @@
               <Thumb>
                 <Thumb.Template>
                   <ControlTemplate TargetType="Thumb">
-                    <Border CornerRadius="3" Background="{StaticResource Brush.ScrollThumb}" />
+                    <Border CornerRadius="3" Background="{DynamicResource Brush.ScrollThumb}" />
                   </ControlTemplate>
                 </Thumb.Template>
               </Thumb>
@@ -349,8 +349,8 @@
        Card (list row) — white, 1px #ECEEF3, soft shadow, hover border #D8DCE6
        ============================================================ -->
   <Style x:Key="ListCardStyle" TargetType="Border">
-    <Setter Property="Background" Value="{StaticResource Brush.CardBg}" />
-    <Setter Property="BorderBrush" Value="{StaticResource Brush.CardBorder}" />
+    <Setter Property="Background" Value="{DynamicResource Brush.CardBg}" />
+    <Setter Property="BorderBrush" Value="{DynamicResource Brush.CardBorder}" />
     <Setter Property="BorderThickness" Value="1" />
     <Setter Property="Effect">
       <Setter.Value>
@@ -359,7 +359,7 @@
     </Setter>
     <Style.Triggers>
       <Trigger Property="IsMouseOver" Value="True">
-        <Setter Property="BorderBrush" Value="{StaticResource Brush.CardBorderHover}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.CardBorderHover}" />
         <Setter Property="Effect">
           <Setter.Value>
             <DropShadowEffect BlurRadius="12" ShadowDepth="4" Direction="270" Opacity="0.08" Color="#101828" />
@@ -400,7 +400,7 @@
           <Grid>
             <ContentPresenter HorizontalAlignment="Stretch" />
             <Border x:Name="FocusRing" CornerRadius="18" Margin="-2" BorderThickness="2"
-                    BorderBrush="{StaticResource Brush.Accent}" Opacity="0.5" Visibility="Collapsed" IsHitTestVisible="False" />
+                    BorderBrush="{DynamicResource Brush.Accent}" Opacity="0.5" Visibility="Collapsed" IsHitTestVisible="False" />
           </Grid>
           <ControlTemplate.Triggers>
             <Trigger Property="IsKeyboardFocused" Value="True">

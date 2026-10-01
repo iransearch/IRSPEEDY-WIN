@@ -6,62 +6,61 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
   <!-- Brand -->
-  <Color x:Key="Color.Accent">#1E3A8A</Color>
-  <SolidColorBrush x:Key="Brush.Accent" Color="{StaticResource Color.Accent}" />
+  <SolidColorBrush x:Key="Brush.Accent" Color="{DynamicResource AccentColor}" />
 
   <!-- Window -->
   <LinearGradientBrush x:Key="Brush.WindowBg" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="#FFFFFF" Offset="0" />
-    <GradientStop Color="#F8FAFC" Offset="1" />
+    <GradientStop Color="{DynamicResource WindowBgTopColor}" Offset="0" />
+    <GradientStop Color="{DynamicResource WindowBgBottomColor}" Offset="1" />
   </LinearGradientBrush>
-  <SolidColorBrush x:Key="Brush.WindowEdge" Color="#99FFFFFF" />
+  <SolidColorBrush x:Key="Brush.WindowEdge" Color="{DynamicResource Theme.WindowEdgeColor}" />
 
   <!-- Text -->
-  <SolidColorBrush x:Key="Brush.TextStrong" Color="#141B33" />     <!-- window titles -->
-  <SolidColorBrush x:Key="Brush.TextPrimary" Color="#1B2033" />    <!-- row titles -->
-  <SolidColorBrush x:Key="Brush.TextInput" Color="#1F2433" />      <!-- typed text -->
-  <SolidColorBrush x:Key="Brush.TextSecondary" Color="#6B7280" />  <!-- "3 برنامه انتخاب شده" -->
-  <SolidColorBrush x:Key="Brush.TextMuted" Color="#9CA3B4" />      <!-- subtitles, placeholder -->
+  <SolidColorBrush x:Key="Brush.TextStrong" Color="{DynamicResource TextPrimaryColor}" />     <!-- window titles -->
+  <SolidColorBrush x:Key="Brush.TextPrimary" Color="{DynamicResource RowTitleColor}" />    <!-- row titles -->
+  <SolidColorBrush x:Key="Brush.TextInput" Color="{DynamicResource TextBodyColor}" />      <!-- typed text -->
+  <SolidColorBrush x:Key="Brush.TextSecondary" Color="{DynamicResource MutedTextColor}" />  <!-- "3 برنامه انتخاب شده" -->
+  <SolidColorBrush x:Key="Brush.TextMuted" Color="{DynamicResource TextSecondaryColor}" />      <!-- subtitles, placeholder -->
 
   <!-- Lines & surfaces -->
-  <SolidColorBrush x:Key="Brush.Divider" Color="#EEF0F4" />
-  <SolidColorBrush x:Key="Brush.CardBg" Color="#FFFFFF" />
-  <SolidColorBrush x:Key="Brush.CardBorder" Color="#ECEEF3" />
-  <SolidColorBrush x:Key="Brush.CardBorderHover" Color="#D8DCE6" />
-  <SolidColorBrush x:Key="Brush.FieldBorder" Color="#E1E4EC" />
-  <SolidColorBrush x:Key="Brush.SurfaceSoft" Color="#F5F7FB" />     <!-- activation row background -->
-  <SolidColorBrush x:Key="Brush.Chevron" Color="#C3C8D4" />
-  <SolidColorBrush x:Key="Brush.ScrollThumb" Color="#D7DBE3" />
+  <SolidColorBrush x:Key="Brush.Divider" Color="{DynamicResource StatCardDividerColor}" />
+  <SolidColorBrush x:Key="Brush.CardBg" Color="{DynamicResource Theme.SurfaceColor}" />
+  <SolidColorBrush x:Key="Brush.CardBorder" Color="{DynamicResource SettingsRowBorderColor}" />
+  <SolidColorBrush x:Key="Brush.CardBorderHover" Color="{DynamicResource Theme.CardBorderHoverColor}" />
+  <SolidColorBrush x:Key="Brush.FieldBorder" Color="{DynamicResource StatCardBorderColor}" />
+  <SolidColorBrush x:Key="Brush.SurfaceSoft" Color="{DynamicResource Theme.SurfaceSoftColor}" />     <!-- activation row background -->
+  <SolidColorBrush x:Key="Brush.Chevron" Color="{DynamicResource Theme.ChevronColor}" />
+  <SolidColorBrush x:Key="Brush.ScrollThumb" Color="{DynamicResource Theme.ScrollThumbColor}" />
 
   <!-- Status -->
-  <SolidColorBrush x:Key="Brush.StatusOn" Color="#159A63" />
-  <SolidColorBrush x:Key="Brush.StatusOff" Color="#9CA3B4" />
-  <SolidColorBrush x:Key="Brush.Danger" Color="#DC2626" />
+  <SolidColorBrush x:Key="Brush.StatusOn" Color="{DynamicResource Theme.SuccessColor}" />
+  <SolidColorBrush x:Key="Brush.StatusOff" Color="{DynamicResource TextSecondaryColor}" />
+  <SolidColorBrush x:Key="Brush.Danger" Color="{DynamicResource DisconnectGradientTopColor}" />
 
   <!-- Toggle switch -->
   <LinearGradientBrush x:Key="Brush.ToggleOn" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="#22B37A" Offset="0" />
-    <GradientStop Color="#159A63" Offset="1" />
+    <GradientStop Color="{DynamicResource ToggleOnTopColor}" Offset="0" />
+    <GradientStop Color="{DynamicResource Theme.SuccessColor}" Offset="1" />
   </LinearGradientBrush>
-  <SolidColorBrush x:Key="Brush.ToggleOff" Color="#DEE1E8" />
+  <SolidColorBrush x:Key="Brush.ToggleOff" Color="{DynamicResource ToggleOffColor}" />
 
   <!-- Buttons -->
   <LinearGradientBrush x:Key="Brush.PrimaryGradient" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="#2447A8" Offset="0" />
-    <GradientStop Color="#1E3A8A" Offset="1" />
+    <GradientStop Color="{DynamicResource AccentGradientTopColor}" Offset="0" />
+    <GradientStop Color="{DynamicResource AccentGradientBottomColor}" Offset="1" />
   </LinearGradientBrush>
   <LinearGradientBrush x:Key="Brush.CloseGradient" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="#EF4444" Offset="0" />
-    <GradientStop Color="#DC2626" Offset="1" />
+    <GradientStop Color="{DynamicResource SettingsCloseTopColor}" Offset="0" />
+    <GradientStop Color="{DynamicResource DisconnectGradientTopColor}" Offset="1" />
   </LinearGradientBrush>
 
   <!-- "افزودن برنامه" dashed button -->
-  <SolidColorBrush x:Key="Brush.AddBg" Color="#F7F9FD" />
-  <SolidColorBrush x:Key="Brush.AddBgHover" Color="#EEF3FC" />
-  <SolidColorBrush x:Key="Brush.AddBorder" Color="#C3D0EA" />
-  <SolidColorBrush x:Key="Brush.AddBorderHover" Color="#A9BCE3" />
+  <SolidColorBrush x:Key="Brush.AddBg" Color="{DynamicResource Theme.SurfaceRaisedColor}" />
+  <SolidColorBrush x:Key="Brush.AddBgHover" Color="{DynamicResource Theme.SurfaceHoverColor}" />
+  <SolidColorBrush x:Key="Brush.AddBorder" Color="{DynamicResource Theme.AddBorderColor}" />
+  <SolidColorBrush x:Key="Brush.AddBorderHover" Color="{DynamicResource Theme.AddBorderHoverColor}" />
 
   <!-- Trash button on manually-added apps -->
-  <SolidColorBrush x:Key="Brush.RemoveHoverBg" Color="#FDECEC" />
+  <SolidColorBrush x:Key="Brush.RemoveHoverBg" Color="{DynamicResource Theme.DangerSurfaceColor}" />
 
 </ResourceDictionary>

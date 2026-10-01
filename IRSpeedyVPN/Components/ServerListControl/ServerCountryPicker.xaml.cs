@@ -192,10 +192,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public Brush SignalBrush { get => _signalBrush; private set { _signalBrush = value; On(); } }
         private void SetSignalColor(long latency)
         {
-            var color = latency <= 0 ? "#9CA3B4" : latency <= 45 ? "#17A366" : latency <= 75 ? "#F59E0B" : "#DC2626";
-            var brush = (SolidColorBrush)new BrushConverter().ConvertFromString(color);
-            brush.Freeze();
-            SignalBrush = brush;
+            var resource = latency <= 0 ? "TextSecondaryBrush" : latency <= 45 ? "PingGoodBrush"
+                : latency <= 75 ? "SettingsIconRouteBrush" : "Theme.DangerBrush";
+            // Keep the shared brush live when an already-tested list changes theme.
+            SignalBrush = Application.Current.TryFindResource(resource) as Brush ?? Brushes.Gray;
         }
 
         // Best (lowest) positive latency in this row, used to order the list from
