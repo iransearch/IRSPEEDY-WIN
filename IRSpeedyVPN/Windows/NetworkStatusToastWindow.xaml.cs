@@ -6,7 +6,7 @@ using System.Windows.Threading;
 
 namespace IRSpeedyVPN.Windows
 {
-    internal partial class NetworkStatusToastWindow : Window
+    public partial class NetworkStatusToastWindow : Window
     {
         private readonly Window anchorWindow;
         private readonly DispatcherTimer autoCloseTimer;
