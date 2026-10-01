@@ -34,7 +34,7 @@
                 <Grid Grid.Column="0" Width="58" Height="76" VerticalAlignment="Center"
                       HorizontalAlignment="Center" FlowDirection="LeftToRight">
                     <Ellipse Width="54" Height="54"
-                             Fill="{DynamicResource Theme.DangerSurfaceBrush}"
+                             Fill="{DynamicResource Brush.RemoveHoverBg}"
                              Stroke="{DynamicResource Theme.DangerBorderBrush}"
                              StrokeThickness="1"
                              VerticalAlignment="Center"/>
