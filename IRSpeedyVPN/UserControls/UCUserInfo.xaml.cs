@@ -63,6 +63,7 @@ namespace IRSpeedyVPN.UserControls
         }
         private void btn_ChangeServer_Click(object sender, RoutedEventArgs e)
         {
+            CancelConnectionTest();
             ResetTrafficPanel();
             if (OnChangeServerRequest != null)
                 OnChangeServerRequest.Invoke(sender, e);
@@ -70,68 +71,12 @@ namespace IRSpeedyVPN.UserControls
 
         private void btnDisConnect_Click(object sender, RoutedEventArgs e)
         {
+            CancelConnectionTest();
             ResetTrafficPanel();
             CancelPublicIpRequest();
             uiTimer.Change(int.MaxValue, int.MaxValue);
             if (OnDisconnectRequest != null)
                 OnDisconnectRequest.Invoke(sender, e);
-        }
-
-        private long?[] CheckPing(string[] sites, int? httpPort)
-        {
-            long?[] result = new long?[sites.Length];
-
-            System.Threading.Tasks.Parallel.For(0, sites.Length, i =>
-            {
-                try
-                {
-                    long delay = ServiceHelper.ConnectionUrlTest(sites[i], 4000, httpPort);
-                    if (delay >= 0)
-                        result[i] = delay;
-                }
-                catch (Exception ex)
-                {
-                    LogHelper.WriteLog(ex);
-                }
-            });
-
-            return result;
-        }
-
-        private void ConnectionTest_PreviewMouseDown(object sender, MouseButtonEventArgs e)
-        {
-            var service = globalInfo?.CurrentService;
-            if (service == null)
-                return;
-            // Snapshot the active port before the worker starts. Do not assume 1080.
-            int? httpPort = service.HttpPort;
-            OnLoadingRequest?.Invoke(true, null);
-            string[] sites = new[]
-            {
-                "https://www.google.com/generate_204",
-                "https://www.youtube.com",
-                "https://www.instagram.com",
-                "https://telegram.org"
-            };
-            long?[] res = new long?[sites.Length];
-
-            Action action = () => res = CheckPing(sites, httpPort);
-            action.BeginInvoke(ar =>
-            {
-                OnLoadingRequest?.Invoke(false, null);
-                Dispatcher.Invoke(() =>
-                {
-                    var result = new PingResult
-                    {
-                        GoogleSpeed = res[0],
-                        YoutubeSpeed = res[1],
-                        InstaSpeed = res[2],
-                        TelegramSpeed = res[3],
-                        Owner = Window.GetWindow(this)
-                    };
-                    result.ShowDialog();
-                });
-            }, null);
         }
 
         private void ShareConnection_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -223,6 +168,7 @@ namespace IRSpeedyVPN.UserControls
             UpdateConnectedMotion();
             if (!IsVisible)
             {
+                CancelConnectionTest();
                 ResetTrafficPanel();
                 uiTimer?.Change(Timeout.Infinite, Timeout.Infinite);
                 CancelPublicIpRequest();

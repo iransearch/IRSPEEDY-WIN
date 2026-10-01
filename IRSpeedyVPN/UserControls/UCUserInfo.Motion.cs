@@ -36,6 +36,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void Connected_Unloaded(object sender, RoutedEventArgs e)
         {
+            CancelConnectionTest();
             ResetTrafficPanel();
             CancelPublicIpRequest();
             StopConnectedMotion();
