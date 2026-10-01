@@ -1,6 +1,7 @@
 using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Windows;
 using System;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
@@ -15,24 +16,9 @@ namespace IRSpeedyVPN.UserControls
         private Window connectionTestWindow;
         private Storyboard connectionTestMotion;
 
-        private static long?[] CheckPing(string[] sites, int? httpPort, CancellationToken token)
+        private static Task<bool[]> CheckConnectionsAsync(string[] hosts, int? httpPort, CancellationToken token)
         {
-            var results = new long?[sites.Length];
-            Parallel.For(0, sites.Length, new ParallelOptions { CancellationToken = token }, i =>
-            {
-                token.ThrowIfCancellationRequested();
-                try
-                {
-                    long delay = ServiceHelper.ConnectionUrlTest(sites[i], 4000, httpPort);
-                    if (delay >= 0) results[i] = delay;
-                }
-                catch (Exception ex)
-                {
-                    LogHelper.WriteLog(ex);
-                }
-            });
-            token.ThrowIfCancellationRequested();
-            return results;
+            return Task.WhenAll(hosts.Select(host => ConnectionTlsTest.CheckAsync(host, 8000, httpPort, token)));
         }
 
         private async void ConnectionTest_PreviewMouseDown(object sender, MouseButtonEventArgs e)
@@ -50,24 +36,24 @@ namespace IRSpeedyVPN.UserControls
             try
             {
                 SetConnectionTestPending(true);
-                string[] sites =
+                string[] hosts =
                 {
-                    "https://www.google.com/generate_204",
-                    "https://www.youtube.com",
-                    "https://www.instagram.com",
-                    "https://telegram.org"
+                    "www.google.com",
+                    "www.youtube.com",
+                    "www.instagram.com",
+                    "telegram.org"
                 };
-                var results = await Task.Run(() => CheckPing(sites, httpPort, request.Token), request.Token);
+                var results = await Task.Run(() => CheckConnectionsAsync(hosts, httpPort, request.Token), request.Token);
                 if (request.IsCancellationRequested || connectionTestRequest != request || !IsLoaded || !IsVisible
                     || globalInfo.CurrentService != service || globalInfo.ConnectionTime != connectedAt) return;
 
                 SetConnectionTestPending(false);
                 var result = new PingResult
                 {
-                    GoogleSpeed = results[0],
-                    YoutubeSpeed = results[1],
-                    InstaSpeed = results[2],
-                    TelegramSpeed = results[3],
+                    GoogleConfirmed = results[0],
+                    YoutubeConfirmed = results[1],
+                    InstagramConfirmed = results[2],
+                    TelegramConfirmed = results[3],
                     Owner = Window.GetWindow(this)
                 };
                 result.ShowDialog();

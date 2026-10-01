@@ -1,16 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
 using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Shapes;
 
 namespace IRSpeedyVPN.Windows
 {
@@ -24,27 +14,27 @@ namespace IRSpeedyVPN.Windows
             InitializeComponent();
         }
 
-        public long? GoogleSpeed
+        public bool GoogleConfirmed
         {
-            get => ParseValue(txtGoogle.Text);
+            get => txtGoogle.Text == "تأیید شد";
             set => SetValue(txtGoogle, value);
         }
 
-        public long? YoutubeSpeed
+        public bool YoutubeConfirmed
         {
-            get => ParseValue(txtYoutube.Text);
+            get => txtYoutube.Text == "تأیید شد";
             set => SetValue(txtYoutube, value);
         }
 
-        public long? InstaSpeed
+        public bool InstagramConfirmed
         {
-            get => ParseValue(txtInstagram.Text);
+            get => txtInstagram.Text == "تأیید شد";
             set => SetValue(txtInstagram, value);
         }
 
-        public long? TelegramSpeed
+        public bool TelegramConfirmed
         {
-            get => ParseValue(txtTelegram.Text);
+            get => txtTelegram.Text == "تأیید شد";
             set => SetValue(txtTelegram, value);
         }
 
@@ -53,12 +43,12 @@ namespace IRSpeedyVPN.Windows
             Close();
         }
 
-        private static void SetValue(TextBlock target, long? value)
+        private static void SetValue(TextBlock target, bool confirmed)
         {
             if (target == null) return;
-            if (value.HasValue)
+            if (confirmed)
             {
-                target.Text = $"{value.Value} ms";
+                target.Text = "تأیید شد";
                 target.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "ConnectedGreenBrush");
             }
             else
@@ -66,19 +56,6 @@ namespace IRSpeedyVPN.Windows
                 target.Text = "ناموفق";
                 target.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Theme.DangerBrush");
             }
-        }
-
-        private static long? ParseValue(string text)
-        {
-            if (string.IsNullOrWhiteSpace(text))
-                return null;
-            if (text.EndsWith("ms", StringComparison.OrdinalIgnoreCase))
-            {
-                text = text.Substring(0, text.Length - 2);
-            }
-            if (long.TryParse(text, out var val))
-                return val;
-            return null;
         }
     }
 }
