@@ -163,6 +163,14 @@ namespace IRSpeedyVPN.UserControls
                 probeCacheContext = context;
             }
             probeCache.Bind(services);
+            if (probeLoginRoundRequested)
+            {
+                // Bind first so the bootstrap queue is built from the current API
+                // objects, never stale rows left from the previous login.
+                probeCache.RestartForLogin();
+                probeLoginRoundRequested = false;
+                LogHelper.WriteExLog("[ServerChecks] login bootstrap round restarted rows=" + services.Length);
+            }
             countryPicker.Load(services, _isUrlTestSupported);
             countryPicker.SelectedService = selectedService;
 
@@ -222,6 +230,7 @@ namespace IRSpeedyVPN.UserControls
         private bool probeWakeRequested;
         private bool probesRequireDisconnect;
         private bool probeRestartRequested;
+        private bool probeLoginRoundRequested;
         private ServerCheckCache probeCache;
         private string probeCacheContext;
 
@@ -254,10 +263,12 @@ namespace IRSpeedyVPN.UserControls
 
         internal void PrepareServerChecksForLogin()
         {
-            // Called on the UI thread after successful login and connection cleanup,
-            // before Loaded restores this account's results and unfinished bootstrap.
+            // Every real login/app start begins one complete bootstrap scan. Cached
+            // results remain visible, but a previously completed/stopped persisted
+            // round must not leave NextService empty and silently suppress testing.
             probesRequireDisconnect = false;
             probeRestartRequested = false;
+            probeLoginRoundRequested = true;
             probesPaused = false;
         }
 
