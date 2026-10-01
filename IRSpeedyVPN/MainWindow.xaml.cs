@@ -701,12 +701,10 @@ namespace IRSpeedyVPN
                     Content = string.IsNullOrEmpty(icon.Icon) || icon.Icon == "\uf2f5"
                         ? (object)new System.Windows.Shapes.Path {
                             Data = (Geometry)FindResource(icon.Icon == "\uf2f5" ? "ServerListLogoutIcon" : icon.ToolTip.Contains("Shield") ? "IconShield" : "IconGear"),
-                            Stroke = (Brush)FindResource("IconStrokeBrush"), StrokeThickness = 1.7,
+                            StrokeThickness = 1.7,
                             Width = 17, Height = 17, Stretch = Stretch.Uniform, FlowDirection = FlowDirection.LeftToRight,
                             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round }
                         : icon.Icon,
-                    // The shared brush follows the selected application palette.
-                    Foreground = (Brush)FindResource("IconStrokeBrush"),
                     FontFamily = (FontFamily)FindResource("fa_ProLight"),
                     FontSize = 16,
                     Width = 30,
@@ -715,6 +713,9 @@ namespace IRSpeedyVPN
                     VerticalContentAlignment = VerticalAlignment.Center,
                     ToolTip = icon.ToolTip,
                 };
+                label.SetResourceReference(ForegroundProperty, "IconStrokeBrush");
+                if (label.Content is System.Windows.Shapes.Path iconPath)
+                    iconPath.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "IconStrokeBrush");
                 System.Windows.Automation.AutomationProperties.SetName(label, icon.ToolTip ?? "");
                 ToolTipService.SetInitialShowDelay(label, 400);
                 ToolTipService.SetShowDuration(label, 2000);

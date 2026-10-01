@@ -47,7 +47,7 @@ namespace IRSpeedyVPN.Windows
         public string StatusText => IsSplitTunnelEnabled
             ? "فعال — فقط برنامه‌های انتخاب‌شده از تونل عبور می‌کنند"
             : "غیرفعال — همه ترافیک طبق روش اتصال اصلی";
-        public System.Windows.Media.Brush StatusBrush => (System.Windows.Media.Brush)FindResource(IsSplitTunnelEnabled ? "Brush.StatusOn" : "Brush.StatusOff");
+        public System.Windows.Media.Brush StatusBrush => ThemeManager.Instance.GetLiveBrush(IsSplitTunnelEnabled ? "Brush.StatusOn" : "Brush.StatusOff");
         private void Header_DragMove(object sender, MouseButtonEventArgs e) => Common.WindowDrag.Begin(this, e);
         private void Close_Click(object sender, RoutedEventArgs e) => Close();
         private bool Connected => (AppServices.GlobalInfo?.CurrentService as TunnelPlusService)?.IsTunnelConnected == true;

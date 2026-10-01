@@ -1,4 +1,5 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:sys="clr-namespace:System;assembly=mscorlib">
+  <!-- Theme-dependent brushes are defined in both complete application palettes. -->
   <!-- ===================== Colors ===================== -->
   <!-- Window background: fully opaque (no transparency anywhere in the app) -->
   <!-- Login screen -->
@@ -7,79 +8,11 @@
   <!-- rgba(23,163,102,0.25) -->
   <!-- Settings screen -->
   <!-- ===================== Brushes ===================== -->
-  <SolidColorBrush x:Key="AccentBrush" Color="{DynamicResource AccentColor}"/>
-  <LinearGradientBrush x:Key="AccentGradientBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource AccentGradientTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource AccentGradientBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
   <!-- App window background: opaque solid gradient (no Mica/Acrylic — the
        approved design uses a plain, fully opaque card, not a glass/blur
        material). Set Window.Background to this brush directly. -->
-  <LinearGradientBrush x:Key="WindowBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource WindowBgTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource WindowBgBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
   <!-- Desktop backdrop behind the floating window, for the mockup/preview
        frame only — not part of the app window itself. -->
-  <LinearGradientBrush x:Key="DesktopBackdropBrush" StartPoint="0.2,0" EndPoint="0.8,1">
-    <GradientStop Color="{DynamicResource DesktopBackdropTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource DesktopBackdropBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
-  <SolidColorBrush x:Key="TextPrimaryBrush" Color="{DynamicResource TextPrimaryColor}"/>
-  <SolidColorBrush x:Key="TextSecondaryBrush" Color="{DynamicResource TextSecondaryColor}"/>
-  <SolidColorBrush x:Key="TextMutedBrush" Color="{DynamicResource TextMutedColor}"/>
-  <SolidColorBrush x:Key="TextBodyBrush" Color="{DynamicResource TextBodyColor}"/>
-  <SolidColorBrush x:Key="RowTitleBrush" Color="{DynamicResource RowTitleColor}"/>
-  <SolidColorBrush x:Key="IconStrokeBrush" Color="{DynamicResource IconStrokeColor}"/>
-  <SolidColorBrush x:Key="IconMutedBrush" Color="{DynamicResource IconMutedColor}"/>
-  <SolidColorBrush x:Key="SearchBorderBrush" Color="{DynamicResource SearchBorderColor}"/>
-  <SolidColorBrush x:Key="DividerBrush" Color="{DynamicResource DividerColor}"/>
-  <SolidColorBrush x:Key="SmartLocationBorderBrush" Color="{DynamicResource SmartLocationBorderColor}"/>
-  <LinearGradientBrush x:Key="SmartLocationBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource SmartLocationBgTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource SmartLocationBgBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
-  <SolidColorBrush x:Key="SmartLocationTitleBrush" Color="{DynamicResource SmartLocationTitleColor}"/>
-  <SolidColorBrush x:Key="SmartLocationSubtitleBrush" Color="{DynamicResource SmartLocationSubtitleColor}"/>
-  <SolidColorBrush x:Key="RowHoverBrush" Color="{DynamicResource RowHoverColor}"/>
-  <SolidColorBrush x:Key="PingGoodBrush" Color="{DynamicResource PingGoodColor}"/>
-  <SolidColorBrush x:Key="RadioBorderBrush" Color="{DynamicResource RadioBorderColor}"/>
-  <SolidColorBrush x:Key="FieldBorderBrush" Color="{DynamicResource FieldBorderColor}"/>
-  <SolidColorBrush x:Key="FieldFocusBorderBrush" Color="{DynamicResource FieldFocusBorderColor}"/>
-  <SolidColorBrush x:Key="FieldLabelBrush" Color="{DynamicResource FieldLabelColor}"/>
-  <SolidColorBrush x:Key="FieldPlaceholderIconBrush" Color="{DynamicResource FieldPlaceholderIconColor}"/>
-  <SolidColorBrush x:Key="DividerTextBrush" Color="{DynamicResource DividerTextColor}"/>
-  <SolidColorBrush x:Key="MutedTextBrush" Color="{DynamicResource MutedTextColor}"/>
-  <SolidColorBrush x:Key="ConnectedGreenBrush" Color="{DynamicResource ConnectedGreenColor}"/>
-  <SolidColorBrush x:Key="ConnectedGreenDarkBrush" Color="{DynamicResource ConnectedGreenDarkColor}"/>
-  <LinearGradientBrush x:Key="ConnectedHeroBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource ConnectedHeroBgTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource ConnectedHeroBgBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
-  <LinearGradientBrush x:Key="DisconnectGradientBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource DisconnectGradientTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource DisconnectGradientBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
-  <SolidColorBrush x:Key="StatCardBorderBrush" Color="{DynamicResource StatCardBorderColor}"/>
-  <SolidColorBrush x:Key="StatCardDividerBrush" Color="{DynamicResource StatCardDividerColor}"/>
-  <SolidColorBrush x:Key="ServerCardBorderBrush" Color="{DynamicResource ServerCardBorderColor}"/>
-  <LinearGradientBrush x:Key="SettingsCloseBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource SettingsCloseTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource SettingsCloseBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
-  <SolidColorBrush x:Key="ToggleTrackBrush" Color="{DynamicResource ToggleTrackColor}"/>
-  <LinearGradientBrush x:Key="ToggleOnBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource ToggleOnTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource ToggleOnBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
-  <SolidColorBrush x:Key="ToggleOffBrush" Color="{DynamicResource ToggleOffColor}"/>
-  <SolidColorBrush x:Key="SettingsRowBorderBrush" Color="{DynamicResource SettingsRowBorderColor}"/>
-  <LinearGradientBrush x:Key="ConfirmButtonBackgroundBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource AccentGradientTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource AccentGradientBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
-  <SolidColorBrush x:Key="ConfirmButtonBorderBrush" Color="{DynamicResource ConfirmButtonBorderColor}"/>
-  <SolidColorBrush x:Key="ConfirmButtonTextBrush" Color="{DynamicResource ConfirmButtonTextColor}"/>
   <!-- ===================== Typography ===================== -->
   <!-- Load Vazirmatn as a bundled font resource; family name below assumes
        the .ttf/.otf internal font-family name is "Vazirmatn". -->
@@ -145,11 +78,6 @@
   <sys:Double x:Key="ToggleThumbDiameter">20</sys:Double>
   <sys:Double x:Key="ConfirmButtonHeight">50</sys:Double>
   <CornerRadius x:Key="ConfirmButtonCornerRadius">14</CornerRadius>
-  <LinearGradientBrush x:Key="WindowBackgroundFallbackBrush" StartPoint="0,0" EndPoint="0,1">
-    <GradientStop Color="{DynamicResource WindowBgTopColor}" Offset="0"/>
-    <GradientStop Color="{DynamicResource WindowBgBottomColor}" Offset="1"/>
-  </LinearGradientBrush>
-  <SolidColorBrush x:Key="HeaderHoverBrush" Color="{DynamicResource HeaderHoverColor}"/>
   <FontFamily x:Key="AppFontFamilyMedium">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn Medium</FontFamily>
   <FontFamily x:Key="AppFontFamilySemiBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn SemiBold</FontFamily>
   <FontFamily x:Key="AppFontFamilyExtraBold">pack://application:,,,/Fonts/Vazirmatn/#Vazirmatn ExtraBold</FontFamily>
@@ -274,12 +202,6 @@
     <PathGeometry Figures="M7 21.9l-4-4 4-4"/>
     <PathGeometry Figures="M21 11.4v1.1a4 4 0 0 1-4 4H3"/>
   </GeometryGroup>
-  <SolidColorBrush x:Key="SettingsIconGlobeBrush" Color="{DynamicResource SettingsIconGlobeColor}"/>
-  <SolidColorBrush x:Key="SettingsIconStackBrush" Color="{DynamicResource SettingsIconStackColor}"/>
-  <SolidColorBrush x:Key="SettingsIconRouteBrush" Color="{DynamicResource SettingsIconRouteColor}"/>
-  <SolidColorBrush x:Key="SettingsIconChatBrush" Color="{DynamicResource SettingsIconChatColor}"/>
-  <SolidColorBrush x:Key="SettingsIconSparkBrush" Color="{DynamicResource SettingsIconSparkColor}"/>
-  <SolidColorBrush x:Key="SettingsIconPadBrush" Color="{DynamicResource SettingsIconPadColor}"/>
   <sys:Double x:Key="SettingsRowMinHeight">72</sys:Double>
   <sys:Double x:Key="SettingsIconBadgeSize">42</sys:Double>
   <CornerRadius x:Key="SettingsIconBadgeCornerRadius">13</CornerRadius>

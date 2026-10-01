@@ -1,66 +1,6 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+  <!-- Theme-dependent brushes are defined in both complete application palettes. -->
   <!-- Color roles shared by every page; values come from the selected palette. -->
   <SolidColorBrush x:Key="Theme.TransparentBrush" Color="Transparent"/>
-  <SolidColorBrush x:Key="AccentGradientTopBrush" Color="{DynamicResource AccentGradientTopColor}"/>
-  <SolidColorBrush x:Key="ConnectedRingBrush" Color="{DynamicResource ConnectedRingColor}"/>
-  <SolidColorBrush x:Key="Theme.AccentHaloBrush" Color="{DynamicResource Theme.AccentHaloColor}"/>
-  <SolidColorBrush x:Key="Theme.AccentLineBrush" Color="{DynamicResource Theme.AccentLineColor}"/>
-  <SolidColorBrush x:Key="Theme.AccentWashBrush" Color="{DynamicResource Theme.AccentWashColor}"/>
-  <SolidColorBrush x:Key="Theme.CardSoftBorderBrush" Color="{DynamicResource Theme.CardSoftBorderColor}"/>
-  <SolidColorBrush x:Key="Theme.ChevronBrush" Color="{DynamicResource Theme.ChevronColor}"/>
-  <SolidColorBrush x:Key="Theme.ConnectedInnerRingBrush" Color="{DynamicResource Theme.ConnectedInnerRingColor}"/>
-  <SolidColorBrush x:Key="Theme.ConnectingBorderBrush" Color="{DynamicResource Theme.ConnectingBorderColor}"/>
-  <SolidColorBrush x:Key="Theme.ConnectingInnerRingBrush" Color="{DynamicResource Theme.ConnectingInnerRingColor}"/>
-  <SolidColorBrush x:Key="Theme.ConnectingRingBrush" Color="{DynamicResource Theme.ConnectingRingColor}"/>
-  <SolidColorBrush x:Key="Theme.ConnectingSurfaceBrush" Color="{DynamicResource Theme.ConnectingSurfaceColor}"/>
-  <SolidColorBrush x:Key="Theme.DangerBorderBrush" Color="{DynamicResource Theme.DangerBorderColor}"/>
-  <SolidColorBrush x:Key="Theme.DangerBrush" Color="{DynamicResource Theme.DangerColor}"/>
-  <SolidColorBrush x:Key="Theme.FieldSoftBrush" Color="{DynamicResource Theme.FieldSoftColor}"/>
-  <SolidColorBrush x:Key="Theme.HeaderHoverSoftBrush" Color="{DynamicResource Theme.HeaderHoverSoftColor}"/>
-  <SolidColorBrush x:Key="Theme.HintSurfaceBrush" Color="{DynamicResource Theme.HintSurfaceColor}"/>
-  <SolidColorBrush x:Key="Theme.IconAmberBrush" Color="{DynamicResource Theme.IconAmberColor}"/>
-  <SolidColorBrush x:Key="Theme.IconPurpleBrush" Color="{DynamicResource Theme.IconPurpleColor}"/>
-  <SolidColorBrush x:Key="Theme.IconTealBrush" Color="{DynamicResource Theme.IconTealColor}"/>
-  <SolidColorBrush x:Key="Theme.InnerBorderBrush" Color="{DynamicResource Theme.InnerBorderColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyAccentBrush" Color="{DynamicResource Theme.LegacyAccentColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyBlackBrush" Color="{DynamicResource Theme.LegacyBlackColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyBlueBrush" Color="{DynamicResource Theme.LegacyBlueColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyButtonTopBrush" Color="{DynamicResource Theme.LegacyButtonTopColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyDangerSurfaceBrush" Color="{DynamicResource Theme.LegacyDangerSurfaceColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyGrayLineBrush" Color="{DynamicResource Theme.LegacyGrayLineColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyGrayStatusBrush" Color="{DynamicResource Theme.LegacyGrayStatusColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyGrayTextBrush" Color="{DynamicResource Theme.LegacyGrayTextColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyGreenBrush" Color="{DynamicResource Theme.LegacyGreenColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyOverlayBrush" Color="{DynamicResource Theme.LegacyOverlayColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyRedBrush" Color="{DynamicResource Theme.LegacyRedColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacySurfaceBrush" Color="{DynamicResource Theme.LegacySurfaceColor}"/>
-  <SolidColorBrush x:Key="Theme.LegacyWhiteSmokeBrush" Color="{DynamicResource Theme.LegacyWhiteSmokeColor}"/>
-  <SolidColorBrush x:Key="Theme.LoadingGlassBorderBrush" Color="{DynamicResource Theme.LoadingGlassBorderColor}"/>
-  <SolidColorBrush x:Key="Theme.LoadingLineBrush" Color="{DynamicResource Theme.LoadingLineColor}"/>
-  <SolidColorBrush x:Key="Theme.LoadingOrbitBrush" Color="{DynamicResource Theme.LoadingOrbitColor}"/>
-  <SolidColorBrush x:Key="Theme.LoadingSurfaceBrush" Color="{DynamicResource Theme.LoadingSurfaceColor}"/>
-  <SolidColorBrush x:Key="Theme.MotionLineBrush" Color="{DynamicResource Theme.MotionLineColor}"/>
-  <SolidColorBrush x:Key="Theme.MutedDotBrush" Color="{DynamicResource Theme.MutedDotColor}"/>
-  <SolidColorBrush x:Key="Theme.OverlayBrush" Color="{DynamicResource Theme.OverlayColor}"/>
-  <SolidColorBrush x:Key="Theme.ProgressTrackBrush" Color="{DynamicResource Theme.ProgressTrackColor}"/>
-  <SolidColorBrush x:Key="Theme.ScrollThumbBrush" Color="{DynamicResource Theme.ScrollThumbColor}"/>
-  <SolidColorBrush x:Key="Theme.SelectionRingBrush" Color="{DynamicResource Theme.SelectionRingColor}"/>
-  <SolidColorBrush x:Key="Theme.SettingsSoftBrush" Color="{DynamicResource Theme.SettingsSoftColor}"/>
-  <SolidColorBrush x:Key="Theme.SoftDividerBrush" Color="{DynamicResource Theme.SoftDividerColor}"/>
-  <SolidColorBrush x:Key="Theme.StatusDeepGreenBrush" Color="{DynamicResource Theme.StatusDeepGreenColor}"/>
-  <SolidColorBrush x:Key="Theme.StatusGreenBrush" Color="{DynamicResource Theme.StatusGreenColor}"/>
-  <SolidColorBrush x:Key="Theme.StatusRedBrush" Color="{DynamicResource Theme.StatusRedColor}"/>
-  <SolidColorBrush x:Key="Theme.SuccessSoftBrush" Color="{DynamicResource Theme.SuccessSoftColor}"/>
-  <SolidColorBrush x:Key="Theme.SuccessSurfaceBrush" Color="{DynamicResource Theme.SuccessSurfaceColor}"/>
-  <SolidColorBrush x:Key="Theme.SurfaceBrush" Color="{DynamicResource Theme.SurfaceColor}"/>
-  <SolidColorBrush x:Key="Theme.SurfaceDisabledBrush" Color="{DynamicResource Theme.SurfaceDisabledColor}"/>
-  <SolidColorBrush x:Key="Theme.TabTrackBrush" Color="{DynamicResource Theme.TabTrackColor}"/>
-  <SolidColorBrush x:Key="Theme.ThinBorderBrush" Color="{DynamicResource Theme.ThinBorderColor}"/>
-  <SolidColorBrush x:Key="Theme.WarningBorderBrush" Color="{DynamicResource Theme.WarningBorderColor}"/>
-  <SolidColorBrush x:Key="Theme.WarningHoverBrush" Color="{DynamicResource Theme.WarningHoverColor}"/>
-  <SolidColorBrush x:Key="Theme.WarningSurfaceBrush" Color="{DynamicResource Theme.WarningSurfaceColor}"/>
-  <SolidColorBrush x:Key="Theme.WarningTextBrush" Color="{DynamicResource Theme.WarningTextColor}"/>
-  <SolidColorBrush x:Key="ToggleOnTopBrush" Color="{DynamicResource ToggleOnTopColor}"/>
-  <SolidColorBrush x:Key="WindowBgBottomBrush" Color="{DynamicResource WindowBgBottomColor}"/>
 </ResourceDictionary>

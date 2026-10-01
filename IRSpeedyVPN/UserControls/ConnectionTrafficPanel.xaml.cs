@@ -72,7 +72,8 @@ namespace IRSpeedyVPN.UserControls
             TrafficCount.Text = PersianCount(liveRows.Count) + " برنامه";
             TrafficStatus.Text = snapshot.Status;
             TrafficStatus.ToolTip = snapshot.Status;
-            TrafficStatusDot.Fill = (Brush)FindResource(snapshot.Connected ? "ConnectedGreenBrush" : "IconStrokeBrush");
+            TrafficStatusDot.SetResourceReference(System.Windows.Shapes.Shape.FillProperty,
+                snapshot.Connected ? "ConnectedGreenBrush" : "IconStrokeBrush");
             TrafficSubtitle.Text = "مصرف ثبت‌شده از آخرین ریست";
             TrafficSubtitle.ToolTip = "شروع ثبت: " + snapshot.SinceUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
             EmptyTrafficText.Visibility = liveRows.Count == 0 ? Visibility.Visible : Visibility.Collapsed;

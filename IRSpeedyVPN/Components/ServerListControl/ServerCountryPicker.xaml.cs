@@ -194,8 +194,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             var resource = latency <= 0 ? "TextSecondaryBrush" : latency <= 45 ? "PingGoodBrush"
                 : latency <= 75 ? "SettingsIconRouteBrush" : "Theme.DangerBrush";
-            // Keep the shared brush live when an already-tested list changes theme.
-            SignalBrush = Application.Current.TryFindResource(resource) as Brush ?? Brushes.Gray;
+            // Rows are cached across logout/login, when the appearance can change.
+            SignalBrush = ThemeManager.Instance.GetLiveBrush(resource);
         }
 
         // Best (lowest) positive latency in this row, used to order the list from

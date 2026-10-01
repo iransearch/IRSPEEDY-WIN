@@ -1,10 +1,12 @@
 using Microsoft.Win32;
 using System;
+using System.Collections.Generic;
 using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Security;
 using System.Windows;
+using System.Windows.Media;
 
 namespace IRSpeedyVPN.Common
 {
@@ -21,6 +23,7 @@ namespace IRSpeedyVPN.Common
         private ResourceDictionary darkPalette;
         private int paletteIndex = -1;
         private bool isDark;
+        private readonly Dictionary<string, SolidColorBrush> liveBrushes = new Dictionary<string, SolidColorBrush>();
 
         public static ThemeManager Instance { get; } = new ThemeManager();
         private ThemeManager() { }
@@ -63,12 +66,30 @@ namespace IRSpeedyVPN.Common
                     Source = new Uri("/IRSpeedyVPN;component/Themes/Palette.Dark.xaml", UriKind.Relative)
                 };
 
-            // Replace the palette at its original precedence. Do not append dictionaries
-            // on each click, recreate pages, or enter any connection/startup code.
+            // Replace complete brushes and colors together. Shared brushes must not
+            // retain DynamicResource expressions into a palette that has been removed.
             Application.Current.Resources.MergedDictionaries[paletteIndex] = dark ? darkPalette : lightPalette;
+            foreach (var entry in new List<KeyValuePair<string, SolidColorBrush>>(liveBrushes))
+                entry.Value.Color = ((SolidColorBrush)Application.Current.FindResource(entry.Key)).Color;
             isDark = dark;
             if (persist) SavePreference(dark);
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(IsDark)));
+        }
+
+        // View-model bindings may retain a Brush without re-evaluating their getter.
+        // Give those few roles a stable, unfrozen copy and update its Color on a switch.
+        // XAML and dependency properties should use DynamicResource/SetResourceReference.
+        internal SolidColorBrush GetLiveBrush(string resourceKey)
+        {
+            Application.Current.Dispatcher.VerifyAccess();
+            if (paletteIndex < 0) Initialize();
+            if (!liveBrushes.TryGetValue(resourceKey, out var brush))
+            {
+                var source = (SolidColorBrush)Application.Current.FindResource(resourceKey);
+                brush = new SolidColorBrush(source.Color);
+                liveBrushes.Add(resourceKey, brush);
+            }
+            return brush;
         }
 
         private static bool ReadPreference()

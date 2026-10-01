@@ -65,7 +65,8 @@ namespace IRSpeedyVPN.Windows
             {
                 bool enabled = SplitTunnelStore.Load().Enabled;
                 SplitTunnelStatus.Text = enabled ? "فعال" : "غیرفعال";
-                SplitTunnelStatus.Foreground = (System.Windows.Media.Brush)FindResource(enabled ? "Brush.StatusOn" : "Brush.TextMuted");
+                SplitTunnelStatus.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty,
+                    enabled ? "Brush.StatusOn" : "Brush.TextMuted");
                 if (enabled && IsOn(GameMode)) SetChecked(GameMode, false);
             }
             catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); }
