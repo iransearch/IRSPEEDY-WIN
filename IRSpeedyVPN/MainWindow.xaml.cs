@@ -637,6 +637,7 @@ namespace IRSpeedyVPN
             {
                 ShowMessage("");
                 gInfo.ConnectionTime = DateTime.Now;
+                uCServerList.MarkSuccessfulConnection(service);
                 ShowControl(uCUserInfo);                
 
             }

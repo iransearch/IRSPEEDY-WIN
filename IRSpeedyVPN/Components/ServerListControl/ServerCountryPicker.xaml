@@ -295,7 +295,22 @@
                     </Rectangle>
                   </Grid>
                 </Grid>
-                <TextBlock Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" VerticalAlignment="Center" Margin="10,0" ToolTip="{Binding CountryName}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/></TextBlock>
+                <Grid Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
+                  <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                  <Grid Width="18" Height="18" Margin="0,0,7,0" ToolTip="آخرین اتصال موفق" AutomationProperties.Name="آخرین اتصال موفق">
+                    <Grid.Style><Style TargetType="Grid">
+                      <Setter Property="Visibility" Value="Collapsed"/>
+                      <Style.Triggers><DataTrigger Binding="{Binding IsLastSuccessfulConnection}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                    </Style></Grid.Style>
+                    <Path Data="M9,0 L11.6,5.7 L18,6.5 L13.3,10.8 L14.5,17 L9,13.9 L3.5,17 L4.7,10.8 L0,6.5 L6.4,5.7 Z" Stretch="Uniform" Stroke="#FFE6AD32" StrokeThickness="0.6">
+                      <Path.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#FFFFF4BB" Offset="0"/><GradientStop Color="#FFFFD35B" Offset="0.45"/><GradientStop Color="#FFF2AD24" Offset="1"/>
+                      </LinearGradientBrush></Path.Fill>
+                      <Path.Effect><DropShadowEffect Color="#FFFFCC55" BlurRadius="6" ShadowDepth="0" Opacity="0.65"/></Path.Effect>
+                    </Path>
+                  </Grid>
+                  <TextBlock Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/></TextBlock>
+                </Grid>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
                   <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                   <StackPanel ToolTip="{Binding SignalToolTip}">

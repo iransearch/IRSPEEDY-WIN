@@ -173,6 +173,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
             set { if (_isSelectedCountry == value) return; _isSelectedCountry = value; On(); }
         }
 
+        private bool _isLastSuccessfulConnection;
+        public bool IsLastSuccessfulConnection
+        {
+            get => _isLastSuccessfulConnection;
+            set { if (_isLastSuccessfulConnection == value) return; _isLastSuccessfulConnection = value; On(); }
+        }
+
         private bool _isSelectable;
         public bool IsSelectable
         {
@@ -337,6 +344,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _urlTest = urlTestSupported;
             var arr = services?.ToArray() ?? new IVPNService[0];
             var previousServiceId = _selectedGroup?.Service?.ID;
+            var lastSuccessfulKey = LastSuccessfulServer.Read();
 
             _allGroups = arr
                 .OrderBy(s => s.Country)
@@ -346,6 +354,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                     var group = new GroupItem
                     {
                         Service = service,
+                        IsLastSuccessfulConnection = LastSuccessfulServer.Key(service) == lastSuccessfulKey,
                         CountryCode = service.CountryCode,
                         CountryName = string.IsNullOrWhiteSpace(service.Country)
                             ? (service.CountryCode ?? "")
@@ -432,13 +441,23 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
 
         /// <summary>
-        /// Reorders the rows from fastest to slowest as their tests come in, keeping
-        /// the current filter and selection intact.
+        /// Pins only a successfully connected country row. Smart remains a separate
+        /// fixed card, and choosing or testing a row never changes this marker.
         /// </summary>
+        public void MarkSuccessfulConnection(IVPNService service)
+        {
+            if (!LastSuccessfulServer.TryRecord(service, out var key)) return;
+            foreach (var group in _allGroups)
+                group.IsLastSuccessfulConnection = LastSuccessfulServer.Key(group.Service) == key;
+            ResortGroups();
+            ServerScroller.ScrollToTop();
+        }
+
         private void ResortGroups()
         {
             var ordered = _allGroups
-                .OrderBy(g => g.SortKey)
+                .OrderByDescending(g => g.IsLastSuccessfulConnection)
+                .ThenBy(g => g.SortKey)
                 .ThenBy(g => g.CountryName, StringComparer.CurrentCulture)
                 .ThenBy(g => g.Service?.ID ?? int.MaxValue)
                 .ToList();

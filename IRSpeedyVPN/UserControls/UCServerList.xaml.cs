@@ -38,6 +38,8 @@ namespace IRSpeedyVPN.UserControls
         internal event ConnectRequest OnConnectRequest;
 
         internal IVPNService selectedService;
+        internal void MarkSuccessfulConnection(IVPNService service)
+            => countryPicker.MarkSuccessfulConnection(service);
         private string selectedProtocol;
         private string _selectedServiceName;
         private bool _isLoading = true;
