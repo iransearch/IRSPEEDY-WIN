@@ -303,6 +303,37 @@
                       <Style.Triggers><DataTrigger Binding="{Binding IsLastSuccessfulConnection}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
                     </Style></Grid.Style>
                     <Path Data="M9,0 L11.6,5.7 L18,6.5 L13.3,10.8 L14.5,17 L9,13.9 L3.5,17 L4.7,10.8 L0,6.5 L6.4,5.7 Z" Stretch="Uniform" Stroke="#FFE6AD32" StrokeThickness="0.6">
+                      <Path.Style><Style TargetType="Path">
+                        <Style.Triggers>
+                          <MultiDataTrigger>
+                            <MultiDataTrigger.Conditions>
+                              <Condition Binding="{Binding IsLastSuccessfulConnection}" Value="True"/>
+                              <Condition Binding="{Binding IsVisible, RelativeSource={RelativeSource Self}}" Value="True"/>
+                            </MultiDataTrigger.Conditions>
+                            <MultiDataTrigger.EnterActions>
+                              <BeginStoryboard x:Name="LastSuccessfulStarSparkle">
+                                <Storyboard RepeatBehavior="Forever">
+                                  <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)" Duration="0:0:4">
+                                    <LinearDoubleKeyFrame KeyTime="0:0:0" Value="0.65"/>
+                                    <SplineDoubleKeyFrame KeyTime="0:0:0.3" Value="1" KeySpline="0.2,0,0.2,1"/>
+                                    <SplineDoubleKeyFrame KeyTime="0:0:0.8" Value="0.65" KeySpline="0.2,0,0.2,1"/>
+                                    <LinearDoubleKeyFrame KeyTime="0:0:4" Value="0.65"/>
+                                  </DoubleAnimationUsingKeyFrames>
+                                  <DoubleAnimationUsingKeyFrames Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)" Duration="0:0:4">
+                                    <LinearDoubleKeyFrame KeyTime="0:0:0" Value="6"/>
+                                    <SplineDoubleKeyFrame KeyTime="0:0:0.3" Value="11" KeySpline="0.2,0,0.2,1"/>
+                                    <SplineDoubleKeyFrame KeyTime="0:0:0.8" Value="6" KeySpline="0.2,0,0.2,1"/>
+                                    <LinearDoubleKeyFrame KeyTime="0:0:4" Value="6"/>
+                                  </DoubleAnimationUsingKeyFrames>
+                                </Storyboard>
+                              </BeginStoryboard>
+                            </MultiDataTrigger.EnterActions>
+                            <MultiDataTrigger.ExitActions>
+                              <RemoveStoryboard BeginStoryboardName="LastSuccessfulStarSparkle"/>
+                            </MultiDataTrigger.ExitActions>
+                          </MultiDataTrigger>
+                        </Style.Triggers>
+                      </Style></Path.Style>
                       <Path.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                         <GradientStop Color="#FFFFF4BB" Offset="0"/><GradientStop Color="#FFFFD35B" Offset="0.45"/><GradientStop Color="#FFF2AD24" Offset="1"/>
                       </LinearGradientBrush></Path.Fill>
