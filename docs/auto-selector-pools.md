@@ -86,3 +86,11 @@ and reconnect, then disconnect Wi-Fi briefly and restore it. Confirm new flows
 recover through a healthy member without manually disconnecting and that AI
 traffic never uses a main member. Open flows are not forcibly interrupted merely
 because selection changes. Repeat the sustained two-hour scenario from the log.
+
+
+Core patch delivery: `core-patches/throne-round-robin.patch` contains the tested
+Throne-G change because this environment currently lacks push access to that
+repository (HTTPS authentication returns 401). Apply it to the Core branch at
+base `c0fa2071` using `git am /path/to/IRSPEEDY-WIN/core-patches/throne-round-robin.patch`,
+then build the Core and package it under the existing V-Guard/SGuard names.
+Do not use the older Core with this app's main pool configuration.
