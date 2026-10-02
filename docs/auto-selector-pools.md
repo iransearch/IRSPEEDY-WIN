@@ -1,4 +1,4 @@
-# Smart and country Auto Selector pools (1.4.6.2)
+# Smart and country Auto Selector pools (1.4.6.3)
 
 Smart/country connections that supply `_smartFastUrls` now use independent
 sing-box `auto-selector` groups. Single-server connections and list URL tests
@@ -29,7 +29,7 @@ Both groups use:
 | `dial_retries` / `fail_tolerance` | 2 / 0.2 |
 | `tolerance` | 300ms |
 | `max_rtt` | unset (unlimited) |
-| `balance` / `balance_mode` | true / connection |
+| `balance` / `balance_mode` | true / main: round-robin, AI: connection |
 | `interrupt_exist_connections` | false |
 
 The Core clamps `bench_interval` to at least `interval`, so both are 900s.
@@ -53,10 +53,23 @@ cancellation, failed start, disconnect and rebuild return them to the existing
 port allocator; teardown is idempotent. Each attempted start records
 `auto-selector-config-apply` with group sizes/policy and no credentials.
 
-Required Core: the Throne fork's `auto-selector`, with the sing-box dependency
+Main round-robin assigns each new dial to the next usable qualified member.
+TCP and UDP have separate cursors. Members in cooldown and members already
+tried by that dial are skipped. Existing flows keep their member, and fewer than
+three healthy members still means fewer than three participants. AI retains the
+upstream per-connection random algorithm.
+
+Required Core: Throne-G commit `5c47531b` on
+`update/fc668b60-core-only-1.3.0-beta.1`, with the round-robin extension in
+`core/server/internal/autoselector`. The main group uses the explicit `auto-selector-round-robin` type so an older
+Core rejects Start instead of silently treating an unknown balance mode as rotate.
+The extension retains upstream health code. AI still uses the original
+`auto-selector` type and constructor.
+
+Base Core dependency: the Throne fork's `auto-selector`, with the sing-box dependency
 `f154bec036c9` present in Core commit `4facf147`; prefer branch head `c0fa2071`.
-Use that Core in the separately supplied `Resources/Files.zip`. No Core source
-or archive is modified here. An incompatible Core should fail Start rather than
+Use the updated Throne-G Core in the separately supplied `Resources/Files.zip`.
+Core source changes live in Throne-G; the archive is not modified here. An incompatible Core should fail Start rather than
 silently reverting to the old pool.
 
 Validation: `dotnet run --project tests/HysteriaXrayChecks` executes production

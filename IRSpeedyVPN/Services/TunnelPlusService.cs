@@ -517,7 +517,7 @@ namespace IRSpeedyVPN.Services
                     + " aiPolicy=" + (!autoSelectorPlan.AiEnabled ? "disabled"
                         : autoSelectorPlan.AiMembers == 0 ? "blocked-empty-pool" : "independent-pool")
                     + " checkIntervalSec=900 fullSweepSec=900 watchIntervalSec=300 samplesKept=10"
-                    + " switchToleranceMs=300 maxLatency=unlimited");
+                    + " switchToleranceMs=300 maxLatency=unlimited mainBalance=round-robin aiBalance=connection");
             }
             else if (needXray && !string.IsNullOrEmpty(xrayConfig))
             {

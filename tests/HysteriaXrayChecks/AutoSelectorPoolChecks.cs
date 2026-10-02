@@ -46,7 +46,7 @@ internal static class AutoSelectorPoolChecks
                 var outbounds = ((JArray)config["outbounds"]).OfType<JObject>().ToArray();
                 var main = outbounds.Single(o => (string)o["tag"] == "proxy");
                 var ai = outbounds.Single(o => (string)o["tag"] == "ai-proxy");
-                Check((string)main["type"] == "auto-selector" && (string)ai["type"] == "auto-selector"
+                Check((string)main["type"] == "auto-selector-round-robin" && (string)ai["type"] == "auto-selector"
                     && main["outbounds"].Values<string>().All(t => t.StartsWith("smart-proxy-"))
                     && ai["outbounds"].Values<string>().All(t => t.StartsWith("ai-proxy-"))
                     && main["fallbackTag"] == null && ai["fallbackTag"] == null,
@@ -56,7 +56,8 @@ internal static class AutoSelectorPoolChecks
                     && (int)main["tolerance"] == 300 && (int)ai["tolerance"] == 300
                     && main["max_rtt"] == null && ai["max_rtt"] == null
                     && (int)main["expected"] == 2 && (int)main["active_size"] == 2
-                    && (bool)main["balance"] && (string)main["balance_mode"] == "connection"
+                    && (bool)main["balance"] && (string)main["balance_mode"] == "round-robin"
+                    && (string)ai["balance_mode"] == "connection"
                     && !(bool)main["interrupt_exist_connections"] && (int)ai["expected"] == 1,
                     "health policy, small-pool limits and existing-session stability in " + (tun ? "TUN" : "proxy"));
                 Check(JToken.DeepEquals(config["dns"], original["dns"])

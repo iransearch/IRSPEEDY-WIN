@@ -94,7 +94,7 @@ namespace IRSpeedyVPN.Services.Xray
             var members = bridges.ToArray();
             return new JObject
             {
-                ["type"] = "auto-selector", ["tag"] = tag,
+                ["type"] = tag == "proxy" ? "auto-selector-round-robin" : "auto-selector", ["tag"] = tag,
                 ["outbounds"] = new JArray(members.Select(b => (string)b["tag"])),
                 ["url"] = "https://connectivitycheck.gstatic.com/generate_204",
                 ["interval"] = "900s", ["bench_interval"] = "900s", ["watch_interval"] = "300s",
@@ -102,7 +102,7 @@ namespace IRSpeedyVPN.Services.Xray
                 ["sampling"] = 10, ["tolerance"] = 300,
                 ["fail_tolerance"] = 0.2,
                 ["timeout"] = "5s", ["concurrency"] = 4, ["dial_retries"] = 2,
-                ["balance"] = true, ["balance_mode"] = "connection",
+                ["balance"] = true, ["balance_mode"] = tag == "proxy" ? "round-robin" : "connection",
                 ["interrupt_exist_connections"] = false
                 // Leave connectivity_url unset: a blocked fixed endpoint must not
                 // declare the physical internet offline. Core retains its OS/error
