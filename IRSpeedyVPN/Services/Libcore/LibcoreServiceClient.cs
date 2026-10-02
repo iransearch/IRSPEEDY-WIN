@@ -50,6 +50,14 @@ namespace IRSpeedyVPN.Services.Libcore
                     LibcoreProto.DecodeErrorResp, timeoutMs);
         }
 
+        public ErrorResp RecheckAutoSelector(string tag, int timeoutMs)
+        {
+            var request = LibcoreProto.EncodeAutoSelectorRecheck(tag);
+            using (var client = ProtorpcClient.Connect(_host, _port, timeoutMs))
+                return client.CallWithDeadline("LibcoreService.AutoSelectorAction", request,
+                    LibcoreProto.DecodeErrorResp, timeoutMs);
+        }
+
         public ErrorResp CheckConfig(LoadConfigReq req)
         {
             return Call("LibcoreService.CheckConfig", LibcoreProto.EncodeLoadConfigReq(req), LibcoreProto.DecodeErrorResp);

@@ -51,8 +51,10 @@ internal static class AutoSelectorPoolChecks
                     && ai["outbounds"].Values<string>().All(t => t.StartsWith("ai-proxy-"))
                     && main["fallbackTag"] == null && ai["fallbackTag"] == null,
                     "main and AI selection stay independent in " + (tun ? "TUN" : "proxy"));
-                Check((string)main["interval"] == "60s" && (string)main["bench_interval"] == "300s"
-                    && (string)main["watch_interval"] == "15s" && (int)main["sampling"] == 10
+                Check((string)main["interval"] == "900s" && (string)main["bench_interval"] == "900s"
+                    && (string)main["watch_interval"] == "300s" && (int)main["sampling"] == 10
+                    && (int)main["tolerance"] == 300 && (int)ai["tolerance"] == 300
+                    && main["max_rtt"] == null && ai["max_rtt"] == null
                     && (int)main["expected"] == 2 && (int)main["active_size"] == 2
                     && (bool)main["balance"] && (string)main["balance_mode"] == "connection"
                     && !(bool)main["interrupt_exist_connections"] && (int)ai["expected"] == 1,

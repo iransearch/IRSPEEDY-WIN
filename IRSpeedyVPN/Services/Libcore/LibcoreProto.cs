@@ -10,6 +10,17 @@ namespace IRSpeedyVPN.Services.Libcore
         private const int WireVarint = 0;
         private const int WireLengthDelimited = 2;
 
+        public static byte[] EncodeAutoSelectorRecheck(string tag)
+        {
+            // Throne AutoSelectorActionRequest: tag=1, action=2. Never send an
+            // empty tag: that would recheck every group rather than AI alone.
+            if (string.IsNullOrWhiteSpace(tag)) throw new ArgumentException("Group tag is required.", nameof(tag));
+            var w = new ProtoWriter();
+            w.WriteStringField(1, tag);
+            w.WriteStringField(2, "recheck");
+            return w.ToArray();
+        }
+
         public static byte[] EncodeRequestHeader(ulong id, string method, uint rawLen)
         {
             var w = new ProtoWriter();

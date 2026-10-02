@@ -89,7 +89,7 @@ namespace IRSpeedyVPN.Services.Xray
             catch { plan.Dispose(); throw; }
         }
 
-        private static JObject Group(string tag, IEnumerable<JObject> bridges, string maxRtt)
+        private static JObject Group(string tag, IEnumerable<JObject> bridges)
         {
             var members = bridges.ToArray();
             return new JObject
@@ -97,9 +97,9 @@ namespace IRSpeedyVPN.Services.Xray
                 ["type"] = "auto-selector", ["tag"] = tag,
                 ["outbounds"] = new JArray(members.Select(b => (string)b["tag"])),
                 ["url"] = "https://connectivitycheck.gstatic.com/generate_204",
-                ["interval"] = "60s", ["bench_interval"] = "300s", ["watch_interval"] = "15s",
+                ["interval"] = "900s", ["bench_interval"] = "900s", ["watch_interval"] = "300s",
                 ["active_size"] = Math.Min(8, members.Length), ["expected"] = Math.Min(3, members.Length),
-                ["sampling"] = 10, ["max_rtt"] = maxRtt,
+                ["sampling"] = 10, ["tolerance"] = 300,
                 ["fail_tolerance"] = 0.2,
                 ["timeout"] = "5s", ["concurrency"] = 4, ["dial_retries"] = 2,
                 ["balance"] = true, ["balance_mode"] = "connection",
@@ -128,8 +128,8 @@ namespace IRSpeedyVPN.Services.Xray
                 if (detour != null) copy["detour"] = detour.DeepClone();
                 outbounds.Add(copy);
             }
-            primary.Replace(Group("proxy", main, "3s"));
-            if (ai.Count > 0) outbounds.Add(Group("ai-proxy", ai, "5s"));
+            primary.Replace(Group("proxy", main));
+            if (ai.Count > 0) outbounds.Add(Group("ai-proxy", ai));
             // Core/process bypasses have no user inbound. Restrict AI policy to
             // user traffic so server DNS and physical connectivity checks cannot
             // be routed back into an AI bridge.

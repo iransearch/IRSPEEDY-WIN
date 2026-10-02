@@ -14,6 +14,7 @@ class Program
         await CheckUnresponsiveStart(false);
         await CheckUnresponsiveStart(true);
         await CheckResponsiveStart();
+        await AutoSelectorRecheckChecks.Run();
         await UrlTestCancellationChecks.Run();
     }
 

@@ -414,6 +414,7 @@ namespace IRSpeedyVPN.Services
                         return;
                     }
                     IsConnected = true;
+                    RecheckAiPoolAfterStart();
                     ResumeSharingAfterCoreStart();
                     Diagnostic("connection-established", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy"));
                     ConnectionDiagnostics.RequestSnapshot();
@@ -515,7 +516,8 @@ namespace IRSpeedyVPN.Services
                     + " mainMembers=" + autoSelectorPlan.MainMembers + " aiMembers=" + autoSelectorPlan.AiMembers
                     + " aiPolicy=" + (!autoSelectorPlan.AiEnabled ? "disabled"
                         : autoSelectorPlan.AiMembers == 0 ? "blocked-empty-pool" : "independent-pool")
-                    + " checkIntervalSec=60 fullSweepSec=300 watchIntervalSec=15 samplesKept=10");
+                    + " checkIntervalSec=900 fullSweepSec=900 watchIntervalSec=300 samplesKept=10"
+                    + " switchToleranceMs=300 maxLatency=unlimited");
             }
             else if (needXray && !string.IsNullOrEmpty(xrayConfig))
             {
@@ -779,6 +781,38 @@ namespace IRSpeedyVPN.Services
         {
             lock (startCancellationGate)
                 return startCancellation?.Token ?? CancellationToken.None;
+        }
+
+        private void RecheckAiPoolAfterStart()
+        {
+            // Native startup probes only the first active tier. Check remaining
+            // AI members once so a faster one beyond the first eight need not
+            // wait for the 15-minute periodic round. Small pools already get a
+            // complete native initial round; do not duplicate their probes.
+            var plan = autoSelectorPlan;
+            if (plan == null || plan.AiMembers <= 8) return;
+            long generation = Interlocked.Read(ref connectionGeneration);
+            Task.Run(() =>
+            {
+                lock (connectionLifecycleGate)
+                {
+                    if (userCancelRequested || !IsConnected || !ReferenceEquals(plan, autoSelectorPlan)
+                        || generation != Interlocked.Read(ref connectionGeneration)) return;
+                    try
+                    {
+                        var result = new LibcoreServiceClient("127.0.0.1", CorePort, 750)
+                            .RecheckAutoSelector("ai-proxy", 750);
+                        Diagnostic("ai-pool-initial-recheck", "success=" + (result != null && string.IsNullOrEmpty(result.Error))
+                            + " members=" + plan.AiMembers);
+                    }
+                    catch (Exception ex)
+                    {
+                        // Optional Core capability failure must not restart or
+                        // disconnect the established VPN. Normal checks continue.
+                        Diagnostic("ai-pool-initial-recheck-unavailable", "exception=" + ex.GetType().Name);
+                    }
+                }
+            });
         }
 
         private void ReleaseAutoSelectorPlan()
