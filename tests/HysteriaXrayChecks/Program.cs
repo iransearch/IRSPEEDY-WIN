@@ -76,7 +76,7 @@ class Program
             Check(((JArray)rebuilt["routing"]["balancers"]).Count == (enabled ? 2 : 1), "Stale AI balancer remained");
             if (enabled)
             {
-                Check(((JArray)rebuilt["routing"]["rules"]).IndexOf(aiRules[0]) == 1
+                Check(((JArray)rebuilt["routing"]["rules"]).IndexOf(aiRules[0]) == 2
                     && aiRules[0]["domain"].Values<string>().Contains("domain:showip.net"), "ShowIP AI rule lost priority");
                 Check((string)aiMembers[0]["protocol"] == (round < 2 ? "hysteria2" : "vless"), "Stale AI API member retained");
             }
@@ -94,6 +94,7 @@ class Program
         Console.WriteLine("PASS: repeated AI on/off, current members, ShowIP rule, shared startup snapshot and preserved probe policy.");
         CheckAiIsolation(links);
         PoolDnsChecks.Run();
+        AutoSelectorPoolChecks.Run();
 
         var singBox = IRSpeedyVPN.Services.SingBox.Samples.sg_clientSample;
         var runtime = Path.Combine(Path.GetTempPath(), "IRSpeedy-GeoRouting-" + Guid.NewGuid().ToString("N"));
@@ -180,7 +181,7 @@ class Program
             Check(policyActive == enabled && aiRules.Length == (enabled ? 1 : 0), "Empty AI pool silently removed its policy");
             if (enabled)
             {
-                Check(rules.IndexOf(aiRules[0]) == 1, "AI policy lost priority over direct/main rules");
+                Check(rules.IndexOf(aiRules[0]) == 2, "AI policy lost priority after physical connectivity bypass");
                 Check(aiRules[0]["domain"].Values<string>().SequenceEqual(SmartIpRouting.AiDomains.Select(d => "domain:" + d)),
                     "Empty AI protection lost service domains");
                 if (members.Length > 0)

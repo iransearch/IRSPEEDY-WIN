@@ -7,7 +7,11 @@ using Newtonsoft.Json;
 namespace v2rayN.Base { }
 namespace IRSpeedyVPN.Common
 {
-    public static class LogHelper { public static void WriteLog(Exception error) { throw new Exception("Generator log", error); } }
+    public static class LogHelper
+    {
+        public static void WriteLog(Exception error) { throw new Exception("Generator log", error); }
+        public static void WriteExLog(string message) { }
+    }
     internal static class ConnectionDiagnostics
     {
         internal static readonly List<string> Lines = new List<string>();

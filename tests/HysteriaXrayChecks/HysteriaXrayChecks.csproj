@@ -5,6 +5,7 @@
     <LangVersion>7.3</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="../../IRSpeedyVPN/Services/InternetConnectivityMonitor.cs" Link="InternetConnectivityMonitor.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Xray/*.cs" Link="Xray/%(Filename)%(Extension)" />
     <Compile Include="../../IRSpeedyVPN/Services/GeoRoutingFallback.cs" Link="GeoRoutingFallback.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/SingBox/Samples.cs" Link="SingBox/Samples.cs" />

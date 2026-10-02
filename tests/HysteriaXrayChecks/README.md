@@ -33,6 +33,11 @@ are logged once per attempted start. It does not validate corrupt geo data or
 replace a live Windows connection test. The embedded runtime remains single-file.
 # AI preference lifecycle
 
+Live Smart/country startup now replaces the legacy Xray template's balancers
+with independent sing-box Auto Selectors. The legacy builder checks below remain
+transport/template regressions. `AutoSelectorPoolChecks` exercises the final
+live pool plan (22 checks); see [Auto Selector pools](../../docs/auto-selector-pools.md).
+
 The harness also rebuilds a Smart configuration through repeated AI on/off
 transitions in one process, changes the supplied AI members, and verifies that
 old rules, balancers and members do not survive. It checks the unset preference

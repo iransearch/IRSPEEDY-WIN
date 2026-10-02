@@ -41,6 +41,7 @@ namespace IRSpeedyVPN.Services
         long urlTestSpeed;
         DateTime lastUrlTest;
         int _xraySocksPort;
+        Xray.AutoSelectorPoolPlan autoSelectorPlan;
         string _singboxLinkOverride;
         public static string selectedChain;
         public static object grpcLock=new object();
@@ -303,48 +304,25 @@ namespace IRSpeedyVPN.Services
                             return;
                         }
 
-                        // Preserve the pre-Core-update Smart topology: every supplied
-                        // server is an independent member of one Xray leastLoad pool.
-                        // Hysteria2 is translated to Xray's protocol="hysteria",
-                        // version=2 schema by the generator; no outer sing-box URLTest
-                        // is allowed to collapse the whole pool into one member.
+                        // Stop/rebuild owns the bridge ports for this connection generation.
+                        ReleaseAutoSelectorPlan();
                         needXray = true;
-                        _xraySocksPort = FreePortManager.Dequeue();
-                        var authUser = Guid.NewGuid().ToString("N");
-                        var authPass = Guid.NewGuid().ToString("N");
-                        bool aiRoutingEnabled = false;
-                        int poolMemberCount;
-                        int hysteriaMemberCount;
-                        xrayConfig = Xray.ConfigGenerator.GetSmartBalancerConfig(
-                            smartUrls,
-                            _xraySocksPort,
-                            authUser,
-                            authPass,
-                            GetAiLinks(),
-                            out aiRoutingEnabled,
-                            out poolMemberCount,
-                            out hysteriaMemberCount,
-                            isVodEnabled);
-                        if (string.IsNullOrWhiteSpace(xrayConfig))
+                        autoSelectorPlan = Xray.AutoSelectorPoolPlan.Create(smartUrls, GetAiLinks(),
+                            isVodEnabled, FreePortManager.Dequeue, FreePortManager.Enqueue);
+                        if (autoSelectorPlan == null)
                         {
-                            if (_xraySocksPort > 0)
-                                FreePortManager.Enqueue(_xraySocksPort);
-                            _xraySocksPort = 0;
                             TryStopCore();
-                            if (onConnectDisconnect != null)
-                                onConnectDisconnect.Invoke(this, false, 0, "سروری یافت نشد");
+                            onConnectDisconnect?.Invoke(this, false, 0, "سروری یافت نشد");
                             return;
                         }
-
-                        singboxLink = $"socks://{authUser}:{authPass}@127.0.0.1:{_xraySocksPort}";
-                        LogHelper.WriteExLog(
-                            "Smart config prepared. mode=xray-leastload"
+                        xrayConfig = autoSelectorPlan.XrayConfig;
+                        singboxLink = $"socks://{autoSelectorPlan.User}:{autoSelectorPlan.Password}@127.0.0.1:{autoSelectorPlan.PrimaryPort}";
+                        LogHelper.WriteExLog("Smart config prepared. mode=singbox-auto-selector"
                             + " inputCandidates=" + smartUrls.Count
-                            + " poolMembers=" + poolMemberCount
-                            + " hysteriaMembers=" + hysteriaMemberCount
-                            + " droppedCandidates=" + (smartUrls.Count - poolMemberCount)
-                            + " xrayEnabled=True"
-                            + " aiRoutingEnabled=" + aiRoutingEnabled);
+                            + " poolMembers=" + autoSelectorPlan.MainMembers
+                            + " aiMembers=" + autoSelectorPlan.AiMembers
+                            + " hysteriaMembers=" + autoSelectorPlan.HysteriaMembers
+                            + " aiRoutingEnabled=" + autoSelectorPlan.AiEnabled);
                         _singboxLinkOverride = null;
                     }
                     else if (Xray.ConfigGenerator.LinkNeedsXray(lastLink))
@@ -382,8 +360,8 @@ namespace IRSpeedyVPN.Services
                         _singboxLinkOverride = singboxLink;
                     }
                     */
-                    // Standard connections and Xray-only Smart pools still use the
-                    // existing single-outbound core_config path.
+                    // Generate the existing inbound/DNS/Shield/VOD shell, then
+                    // replace its primary outbound with the independent groups.
                     if (string.IsNullOrWhiteSpace(configData))
                     {
                         configData = SingBox.ConfigGenerator.GetConfig(
@@ -403,7 +381,13 @@ namespace IRSpeedyVPN.Services
                         );
                     }
 
-                    if (userCancelRequested) return;
+                    if (isSmartFast)
+                        configData = autoSelectorPlan.Apply(configData);
+                    if (userCancelRequested)
+                    {
+                        ReleaseAutoSelectorPlan();
+                        return;
+                    }
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig,
                         isSmartFast ? Xray.SmartIpRouting.OutboundDnsStrategy : ""))
                     {
@@ -417,11 +401,18 @@ namespace IRSpeedyVPN.Services
                         StopSniServers(serviceSniServers);
                         if (needXray && _xraySocksPort > 0) FreePortManager.Enqueue(_xraySocksPort);
                         _xraySocksPort = 0;
+                        TryStopCore();
+                        ReleaseAutoSelectorPlan();
                         onConnectDisconnect?.Invoke(this, false, 0, startError);
                         return;
                     }
 
-                    if (userCancelRequested) return;
+                    if (userCancelRequested)
+                    {
+                        TryStopCore();
+                        ReleaseAutoSelectorPlan();
+                        return;
+                    }
                     IsConnected = true;
                     ResumeSharingAfterCoreStart();
                     Diagnostic("connection-established", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy"));
@@ -450,6 +441,7 @@ namespace IRSpeedyVPN.Services
             {
                 StopSniServers(serviceSniServers);
                 TryStopCore();
+                ReleaseAutoSelectorPlan();
                 if (onConnectDisconnect != null)
                     onConnectDisconnect.Invoke(this, false, 0, ex.Message);
             }
@@ -517,7 +509,15 @@ namespace IRSpeedyVPN.Services
                 + " xrayConfigId=" + ConnectionDiagnostics.Fingerprint(xrayConfig) + " needXray=" + needXray
                 + " xrayDnsStrategy=" + (needXray && !string.IsNullOrEmpty(xrayOutboundDnsStrategy)
                     ? xrayOutboundDnsStrategy : "unwired"));
-            if (needXray && !string.IsNullOrEmpty(xrayConfig))
+            if (autoSelectorPlan != null)
+            {
+                Diagnostic("auto-selector-config-apply", "xrayConfigId=" + ConnectionDiagnostics.Fingerprint(xrayConfig)
+                    + " mainMembers=" + autoSelectorPlan.MainMembers + " aiMembers=" + autoSelectorPlan.AiMembers
+                    + " aiPolicy=" + (!autoSelectorPlan.AiEnabled ? "disabled"
+                        : autoSelectorPlan.AiMembers == 0 ? "blocked-empty-pool" : "independent-pool")
+                    + " checkIntervalSec=60 fullSweepSec=300 watchIntervalSec=15 samplesKept=10");
+            }
+            else if (needXray && !string.IsNullOrEmpty(xrayConfig))
             {
                 var plan = JObject.Parse(xrayConfig);
                 var planRules = plan["routing"]?["rules"] as JArray;
@@ -781,6 +781,12 @@ namespace IRSpeedyVPN.Services
                 return startCancellation?.Token ?? CancellationToken.None;
         }
 
+        private void ReleaseAutoSelectorPlan()
+        {
+            autoSelectorPlan?.Dispose();
+            autoSelectorPlan = null;
+        }
+
         private void DisconnectLocked(bool chkprocess, bool silent, bool userCanceled)
         {
             if (!PauseSharingBeforeCoreRestart(!userCanceled))
@@ -818,6 +824,7 @@ namespace IRSpeedyVPN.Services
                     _xraySocksPort = 0;
                 }
                
+                ReleaseAutoSelectorPlan();
                 _singboxLinkOverride = null;
                 suppressCoreExit = false;                
                 IsConnected = false;
