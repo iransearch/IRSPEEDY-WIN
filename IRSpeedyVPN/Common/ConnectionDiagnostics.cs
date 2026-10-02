@@ -112,6 +112,7 @@ namespace IRSpeedyVPN.Common
         }
         internal static void Write(string stage, string fields)
         {
+            if (!LogPolicy.UsefulDiagnostic(stage, fields)) return;
             try
             {
                 // Capture event time/context before queueing; disk IO never blocks UI/core readers.
