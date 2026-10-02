@@ -81,7 +81,7 @@ class Program
                 Check((string)aiMembers[0]["protocol"] == (round < 2 ? "hysteria2" : "vless"), "Stale AI API member retained");
             }
             Check((string)rebuilt["burstObservatory"]["pingConfig"]["interval"] == "15m"
-                && (int)rebuilt["burstObservatory"]["pingConfig"]["sampling"] == 2, "Probe policy changed");
+                && (int)rebuilt["burstObservatory"]["pingConfig"]["sampling"] == 3, "Probe policy changed");
             Check((string)rebuilt["log"]["loglevel"] == "info", "Runtime route decisions remain hidden");
         }
         // One startup uses the captured setting even if a later registry read changes.

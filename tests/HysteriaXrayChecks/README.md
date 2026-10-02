@@ -37,7 +37,7 @@ The harness also rebuilds a Smart configuration through repeated AI on/off
 transitions in one process, changes the supplied AI members, and verifies that
 old rules, balancers and members do not survive. It checks the unset preference
 default, ShowIP rule priority, the captured startup preference and unchanged
-15-minute/sampling-2 probe settings. Registry access is represented by the
+15-minute/sampling-3 probe settings. Registry access is represented by the
 fixture; this does not execute the Windows registry, WPF or the packaged Core.
 
 On Windows, disconnect, save AI off, reconnect, then disconnect, save AI on and
@@ -56,7 +56,7 @@ direct/main rules. AI off removes both the pool and blocking policy.
 
 The regression cases cover mixed accepted/rejected inputs, null/empty inputs,
 all-rejected inputs, and repeated state transitions, while retaining the main
-pool and 15-minute/sampling-2 probe settings. They compile the production
+pool and 15-minute/sampling-3 probe settings. They compile the production
 generator, not a simulated balancer. Live Windows testing should additionally
 fail AI probes with a working main pool and confirm that `showip.net` either
 uses an AI member or fails; it must never use the main/default route.
@@ -85,7 +85,7 @@ the requested policy, not confirmation that an old Core binary honored it.
 
 The harness verifies exact protobuf field-13 encoding, main/AI Hysteria2 and gRPC
 members, XHTTP upload/download settings, literal-IP preservation, and isolation
-from single-server configs. Existing AI fallback/block and 15m/sampling-2
+from single-server configs. Existing AI fallback/block and 15m/sampling-3
 checks run alongside it. These checks do not simulate Windows DNS or QUIC.
 
 Core compatibility was reviewed against `iransearch/Throne-G` commit
