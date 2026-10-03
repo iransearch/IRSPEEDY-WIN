@@ -69,7 +69,7 @@
                 </Grid>
 
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0,8,0">
-                    <TextBlock Text="اوه! اینترنت یک دنیا قطع شد :)"
+                    <TextBlock Text="اتصال رفت؛ خاطره‌اش ماند!"
                                FontFamily="{StaticResource AppFontFamilySemiBold}"
                                FontSize="15.5" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextPrimaryBrush}"

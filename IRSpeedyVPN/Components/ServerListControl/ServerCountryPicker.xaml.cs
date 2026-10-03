@@ -199,8 +199,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public Brush SignalBrush { get => _signalBrush; private set { _signalBrush = value; On(); } }
         private void SetSignalColor(long latency)
         {
-            var resource = latency <= 0 ? "TextSecondaryBrush" : latency <= 45 ? "PingGoodBrush"
-                : latency <= 75 ? "SettingsIconRouteBrush" : "Theme.DangerBrush";
+            var resource = latency > 0 ? "PingGoodBrush" : "TextSecondaryBrush";
             // Rows are cached across logout/login, when the appearance can change.
             SignalBrush = ThemeManager.Instance.GetLiveBrush(resource);
         }

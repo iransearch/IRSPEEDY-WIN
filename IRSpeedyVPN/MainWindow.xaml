@@ -23,14 +23,14 @@
         <!-- ══════════════════ Header (§2) ══════════════════ -->
         <Grid Grid.Row="0" Margin="12,0" Background="Transparent" MouseLeftButtonDown="Header_MouseDown" FlowDirection="LeftToRight">
           <Grid.ColumnDefinitions>
-            <!-- Fixed window controls, divider and primary service action. -->
-            <ColumnDefinition Width="70"/>
-            <ColumnDefinition Width="21"/>
-            <ColumnDefinition Width="40"/>
-            <ColumnDefinition Width="*" MinWidth="150"/>
-            <!-- Contextual actions cannot change the title's origin. -->
-            <ColumnDefinition Width="80"/>
+            <!-- Brand mark and account actions occupy the physical left side. -->
             <ColumnDefinition Width="24"/>
+            <ColumnDefinition Width="80"/>
+            <ColumnDefinition Width="*" MinWidth="150"/>
+            <!-- Service settings precede the standard right-side window controls. -->
+            <ColumnDefinition Width="40"/>
+            <ColumnDefinition Width="21"/>
+            <ColumnDefinition Width="70"/>
           </Grid.ColumnDefinitions>
           <!-- Equal outside columns center the wordmark in the whole window.
                Version visibility and page actions cannot change its position. -->
@@ -46,29 +46,16 @@
               </ContextMenu>
             </Grid.ContextMenu>
             <TextBlock x:Name="HeaderWordmark" Grid.Column="1" Text="IRSPEEDY" FontFamily="{StaticResource AppFontFamily}" FontWeight="Bold" FontSize="15" Foreground="{DynamicResource TextPrimaryBrush}" VerticalAlignment="Center" Margin="0"/>
-            <TextBlock x:Name="txtVersion" Grid.Column="2" HorizontalAlignment="Left" Text="1.0.0.1" FontFamily="{StaticResource AppFontFamilyMedium}" FontSize="{StaticResource FontSizeVersion}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="8,3,0,0" FlowDirection="LeftToRight"/>
+            <TextBlock x:Name="txtVersion" Grid.Column="0" HorizontalAlignment="Right" Text="1.0.0.1" FontFamily="{StaticResource AppFontFamilyMedium}" FontSize="{StaticResource FontSizeVersion}" Foreground="{DynamicResource TextSecondaryBrush}" VerticalAlignment="Center" Margin="0,3,8,0" FlowDirection="LeftToRight"/>
           </Grid>
           <!-- Kept for code compatibility (Login sets it); no longer part of the
                      visible header per the new design. -->
           <TextBlock x:Name="txtUsername" Text="" Visibility="Collapsed"/>
           <TextBlock x:Name="lblPremium" Text="PREMIUM" Visibility="Collapsed"/>
           <TextBlock x:Name="txtGlobalMessage" Text="برای عملکرد صحیح برنامه، نسخه دات نت را به 4.8 ارتقا دهید" Foreground="Salmon" Visibility="Collapsed" FontSize="11" HorizontalAlignment="Center" VerticalAlignment="Bottom" Grid.ColumnSpan="6" TextWrapping="Wrap" MaxWidth="360"/>
-          <!-- Window controls keep the same horizontal and vertical positions. -->
-          <StackPanel Orientation="Horizontal" HorizontalAlignment="Left" VerticalAlignment="Center" Grid.Column="0" FlowDirection="LeftToRight">
-            <Border Width="30" Height="30" CornerRadius="8" Cursor="Hand" MouseDown="Exit_PreviewMouseDown" Margin="0,0,10,0" AutomationProperties.Name="بستن پنجره" ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="خروج">
-              <Border.Style>
-                <Style TargetType="Border">
-                  <Setter Property="Background" Value="Transparent"/>
-                  <Style.Triggers>
-                    <Trigger Property="IsMouseOver" Value="True">
-                      <Setter Property="Background" Value="{DynamicResource HeaderHoverBrush}"/>
-                    </Trigger>
-                  </Style.Triggers>
-                </Style>
-              </Border.Style>
-              <Path Data="{StaticResource IconClose}" Stretch="Uniform" Width="12" Height="12" Stroke="{DynamicResource IconStrokeBrush}" StrokeThickness="1.4"/>
-            </Border>
-            <Border Width="30" Height="30" CornerRadius="8" Cursor="Hand" MouseLeftButtonDown="Minimize_MouseLeftButtonDown" AutomationProperties.Name="کوچک کردن پنجره" ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="کوچک کردن">
+          <!-- Explicit LTR ordering keeps minimize then close at the physical right. -->
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Center" Grid.Column="5" FlowDirection="LeftToRight">
+            <Border Width="30" Height="30" CornerRadius="8" Cursor="Hand" MouseLeftButtonDown="Minimize_MouseLeftButtonDown" Margin="0,0,10,0" AutomationProperties.Name="کوچک کردن پنجره" ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="کوچک کردن">
               <Border.Style>
                 <Style TargetType="Border">
                   <Setter Property="Background" Value="Transparent"/>
@@ -81,11 +68,24 @@
               </Border.Style>
               <Path Data="{StaticResource IconMinimize}" Stretch="Uniform" Width="12" Height="12" Stroke="{DynamicResource IconStrokeBrush}" StrokeThickness="1.4"/>
             </Border>
+            <Border Width="30" Height="30" CornerRadius="8" Cursor="Hand" MouseDown="Exit_PreviewMouseDown" AutomationProperties.Name="بستن پنجره" ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="بستن پنجره">
+              <Border.Style>
+                <Style TargetType="Border">
+                  <Setter Property="Background" Value="Transparent"/>
+                  <Style.Triggers>
+                    <Trigger Property="IsMouseOver" Value="True">
+                      <Setter Property="Background" Value="{DynamicResource HeaderHoverBrush}"/>
+                    </Trigger>
+                  </Style.Triggers>
+                </Style>
+              </Border.Style>
+              <Path Data="{StaticResource IconClose}" Stretch="Uniform" Width="12" Height="12" Stroke="{DynamicResource IconStrokeBrush}" StrokeThickness="1.4"/>
+            </Border>
           </StackPanel>
-          <Border Grid.Column="1" Width="1" Height="18" Background="{DynamicResource DividerBrush}" VerticalAlignment="Center" HorizontalAlignment="Center" x:Name="HeaderDivider" Visibility="Collapsed"/>
+          <Border Grid.Column="4" Width="1" Height="18" Background="{DynamicResource DividerBrush}" VerticalAlignment="Center" HorizontalAlignment="Center" x:Name="HeaderDivider" Visibility="Collapsed"/>
           <!-- Legacy account settings share the primary slot only on pages where
                service actions are hidden; their visibility remains controlled in code. -->
-          <Border Grid.Column="2" x:Name="btnSettings" Width="30" Height="30" VerticalAlignment="Center" HorizontalAlignment="Left" CornerRadius="8" Background="Transparent" Visibility="Collapsed" Cursor="Hand" PreviewMouseDown="btnSettings_MouseDown" ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="تنظیمات">
+          <Border Grid.Column="3" x:Name="btnSettings" Width="30" Height="30" VerticalAlignment="Center" HorizontalAlignment="Right" Margin="0,0,10,0" CornerRadius="8" Background="Transparent" Visibility="Collapsed" Cursor="Hand" PreviewMouseDown="btnSettings_MouseDown" ToolTipService.InitialShowDelay="400" ToolTipService.ShowDuration="2000" ToolTipService.BetweenShowDelay="10000" ToolTip="تنظیمات">
               <Border.Style>
                 <Style TargetType="Border">
                   <Setter Property="Background" Value="Transparent"/>
@@ -100,22 +100,22 @@
             </Border>
           <!-- Keep one visibility owner for both service-action areas. Fixed slots
                reserve space even while login/connection animation hides the actions. -->
-          <Grid x:Name="panelHeaderIcons" Grid.Column="2" Grid.ColumnSpan="3" Height="30" VerticalAlignment="Center" FlowDirection="LeftToRight">
+          <Grid x:Name="panelHeaderIcons" Grid.Column="1" Grid.ColumnSpan="3" Height="30" VerticalAlignment="Center" FlowDirection="LeftToRight">
             <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="40"/>
-              <ColumnDefinition Width="*"/>
               <ColumnDefinition Width="80"/>
+              <ColumnDefinition Width="*"/>
+              <ColumnDefinition Width="40"/>
             </Grid.ColumnDefinitions>
-            <StackPanel x:Name="panelHeaderPrimaryIcons" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left"/>
-            <StackPanel x:Name="panelHeaderSecondaryIcons" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right"/>
+            <StackPanel x:Name="panelHeaderPrimaryIcons" Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right"/>
+            <StackPanel x:Name="panelHeaderSecondaryIcons" Grid.Column="0" Orientation="Horizontal" HorizontalAlignment="Left"/>
           </Grid>
           <!-- Login appearance is a header action, outside the page transition
                and the service-only action group. Its slot stays beside the logo. -->
-          <ToggleButton x:Name="LoginThemeToggle" Grid.Column="4" Panel.ZIndex="1"
+          <ToggleButton x:Name="LoginThemeToggle" Grid.Column="1" Panel.ZIndex="1"
                         Style="{StaticResource AppearanceToggle}" Visibility="Collapsed"
-                        HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,10,0"
+                        HorizontalAlignment="Left" VerticalAlignment="Center" Margin="10,0,0,0"
                         IsEnabled="{Binding IsEnabled, ElementName=TransitionBox}"/>
-          <Image Source="pack://application:,,,/Resources/Irspeedy/Logo/logo-server-list.png" Width="24" Height="32" VerticalAlignment="Center" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" Grid.Column="5"/>
+          <Image Source="pack://application:,,,/Resources/Irspeedy/Logo/logo-server-list.png" Width="24" Height="32" VerticalAlignment="Center" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" Grid.Column="0"/>
         </Grid>
         <!-- ══════════════════ Content ══════════════════ -->
         <Grid Grid.Row="1">
