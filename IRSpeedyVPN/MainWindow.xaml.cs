@@ -747,10 +747,11 @@ namespace IRSpeedyVPN
 
             foreach (var icon in icons)
             {
+                var isPrimary = ReferenceEquals(icon, primaryIcon);
                 var label = new Button
                 {
                     Style = (Style)FindResource("HeaderIconButton"),
-                    Margin = new Thickness(0, 0, 10, 0),
+                    Margin = isPrimary ? new Thickness(0) : new Thickness(0, 0, 10, 0),
                     Content = string.IsNullOrEmpty(icon.Icon) || icon.Icon == "\uf2f5"
                         ? (object)new System.Windows.Shapes.Path {
                             Data = (Geometry)FindResource(icon.Icon == "\uf2f5" ? "ServerListLogoutIcon" : icon.ToolTip.Contains("Shield") ? "IconShield" : "IconGear"),
@@ -780,7 +781,7 @@ namespace IRSpeedyVPN
                     label.Click += (s, e) => handler();
                 }
 
-                var target = ReferenceEquals(icon, primaryIcon)
+                var target = isPrimary
                     ? panelHeaderPrimaryIcons : panelHeaderSecondaryIcons;
                 target.Children.Add(label);
             }
