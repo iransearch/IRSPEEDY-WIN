@@ -107,6 +107,9 @@ namespace IRSpeedyVPN
             uCLoading.Visibility = Visibility.Hidden;
             uCLoginLoading.SetStage(0);
             uCLoginLoading.Visibility = Visibility.Visible;
+            panelHeaderIcons.Visibility = Visibility.Collapsed;
+            btnSettings.Visibility = Visibility.Collapsed;
+            HeaderDivider.Visibility = Visibility.Collapsed;
             txtVersion.Visibility = Visibility.Collapsed;
         }
 
@@ -191,7 +194,6 @@ namespace IRSpeedyVPN
                 // below validates credentials/session and refreshes servers every 30 min.
                 mainTimer.Change(Timeout.Infinite, Timeout.Infinite);
 
-                btnSettings.Visibility = Visibility.Visible;
                 txtUsername.Text = gInfo.Username;
                 ShowMessage("");
                 ShowLoginServerList();

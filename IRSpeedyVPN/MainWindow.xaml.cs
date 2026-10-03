@@ -913,6 +913,7 @@ namespace IRSpeedyVPN
             uCLoginLoading.Visibility = Visibility.Visible;
             panelHeaderIcons.Visibility = Visibility.Collapsed;
             btnSettings.Visibility = Visibility.Collapsed;
+            HeaderDivider.Visibility = Visibility.Collapsed;
             txtVersion.Visibility = Visibility.Collapsed;
             // Let the first layout/render complete before starting the minimum timer.
             await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
@@ -1160,7 +1161,6 @@ namespace IRSpeedyVPN
                         mainTimer.Change(1000,1000);
                         Dispatcher.Invoke((Action)(() =>
                         {
-                            btnSettings.Visibility = Visibility.Visible;
                             txtUsername.Text = gInfo.Username;
                             ShowMessage("");                            
                             ShowLoginServerList();

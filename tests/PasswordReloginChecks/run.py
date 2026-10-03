@@ -29,7 +29,7 @@ class TimerStub {public void Change(int a,int b){} }
 class LoginForm { public string User,Password; public bool Remember; public void SetUserPassword(string u,string p,bool r){User=u;Password=p;Remember=r;} public void HideRenewMessage(){} }
 class ServerList {
  public bool probesPaused=true;
- public bool probesRequireDisconnect=true,probeRestartRequested=true;
+ public bool probesRequireDisconnect=true,probeRestartRequested=true,probeLoginRoundRequested;
  PREPARE_METHOD
  public bool Drained; public Task DrainServerChecksAsync(){Drained=true;return Task.CompletedTask;} public void PauseServerChecks(){} public void RefreshServicesFromFactory(){} }
 class ProbeTimer {public bool Stopped; public void Stop(){Stopped=true;} }
