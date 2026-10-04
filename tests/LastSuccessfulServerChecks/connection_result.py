@@ -9,6 +9,7 @@ using System;using System.Threading;using System.Threading.Tasks;using System.Di
 class Info {public object CurrentService=new object();public DateTime ConnectionTime;}
 class ListView {public int Marks;public object Recorded;public void MarkSuccessfulConnection(object service){Marks++;Recorded=service;}}
 class Dispatch {public bool HasShutdownStarted;}
+static class VpnTimeZone { public static object Owner;public static void BeginConnection(object service){Owner=service;}public static void EndConnection(){Owner=null;} }
 class Window {
  public Info gInfo=new Info();public ListView uCServerList=new ListView();object uCUserInfo=new object();
  public Dispatch Dispatcher=new Dispatch();public long connectionRequestVersion;public bool IsUserLogin=true;
@@ -24,7 +25,9 @@ class Program {
  static async Task Main(){
   var success=new Window();success.Result(true);
   Check(success.uCServerList.Marks==1&&ReferenceEquals(success.uCServerList.Recorded,success.gInfo.CurrentService),"successful presentation records the actual connected service");
+  Check(ReferenceEquals(VpnTimeZone.Owner,success.gInfo.CurrentService),"clock activation belongs to the presented VPN connection");
   success.Result(false);
+  Check(VpnTimeZone.Owner==null,"disconnect removes clock activation before cleanup");
   Check(success.uCServerList.Marks==1,"failed or disconnected result retains the previous successful marker");
   var cancelled=new Window();cancelled.StartDelay();cancelled.Result(true);cancelled.connectionRequestVersion++;
   var replaced=new Window();replaced.StartDelay();replaced.Result(true);replaced.gInfo.CurrentService=new object();

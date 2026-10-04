@@ -496,6 +496,7 @@ namespace IRSpeedyVPN.Services
                 var split = SplitTunneling.SplitTunnelStore.Load();
                 configData = SplitTunneling.SplitTunnelPolicyBuilder.Apply(configData, split, System.Windows.Forms.Application.ExecutablePath);
                 configData = Traffic.TrafficConfiguration.Enable(configData);
+                configData = SingBox.VpnTimeZoneRouting.Apply(configData);
                 if (split.Enabled)
                     Diagnostic("split-tunnel", "policy=selected-only selected=" + split.Apps.Count
                         + " mode=" + (lastVpnMode ? "TUN+local-proxy" : "local-proxy")
@@ -760,6 +761,7 @@ namespace IRSpeedyVPN.Services
         }
         private void DisconnectInternal(bool chkprocess, bool silent, bool userCanceled)
         {
+            if (userCanceled) VpnTimeZone.EndConnection(this);
             // Invalidate queued starts before waiting for an in-flight startup to drain.
             if (userCanceled) CancelPendingConnection();
             lock (connectionLifecycleGate)
@@ -2180,6 +2182,7 @@ namespace IRSpeedyVPN.Services
                     if (!ShouldRetryCoreExit())
                     {
                         Diagnostic("core-exit-decision", "action=disconnect reason=retry-policy");
+                        VpnTimeZone.EndConnection(this);
                         DisconnectLocked(true, false, false);
                         return;
                     }

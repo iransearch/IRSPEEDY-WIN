@@ -35,6 +35,7 @@ namespace IRSpeedyVPN
 
             try
             {
+                VpnTimeZone.Recover();
                 // Also guard assembly/JIT loading failures before Initialize can catch them.
                 try
                 {
@@ -51,7 +52,10 @@ namespace IRSpeedyVPN
                 // An exception raised inside the dispatcher loop is not covered by the
                 // try/catch around Main, so log it before WPF tears the process down.
                 app.DispatcherUnhandledException += (sender, args) =>
+                {
+                    VpnTimeZone.EndConnection();
                     LogHelper.WriteLog(args.Exception, true);
+                };
 
                 // App.xaml already loads the base/theme dictionaries. Keep only the two
                 // dictionaries that are not declared there; loading every theme twice was
@@ -80,6 +84,7 @@ namespace IRSpeedyVPN
             }
             finally
             {
+                VpnTimeZone.EndConnection();
                 ErrorReporting.Shutdown();
             }
         }
@@ -93,6 +98,7 @@ namespace IRSpeedyVPN
         {
             AppDomain.CurrentDomain.UnhandledException += (sender, args) =>
             {
+                VpnTimeZone.EndConnection();
                 var exception = args.ExceptionObject as Exception;
                 if (exception != null)
                     LogHelper.WriteLog(exception, true);

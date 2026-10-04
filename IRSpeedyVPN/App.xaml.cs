@@ -18,6 +18,7 @@ namespace IRSpeedyVPN
     {
         protected override void OnExit(ExitEventArgs e)
         {
+            Common.VpnTimeZone.EndConnection();
             // Normal Exit already awaited bounded cleanup. Do not repeat blocking
             // teardown here after the dispatcher is starting to shut down.
             if (!IRSpeedyVPN.MainWindow.ExitCleanupStarted)
@@ -42,4 +43,3 @@ namespace IRSpeedyVPN
         }
     }
 }
-

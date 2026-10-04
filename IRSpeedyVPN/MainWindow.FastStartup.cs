@@ -160,7 +160,7 @@ namespace IRSpeedyVPN
                     return false;
 
                 if (account.UserAccount.ExpiryDate != null
-                    && account.UserAccount.ExpiryDate.Value < DateTime.Now)
+                    && account.UserAccount.ExpiryDate.Value < VpnTimeZone.AccountNow)
                     return false;
 
                 IsRememberChecked = true;
@@ -463,7 +463,7 @@ namespace IRSpeedyVPN
                     account.UserAccount.Username = username;
 
                     if (account.UserAccount.ExpiryDate != null
-                        && account.UserAccount.ExpiryDate.Value < DateTime.Now)
+                        && account.UserAccount.ExpiryDate.Value < VpnTimeZone.AccountNow)
                     {
                         RechareLogout(false);
                         return;

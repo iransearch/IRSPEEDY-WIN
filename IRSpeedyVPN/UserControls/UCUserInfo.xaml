@@ -168,8 +168,8 @@
               <TextBlock x:Name="txtCountry" FontSize="14" FontWeight="Bold" Foreground="{DynamicResource SmartLocationTitleBrush}" TextTrimming="CharacterEllipsis"/>
               <TextBlock x:Name="txtServerDetail" FontSize="12" FontFamily="{StaticResource AppFontFamilyMedium}" FontWeight="Normal" Foreground="{DynamicResource SmartLocationSubtitleBrush}" TextTrimming="CharacterEllipsis"/>
             </StackPanel>
-            <Button x:Name="btn_ChangeServer" Grid.Column="3" Width="32" Height="32" ToolTip="تغییر سرور" Click="btn_ChangeServer_Click" Background="{DynamicResource Theme.AccentWashBrush}" Cursor="Hand">
-              <Viewbox Width="17" Height="17" FlowDirection="LeftToRight"><Canvas Width="24" Height="24"><Path Data="{StaticResource IconSwapServer}" Stroke="{DynamicResource AccentBrush}" StrokeThickness="2" FlowDirection="LeftToRight" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
+            <Button x:Name="btnTimeZone" Grid.Column="3" Width="32" Height="32" ToolTip="هماهنگی منطقهٔ زمانی با VPN" Click="TimeZone_Click" Background="{DynamicResource Theme.AccentWashBrush}" Cursor="Hand" AutomationProperties.Name="هماهنگی منطقهٔ زمانی با VPN" ToolTipService.InitialShowDelay="300">
+              <Viewbox Width="17" Height="17" FlowDirection="LeftToRight"><Canvas Width="24" Height="24"><Path x:Name="TimeZoneClockIcon" Data="M12,3 A9,9 0 1 1 12,21 A9,9 0 1 1 12,3 M12,7 L12,12 L15.5,14" Stroke="{DynamicResource IconStrokeBrush}" StrokeThickness="1.8" FlowDirection="LeftToRight" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
               </Canvas></Viewbox><Button.Template>
                 <ControlTemplate TargetType="Button">
                   <Border Background="{TemplateBinding Background}" CornerRadius="9">

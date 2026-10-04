@@ -196,6 +196,7 @@ namespace IRSpeedyVPN
         {
             if (ExitCleanupStarted) return;
             ExitCleanupStarted = true;
+            VpnTimeZone.EndConnection();
             IsEnabled = false;
             IsUserLogin = false;
             Interlocked.Increment(ref connectionRequestVersion);
@@ -255,7 +256,7 @@ namespace IRSpeedyVPN
             if (timercounter % 30 == 0)
             {
 
-                if (gInfo.ServerResponse.GetJsonString("user_data.ExpiryDate").IsValidTimeFormat() && gInfo.ExpiryDate != null && gInfo.ExpiryDate < DateTime.Now)
+                if (gInfo.ServerResponse.GetJsonString("user_data.ExpiryDate").IsValidTimeFormat() && gInfo.ExpiryDate != null && gInfo.ExpiryDate < VpnTimeZone.AccountNow)
                 {
                     RechareLogout();
                 }
@@ -468,6 +469,7 @@ namespace IRSpeedyVPN
 
         private async void UCUserInfo_OnDisconnectRequest(object sender, EventArgs e)
         {
+            VpnTimeZone.EndConnection();
             // Accept the user's intent immediately, without exposing cleanup details.
             long version = Interlocked.Increment(ref connectionRequestVersion);
             if (gInfo.CurrentService is TunnelPlusService tunnel)
@@ -497,6 +499,7 @@ namespace IRSpeedyVPN
                 return;
             }
 
+            VpnTimeZone.EndConnection();
             long version = Interlocked.Increment(ref connectionRequestVersion);
             uCServerList.PauseServerChecksForConnection();
             if (gInfo.CurrentService is TunnelPlusService previousTunnel)
@@ -618,6 +621,7 @@ namespace IRSpeedyVPN
 
         async void ProcessConnectionResult(bool connected,string Message)
         {
+            if (!connected) VpnTimeZone.EndConnection();
             long result = ++connectionPresentationResult;
             long version = Interlocked.Read(ref connectionRequestVersion);
             var service = gInfo.CurrentService;
@@ -637,6 +641,7 @@ namespace IRSpeedyVPN
             {
                 ShowMessage("");
                 gInfo.ConnectionTime = DateTime.Now;
+                VpnTimeZone.BeginConnection(service);
                 uCServerList.MarkSuccessfulConnection(service);
                 ShowControl(uCUserInfo);                
 
@@ -1263,6 +1268,7 @@ namespace IRSpeedyVPN
         }
         private void DisconnectAll()
         {
+            VpnTimeZone.EndConnection();
             Interlocked.Increment(ref connectionRequestVersion);
             UnRegiserVpnService();
             if (serviceFactory.Services != null)
@@ -1455,6 +1461,7 @@ namespace IRSpeedyVPN
         }
         void Logout(string Message,bool resetInput=true)
         {
+            VpnTimeZone.EndConnection();
             uCServerList.PauseServerChecks();
 
             Interlocked.Increment(ref connectionRequestVersion);

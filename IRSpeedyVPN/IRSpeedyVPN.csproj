@@ -158,6 +158,8 @@
 	</ItemGroup>
 
   <ItemGroup>
+    <EmbeddedResource Include="Resources\TimeZones\iana-windows.tsv" LogicalName="IRSpeedyVPN.TimeZones.tsv" />
+    <EmbeddedResource Include="..\docs\third-party\Unicode-CLDR-LICENSE.txt" Link="Licenses\Unicode-CLDR-LICENSE.txt" />
     <EmbeddedResource Include="..\docs\third-party\Moonlight-Tunneling-LICENSE.txt" Link="Licenses\Moonlight-Tunneling-LICENSE.txt" />
     <EmbeddedResource Include="Components\ToggleSwitch\Icons\ToggleSwitch.HorizontalToggleSwitch.Expression.Large.png" />
     <EmbeddedResource Include="Components\ToggleSwitch\Icons\ToggleSwitch.HorizontalToggleSwitch.Expression.Small.png" />

@@ -90,7 +90,7 @@ namespace IRSpeedyVPN.Common
         public static string TotalDays(this DateTime d)
         {
             StringBuilder sb = new StringBuilder();
-            double days = (d - DateTime.Now).TotalDays;
+            double days = (d - VpnTimeZone.AccountNow).TotalDays;
             if (days / 365.0 > 1)
                 sb.Append(string.Format("{0}سال", (int)(days / 365)));
             if (days % 365 > 0)

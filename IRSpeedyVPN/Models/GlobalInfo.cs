@@ -14,7 +14,14 @@ namespace IRSpeedyVPN.Models
         public string Password { get; set; }
         public int ManagementPort { get => 7075; }
         public SettingInfo settings { get; set; }
-        public DateTime ConnectionTime { get; set; }
+        private DateTime connectionTime;
+        private System.Diagnostics.Stopwatch connectionClock;
+        public DateTime ConnectionTime
+        {
+            get { return connectionTime; }
+            set { connectionTime = value; connectionClock = System.Diagnostics.Stopwatch.StartNew(); }
+        }
+        public TimeSpan ConnectionElapsed => connectionClock?.Elapsed ?? TimeSpan.Zero;
         public IVPNService CurrentService;
         public string ServerResponse { get; set; }
         public List<Url> Vods { get; set; }

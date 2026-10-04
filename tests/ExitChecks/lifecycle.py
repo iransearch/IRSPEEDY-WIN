@@ -7,10 +7,11 @@ harness=r'''
 using System;using System.Linq;using System.Threading;using System.Threading.Tasks;using System.Collections.Generic;
 namespace System.Windows { class Application { public static Application Current=new Application();public TaskCompletionSource<bool> Done=new TaskCompletionSource<bool>();public void Shutdown(){Done.TrySetResult(true);} } }
 interface IVPNService { void Disconnect(); }
+static class VpnTimeZone { public static bool Restored; public static void EndConnection(){Restored=true;} }
 class TunnelPlusService : IVPNService { public static bool Exiting,Killed;public bool Cancelled;public int Stops;public bool Stall;
  public static void BeginApplicationExit(){Exiting=true;} public void CancelForApplicationExit(){Cancelled=true;}
  public static void StopOwnedProcessesForExit(){Killed=true;}
- public void Disconnect(){Interlocked.Increment(ref Stops);if(Stall)new ManualResetEventSlim().Wait();}
+ public void Disconnect(){if(!VpnTimeZone.Restored)throw new Exception("Time zone must restore before service cleanup");Interlocked.Increment(ref Stops);if(Stall)new ManualResetEventSlim().Wait();}
 }
 namespace Services.Hotspot { static class DirectHotspot { public static Counter Controller=new Counter();public static void StopPollingForExit(){} } }
 class Counter { public int Calls;public void Stop(){Interlocked.Increment(ref Calls);}public void Detach(){Interlocked.Increment(ref Calls);} }
@@ -30,6 +31,7 @@ tests=r'''
  static async Task Main(){
  var h=new Harness();var stale=new TunnelPlusService{Stall=true};var active=new TunnelPlusService();h.serviceFactory.Services.Add(stale);h.gInfo.CurrentService=active;
  var clock=System.Diagnostics.Stopwatch.StartNew();h.Notify_Exit(null,EventArgs.Empty);h.Notify_Exit(null,EventArgs.Empty);
+ if(!VpnTimeZone.Restored)throw new Exception("Exit did not restore time zone synchronously");
  if(clock.ElapsedMilliseconds>500)throw new Exception("Exit blocked its caller");
  await Task.Delay(100);if(!SystemProxy.Disabled||h.proxifier.Calls!=1||!active.Cancelled||!stale.Cancelled)throw new Exception("independent cleanup/cancellation missing");
  if(await Task.WhenAny(System.Windows.Application.Current.Done.Task,Task.Delay(11000))!=System.Windows.Application.Current.Done.Task)throw new Exception("Exit never completed");

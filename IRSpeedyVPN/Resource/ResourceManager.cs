@@ -242,7 +242,7 @@ namespace IRSpeedyVPN.Resource
                     .Split('\n');
                 if (userInfo.Length < 2
                     || userInfo[0] != acc.UserAccount.Username
-                    || (acc.UserAccount.ExpiryDate != null && acc.UserAccount.ExpiryDate.Value < DateTime.Now))
+                    || (acc.UserAccount.ExpiryDate != null && acc.UserAccount.ExpiryDate.Value < VpnTimeZone.AccountNow))
                     return null;
 
                 Password = userInfo[1];

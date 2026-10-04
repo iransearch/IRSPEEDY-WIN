@@ -39,6 +39,7 @@ class Label {public string Text;}
 class Proxy {public void Detach(){} }
 class Cache {public string TempPath="temp";public string Password="old";public int Saves;public void SaveConfig(Account a,string p){Saves++;Password=p;}public void RemoveConfig(){} }
 class LogHelper {public static void WriteExLog(string s){} public static void WriteLog(Exception e){} }
+static class VpnTimeZone { public static DateTime AccountNow=>DateTime.Now; }
 class Program {
  int serverRefreshBusy;FakeDispatcher Dispatcher=new FakeDispatcher();Factory serviceFactory=new Factory();
  void LogoutInvalidSession(string m){IsUserLogin=false;}void RechareLogout(bool value){IsUserLogin=false;}

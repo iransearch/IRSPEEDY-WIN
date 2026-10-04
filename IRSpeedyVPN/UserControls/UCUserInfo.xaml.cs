@@ -56,7 +56,8 @@ namespace IRSpeedyVPN.UserControls
             {
                 if (globalInfo == null || !IsVisible) return;
                 RefreshServerDetail();
-                var elapsed = DateTime.Now - globalInfo.ConnectionTime;
+                RefreshTimeZoneUi();
+                var elapsed = globalInfo.ConnectionElapsed;
                 if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
                 txtConnectionTime.Text = PersianDigits(((int)elapsed.TotalHours).ToString("00") + elapsed.ToString(@"\:mm\:ss"));
             }));
@@ -118,6 +119,7 @@ namespace IRSpeedyVPN.UserControls
             imgCountry.Source = IRSpeedyVPN.Components.ServerListControl.FlagCatalog.TryGet(globalInfo.CurrentService.CountryCode);
             imgCountry.Visibility = imgCountry.Source == null ? Visibility.Hidden : Visibility.Visible;
             RefreshServerDetail();
+            RefreshTimeZoneUi();
 
             txtServiceName.Text = globalInfo.CurrentService.Name + (proxifier.IsAttached() && proxifier.ProxyType.GetDescription().Length > 0 ? " / " + proxifier.ProxyType.GetDescription() : "");
             txtConnectionTime.Text = "۰۰:۰۰:۰۰";
