@@ -2,7 +2,12 @@
 <Viewbox Stretch="Uniform"><Canvas Width="384" Height="175" ClipToBounds="True">
 <Border Width="384" Height="175" CornerRadius="16"><Border.Background><RadialGradientBrush><GradientStop Color="{DynamicResource Theme.MotionSurfaceColor}" Offset="0"/><GradientStop Color="{DynamicResource Theme.LoadingSurfaceColor}" Offset="1"/></RadialGradientBrush></Border.Background></Border>
 <Rectangle Canvas.Left="103" Canvas.Top="66" Width="190" Height="44" RadiusX="21" RadiusY="21" Stroke="{DynamicResource Theme.AccentHaloBrush}" StrokeThickness="9"><Rectangle.Effect><BlurEffect Radius="2.6"/></Rectangle.Effect></Rectangle>
-<Rectangle x:Name="Tunnel" Canvas.Left="111" Canvas.Top="71" Width="174" Height="33" RadiusX="16.5" RadiusY="16.5" Fill="{DynamicResource Theme.AccentWashBrush}" Stroke="{DynamicResource Theme.AccentLineBrush}" StrokeThickness="1.8"/>
+<!-- Storyboard animates this private brush, never the frozen shared palette brush. -->
+<Rectangle x:Name="Tunnel" Canvas.Left="111" Canvas.Top="71" Width="174" Height="33" RadiusX="16.5" RadiusY="16.5" Fill="{DynamicResource Theme.AccentWashBrush}" StrokeThickness="1.8">
+  <Rectangle.Stroke>
+    <SolidColorBrush Color="{DynamicResource Theme.AccentLineColor}"/>
+  </Rectangle.Stroke>
+</Rectangle>
 <Ellipse x:Name="Http0" Width="7.6" Height="7.6" Canvas.Left="115.2" Canvas.Top="84.2" Fill="{DynamicResource AccentBrush}" Opacity="0.2"><Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform></Ellipse>
 <Ellipse x:Name="Http1" Width="9.6" Height="9.6" Canvas.Left="114.2" Canvas.Top="83.2" Fill="{DynamicResource AccentBrush}" Opacity="0.5"><Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform></Ellipse>
 <Ellipse x:Name="Http2" Width="11.6" Height="11.6" Canvas.Left="113.2" Canvas.Top="82.2" Fill="{DynamicResource AccentBrush}" Opacity="1"><Ellipse.RenderTransform><TranslateTransform/></Ellipse.RenderTransform><Ellipse.Effect><DropShadowEffect Color="{DynamicResource AccentColor}" BlurRadius="5.2" ShadowDepth="0" Opacity="0.6"/></Ellipse.Effect></Ellipse>

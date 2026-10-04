@@ -11,7 +11,7 @@ enum Visibility { Visible, Collapsed }
 class Color { public static object FromRgb(int r,int g,int b)=>null; }
 class SolidColorBrush { public SolidColorBrush(object c){} }
 class Brushes { public static object Gray; }
-class Control { public bool IsChecked,IsEnabled; public Visibility Visibility; public double Opacity; public string Text; public object Foreground; }
+class Control { public bool IsChecked,IsEnabled; public Visibility Visibility; public double Opacity; public string Text; public object Foreground; public void SetResourceReference(object property,string key){Foreground=key;} }
 class ServiceInfo { public bool IsShareActive=true; public int? HttpPort=8080,SocksPort=1080; }
 class IPGlobalProperties {
  public static IPGlobalProperties GetIPGlobalProperties()=>new IPGlobalProperties();
@@ -24,6 +24,7 @@ class UiContext:SynchronizationContext {
  public void Run(Func<Task> action){SetSynchronizationContext(this);var task=action();while(!task.IsCompleted){if(queue.TryTake(out var next,100))next();}task.GetAwaiter().GetResult();}
 }
 class Program {
+ static readonly object ForegroundProperty=new object();
  bool IsLoaded=true,proxyBusy,proxyRefreshPending,proxyListenerActive,hotspotBusy;
  int proxyNetworkVersion,proxySnapshotPort; object proxySnapshotService; string proxyIp,proxyError;
  ServiceInfo Service=new ServiceInfo(); bool ProxyAvailable=true;
