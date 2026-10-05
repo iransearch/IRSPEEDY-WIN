@@ -8,8 +8,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Net;
-using System.Net.Http;
 using System.Text;
 using System.Threading;
 using System.Windows;
@@ -38,7 +36,6 @@ namespace IRSpeedyVPN.UserControls
         public event EventHandler OnChangeServerRequest;
         Timer uiTimer;
         int timerTick;
-        CancellationTokenSource publicIpRequest;
         
         GlobalInfo globalInfo;
 
@@ -185,87 +182,6 @@ namespace IRSpeedyVPN.UserControls
                     RefreshPublicIp();
                     QueueTrafficDrawerPreload();
                 }
-            }
-        }
-
-        private void CancelPublicIpRequest()
-        {
-            var request = publicIpRequest;
-            publicIpRequest = null;
-            request?.Cancel(); // The owning async operation disposes it in finally.
-            if (txtReceivedIp != null)
-            {
-                txtReceivedIp.Text = "—";
-                txtReceivedIp.ToolTip = "آی‌پی عمومی در دسترس نیست";
-            }
-        }
-
-        private async void RefreshPublicIp()
-        {
-            CancelPublicIpRequest();
-            var service = globalInfo?.CurrentService;
-            var port = service?.HttpPort;
-            if (!IsLoaded || !IsVisible || !port.HasValue || port.Value < 1 || port.Value > 65535) return;
-            var connectedAt = globalInfo.ConnectionTime;
-            var request = new CancellationTokenSource();
-            publicIpRequest = request;
-            string diagnosticRequest = Guid.NewGuid().ToString("N");
-            string diagnosticService = (service as IRSpeedyVPN.Services.TunnelPlusService)?.DiagnosticIdentity ?? "service=other";
-            var diagnosticClock = System.Diagnostics.Stopwatch.StartNew();
-            ConnectionDiagnostics.Write("public-ip-begin", diagnosticService + " request=" + diagnosticRequest
-                + " route=explicit-loopback-proxy port=" + port.Value + " directFallback=False");
-            txtReceivedIp.ToolTip = "در حال دریافت آی‌پی خروجی اتصال";
-            try
-            {
-                // Display-only request: failure must never control the VPN lifecycle.
-                // Always query through this connection's listener. Never fall back to
-                // direct/system proxy, which could display the ISP address as VPN IP.
-                using (var handler = new HttpClientHandler
-                {
-                    Proxy = new WebProxy("http://127.0.0.1:" + port.Value),
-                    UseProxy = true,
-                    AllowAutoRedirect = false,
-                    UseCookies = false
-                })
-                using (var client = new HttpClient(handler)
-                {
-                    Timeout = TimeSpan.FromSeconds(8),
-                    MaxResponseContentBufferSize = 128
-                })
-                using (var response = await client.GetAsync("https://api.ipify.org", request.Token))
-                {
-                    ConnectionDiagnostics.Write("public-ip-http", diagnosticService + " request=" + diagnosticRequest
-                        + " status=" + (int)response.StatusCode + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds);
-                    response.EnsureSuccessStatusCode();
-                    var text = (await response.Content.ReadAsStringAsync()).Trim();
-                    IPAddress address;
-                    if (!IPAddress.TryParse(text, out address))
-                    { ConnectionDiagnostics.Write("public-ip-invalid", "request=" + diagnosticRequest); return; }
-                    if (request.IsCancellationRequested || publicIpRequest != request || !IsVisible
-                        || globalInfo.CurrentService != service || globalInfo.ConnectionTime != connectedAt) return;
-                    ConnectionDiagnostics.Write("public-ip-displayed", diagnosticService + " request=" + diagnosticRequest
-                        + " ipId=" + ConnectionDiagnostics.Fingerprint(address.ToString()) + " family=" + address.AddressFamily
-                        + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds);
-                    txtReceivedIp.Text = address.ToString();
-                    txtReceivedIp.ToolTip = "آی‌پی خروجی مشاهده‌شده برای این اتصال";
-                }
-            }
-            catch (OperationCanceledException)
-            { ConnectionDiagnostics.Write("public-ip-canceled", diagnosticService + " request=" + diagnosticRequest
-                + " requested=" + request.IsCancellationRequested + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds); }
-            catch (HttpRequestException ex)
-            { ConnectionDiagnostics.Write("public-ip-error", diagnosticService + " request=" + diagnosticRequest
-                + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds + " exception=" + ex.GetType().Name
-                + " inner=" + ex.InnerException?.GetType().Name + " hresult=" + ex.HResult
-                + " text=\"" + ConnectionDiagnostics.SafeCoreText(ex.Message) + "\""); }
-            finally
-            {
-                if (publicIpRequest == request)
-                {
-                    publicIpRequest = null;
-                    if (txtReceivedIp.Text == "—") txtReceivedIp.ToolTip = "دریافت آی‌پی ممکن نشد؛ اتصال شما قطع نشده است";
-                }
-                request.Dispose();
             }
         }
 

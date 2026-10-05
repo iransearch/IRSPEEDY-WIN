@@ -8,6 +8,7 @@
   <ItemGroup>
     <Compile Include="../../IRSpeedyVPN/Common/VpnTimeZoneSession.cs" Link="VpnTimeZoneSession.cs" />
     <Compile Include="../../IRSpeedyVPN/Common/TimeZoneLookup.cs" Link="TimeZoneLookup.cs" />
+    <Compile Include="../../IRSpeedyVPN/Common/PublicIpLookup.cs" Link="PublicIpLookup.cs" />
     <Compile Include="../../IRSpeedyVPN/Common/TimeZoneJournal.cs" Link="TimeZoneJournal.cs" />
     <Compile Include="../../IRSpeedyVPN/Common/WindowsTimeZoneSystem.cs" Link="WindowsTimeZoneSystem.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/SingBox/VpnTimeZoneRouting.cs" Link="VpnTimeZoneRouting.cs" />

@@ -17,11 +17,12 @@ namespace IRSpeedyVPN.Services.SingBox
             if (rules == null || inbounds == null || inbounds.Length == 0
                 || outbounds == null || !outbounds.OfType<JObject>().Any(o => (string)o["tag"] == "proxy"))
                 throw new InvalidOperationException("VPN IP lookup requires the primary proxy and an HTTP listener.");
-            // Only this HTTPS request on the explicit user listener bypasses AI,
+            // IP display and time-zone HTTPS lookups on the explicit user listener bypass AI,
             // VOD, Game Mode and process exclusions. Core/DNS traffic is unaffected.
             rules.Insert(0, new JObject
             {
-                ["inbound"] = new JArray(inbounds), ["domain"] = new JArray(Common.TimeZoneLookup.Host),
+                ["inbound"] = new JArray(inbounds),
+                ["domain"] = new JArray(Common.PublicIpLookup.Hosts.Concat(new[] { Common.TimeZoneLookup.Host })),
                 ["network"] = "tcp", ["port"] = 443, ["action"] = "route", ["outbound"] = "proxy"
             });
             return root.ToString();

@@ -209,9 +209,9 @@ internal static class Program
         var result = JObject.Parse(VpnTimeZoneRouting.Apply(original.ToString()));
         var route = (JObject)result["route"]; var rules = (JArray)route["rules"]; var first = (JObject)rules[0];
         Check((string)first["outbound"] == "proxy" && (string)first["network"] == "tcp" && (int)first["port"] == 443
-            && first["domain"].Values<string>().SequenceEqual(new[] { TimeZoneLookup.Host })
+            && first["domain"].Values<string>().SequenceEqual(PublicIpLookup.Hosts.Concat(new[] { TimeZoneLookup.Host }))
             && first["inbound"].Values<string>().SequenceEqual(new[] { "mixed-in", "sharing-http" }),
-            "HTTPS GeoIP request through explicit listeners always selects main pool");
+            "HTTPS public-IP/GeoIP requests through explicit listeners always select main pool");
         rules.RemoveAt(0);
         Check(JToken.DeepEquals(route, original["route"]) && JToken.DeepEquals(result["outbounds"], original["outbounds"]),
             "AI/VOD/process exclusions, Game Mode final and existing pool membership are preserved");

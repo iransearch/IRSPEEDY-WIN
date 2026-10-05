@@ -11,27 +11,32 @@ from xml.sax.saxutils import escape
 root = Path(__file__).resolve().parents[2]
 linked = [
     'Common/VpnTimeZoneSession.cs', 'Common/VpnTimeZone.cs',
-    'Common/TimeZoneLookup.cs', 'Common/TimeZoneJournal.cs',
+    'Common/TimeZoneLookup.cs', 'Common/PublicIpLookup.cs', 'Common/TimeZoneJournal.cs',
     'Common/WindowsTimeZoneSystem.cs', 'Services/SingBox/VpnTimeZoneRouting.cs',
-    'UserControls/UCUserInfo.TimeZone.cs',
+    'UserControls/UCUserInfo.TimeZone.cs', 'UserControls/UCUserInfo.PublicIp.cs',
 ]
 stubs = '''
 using System;
 using System.Windows;
 using System.Windows.Controls;
-namespace IRSpeedyVPN.Common { static class LogHelper { internal static void WriteLog(Exception e){} } }
+namespace IRSpeedyVPN.Common {
+ static class LogHelper { internal static void WriteLog(Exception e){} }
+ static class ConnectionDiagnostics { internal static void Write(string stage,string fields){} internal static string Fingerprint(string value)=>value; }
+}
+namespace IRSpeedyVPN.Interfaces { interface IVPNService { int? HttpPort { get; } } }
 namespace IRSpeedyVPN.Services {
- class Service { public int? HttpPort; }
- class TunnelPlusService : Service { public bool IsTunnelConnected; }
+ class Service : Interfaces.IVPNService { public int? HttpPort { get; set; } }
+ class TunnelPlusService : Service { public bool IsTunnelConnected; internal string DiagnosticIdentity=>""; }
 }
 namespace IRSpeedyVPN {
  class MainWindow { public void ShowHintPopup(string text, UIElement anchor){} }
 }
 namespace IRSpeedyVPN.UserControls {
- class Info { public Services.Service CurrentService; }
+ class Info { public Interfaces.IVPNService CurrentService; public DateTime ConnectionTime; }
  public partial class UCUserInfo : UserControl {
   private Info globalInfo;
   private Button btnTimeZone;
+  private TextBlock txtReceivedIp;
   private System.Windows.Shapes.Path TimeZoneClockIcon;
   private MainWindow GetMainWindow()=>null;
   private static string PersianDigits(string text)=>text;
@@ -57,4 +62,4 @@ with tempfile.TemporaryDirectory(prefix='time-zone-net48-') as directory:
 </ItemGroup></Project>''')
     subprocess.run([sys.argv[1] if len(sys.argv) > 1 else 'dotnet', 'build',
                     str(path / 'Checks.csproj'), '-v:q'], check=True)
-print('PASS production time-zone feature and clock handler compile against net48/WPF APIs')
+print('PASS production time-zone/public-IP features and UI handlers compile against net48/WPF APIs')
