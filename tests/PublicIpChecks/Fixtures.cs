@@ -11,6 +11,8 @@ namespace IRSpeedyVPN.Services
     internal class TunnelPlusService : Interfaces.IVPNService
     {
         internal string DiagnosticIdentity => "service=fixture";
+        internal void RequestConnectionState(string reason, string request = null, int delayMs = 0, string expectedIdentity = null)
+            => ConnectionDiagnostics.Records.Enqueue("snapshot-request cause=" + reason);
         public int? HttpPort { get; set; } = 7788;
     }
 }

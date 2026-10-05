@@ -102,7 +102,7 @@ namespace IRSpeedyVPN.Common
                                 {
                                     budget.Token.ThrowIfCancellationRequested();
                                     lastError = ex;
-                                    diagnostic?.Invoke("public-ip-attempt-failed", fields + " exception=" + ex.GetType().Name);
+                                    diagnostic?.Invoke("public-ip-attempt-failed", fields + " " + NetworkFailureDiagnostic.ExceptionFields(ex));
                                 }
                             }
                         }

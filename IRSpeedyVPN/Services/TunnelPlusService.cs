@@ -418,6 +418,7 @@ namespace IRSpeedyVPN.Services
                     ResumeSharingAfterCoreStart();
                     Diagnostic("connection-established", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy"));
                     ConnectionDiagnostics.RequestSnapshot();
+                    RequestConnectionState("startup", delayMs: 3000);
                     if (vpnmode)
                     {                      
                         useSystemProxy = false;

@@ -9,6 +9,8 @@ namespace IRSpeedyVPN.Services.Libcore
         public string Id = "";
         public string Process = "";
         public string ProcessPath = "";
+        public string Outbound = "", Network = "", DiagnosticTarget = "other";
+        public readonly List<string> Chain = new List<string>();
         public long Upload;
         public long Download;
     }
@@ -22,7 +24,8 @@ namespace IRSpeedyVPN.Services.Libcore
     internal static partial class LibcoreProto
     {
         // Throne libcore.proto: active=1, recently-closed (non-draining)=2.
-        // Read only fields required for usage; never retain destinations or IPs.
+        // Retain usage and routing tags. Classify the app's fixed IP providers,
+        // but never retain browsing destinations, source addresses or domains.
         public static QueryConnectionsResponse DecodeQueryConnections(byte[] data)
         {
             var result = new QueryConnectionsResponse();
@@ -59,9 +62,38 @@ namespace IRSpeedyVPN.Services.Libcore
                     if (value < 0) throw new InvalidDataException("Negative traffic counter.");
                     if (field == 3) row.Upload = value; else row.Download = value;
                 }
+                else if (wire == WireLengthDelimited && (field == 5 || field == 6 || field == 7 || field == 9 || field == 12))
+                {
+                    string value = reader.ReadString();
+                    if (field == 5) row.Outbound = value;
+                    else if (field == 6) row.Network = value;
+                    else if (field == 12) { if (row.Chain.Count < 16) row.Chain.Add(value); }
+                    else
+                    {
+                        string target = DiagnosticTarget(value);
+                        if (target != "other") row.DiagnosticTarget = target;
+                    }
+                }
                 else reader.SkipField(wire);
             }
             return row;
+        }
+
+        internal static string DiagnosticTarget(string value)
+        {
+            if (string.IsNullOrEmpty(value) || value.Length > 256) return "other";
+            // ConnectionMetaData.dest is host:port; domain is just the hostname.
+            string host = value;
+            int colon = host.LastIndexOf(':');
+            if (colon >= 0) host = host.Substring(0, colon);
+            host = host.TrimEnd('.').ToLowerInvariant();
+            switch (host)
+            {
+                case "api.ipify.org": return "public-ip-ipify";
+                case "checkip.amazonaws.com": return "public-ip-amazon";
+                case "icanhazip.com": return "public-ip-icanhazip";
+                default: return "other";
+            }
         }
     }
 }

@@ -1,4 +1,5 @@
 using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Services;
 using IRSpeedyVPN.Windows;
 using System;
 using System.Linq;
@@ -48,6 +49,8 @@ namespace IRSpeedyVPN.UserControls
                     || globalInfo.CurrentService != service || globalInfo.ConnectionTime != connectedAt) return;
 
                 SetConnectionTestPending(false);
+                if (results.All(confirmed => !confirmed))
+                    (service as TunnelPlusService)?.RequestConnectionState("connection-test-failed");
                 var result = new PingResult
                 {
                     GoogleConfirmed = results[0],

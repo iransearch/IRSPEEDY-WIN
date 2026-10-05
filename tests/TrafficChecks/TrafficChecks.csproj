@@ -4,6 +4,7 @@
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="LibcoreProto.cs"/>
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="LibcoreMessages.cs"/>
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreTraffic.cs" Link="LibcoreTraffic.cs"/>
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreAutoSelectors.cs" Link="LibcoreAutoSelectors.cs"/>
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs"/>
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs"/>
     <Compile Include="../../IRSpeedyVPN/Services/Traffic/TrafficLedger.cs" Link="TrafficLedger.cs"/>

@@ -78,6 +78,14 @@ namespace IRSpeedyVPN.Services
                     : lower.Contains("interface") ? "interface" : lower.Contains("route") ? "route"
                     : lower.Contains("tun") ? "tun" : "other";
                 if (category == null) return;
+                string failureReason = NetworkFailureDiagnostic.CoreReason(line);
+                if (category == "error" || category == "pool-selection-error")
+                {
+                    // The process reader may be a separate test-service instance.
+                    // Read the active connection, without starting another probe.
+                    if (failureReason != "none" && failureReason != "canceled" && failureReason != "unclassified")
+                        (gInfo?.CurrentService as TunnelPlusService)?.RequestConnectionState("core-dial-error");
+                }
                 string safeText = ConnectionDiagnostics.SafeCoreText(line);
                 lock (diagnosticOutputLock)
                 {
@@ -97,6 +105,8 @@ namespace IRSpeedyVPN.Services
                 // Keep diagnostic vocabulary only; URLs, identifiers, credentials and configs are removed.
                 Diagnostic("core-output", "pid=" + DiagnosticPid(process) + " source=" + source
                     + " category=" + category + " messageId=" + ConnectionDiagnostics.Fingerprint(line)
+                    + " failureReason=" + failureReason
+                    + (category == "error" || category == "pool-selection-error" ? " failureMembers=" + CoreRoutingSignal.FailureMembers(line) : "")
                     + (routingSignal ? " " + routingDetails : "")
                     + " text=\"" + safeText + "\"");
                 if (category == "network-changed" || category == "interface" || category == "fatal" || category == "panic")

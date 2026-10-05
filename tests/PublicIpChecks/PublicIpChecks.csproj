@@ -6,6 +6,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="../../IRSpeedyVPN/Common/PublicIpLookup.cs" Link="PublicIpLookup.cs" />
+    <Compile Include="../../IRSpeedyVPN/Common/NetworkFailureDiagnostic.cs" Link="NetworkFailureDiagnostic.cs" />
     <Compile Include="../../IRSpeedyVPN/UserControls/UCUserInfo.PublicIp.cs" Link="UCUserInfo.PublicIp.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/SingBox/VpnTimeZoneRouting.cs" Link="VpnTimeZoneRouting.cs" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />

@@ -37,13 +37,19 @@ namespace System.Windows.Media.Animation {
   public void Remove(object owner) { if(Running) Interlocked.Increment(ref Stops); Running=false; }
  }
 }
-namespace IRSpeedyVPN.Services {}
+namespace IRSpeedyVPN.Services {
+ public class TunnelPlusService : UserControls.Service {
+  public static int SnapshotRequests;
+  public void RequestConnectionState(string reason) { if(reason=="connection-test-failed") Interlocked.Increment(ref SnapshotRequests); }
+ }
+}
 namespace IRSpeedyVPN.Common {
  public static class LogHelper { public static void WriteLog(Exception error) {} }
  public static class ConnectionTlsTest {
   public static ManualResetEventSlim Gate = new ManualResetEventSlim(false);
   public static int Calls, Workers, WrongPorts, ExpectedPort;
   public static int CallerThread, UiThreadCalls;
+  public static bool AllFail;
   public static Task<bool> CheckAsync(string host, int timeout, int? port, CancellationToken token) {
    Interlocked.Increment(ref Workers);
    try {
@@ -51,11 +57,11 @@ namespace IRSpeedyVPN.Common {
     if(port != ExpectedPort || timeout != 8000) Interlocked.Increment(ref WrongPorts);
     Interlocked.Increment(ref Calls);
     Gate.Wait();
-    return Task.FromResult(!host.Contains("youtube"));
+    return Task.FromResult(!AllFail&&!host.Contains("youtube"));
    } finally { Interlocked.Decrement(ref Workers); }
   }
   public static void Reset(int port) {
-   Gate = new ManualResetEventSlim(false); Calls=Workers=WrongPorts=UiThreadCalls=0; ExpectedPort=port;
+   Gate = new ManualResetEventSlim(false); Calls=Workers=WrongPorts=UiThreadCalls=0; ExpectedPort=port; AllFail=false;
    CallerThread=Thread.CurrentThread.ManagedThreadId;
   }
  }
@@ -79,7 +85,7 @@ namespace IRSpeedyVPN.UserControls {
   public bool IsLoaded=true, IsVisible=true;
   public Control TestConnectionMenu=new Control(), ConnectionTestVisual=new Control(), ConnectionTestStatus=new Control(), ConnectedCheckBadge=new Control();
   private Storyboard StartMotion(string key) { return new Storyboard(); }
-  public UCUserInfo(int port) { globalInfo.CurrentService=new Service{HttpPort=port}; SetConnectionTestPending(false); }
+  public UCUserInfo(int port) { globalInfo.CurrentService=new Services.TunnelPlusService{HttpPort=port}; SetConnectionTestPending(false); }
   public void Start() { ConnectionTest_PreviewMouseDown(this,null); }
   public void Cancel() { CancelConnectionTest(); }
   public void ReplaceService() { globalInfo.CurrentService=new Service{HttpPort=9876}; }
@@ -117,6 +123,10 @@ class Program {
   Check(PingResult.Shown==1&&PingResult.Last.GoogleConfirmed&&!PingResult.Last.YoutubeConfirmed&&PingResult.Last.InstagramConfirmed&&PingResult.Last.Owner==Window.Shared,"completed test displays the recorded success and failure results once");
   starts=Storyboard.Starts; Window.Shared.Change(WindowState.Minimized); Window.Shared.Change(WindowState.Normal);
   Check(Storyboard.Starts==starts&&view.ConnectedCheckBadge.IsVisible,"completed test removes animation and restores the connected badge");
+  Check(IRSpeedyVPN.Services.TunnelPlusService.SnapshotRequests==0,"partial success does not request failure diagnostics");
+  ConnectionTlsTest.Reset(5566); ConnectionTlsTest.AllFail=true; view=new UCUserInfo(5566); view.Start();
+  await Wait(()=>ConnectionTlsTest.Calls>0); ConnectionTlsTest.Gate.Set(); await Wait(()=>!view.Pending);
+  Check(IRSpeedyVPN.Services.TunnelPlusService.SnapshotRequests==1&&PingResult.Shown==2,"all-failed manual test requests one snapshot and still displays results");
  }
 }
 '''

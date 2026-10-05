@@ -5,7 +5,16 @@
   <Compile Include="../../IRSpeedyVPN/Common/CoreDiagnosticMetadata.cs" Link="CoreDiagnosticMetadata.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/ConnectionDiagnostics.cs" Link="ConnectionDiagnostics.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/CoreRoutingSignal.cs" Link="CoreRoutingSignal.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Common/NetworkFailureDiagnostic.cs" Link="NetworkFailureDiagnostic.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Common/ConnectionStateDiagnostic.cs" Link="ConnectionStateDiagnostic.cs"/>
   <Compile Include="../../IRSpeedyVPN/Services/TunnelPlusService.Diagnostics.cs" Link="TunnelPlusService.Diagnostics.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Services/TunnelPlusService.ConnectionState.cs" Link="TunnelPlusService.ConnectionState.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreAutoSelectors.cs" Link="LibcoreAutoSelectors.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreTraffic.cs" Link="LibcoreTraffic.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="LibcoreProto.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="LibcoreMessages.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs"/>
   <Compile Include="../../IRSpeedyVPN/Services/SystemProxy.cs" Link="SystemProxy.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/Win32.cs" Link="Win32.cs"/>
  </ItemGroup>

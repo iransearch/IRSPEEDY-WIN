@@ -11,9 +11,10 @@ from xml.sax.saxutils import escape
 root = Path(__file__).resolve().parents[2]
 linked = [
     'Common/VpnTimeZoneSession.cs', 'Common/VpnTimeZone.cs',
-    'Common/TimeZoneLookup.cs', 'Common/PublicIpLookup.cs', 'Common/TimeZoneJournal.cs',
+    'Common/TimeZoneLookup.cs', 'Common/PublicIpLookup.cs', 'Common/NetworkFailureDiagnostic.cs', 'Common/TimeZoneJournal.cs',
     'Common/WindowsTimeZoneSystem.cs', 'Services/SingBox/VpnTimeZoneRouting.cs',
     'UserControls/UCUserInfo.TimeZone.cs', 'UserControls/UCUserInfo.PublicIp.cs',
+    'UserControls/UCUserInfo.ConnectionTest.cs',
 ]
 stubs = '''
 using System;
@@ -26,10 +27,16 @@ namespace IRSpeedyVPN.Common {
 namespace IRSpeedyVPN.Interfaces { interface IVPNService { int? HttpPort { get; } } }
 namespace IRSpeedyVPN.Services {
  class Service : Interfaces.IVPNService { public int? HttpPort { get; set; } }
- class TunnelPlusService : Service { public bool IsTunnelConnected; internal string DiagnosticIdentity=>""; }
+ class TunnelPlusService : Service { public bool IsTunnelConnected; internal string DiagnosticIdentity=>""; internal void RequestConnectionState(string reason,string request=null,int delayMs=0,string expectedIdentity=null){} }
 }
 namespace IRSpeedyVPN {
  class MainWindow { public void ShowHintPopup(string text, UIElement anchor){} }
+}
+namespace IRSpeedyVPN.Windows {
+ class PingResult : Window { public bool GoogleConfirmed,YoutubeConfirmed,InstagramConfirmed,TelegramConfirmed; }
+}
+namespace IRSpeedyVPN.Common {
+ static class ConnectionTlsTest { internal static System.Threading.Tasks.Task<bool> CheckAsync(string host,int timeout,int? port,System.Threading.CancellationToken token)=>System.Threading.Tasks.Task.FromResult(false); }
 }
 namespace IRSpeedyVPN.UserControls {
  class Info { public Interfaces.IVPNService CurrentService; public DateTime ConnectionTime; }
@@ -38,6 +45,9 @@ namespace IRSpeedyVPN.UserControls {
   private Button btnTimeZone;
   private TextBlock txtReceivedIp;
   private System.Windows.Shapes.Path TimeZoneClockIcon;
+  private Button TestConnectionMenu;
+  private UIElement ConnectionTestVisual,ConnectionTestStatus,ConnectedCheckBadge;
+  private System.Windows.Media.Animation.Storyboard StartMotion(string key)=>null;
   private MainWindow GetMainWindow()=>null;
   private static string PersianDigits(string text)=>text;
  }
@@ -62,4 +72,4 @@ with tempfile.TemporaryDirectory(prefix='time-zone-net48-') as directory:
 </ItemGroup></Project>''')
     subprocess.run([sys.argv[1] if len(sys.argv) > 1 else 'dotnet', 'build',
                     str(path / 'Checks.csproj'), '-v:q'], check=True)
-print('PASS production time-zone/public-IP features and UI handlers compile against net48/WPF APIs')
+print('PASS production time-zone/public-IP features and UI handlers including connection test compile against net48/WPF APIs')

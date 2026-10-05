@@ -73,6 +73,7 @@ internal static class Program
         TunnelPlusService.Exercise();
         ConnectionDiagnostics.Write("check", "disk-failure");
         ConnectionDiagnostics.Flush();
+        ConnectionStateChecks.Run().GetAwaiter().GetResult();
         Console.WriteLine("PASS: active/reader separation, error budget under route flood, proxy wrapper compilation, privacy, asynchronous slow/failing sink isolation, build identity and correlation.");
     }
     private static void Require(bool valid, string message) { if (!valid) throw new Exception(message); }

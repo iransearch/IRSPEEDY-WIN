@@ -52,7 +52,7 @@ namespace IRSpeedyVPN.Common
                 return category == "error" || category == "warning" || category == "panic"
                     || category == "fatal" || category == "pool-selection-error"
                     || category == "ai-probe-error" || category == "network-changed"
-                    || category == "showip-route";
+                    || category == "showip-route" || category == "public-ip-route";
             }
             if (stage == "ui-connection-callback")
                 return string.Equals(Field(fields, "connected"), "false", StringComparison.OrdinalIgnoreCase);

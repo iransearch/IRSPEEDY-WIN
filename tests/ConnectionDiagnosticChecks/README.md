@@ -3,6 +3,10 @@
 This change is observational. It does not add health probes, reconnects, proxy repairs,
 core resets or direct fallback. Existing connection and public-IP behavior is retained.
 
+Version 1.4.6.7 also records bounded, event-triggered Core pool/flow snapshots.
+See [the connected/no-data report](../../docs/diagnostics/connected-no-data-2026-10-05.md)
+for fields, privacy, rate limits and the next Windows reproduction.
+
 - `proxy-change-end` and failures: operation ID, caller stack (method names only), thread,
   active connection, HKCU settings and WinINet LAN flags before/after every application
   proxy mutation. Native set failures and swallowed disable errors are recorded.
@@ -29,6 +33,12 @@ must not affect the connection. A forcibly terminated application may lose queue
 `dotnet run --project tests/ConnectionDiagnosticChecks` checks active versus idle reader
 state, rate-budget isolation, safe text, slow/failing sinks and compiles the proxy wrappers.
 Windows native queries and WPF behavior still require a Windows build/run.
+
+The harness additionally checks the production read-only RPC path, unsupported
+queries, deadlines/cancellation, late responses, safe pool/flow formatting,
+Windows/native socket error preservation and snapshot throttling.
+Run `python3 tests/ConnectionDiagnosticChecks/net48_compile.py /path/to/dotnet`
+for the production diagnostics/RPC compatibility build against real net48 APIs.
 
 For reproduction: run the normal single-file builder, connect, disconnect/reconnect Wi-Fi,
 and collect `log-yyyy-MM-dd.txt` from `%LOCALAPPDATA%\IRSpeedyVPN\Logs\`

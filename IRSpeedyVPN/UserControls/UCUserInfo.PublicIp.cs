@@ -59,13 +59,21 @@ namespace IRSpeedyVPN.UserControls
             ConnectionDiagnostics.Write("public-ip-begin", diagnosticFields
                 + " route=explicit-loopback-proxy port=" + port.Value + " directFallback=False");
             txtReceivedIp.ToolTip = "در حال دریافت آی‌پی خروجی اتصال";
+            int diagnosticFailureCaptured = 0;
             try
             {
                 // Lookup failures never control the VPN lifecycle. Alternate
                 // providers and retries still use the same explicit VPN listener.
                 var result = await publicIpLookup.ResolveAsync(port.Value, request.Token,
-                    (stage, fields) => ConnectionDiagnostics.Write(stage, diagnosticFields + " " + fields
-                        + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds));
+                    (stage, fields) =>
+                    {
+                        ConnectionDiagnostics.Write(stage, diagnosticFields + " " + fields
+                            + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds);
+                        if (stage == "public-ip-attempt-failed" && !request.IsCancellationRequested
+                            && Interlocked.Exchange(ref diagnosticFailureCaptured, 1) == 0)
+                            (service as TunnelPlusService)?.RequestConnectionState("public-ip-first-failure", diagnosticRequest,
+                                expectedIdentity: diagnosticService);
+                    });
                 if (request.IsCancellationRequested || publicIpRequest != request || !IsLoaded || !IsVisible
                     || globalInfo.CurrentService != service || globalInfo.ConnectionTime != connectedAt
                     || service.HttpPort != port) return;
@@ -84,7 +92,10 @@ namespace IRSpeedyVPN.UserControls
             catch (Exception ex)
             {
                 ConnectionDiagnostics.Write("public-ip-error", diagnosticFields
-                    + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds + " exception=" + ex.GetType().Name);
+                    + " elapsedMs=" + diagnosticClock.ElapsedMilliseconds + " " + NetworkFailureDiagnostic.ExceptionFields(ex));
+                if (!request.IsCancellationRequested)
+                    (service as TunnelPlusService)?.RequestConnectionState("public-ip-failed", diagnosticRequest,
+                        expectedIdentity: diagnosticService);
             }
             finally
             {

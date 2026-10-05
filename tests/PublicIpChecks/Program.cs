@@ -47,6 +47,7 @@ internal static class Program
         await CancellationAndDeadline();
         await PageLifecycle();
         await StaleConnectionResult();
+        await FailureDiagnostics();
         Routing();
         Console.WriteLine("Public IP checks passed: " + passed);
     }
@@ -185,5 +186,21 @@ internal static class Program
         Check((string)first["outbound"] == "proxy" && (string)first["network"] == "tcp" && (int)first["port"] == 443
             && first["inbound"].Values<string>().SequenceEqual(new[] { "local" }), "Exact lookup domains on HTTP listener precede process/direct bypass");
         Check(JToken.DeepEquals(applied["outbounds"], originalOutbounds) && JToken.DeepEquals(new JArray(rules.Skip(1)), originalRules), "Pool configuration and independent AI rules remain intact");
+    }
+
+    private static async Task FailureDiagnostics()
+    {
+        string discarded;
+        while (ConnectionDiagnostics.Records.TryDequeue(out discarded)) { }
+        var lookup = Lookup((m, t) => Task.FromException<HttpResponseMessage>(new HttpRequestException("PRIVATE_URL",
+            new System.Net.Sockets.SocketException((int)System.Net.Sockets.SocketError.ConnectionRefused))));
+        var page = new UCUserInfo(lookup);
+        page.Refresh(); await Wait(() => !page.Pending);
+        var lines = ConnectionDiagnostics.Records.ToArray();
+        Check(lines.Count(l => l.StartsWith("snapshot-request cause=public-ip-first-failure")) == 1
+            && lines.Count(l => l.StartsWith("snapshot-request cause=public-ip-failed")) == 1, "Six provider failures request only first/final core snapshots");
+        Check(lines.Any(l => l.StartsWith("public-ip-attempt-failed ") && l.Contains("socketError="))
+            && lines.All(l => !l.Contains("PRIVATE_URL")), "Provider diagnostics retain safe inner socket cause");
+        Check(page.Displayed == "—", "Diagnostic failure never fabricates a received IP");
     }
 }
