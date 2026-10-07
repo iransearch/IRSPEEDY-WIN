@@ -202,6 +202,9 @@
     <PathGeometry Figures="M7 21.9l-4-4 4-4"/>
     <PathGeometry Figures="M21 11.4v1.1a4 4 0 0 1-4 4H3"/>
   </GeometryGroup>
+  <GeometryGroup x:Key="ServerListRefreshIcon">
+    <PathGeometry Figures="M20 7 A9 9 0 1 0 21 14 M20 2 V7 H15"/>
+  </GeometryGroup>
   <sys:Double x:Key="SettingsRowMinHeight">72</sys:Double>
   <sys:Double x:Key="SettingsIconBadgeSize">42</sys:Double>
   <CornerRadius x:Key="SettingsIconBadgeCornerRadius">13</CornerRadius>

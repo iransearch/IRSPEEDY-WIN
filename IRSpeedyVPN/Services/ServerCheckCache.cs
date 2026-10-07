@@ -214,6 +214,64 @@ namespace IRSpeedyVPN.Services
             }
         }
 
+        internal bool ClearForManualRefresh(IVPNService[] expected = null)
+        {
+            lock (gate)
+            {
+                var expectedRows = expected?.Where(s => s.IsUrlTestSupported).ToArray();
+                if (expectedRows != null && (expectedRows.Length != rowKeys.Count || expectedRows.Any(s => !rowKeys.ContainsKey(s)))) return false;
+                state.Results.Clear(); state.RowResults.Clear();
+                state.PendingRows = new List<string>(); state.CompletedRows = new List<string>();
+                state.InitialScanCompleted = false; state.RoundInProgress = false; state.SequentialRound = false;
+                foreach (var url in bound.Keys)
+                {
+                    url.latency = 0; url.latencychkTime = default(DateTime);
+                    url.LastSuccessfulLatency = 0; url.LastSuccessfulCheckTime = default(DateTime);
+                }
+                Save();
+                return true;
+            }
+        }
+
+        internal void RecordRefreshMember(IVPNService service, Url url, long latency, DateTime checkedUtc)
+        {
+            lock (gate)
+            {
+                string key;
+                if (!rowKeys.ContainsKey(service) || !bound.TryGetValue(url, out key)) return;
+                state.Results.TryGetValue(key, out var previous);
+                var result = new Result { Latency = latency > 0 ? latency : -1, CheckedUtc = checkedUtc,
+                    LastSuccess = latency > 0 ? latency : previous?.LastSuccess ?? 0,
+                    LastSuccessUtc = latency > 0 ? checkedUtc : previous?.LastSuccessUtc ?? default(DateTime) };
+                state.Results[key] = result;
+                foreach (var item in bound.Where(p => p.Value == key)) Apply(item.Key, result);
+            }
+        }
+
+        internal void CompleteRefreshRow(IVPNService service)
+        {
+            lock (gate)
+            {
+                string row;
+                if (!rowKeys.TryGetValue(service, out row)) return;
+                state.RowResults[row] = new RowResult { HasSuccess = (service.GetServerUrls() ?? new List<Url>()).Any(u => u != null && u.latency > 0),
+                    CheckedUtc = DateTime.UtcNow };
+                if (!state.CompletedRows.Contains(row)) state.CompletedRows.Add(row);
+                Save();
+            }
+        }
+
+        internal void FinishManualRefresh(IVPNService[] expected = null)
+        {
+            lock (gate)
+            {
+                var expectedRows = expected?.Where(s => s.IsUrlTestSupported).ToArray();
+                if (expectedRows != null && (expectedRows.Length != rowKeys.Count || expectedRows.Any(s => !rowKeys.ContainsKey(s)))) return;
+                state.InitialScanCompleted = true;
+                Save();
+            }
+        }
+
         internal void RestartFromFirstCountry()
         {
             lock (gate)

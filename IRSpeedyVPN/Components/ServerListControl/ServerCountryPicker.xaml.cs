@@ -421,6 +421,22 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (group != null) group.IsChecking = checking;
         }
 
+        public void ResetTestResults()
+        {
+            foreach (var group in _allGroups) { group.IsChecking = false; group.RefreshSignals(); }
+            // Measurements are cleared, while the independent connection star is retained.
+            Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
+            ServerSelected?.Invoke(null);
+            ResortGroups();
+        }
+
+        public void RestoreTestProgress(IVPNService service)
+        {
+            // Canceling restores committed fresh measurements without advancing
+            // an unfinished row's position in the manual refresh round.
+            _allGroups.FirstOrDefault(g => ReferenceEquals(g.Service, service))?.RefreshSignals();
+        }
+
         /// <summary>Display progress in place without changing ordering or selection.</summary>
         public void ShowGroupProgress(IVPNService service, long latency)
         {

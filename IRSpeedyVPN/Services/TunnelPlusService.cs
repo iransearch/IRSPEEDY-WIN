@@ -958,7 +958,8 @@ namespace IRSpeedyVPN.Services
         }
         public void UrlTestFull(Url[] urls = null, bool force = false,
             Action<long> progress = null, Func<bool> cancelled = null,
-            CancellationToken cancellation = default(CancellationToken), bool prioritizeFailed = false)
+            CancellationToken cancellation = default(CancellationToken), bool prioritizeFailed = false,
+            Action<Url, long> memberProgress = null, Action<Url, long> memberCompleted = null, bool preserveOrder = false)
         {
             Diagnostic("test-group-enter", "forced=" + force);
             cancelUrlTest = false;
@@ -988,7 +989,7 @@ namespace IRSpeedyVPN.Services
                 // tests retain their existing randomized candidate order.
                 IEnumerable<Url> orderedUrls = prioritizeFailed
                     ? (IEnumerable<Url>)sourceUrls.OrderBy(u => u.latency < 0 ? 0 : 1)
-                    : sourceUrls.Randomize();
+                    : preserveOrder ? sourceUrls : sourceUrls.Randomize();
                 var candidateOrder = orderedUrls.Select(u => u.url).Distinct(StringComparer.Ordinal).ToArray();
                 candidateOrder
                     .ToList()
@@ -1007,6 +1008,7 @@ namespace IRSpeedyVPN.Services
                                 LogHelper.WriteExLog("[UrlTest] stage=candidate-rejected candidate="
                                     + sourceUrls.FindIndex(item => item.url == u)
                                     + " reason=" + refusal + ProbeContext(testId, u));
+                                if (!isCancelled() && urlObjects.TryGetValue(u, out var refused)) memberCompleted?.Invoke(refused, -1);
                                 return;
                             }
                             var sniRuntime = GetSniRuntime(u, urlTestSniServers, false);
@@ -1140,7 +1142,7 @@ namespace IRSpeedyVPN.Services
                                     try
                                     {
                                         var response = ExecuteCoreCall(client =>
-                                            client.TestWithProgress(request, progress == null ? null : report, isCancelled,
+                                            client.TestWithProgress(request, progress == null && memberProgress == null ? null : report, isCancelled,
                                                 message => LogHelper.WriteExLog(message), cancellation));
                                         LogProbeAttempt(testId, diagnosticRequest, phase, request, response, tagToUrl,
                                             elapsed.ElapsedMilliseconds, null);
@@ -1162,7 +1164,14 @@ namespace IRSpeedyVPN.Services
                                 },
                                     isCancelled, message => LogHelper.WriteExLog(message
                                         + " testId=" + testId + " countryId=" + ID
-                                        + " countryIndex=" + CountryIndex), progress);
+                                        + " countryIndex=" + CountryIndex), progress,
+                                    memberProgress == null ? null : (Action<URLTestResp>)(result =>
+                                    { if (!isCancelled() && tagToUrl.TryGetValue(result.OutboundTag, out var link)
+                                        && urlObjects.TryGetValue(link, out var item)) memberProgress(item, result.LatencyMs); }),
+                                    memberCompleted == null ? null : (Action<URLTestResp>)(result =>
+                                    { if (!isCancelled() && tagToUrl.TryGetValue(result.OutboundTag, out var link)
+                                        && urlObjects.TryGetValue(link, out var item)) memberCompleted(item,
+                                            UrlTestRetryPolicy.IsSuccess(result) ? result.LatencyMs : -1); }));
                                 break;
                             }
                             catch (InvalidOperationException ex)
@@ -1184,6 +1193,7 @@ namespace IRSpeedyVPN.Services
                                     + sourceUrls.FindIndex(item => item.url == rejectedInfo.Link)
                                     + " reason=core-config-rejected remaining=" + allUrls.Count
                                     + ProbeContext(testId, rejectedInfo.Link));
+                                if (!isCancelled() && urlObjects.TryGetValue(rejectedInfo.Link, out var refused)) memberCompleted?.Invoke(refused, -1);
                                 // Every retry removes one member. Keep the original infos
                                 // for finally's port cleanup; use activeXray for config only.
                             }

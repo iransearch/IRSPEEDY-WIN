@@ -749,6 +749,7 @@ namespace IRSpeedyVPN
             // Page-specific actions cannot move the primary settings button or
             // the wordmark. Older registrations retain the last action as primary.
             var primaryIcon = icons.FirstOrDefault(icon => icon.IsPrimary) ?? icons[icons.Count - 1];
+            var compactSecondary = icons.Count(icon => !ReferenceEquals(icon, primaryIcon)) > 2;
 
             foreach (var icon in icons)
             {
@@ -756,27 +757,32 @@ namespace IRSpeedyVPN
                 var label = new Button
                 {
                     Style = (Style)FindResource("HeaderIconButton"),
-                    Margin = isPrimary ? new Thickness(0) : new Thickness(0, 0, 10, 0),
-                    Content = string.IsNullOrEmpty(icon.Icon) || icon.Icon == "\uf2f5"
+                    Margin = isPrimary ? new Thickness(0) : new Thickness(0, 0, compactSecondary ? 4 : 10, 0),
+                    Content = string.IsNullOrEmpty(icon.Icon) || icon.Icon == "\uf2f5" || icon.Icon == "\uf021"
                         ? (object)new System.Windows.Shapes.Path {
-                            Data = (Geometry)FindResource(icon.Icon == "\uf2f5" ? "ServerListLogoutIcon" : icon.ToolTip.Contains("Shield") ? "IconShield" : "IconGear"),
+                            Data = (Geometry)FindResource(icon.Icon == "\uf021" ? "ServerListRefreshIcon" : icon.Icon == "\uf2f5" ? "ServerListLogoutIcon" : icon.ToolTip.Contains("Shield") ? "IconShield" : "IconGear"),
                             StrokeThickness = 1.7,
                             Width = 17, Height = 17, Stretch = Stretch.Uniform, FlowDirection = FlowDirection.LeftToRight,
                             StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round, StrokeLineJoin = PenLineJoin.Round }
                         : icon.Icon,
                     FontFamily = (FontFamily)FindResource("fa_ProLight"),
                     FontSize = 16,
-                    Width = 30,
+                    Width = !isPrimary && compactSecondary ? 26 : 30,
                     Height = 30,
                     HorizontalContentAlignment = HorizontalAlignment.Center,
                     VerticalContentAlignment = VerticalAlignment.Center,
                     ToolTip = icon.ToolTip,
+                    IsEnabled = icon.IsEnabled,
+                    Opacity = !icon.IsEnabled && !icon.IsBusy ? 0.45 : 1,
                 };
+                if (icon.IsBusy && label.Content is FrameworkElement busyVisual)
+                    HeaderRefreshMotion.Attach(busyVisual);
                 label.SetResourceReference(ForegroundProperty, "IconStrokeBrush");
                 if (label.Content is System.Windows.Shapes.Path iconPath)
                     iconPath.SetResourceReference(System.Windows.Shapes.Shape.StrokeProperty, "IconStrokeBrush");
                 System.Windows.Automation.AutomationProperties.SetName(label, icon.ToolTip ?? "");
                 ToolTipService.SetInitialShowDelay(label, 400);
+                ToolTipService.SetShowOnDisabled(label, true);
                 ToolTipService.SetShowDuration(label, 2000);
                 ToolTipService.SetBetweenShowDelay(label, 10000);
 

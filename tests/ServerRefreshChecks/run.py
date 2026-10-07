@@ -20,6 +20,9 @@ class TunnelPlusService : IVPNService {
  while((Hold || HoldCountry==CountryCode) && !cancel()) Thread.Sleep(1);
  if(!cancel()) foreach(var u in urls){u.latency=Fail?-1:100+ID;u.latencychkTime=DateTime.Now;}
  }
+ public void ResetListTestResult(){} public void UpdateListTestResult(){}
+ public static Action<Url[],CancellationToken,Action<Url,long>,Action<Url,long>> ManualProbe;
+ public static void TestRefreshBatch(Url[] urls,Info info,CancellationToken token,Action<Url,long> progress,Action<Url,long> completed){ManualProbe?.Invoke(urls,token,progress,completed);}
 }
 class Info { public object CurrentService; }
 class FakeDispatcher {
@@ -44,12 +47,15 @@ class Picker {
  void CheckThread(){if(Thread.CurrentThread.ManagedThreadId!=thread)throw new Exception("picker updated off UI thread");}
  public void RefreshGroup(IVPNService s){CheckThread();Updates++;Displayed=s.GetServerUrls()[0].latency;OnRefresh?.Invoke(s);}
  public void ShowGroupProgress(IVPNService s,long latency){CheckThread();Progresses++;Displayed=latency;}
+ public void ResetTestResults(){CheckThread();Displayed=0;}
+ public void RestoreTestProgress(IVPNService s){CheckThread();Displayed=s.GetServerUrls()[0].latency;}
 }
-class LogHelper { public static void WriteLog(Exception e)=>throw e; }
+class LogHelper { public static void WriteLog(Exception e)=>throw e; public static void WriteExLog(string value){} }
 class UrlTestCoordinator { public static volatile bool AbortRequested; public static void CancelAll()=>AbortRequested=true; public static void BeginBatch()=>AbortRequested=false; }
 class Program {
  FakeDispatcher Dispatcher=new FakeDispatcher(); Picker countryPicker=new Picker(); Info globalInfo=new Info();
  bool IsVisible=true; CancellationTokenSource _urlTestCts; IVPNService[] _currentServices;
+ bool manualRefreshBusy,manualRefreshExternalPause;Task manualRefreshTask=Task.CompletedTask;void CancelManualRefresh(){}
 '''
 tests = r'''
  static void Check(bool value,string name){if(!value)throw new Exception(name); Console.WriteLine("PASS "+name);}

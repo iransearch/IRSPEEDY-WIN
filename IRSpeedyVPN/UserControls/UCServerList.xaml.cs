@@ -157,6 +157,7 @@ namespace IRSpeedyVPN.UserControls
 
             // Retire an old API-list scan before rebinding replacement service objects.
             _urlTestCts?.Cancel();
+            CancelManualRefresh();
             _currentServices = services;
             string context = (globalInfo?.Username ?? "") + "\n" + _selectedServiceName + "\n" + (protocol ?? "");
             if (probeCache == null || probeCacheContext != context)
@@ -239,6 +240,7 @@ namespace IRSpeedyVPN.UserControls
         internal void PauseServerChecks()
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(PauseServerChecks); return; }
+            if (manualRefreshBusy) manualRefreshExternalPause = true;
             probesPaused = true;
             StopUrlTests();
         }
@@ -256,6 +258,7 @@ namespace IRSpeedyVPN.UserControls
         {
             PauseServerChecks();
             await probeTask;
+            await manualRefreshTask;
             if (probesRequireDisconnect && probeCache != null)
             {
                 var cache = probeCache;
@@ -290,11 +293,12 @@ namespace IRSpeedyVPN.UserControls
         {
             UrlTestCoordinator.CancelAll();
             _urlTestCts?.Cancel();
+            CancelManualRefresh();
         }
 
         private async void RunBackgroundUrlTests(IVPNService[] services)
         {
-            if (probesPaused || probesRequireDisconnect || services == null || probeCache == null
+            if (manualRefreshBusy || probesPaused || probesRequireDisconnect || services == null || probeCache == null
                 || globalInfo?.CurrentService != null) return;
             if (probeRunning) { probeWakeRequested = true; return; }
             var cache = probeCache;
@@ -475,6 +479,9 @@ namespace IRSpeedyVPN.UserControls
             if (!string.IsNullOrWhiteSpace(TunnelPlusService.selectedChain))
                 icons.Add(new HeaderIconRegistration("", "حذف سرویس پایه", RemoveBaseService));
             icons.Add(new HeaderIconRegistration("\uf2f5", "خروج از حساب", () => host.LogoutFromSettings()));
+            icons.Add(new HeaderIconRegistration("\uf021", manualRefreshBusy ? "در حال بررسی مجدد سرورها" : "بررسی مجدد سرورها",
+                RefreshServerResults, isEnabled: !manualRefreshBusy
+                    && globalInfo?.CurrentService == null && _isUrlTestSupported, isBusy: manualRefreshBusy));
             icons.Add(new HeaderIconRegistration("", "تنظیمات سرویس", OpenServiceSettings, isPrimary: true));
 
             host.SetHeaderIcons(this, icons);

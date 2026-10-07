@@ -22,7 +22,7 @@ static class Shuffle {
  public static IEnumerable<T> Randomize<T>(this IEnumerable<T> input){Calls++;return input.Reverse();}
 }
 class Program {
- static string[] Candidates(List<Url> sourceUrls,bool prioritizeFailed) {
+ static string[] Candidates(List<Url> sourceUrls,bool prioritizeFailed,bool preserveOrder=false) {
 '''
 middle = r'''
  return candidateOrder;
@@ -50,6 +50,8 @@ tests = r''';
  var large=Enumerable.Range(0,20).Select(i=>U("success-"+i,100)).Concat(Enumerable.Range(0,20).Select(i=>U("failed-"+i,-1))).ToList();
  Check(Candidates(large,true).Take(15).All(u=>u.StartsWith("failed-")),"failed candidates occupy the first 15-concurrency submission slots");
  Check(large.All(u=>u.latency==100 || u.latency==-1),"ordering leaves latency and historical result values unchanged");
+ int shuffles=Shuffle.Calls;
+ Check(Candidates(urls,false,true).SequenceEqual(urls.Select(u=>u.url))&&Shuffle.Calls==shuffles,"manual global permutation reaches Core unchanged");
  }
 }
 '''

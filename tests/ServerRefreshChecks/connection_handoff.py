@@ -24,6 +24,7 @@ class Info { public IVPNService CurrentService; }
 class Proxy { public void Detach(){} }
 class Resource { public void ExtractResource(bool b){} }
 class LogHelper { public static void WriteLog(Exception e){throw e;} }
+class VpnTimeZone { public static void EndConnection(){} }
 class Program {
  bool isUpdateAvailable,IsUserLogin=true;long connectionRequestVersion;int pendingConnectionRequests;
  SemaphoreSlim connectionRequestGate=new SemaphoreSlim(1,1);

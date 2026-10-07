@@ -3,6 +3,16 @@ Run `python3 tests/ServerRefreshChecks/connection_handoff.py /path/to/dotnet`
 to check the real connection handlers against delayed VPN cleanup and newer clicks.
 Run `python3 tests/ServerRefreshChecks/url_priority.py /path/to/dotnet`
 to check the production RPC's failed-first member ordering and stable fallback order.
+Run `python3 tests/ServerRefreshChecks/manual_refresh.py /path/to/dotnet`
+to exercise the global configuration shuffle, independent numbered rows, persistent
+cache clearing, partial/final updates, duplicate clicks, API replacement and cancellation.
+Run `python3 tests/ServerRefreshChecks/core_dispatch.py /path/to/dotnet`
+to exercise the actual batch runner and full URL-test method with a fake Core transport,
+including tag mapping, chain/SNI metadata, config rejection, port release and cancellation.
+Append `--net48` to compile that method against .NET Framework 4.8.
+Run `python3 tests/ServerRefreshChecks/net48_compile.py /path/to/dotnet`
+to compile the actual controller, picker, header renderer and animation against net48/WPF
+reference assemblies. This does not run Windows XAML or a real VPN.
 The harness compiles the actual scheduler region and persistent cache against fake
 UI/network dependencies, with a single-threaded synchronization context. It checks
 initial live progress before RPC completion, disconnect-round success/failure/recovery,
@@ -20,6 +30,22 @@ row outcome for priority, including after URL reorder and reload.
 It does not exercise the Windows renderer, real Core RPC or Windows routing.
 
 Manual Windows acceptance:
+- Refresh appears beside logout on the server-list header, in both themes;
+  settings and the Windows minimize/close controls retain their positions.
+- Click refresh during the initial/disconnect scan: drain the old RPC, erase all
+  pings/history, show placeholders, and scan a single global shuffled config queue.
+  Search filtering does not limit testing. Smart remains fixed, the last successful
+  connection stays starred below Smart, and the selection resets to Smart.
+- Partial minimum pings appear in place; only fully completed numbered rows reorder.
+  Successful rows sort by final minimum ping, failed rows sink. Duplicate countries
+  finish independently; identical configs share one probe across their owning rows.
+- The refresh icon spins while busy and ignores repeat clicks. Hide/minimize stops
+  its animation clock; restoring restarts it while busy. Check the optional base-service
+  action also fits without overlapping the wordmark. A final failure stops the spinner.
+- Connect/logout during refresh cancels and drains it before lifecycle work continues;
+  provisional values disappear and late callbacks cannot restore old results.
+- An explicit refresh after a failed connection is allowed while disconnected.
+  Merely returning to the list never resumes a consumed scan.
 - Initial list checks all countries once.
 - Connect during a test: probe drains before connection begins.
 - Leave connected >15 minutes: no list probes; previous values remain on return.

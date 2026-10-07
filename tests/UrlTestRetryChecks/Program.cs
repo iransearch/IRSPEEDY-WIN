@@ -105,7 +105,59 @@ internal static class Program
         catch (OperationCanceledException) { rejected = true; }
         Check(rejected && cancelledCalls == 1, "Cancelled batch issued retry or published results");
         CheckProgress();
+        CheckMemberCallbacks();
         Console.WriteLine("URL test retry and progress checks passed.");
+    }
+
+    private static void CheckMemberCallbacks()
+    {
+        var request = Request();
+        request.OutboundTags = new List<string> { "0", "1", "2" };
+        var progress = new List<string>();
+        var finished = new List<string>();
+        int pass = 0;
+        var result = UrlTestRetryPolicy.Run(request, (req, report) =>
+        {
+            if (++pass == 1)
+            {
+                report(Response(100, 800, -1));
+                report(Response(120, 900, -1));
+                report(new TestResp { Results = new List<URLTestResp> {
+                    new URLTestResp { OutboundTag = "retired-batch", LatencyMs = 1 } } });
+                Check(progress.SequenceEqual(new[] { "0:100", "1:800" }),
+                    "Member progress must improve, match this batch and exclude failed results");
+                Check(finished.Count == 0, "Provisional results completed a member before primary ended");
+                return Response(100, 800, -1);
+            }
+            Check(finished.SequenceEqual(new[] { "0:100" }),
+                "Fast member did not finish before slow/failed members retried");
+            Check(req.OutboundTags.SequenceEqual(new[] { "1", "2" }), "Member callbacks changed retry subset");
+            report(Response(1, 600, 400));
+            throw new TimeoutException();
+        }, () => false, _ => { }, null,
+            r => progress.Add(r.OutboundTag + ":" + r.LatencyMs),
+            r => finished.Add(r.OutboundTag + ":" + r.LatencyMs));
+        Check(finished.SequenceEqual(new[] { "0:100", "1:600", "2:400" })
+            && result.Results.Select(r => r.LatencyMs).SequenceEqual(new[] { 100, 600, 400 }),
+            "Each member must complete once with its best result, including retry timeout");
+        Check(progress.SequenceEqual(new[] { "0:100", "1:800", "1:600", "2:400" }),
+            "Alternate progress reported a member outside its subset");
+
+        bool canceled = false, caught = false;
+        finished.Clear(); pass = 0;
+        try
+        {
+            UrlTestRetryPolicy.Run(request, (req, report) =>
+            {
+                if (++pass == 1) return Response(100, 800, -1);
+                canceled = true;
+                return Response(100, 200, 300);
+            }, () => canceled, _ => { }, null, null,
+                r => finished.Add(r.OutboundTag));
+        }
+        catch (OperationCanceledException) { caught = true; }
+        Check(caught && finished.SequenceEqual(new[] { "0" }),
+            "Canceled alternate must not complete unfinished members");
     }
 
     private static void CheckProgress()

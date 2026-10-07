@@ -23,7 +23,8 @@ namespace IRSpeedyVPN.Services
                 && a.UserInfo == b.UserInfo && a.PathAndQuery == b.PathAndQuery;
         }
 
-        // Both passes complete before the caller commits results or reorders countries.
+        // Ordinary callers commit after both passes. The manual global refresh
+        // can finish members that need no retry before waiting for other members.
         // Only the slow/failed subset is probed a second time; config and routing stay identical.
         internal static TestResp Run(TestReq primary, Func<TestReq, TestResp> send,
             Func<bool> cancelled, Action<string> log)
@@ -32,7 +33,8 @@ namespace IRSpeedyVPN.Services
         }
 
         internal static TestResp Run(TestReq primary, Func<TestReq, Action<TestResp>, TestResp> send,
-            Func<bool> cancelled, Action<string> log, Action<long> progress)
+            Func<bool> cancelled, Action<string> log, Action<long> progress,
+            Action<URLTestResp> memberProgress = null, Action<URLTestResp> memberCompleted = null)
         {
             Action checkCancellation = () =>
             {
@@ -45,10 +47,20 @@ namespace IRSpeedyVPN.Services
                 OutboundTag = tag, LatencyMs = -1, Error = "no-successful-result"
             }, StringComparer.Ordinal);
             long displayedBest = long.MaxValue;
+            var displayedMembers = new Dictionary<string, int>(StringComparer.Ordinal);
             Action<TestResp, HashSet<string>> accept = (response, allowed) =>
             {
                 checkCancellation();
                 Merge(best, response, allowed);
+                if (memberProgress != null) foreach (var pair in best.Where(p => IsSuccess(p.Value)))
+                {
+                    int previous;
+                    if (!displayedMembers.TryGetValue(pair.Key, out previous) || pair.Value.LatencyMs < previous)
+                    {
+                        displayedMembers[pair.Key] = pair.Value.LatencyMs;
+                        memberProgress?.Invoke(pair.Value);
+                    }
+                }
                 var minimum = best.Values.Where(IsSuccess).Select(r => (long)r.LatencyMs)
                     .DefaultIfEmpty(long.MaxValue).Min();
                 if (minimum < displayedBest)
@@ -69,6 +81,9 @@ namespace IRSpeedyVPN.Services
             }
             checkCancellation();
             var retryTags = tags.Where(tag => !IsSuccess(best[tag]) || best[tag].LatencyMs > 500).ToList();
+            var completed = new HashSet<string>(StringComparer.Ordinal);
+            if (memberCompleted != null)
+                foreach (var tag in tags.Except(retryTags)) { checkCancellation(); memberCompleted(best[tag]); completed.Add(tag); }
             if (retryTags.Count > 0 && !SameEndpoint(primary.Url, RetryUrl))
             {
                 var retry = new TestReq
@@ -96,6 +111,8 @@ namespace IRSpeedyVPN.Services
                 checkCancellation();
             }
             var final = new TestResp { Results = tags.Select(tag => best[tag]).ToList() };
+            if (memberCompleted != null)
+                foreach (var tag in tags.Where(tag => !completed.Contains(tag))) { checkCancellation(); memberCompleted(best[tag]); }
             log("[UrlTest] stage=final candidates=" + tags.Count
                 + " successful=" + final.Results.Count(IsSuccess));
             return final;
