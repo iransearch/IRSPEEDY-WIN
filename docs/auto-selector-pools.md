@@ -21,7 +21,7 @@ Both groups use:
 
 | Field | Value |
 |---|---|
-| `expected` / `active_size` | min(3, members) / min(8, members) |
+| `expected` / `active_size` | min(3, members) / min(35, members) |
 | `interval` / `bench_interval` | 900s / 900s |
 | `watch_interval` | 300s |
 | `sampling` | 10 recent results |
@@ -33,7 +33,7 @@ Both groups use:
 | `interrupt_exist_connections` | false |
 
 The Core clamps `bench_interval` to at least `interval`, so both are 900s.
-For AI pools larger than eight members, the app requests one asynchronous,
+For AI pools larger than 35 members, the app requests one asynchronous,
 AI-only full recheck after Start succeeds. This discovers candidates outside the
 initial active tier without waiting for the periodic round. Smaller pools already
 receive a full native initial round. The request is bounded and optional: a

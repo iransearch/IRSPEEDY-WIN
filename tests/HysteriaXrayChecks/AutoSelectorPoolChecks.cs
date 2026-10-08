@@ -110,16 +110,22 @@ internal static class AutoSelectorPoolChecks
         Check(AutoSelectorPoolPlan.Create(new[] { "missing://invalid" }, null, false,
             () => { throw new Exception("unexpected allocation"); }, released.Add) == null,
             "no accepted main member prevents configuration and allocates no ports");
-        var largeLinks = Enumerable.Range(0, 9).Select(i => "hy2://auto-" + i).ToArray();
-        foreach (var link in largeLinks)
-            v2rayN.Handler.ShareHandler.Nodes[link] = v2rayN.Handler.ShareHandler.Nodes["hy2://fixture"];
-        using (var large = AutoSelectorPoolPlan.Create(largeLinks, null, false, () => next++, released.Add))
+        foreach (int count in new[] { 9, 35, 36 })
         {
-            var config = JObject.Parse(large.Apply(BaseConfig(false).ToString()));
-            var group = config["outbounds"].Single(o => (string)o["tag"] == "proxy");
-            Check(group["outbounds"].Count() == 9 && (int)group["expected"] == 3
-                && (int)group["active_size"] == 8,
-                "larger pools retain every member with three ready and eight closely checked");
+            var largeLinks = Enumerable.Range(0, count).Select(i => "hy2://auto-" + i).ToArray();
+            foreach (var link in largeLinks)
+                v2rayN.Handler.ShareHandler.Nodes[link] = v2rayN.Handler.ShareHandler.Nodes["hy2://fixture"];
+            using (var large = AutoSelectorPoolPlan.Create(largeLinks, largeLinks, true, () => next++, released.Add))
+            {
+                var config = JObject.Parse(large.Apply(BaseConfig(false).ToString()));
+                var group = config["outbounds"].Single(o => (string)o["tag"] == "proxy");
+                var aiGroup = config["outbounds"].Single(o => (string)o["tag"] == "ai-proxy");
+                Check(group["outbounds"].Count() == count && aiGroup["outbounds"].Count() == count
+                    && (int)group["expected"] == 3 && (int)aiGroup["expected"] == 3
+                    && (int)group["active_size"] == Math.Min(35, count)
+                    && (int)aiGroup["active_size"] == Math.Min(35, count),
+                    "main/AI pools retain all " + count + " members with three ready and at most 35 closely checked");
+            }
         }
         Console.WriteLine(passed + " Auto Selector pool checks passed.");
     }

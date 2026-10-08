@@ -789,11 +789,11 @@ namespace IRSpeedyVPN.Services
         private void RecheckAiPoolAfterStart()
         {
             // Native startup probes only the first active tier. Check remaining
-            // AI members once so a faster one beyond the first eight need not
+            // AI members once so a faster one beyond the active tier need not
             // wait for the 15-minute periodic round. Small pools already get a
             // complete native initial round; do not duplicate their probes.
             var plan = autoSelectorPlan;
-            if (plan == null || plan.AiMembers <= 8) return;
+            if (plan == null || plan.AiMembers <= Xray.AutoSelectorPoolPlan.CloselyCheckedMemberLimit) return;
             long generation = Interlocked.Read(ref connectionGeneration);
             Task.Run(() =>
             {

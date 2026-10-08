@@ -9,6 +9,7 @@ namespace IRSpeedyVPN.Services.Xray
     /// health belong to independent sing-box groups, never to an inner balancer.</summary>
     internal sealed class AutoSelectorPoolPlan : IDisposable
     {
+        internal const int CloselyCheckedMemberLimit = 35;
         private readonly List<int> ports = new List<int>();
         private readonly Action<int> releasePort;
         private readonly List<JObject> main = new List<JObject>();
@@ -98,7 +99,7 @@ namespace IRSpeedyVPN.Services.Xray
                 ["outbounds"] = new JArray(members.Select(b => (string)b["tag"])),
                 ["url"] = "https://connectivitycheck.gstatic.com/generate_204",
                 ["interval"] = "900s", ["bench_interval"] = "900s", ["watch_interval"] = "300s",
-                ["active_size"] = Math.Min(8, members.Length), ["expected"] = Math.Min(3, members.Length),
+                ["active_size"] = Math.Min(CloselyCheckedMemberLimit, members.Length), ["expected"] = Math.Min(3, members.Length),
                 ["sampling"] = 10, ["tolerance"] = 300,
                 ["fail_tolerance"] = 0.2,
                 ["timeout"] = "5s", ["concurrency"] = 4, ["dial_retries"] = 2,
