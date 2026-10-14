@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup>
+  <ItemGroup>
+    <Compile Include="../../IRSpeedyVPN/Services/NetworkRecoverySession.cs" Link="NetworkRecoverySession.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs" Link="TunnelPlusService.NetworkRecovery.cs" />
+    <Compile Include="../../IRSpeedyVPN/Common/ConnectionTlsTest.cs" Link="ConnectionTlsTest.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/MainPoolRecoveryProof.cs" Link="MainPoolRecoveryProof.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="LibcoreProto.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreTraffic.cs" Link="LibcoreTraffic.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreAutoSelectors.cs" Link="LibcoreAutoSelectors.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="LibcoreMessages.cs" />
+  </ItemGroup>
+</Project>

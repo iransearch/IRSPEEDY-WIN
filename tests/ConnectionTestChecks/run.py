@@ -39,6 +39,7 @@ namespace System.Windows.Media.Animation {
 }
 namespace IRSpeedyVPN.Services {
  public class TunnelPlusService : UserControls.Service {
+  internal ConnectionRecoveryStatus RecoveryStatus;
   public static int SnapshotRequests;
   public void RequestConnectionState(string reason) { if(reason=="connection-test-failed") Interlocked.Increment(ref SnapshotRequests); }
  }
@@ -75,6 +76,7 @@ namespace IRSpeedyVPN.Windows {
 }
 namespace IRSpeedyVPN.UserControls {
  public class Control {
+  public string Text;
   public bool IsEnabled=true; public Visibility Visibility=Visibility.Visible;
   public bool IsVisible => Visibility==Visibility.Visible;
  }
@@ -84,6 +86,7 @@ namespace IRSpeedyVPN.UserControls {
   private Info globalInfo=new Info();
   public bool IsLoaded=true, IsVisible=true;
   public Control TestConnectionMenu=new Control(), ConnectionTestVisual=new Control(), ConnectionTestStatus=new Control(), ConnectedCheckBadge=new Control();
+  public Control NetworkRecoveryStatus=new Control();
   private Storyboard StartMotion(string key) { return new Storyboard(); }
   public UCUserInfo(int port) { globalInfo.CurrentService=new Services.TunnelPlusService{HttpPort=port}; SetConnectionTestPending(false); }
   public void Start() { ConnectionTest_PreviewMouseDown(this,null); }
@@ -91,6 +94,7 @@ namespace IRSpeedyVPN.UserControls {
   public void ReplaceService() { globalInfo.CurrentService=new Service{HttpPort=9876}; }
   public void ReplaceSession() { globalInfo.ConnectionTime=globalInfo.ConnectionTime.AddSeconds(1); }
   public bool Pending => connectionTestRequest!=null;
+  public void Recovering() { ((Services.TunnelPlusService)globalInfo.CurrentService).RecoveryStatus=Services.ConnectionRecoveryStatus.Impaired; RefreshNetworkRecoveryUi(); }
  }
 }
 class Program {
@@ -127,6 +131,8 @@ class Program {
   ConnectionTlsTest.Reset(5566); ConnectionTlsTest.AllFail=true; view=new UCUserInfo(5566); view.Start();
   await Wait(()=>ConnectionTlsTest.Calls>0); ConnectionTlsTest.Gate.Set(); await Wait(()=>!view.Pending);
   Check(IRSpeedyVPN.Services.TunnelPlusService.SnapshotRequests==1&&PingResult.Shown==2,"all-failed manual test requests one snapshot and still displays results");
+  view.Recovering();
+  Check(!view.ConnectedCheckBadge.IsVisible&&view.NetworkRecoveryStatus.IsVisible,"recovery hides connected badge after manual test completes");
  }
 }
 '''
@@ -134,5 +140,7 @@ with tempfile.TemporaryDirectory(prefix='connection-test-checks-') as directory:
     path = Path(directory)
     (path / 'Program.cs').write_text(harness)
     (path / 'ConnectionTest.cs').write_text((root / 'IRSpeedyVPN/UserControls/UCUserInfo.ConnectionTest.cs').read_text())
+    (path / 'NetworkRecoveryUi.cs').write_text((root / 'IRSpeedyVPN/UserControls/UCUserInfo.NetworkRecovery.cs').read_text())
+    (path / 'NetworkRecoverySession.cs').write_text((root / 'IRSpeedyVPN/Services/NetworkRecoverySession.cs').read_text())
     (path / 'checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')
     subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet', 'run', '--project', directory, '-v:q'], check=True)

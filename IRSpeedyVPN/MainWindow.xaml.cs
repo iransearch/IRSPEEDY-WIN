@@ -129,6 +129,7 @@ namespace IRSpeedyVPN
         private void InternetConnectivityMonitor_AvailabilityChanged(
             object sender, InternetAvailabilityChangedEventArgs e)
         {
+            (AppServices.GlobalInfo?.CurrentService as TunnelPlusService)?.ObserveInternetAvailability(e.IsOnline);
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (ExitCleanupStarted)

@@ -15,6 +15,7 @@ linked = [
     'Common/WindowsTimeZoneSystem.cs', 'Services/SingBox/VpnTimeZoneRouting.cs',
     'UserControls/UCUserInfo.TimeZone.cs', 'UserControls/UCUserInfo.PublicIp.cs',
     'UserControls/UCUserInfo.ConnectionTest.cs',
+    'UserControls/UCUserInfo.NetworkRecovery.cs', 'Services/NetworkRecoverySession.cs',
 ]
 stubs = '''
 using System;
@@ -27,7 +28,7 @@ namespace IRSpeedyVPN.Common {
 namespace IRSpeedyVPN.Interfaces { interface IVPNService { int? HttpPort { get; } } }
 namespace IRSpeedyVPN.Services {
  class Service : Interfaces.IVPNService { public int? HttpPort { get; set; } }
- class TunnelPlusService : Service { public bool IsTunnelConnected; internal string DiagnosticIdentity=>""; internal void RequestConnectionState(string reason,string request=null,int delayMs=0,string expectedIdentity=null){} }
+ class TunnelPlusService : Service { public bool IsTunnelConnected; internal ConnectionRecoveryStatus RecoveryStatus=>ConnectionRecoveryStatus.None; internal string DiagnosticIdentity=>""; internal void RequestConnectionState(string reason,string request=null,int delayMs=0,string expectedIdentity=null){} }
 }
 namespace IRSpeedyVPN {
  class MainWindow { public void ShowHintPopup(string text, UIElement anchor){} }
@@ -47,6 +48,7 @@ namespace IRSpeedyVPN.UserControls {
   private System.Windows.Shapes.Path TimeZoneClockIcon;
   private Button TestConnectionMenu;
   private UIElement ConnectionTestVisual,ConnectionTestStatus,ConnectedCheckBadge;
+  private TextBlock NetworkRecoveryStatus;
   private System.Windows.Media.Animation.Storyboard StartMotion(string key)=>null;
   private MainWindow GetMainWindow()=>null;
   private static string PersianDigits(string text)=>text;

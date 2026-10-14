@@ -36,6 +36,11 @@ namespace IRSpeedyVPN.Services
         private Timer timer;
         private int started;
         private bool? lastOnline;
+        private static int knownOnline = -1;
+        internal static bool? LastKnownOnline
+        {
+            get { int value = Volatile.Read(ref knownOnline); return value < 0 ? (bool?)null : value == 1; }
+        }
 
         internal event EventHandler<InternetAvailabilityChangedEventArgs> AvailabilityChanged;
 
@@ -165,6 +170,7 @@ namespace IRSpeedyVPN.Services
             {
                 changed = !lastOnline.HasValue || !lastOnline.Value;
                 lastOnline = true;
+                Volatile.Write(ref knownOnline, 1);
             }
 
             Common.LogHelper.WriteExLog(
@@ -183,6 +189,7 @@ namespace IRSpeedyVPN.Services
             lock (this)
             {
                 lastOnline = false;
+                Volatile.Write(ref knownOnline, 0);
             }
 
             Common.LogHelper.WriteExLog(

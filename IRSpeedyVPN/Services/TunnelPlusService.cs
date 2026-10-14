@@ -414,6 +414,7 @@ namespace IRSpeedyVPN.Services
                         return;
                     }
                     IsConnected = true;
+                    BeginNetworkRecoverySession();
                     RecheckAiPoolAfterStart();
                     ResumeSharingAfterCoreStart();
                     Diagnostic("connection-established", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy"));
@@ -773,6 +774,7 @@ namespace IRSpeedyVPN.Services
         internal void CancelPendingConnection()
         {
             userCancelRequested = true;
+            EndNetworkRecoverySession();
             Interlocked.Increment(ref connectionGeneration);
             CancellationTokenSource pending;
             lock (startCancellationGate) pending = startCancellation;
@@ -826,6 +828,7 @@ namespace IRSpeedyVPN.Services
 
         private void DisconnectLocked(bool chkprocess, bool silent, bool userCanceled)
         {
+            EndNetworkRecoverySession();
             if (!PauseSharingBeforeCoreRestart(!userCanceled))
             {
                 if (userCanceled)

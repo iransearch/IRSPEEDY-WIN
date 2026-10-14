@@ -79,7 +79,7 @@ namespace IRSpeedyVPN.UserControls
         {
             TestConnectionMenu.IsEnabled = !pending;
             ConnectionTestVisual.Visibility = ConnectionTestStatus.Visibility = pending ? Visibility.Visible : Visibility.Collapsed;
-            ConnectedCheckBadge.Visibility = pending ? Visibility.Collapsed : Visibility.Visible;
+            RefreshNetworkRecoveryUi();
             UpdateConnectionTestMotion(pending);
         }
 

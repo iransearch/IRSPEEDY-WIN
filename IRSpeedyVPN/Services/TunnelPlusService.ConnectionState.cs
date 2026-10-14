@@ -16,7 +16,7 @@ namespace IRSpeedyVPN.Services
             // Callers use fixed causes. Core output can belong to an idle reader,
             // so that caller must dispatch this to gInfo.CurrentService instead.
             if (reason != "startup" && reason != "public-ip-first-failure" && reason != "public-ip-failed"
-                && reason != "connection-test-failed" && reason != "core-dial-error") return;
+                && reason != "connection-test-failed" && reason != "core-dial-error" && reason != "network-return-failed") return;
             if (expectedIdentity != null && expectedIdentity != DiagnosticIdentity) return;
             long generation = Interlocked.Read(ref connectionGeneration);
             string connection = diagnosticConnectionId;

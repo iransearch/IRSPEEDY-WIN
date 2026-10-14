@@ -53,6 +53,7 @@ namespace IRSpeedyVPN.UserControls
             {
                 if (globalInfo == null || !IsVisible) return;
                 RefreshServerDetail();
+                RefreshNetworkRecoveryUi();
                 RefreshTimeZoneUi();
                 var elapsed = globalInfo.ConnectionElapsed;
                 if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
@@ -116,6 +117,7 @@ namespace IRSpeedyVPN.UserControls
             imgCountry.Source = IRSpeedyVPN.Components.ServerListControl.FlagCatalog.TryGet(globalInfo.CurrentService.CountryCode);
             imgCountry.Visibility = imgCountry.Source == null ? Visibility.Hidden : Visibility.Visible;
             RefreshServerDetail();
+            RefreshNetworkRecoveryUi();
             RefreshTimeZoneUi();
 
             txtServiceName.Text = globalInfo.CurrentService.Name + (proxifier.IsAttached() && proxifier.ProxyType.GetDescription().Length > 0 ? " / " + proxifier.ProxyType.GetDescription() : "");

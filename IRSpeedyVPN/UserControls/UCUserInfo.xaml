@@ -190,6 +190,8 @@
           </Path.Stroke>
         </Path>
       </Grid>
+      <TextBlock x:Name="NetworkRecoveryStatus" Visibility="Collapsed" Margin="0,8,0,0" FontSize="12"
+                 Foreground="{DynamicResource TextBodyBrush}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
       <Border Style="{StaticResource DesignInfoCard}" Margin="0,16,0,0" x:Name="ConnectedAccountCard" Height="106">
         <Grid>
           <Grid.RowDefinitions>
