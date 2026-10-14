@@ -11,7 +11,7 @@ sdk = Path(sys.argv[1]).parent
 refs = Path(sys.argv[2])
 compiler = next((sdk / 'sdk').glob('*/Roslyn/bincore/csc.dll'))
 sources = ['Services/NetworkRecoverySession.cs', 'Services/TunnelPlusService.NetworkRecovery.cs',
-           'Services/MainPoolRecoveryProof.cs', 'Common/ConnectionTlsTest.cs', 'UserControls/UCUserInfo.NetworkRecovery.cs']
+           'Services/MainPoolRecoveryProof.cs', 'Services/InternetConnectivityMonitor.cs', 'Common/ConnectionTlsTest.cs', 'UserControls/UCUserInfo.NetworkRecovery.cs']
 sources += ['Services/Libcore/' + name + '.cs' for name in ['ProtorpcClient', 'LibcoreServiceClient', 'LibcoreProto', 'LibcoreTraffic', 'LibcoreAutoSelectors', 'LibcoreMessages']]
 main = (root / 'IRSpeedyVPN/MainWindow.xaml.cs').read_text()
 handler = main[main.index('        private void InternetConnectivityMonitor_AvailabilityChanged('):main.index('        private void MainWindow_Closed(')]
@@ -22,8 +22,6 @@ namespace IRSpeedyVPN.Services {
   bool userCancelRequested,IsConnected;long connectionGeneration;int lastListenPort;IRSpeedyVPN.Info gInfo;object autoSelectorPlan;const int CorePort=19810;
   void Diagnostic(string s,string f){}void RequestConnectionState(string cause){}
  }
- class InternetAvailabilityChangedEventArgs:EventArgs {internal bool IsOnline;}
- static class InternetConnectivityMonitor {internal static bool? LastKnownOnline=>null;}
 }
 namespace IRSpeedyVPN {
  class Info { internal object CurrentService; }

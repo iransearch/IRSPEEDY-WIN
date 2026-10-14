@@ -29,7 +29,7 @@ namespace IRSpeedyVPN.Common
                 return stage == "final" || HasFailure(stage, message) || stage == "candidate-rejected";
             }
             if (message.StartsWith("[NetworkMonitor]", StringComparison.Ordinal))
-                return message.Contains("online=false") || message.Contains("exception=")
+                return message.Contains("online=false") || message.Contains("online=true") || message.Contains("exception=")
                     || message.Contains("error=");
             return true;
         }

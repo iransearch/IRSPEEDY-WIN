@@ -12,6 +12,7 @@ namespace IRSpeedyVPN.Services
     {
         private readonly object gate = new object();
         private readonly Func<CancellationToken, Task<bool>> confirm;
+        private readonly Func<CancellationToken, Task<bool>> requestRecovery;
         private readonly Func<int, CancellationToken, Task> delay;
         private CancellationTokenSource worker;
         private bool disposed;
@@ -19,10 +20,12 @@ namespace IRSpeedyVPN.Services
         internal ConnectionRecoveryStatus Status => status;
 
         internal NetworkRecoverySession(Func<CancellationToken, Task<bool>> confirm,
-            Func<int, CancellationToken, Task> delay = null)
+            Func<int, CancellationToken, Task> delay = null,
+            Func<CancellationToken, Task<bool>> requestRecovery = null)
         {
             this.confirm = confirm ?? throw new ArgumentNullException(nameof(confirm));
             this.delay = delay ?? ((ms, token) => Task.Delay(ms, token));
+            this.requestRecovery = requestRecovery;
         }
 
         internal void Observe(bool online)
@@ -51,11 +54,18 @@ namespace IRSpeedyVPN.Services
         {
             try
             {
+                bool requested = requestRecovery == null;
                 for (int attempt = 0; ; attempt++)
                 {
                     request.Token.ThrowIfCancellationRequested();
                     bool usable;
-                    try { usable = await confirm(request.Token).ConfigureAwait(false); }
+                    try
+                    {
+                        // One acknowledged immediate sweep per return. Retry only
+                        // an unavailable RPC, never start overlapping pool sweeps.
+                        if (!requested) requested = await requestRecovery(request.Token).ConfigureAwait(false);
+                        usable = requested && await confirm(request.Token).ConfigureAwait(false);
+                    }
                     catch (OperationCanceledException) { throw; }
                     catch { usable = false; }
                     lock (gate)

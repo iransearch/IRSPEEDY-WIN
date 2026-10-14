@@ -60,11 +60,18 @@ namespace IRSpeedyVPN.Services.Libcore
         }
 
         public ErrorResp RecheckAutoSelector(string tag, int timeoutMs)
+            => AutoSelectorAction(tag, "recheck", timeoutMs, CancellationToken.None);
+
+        internal ErrorResp SetAutoSelectorNetworkAvailability(string tag, bool online, int timeoutMs,
+            CancellationToken cancellation)
+            => AutoSelectorAction(tag, online ? "network-return" : "network-down", timeoutMs, cancellation);
+
+        private ErrorResp AutoSelectorAction(string tag, string action, int timeoutMs, CancellationToken cancellation)
         {
-            var request = LibcoreProto.EncodeAutoSelectorRecheck(tag);
-            using (var client = ProtorpcClient.Connect(_host, _port, timeoutMs))
+            var request = LibcoreProto.EncodeAutoSelectorAction(tag, action);
+            using (var client = ProtorpcClient.Connect(_host, _port, timeoutMs, cancellation))
                 return client.CallWithDeadline("LibcoreService.AutoSelectorAction", request,
-                    LibcoreProto.DecodeErrorResp, timeoutMs);
+                    LibcoreProto.DecodeErrorResp, timeoutMs, cancellation);
         }
 
         public ErrorResp CheckConfig(LoadConfigReq req)

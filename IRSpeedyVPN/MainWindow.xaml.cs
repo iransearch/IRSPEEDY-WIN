@@ -85,7 +85,10 @@ namespace IRSpeedyVPN
             SetupNotify();
             txtVersion.Text = "v" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
-            internetConnectivityMonitor = new InternetConnectivityMonitor();
+            internetConnectivityMonitor = new InternetConnectivityMonitor(
+                () => AppServices.GlobalInfo?.CurrentService?.IsConnected == true,
+                confirmUsablePath: () => (AppServices.GlobalInfo?.CurrentService as TunnelPlusService)
+                    ?.ConfirmInternetPathAsync() ?? Task.FromResult(false));
             internetConnectivityMonitor.AvailabilityChanged += InternetConnectivityMonitor_AvailabilityChanged;
             internetConnectivityMonitor.Start();
             Closed += MainWindow_Closed;
@@ -129,7 +132,9 @@ namespace IRSpeedyVPN
         private void InternetConnectivityMonitor_AvailabilityChanged(
             object sender, InternetAvailabilityChangedEventArgs e)
         {
-            (AppServices.GlobalInfo?.CurrentService as TunnelPlusService)?.ObserveInternetAvailability(e.IsOnline);
+            if (e.AffectsRecovery)
+                (AppServices.GlobalInfo?.CurrentService as TunnelPlusService)?.ObserveInternetAvailability(e.IsOnline);
+            if (!e.IsOnline && !e.NotifyUser) return;
             Dispatcher.BeginInvoke(new Action(() =>
             {
                 if (ExitCleanupStarted)
