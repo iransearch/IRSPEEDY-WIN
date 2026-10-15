@@ -12,8 +12,9 @@ the actual `IVPNService` interface and .NET Framework 4.8/WPF references.
 This catches UI integration errors such as accessing a connection property
 that only exists on `TunnelPlusService` through the service interface.
 
-Fast-return checks also cover four consecutive direct failures, recovery on the
-next fast tick without OS adapter events, suppression of extra notifications,
+Fast-return checks also cover two consecutive direct failures (reset by success), recovery on the
+next fast tick without OS adapter events, one toast signal per confirmed outage,
+deduplication across periodic/fast checks and rearming after an online transition,
 protection against an ICMP target failing while external TLS still works, and
 production RPC ordering/cancellation using a local TCP server. The main-pool
 return command is acknowledged once before recovery proof is queried. Recovery

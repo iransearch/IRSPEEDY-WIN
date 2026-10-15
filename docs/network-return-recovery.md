@@ -6,10 +6,15 @@ to sweep immediately, leaving it behind the 900-second normal interval. Failed
 samples from the outage could also keep a working member outside the qualified set.
 
 While connected, or while the internet is known offline, the direct IP watcher
-checks every fifteen seconds. Four consecutive failed fast pings are needed to
+checks every fifteen seconds. Two consecutive failed fast pings are needed to
 declare an outage. Before suspending a connected VPN it checks external TLS;
-failure of the fixed ICMP endpoint alone cannot stop a working path. The existing
-ten-minute/four-ping notifications remain separate from recovery signals.
+failure of the fixed ICMP endpoint alone cannot stop a working path or display a
+false outage toast. Recovery and notifications use the same confirmed transition:
+the fast check notifies on the second consecutive failed check (or immediately
+when no adapter exists), once per outage. The next confirmed online signal closes
+the toast and rearms notification for a new outage. Startup/ten-minute checks
+still run but cannot duplicate notifications for an outage already reported.
+The UI ignores queued notifications superseded by a newer connectivity state.
 
 The application sends ordered `network-down` / `network-return` actions for the
 explicit `proxy` tag. Each dedicated RPC has a 750 ms deadline, uses the active

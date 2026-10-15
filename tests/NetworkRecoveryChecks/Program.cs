@@ -142,31 +142,55 @@ internal static class Program
             monitor.AvailabilityChanged += (sender, e) => signals.Add(e);
             await monitor.CheckFastAsync(); signals.Clear();
             internet = false;
-            for (int i=0;i<3;i++) await monitor.CheckFastAsync();
-            Check(signals.Count==0, "One lost direct ping suspended the pool");
             await monitor.CheckFastAsync();
-            Check(signals.Count==1 && !signals[0].IsOnline && !signals[0].NotifyUser,
-                "Fast outage was not published independently of the ten-minute notification");
+            Check(signals.Count==0, "One lost direct ping suspended the pool");
+            internet=true;await monitor.CheckFastAsync();
+            internet=false;await monitor.CheckFastAsync();
+            Check(signals.Count==0,"A successful check did not reset consecutive failures");
+            await monitor.CheckFastAsync();
+            Check(signals.Count==1 && !signals[0].IsOnline && signals[0].NotifyUser && signals[0].AffectsRecovery,
+                "Two failed checks did not notify the user and recovery together");
+            Check(signals[0].Reason=="fast-direct-ping-2-failed","Outage diagnostics did not report the two-check threshold");
             await monitor.CheckFastAsync();
             Check(signals.Count==1, "Repeated fast outage duplicated down events");
+            await monitor.CheckAsync();
+            Check(signals.Count==1, "Periodic cycle reopened the already-notified outage");
             internet=true;
             await monitor.CheckFastAsync();
             Check(signals.Count==2 && signals[1].IsOnline, "WAN return without adapter events waited for periodic notification");
+            internet=false;
+            for(int i=0;i<2;i++) await monitor.CheckFastAsync();
+            Check(signals.Count==3 && !signals[2].IsOnline && signals[2].NotifyUser,
+                "A second outage did not receive a new notification");
+            internet=true; await monitor.CheckFastAsync();
             connected=false; int before=pingCalls;
             await monitor.CheckFastAsync();
             Check(pingCalls==before, "Online disconnected app kept fast probing");
         }
-        Console.WriteLine("PASS WAN return is detected on the next fast tick without OS events or extra notifications");
+        Console.WriteLine("PASS fast outage/recovery and toast signals stay synchronized, deduplicate periodic repeats and rearm after recovery");
 
         using (var blockedIcmp = new InternetConnectivityMonitor(() => true,
             attempt=>Task.FromResult(false),()=>true,()=>Task.FromResult(true)))
         {
             int falseOutages=0;
-            blockedIcmp.AvailabilityChanged+=(sender,e)=>{if(!e.IsOnline&&e.AffectsRecovery)falseOutages++;};
-            for(int i=0;i<4;i++)await blockedIcmp.CheckFastAsync();
-            Check(falseOutages==0,"A blocked fixed ping endpoint suspended a working VPN path");
+            blockedIcmp.AvailabilityChanged+=(sender,e)=>{if(!e.IsOnline)falseOutages++;};
+            for(int i=0;i<2;i++)await blockedIcmp.CheckFastAsync();
+            await blockedIcmp.CheckAsync();
+            Check(falseOutages==0,"A blocked fixed ping endpoint suspended or falsely notified a working VPN path");
         }
         Console.WriteLine("PASS a working external TLS path prevents false suspension from blocked ICMP");
+
+        bool adapterAvailable=false;
+        var adapterSignals=new List<InternetAvailabilityChangedEventArgs>();
+        using(var monitor=new InternetConnectivityMonitor(()=>true,attempt=>Task.FromResult(true),()=>adapterAvailable))
+        {
+            monitor.AvailabilityChanged+=(sender,e)=>adapterSignals.Add(e);
+            await monitor.CheckFastAsync(); await monitor.CheckFastAsync(); await monitor.CheckAsync();
+            Check(adapterSignals.Count==1&&!adapterSignals[0].IsOnline&&adapterSignals[0].NotifyUser,
+                "Missing adapter did not notify once across all checks");
+            adapterAvailable=true;await monitor.CheckFastAsync();
+            Check(adapterSignals.Count==2&&adapterSignals[1].IsOnline,"Adapter recovery did not dismiss the outage");
+        }
 
         var latePing = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         int lateSignals=0;

@@ -24,17 +24,17 @@ namespace IRSpeedyVPN.Services
 
     /// <summary>
     /// User-facing connectivity watcher.
-    /// Every ten minutes it sends four ICMP pings to 185.143.233.200.
-    /// Any successful reply marks the cycle online. Four failures trigger an
-    /// offline notification on every failed cycle. A lightweight fifteen-second
-    /// signal while connected/offline also detects WAN recovery without an OS
-    /// adapter event. Fast signals do not produce additional notifications.
+    /// Every ten minutes it sends up to two ICMP pings to 185.143.233.200.
+    /// Any successful reply marks the cycle online. A fifteen-second signal
+    /// while connected/offline detects WAN outages and recovery without an OS
+    /// adapter event. Recovery and notifications share the same confirmed state:
+    /// one notification per outage, closed by the first confirmed online signal.
     /// </summary>
     internal sealed class InternetConnectivityMonitor : IDisposable
     {
         internal const string PingHost = "185.143.233.200";
         internal const string PingCidr = "185.143.233.200/32";
-        private const int AttemptsPerCycle = 4;
+        private const int AttemptsPerCycle = 2;
         private const int PingTimeoutMs = 2500;
 
         private readonly SemaphoreSlim checkGate = new SemaphoreSlim(1, 1);
@@ -114,7 +114,7 @@ namespace IRSpeedyVPN.Services
             Task.Run(CheckAsync);
         }
 
-        private async Task CheckAsync()
+        internal async Task CheckAsync()
         {
             if (!checkGate.Wait(0))
                 return;
@@ -145,19 +145,15 @@ namespace IRSpeedyVPN.Services
                         await Task.Delay(350, lifetime.Token).ConfigureAwait(false);
                 }
 
-                // Important: unlike normal state-change publishing, a failed
-                // four-ping cycle is intentionally raised every ten minutes.
                 bool usablePath = needsFastChecks() && await confirmUsablePath().ConfigureAwait(false);
                 if (lifetime.IsCancellationRequested || revision != Volatile.Read(ref networkRevision)) return;
                 if (usablePath)
                 {
-                    // Retain the requested four-ping notification, but a fixed
-                    // ICMP target cannot suspend a VPN path verified by TLS.
+                    // A fixed ICMP target cannot suspend a working VPN or
+                    // produce a disconnected toast while TLS confirms its path.
                     PublishOnline("external-path-confirmed");
-                    AvailabilityChanged?.Invoke(this, new InternetAvailabilityChangedEventArgs(
-                        false, "irancell-ping-4-of-4-failed", true, false));
                 }
-                else PublishOffline("irancell-ping-4-of-4-failed");
+                else PublishOffline("irancell-ping-" + AttemptsPerCycle + "-of-" + AttemptsPerCycle + "-failed");
             }
             catch (OperationCanceledException)
             {
@@ -182,7 +178,7 @@ namespace IRSpeedyVPN.Services
                 int revision = Volatile.Read(ref networkRevision);
                 if (!networkAvailable())
                 {
-                    PublishOffline("fast-no-network-interface", false);
+                    PublishOffline("fast-no-network-interface");
                     return;
                 }
                 bool success = await pingOnce(0).ConfigureAwait(false);
@@ -197,7 +193,7 @@ namespace IRSpeedyVPN.Services
                     bool usable = await confirmUsablePath().ConfigureAwait(false);
                     if (lifetime.IsCancellationRequested || revision != Volatile.Read(ref networkRevision)) return;
                     if (usable) PublishOnline("external-path-confirmed");
-                    else PublishOffline("fast-direct-ping-4-failed", false);
+                    else PublishOffline("fast-direct-ping-" + AttemptsPerCycle + "-failed");
                 }
             }
             catch (OperationCanceledException) { }
@@ -259,7 +255,7 @@ namespace IRSpeedyVPN.Services
             }
         }
 
-        private void PublishOffline(string reason, bool notifyUser = true)
+        private void PublishOffline(string reason)
         {
             bool changed;
             lock (this)
@@ -269,13 +265,13 @@ namespace IRSpeedyVPN.Services
                 Volatile.Write(ref knownOnline, 0);
             }
 
-            if (changed || notifyUser) Common.LogHelper.WriteExLog(
+            if (changed) Common.LogHelper.WriteExLog(
                 "[NetworkMonitor] online=false reason=" + reason);
 
-            // Offline is cycle-based by request: every confirmed failed cycle
-            // produces a notification, including consecutive failed cycles.
-            if (changed || notifyUser) AvailabilityChanged?.Invoke(
-                this, new InternetAvailabilityChangedEventArgs(false, reason, notifyUser));
+            // All detection paths share the same transition. Repeated fast,
+            // periodic or OS checks must not keep reopening the same outage toast.
+            if (changed) AvailabilityChanged?.Invoke(
+                this, new InternetAvailabilityChangedEventArgs(false, reason));
         }
 
         public void Dispose()

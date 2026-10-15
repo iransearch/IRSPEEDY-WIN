@@ -140,6 +140,10 @@ namespace IRSpeedyVPN
                 if (ExitCleanupStarted)
                     return;
 
+                // A queued outage may have recovered before the UI gets here.
+                if (InternetConnectivityMonitor.LastKnownOnline != e.IsOnline)
+                    return;
+
                 if (e.IsOnline)
                 {
                     networkStatusToast?.CloseAnimated();
