@@ -86,7 +86,7 @@ namespace IRSpeedyVPN
             txtVersion.Text = "v" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
 
             internetConnectivityMonitor = new InternetConnectivityMonitor(
-                () => AppServices.GlobalInfo?.CurrentService?.IsConnected == true,
+                () => (AppServices.GlobalInfo?.CurrentService as TunnelPlusService)?.IsTunnelConnected == true,
                 confirmUsablePath: () => (AppServices.GlobalInfo?.CurrentService as TunnelPlusService)
                     ?.ConfirmInternetPathAsync() ?? Task.FromResult(false));
             internetConnectivityMonitor.AvailabilityChanged += InternetConnectivityMonitor_AvailabilityChanged;

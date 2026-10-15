@@ -12,23 +12,34 @@ refs = Path(sys.argv[2])
 compiler = next((sdk / 'sdk').glob('*/Roslyn/bincore/csc.dll'))
 sources = ['Services/NetworkRecoverySession.cs', 'Services/TunnelPlusService.NetworkRecovery.cs',
            'Services/MainPoolRecoveryProof.cs', 'Services/InternetConnectivityMonitor.cs', 'Common/ConnectionTlsTest.cs', 'UserControls/UCUserInfo.NetworkRecovery.cs']
+sources += ['Interfaces/IVPNService.cs', 'Events/OnConnectDisconnect.cs',
+            'Common/ProxifierType.cs', 'Common/ProxyType.cs']
 sources += ['Services/Libcore/' + name + '.cs' for name in ['ProtorpcClient', 'LibcoreServiceClient', 'LibcoreProto', 'LibcoreTraffic', 'LibcoreAutoSelectors', 'LibcoreMessages']]
 main = (root / 'IRSpeedyVPN/MainWindow.xaml.cs').read_text()
 handler = main[main.index('        private void InternetConnectivityMonitor_AvailabilityChanged('):main.index('        private void MainWindow_Closed(')]
-stubs = '''using System;using System.Threading;using System.Windows;using System.Windows.Controls;using IRSpeedyVPN.Services;
+monitor_setup = main[main.index('            internetConnectivityMonitor = new InternetConnectivityMonitor('):main.index('            internetConnectivityMonitor.AvailabilityChanged +=')]
+tunnel = (root / 'IRSpeedyVPN/Services/TunnelPlusService.cs').read_text()
+connected_property = next(line for line in tunnel.splitlines() if 'public bool IsTunnelConnected =>' in line)
+stubs = '''using System;using System.Threading;using System.Threading.Tasks;using System.Windows;using System.Windows.Controls;using IRSpeedyVPN.Services;using IRSpeedyVPN.Interfaces;
 namespace IRSpeedyVPN.Common { static class LogHelper { internal static void WriteExLog(string s){} } }
+namespace IRSpeedyVPN.Models.NewService { public class Url {} }
 namespace IRSpeedyVPN.Services {
  partial class TunnelPlusService {
   bool userCancelRequested,IsConnected;long connectionGeneration;int lastListenPort;IRSpeedyVPN.Info gInfo;object autoSelectorPlan;const int CorePort=19810;
+''' + connected_property + '''
   void Diagnostic(string s,string f){}void RequestConnectionState(string cause){}
  }
 }
 namespace IRSpeedyVPN {
- class Info { internal object CurrentService; }
+ class Info { internal IVPNService CurrentService; }
  static class AppServices { internal static Info GlobalInfo; }
  class NetworkStatusToastWindow:Window {internal NetworkStatusToastWindow(Window owner){}internal void CloseAnimated(){} }
  partial class MainWindow:Window {
   NetworkStatusToastWindow networkStatusToast;bool ExitCleanupStarted;
+  InternetConnectivityMonitor internetConnectivityMonitor;
+  void ConfigureInternetMonitor() {
+''' + monitor_setup + '''
+  }
 ''' + handler + '''
  }
 }
@@ -49,4 +60,4 @@ with tempfile.TemporaryDirectory(prefix='network-recovery-net48-') as directory:
     args += ['-r:' + str(refs / (name + '.dll')) for name in selected]
     args += [str(root / 'IRSpeedyVPN' / name) for name in sources] + [str(path / 'Stubs.cs')]
     subprocess.run(args, check=True)
-print('PASS production recovery state, service/TLS integration, notification handler and WPF UI compile against net48')
+print('PASS production recovery state, service/TLS integration, monitor setup against IVPNService, notification handler and WPF UI compile against net48')

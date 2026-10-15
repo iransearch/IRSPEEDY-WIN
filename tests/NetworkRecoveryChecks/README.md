@@ -6,6 +6,12 @@ offline suspension, worker deduplication, rejection of stale successes, retry
 until external confirmation, and immediate invalidation on disconnect. It does
 not exercise Windows networking, WPF rendering or a real VPN.
 
+`python tests/NetworkRecoveryChecks/net48_compile.py /path/to/dotnet /path/to/net48/references`
+also compiles the production monitor setup and notification handler against
+the actual `IVPNService` interface and .NET Framework 4.8/WPF references.
+This catches UI integration errors such as accessing a connection property
+that only exists on `TunnelPlusService` through the service interface.
+
 Fast-return checks also cover four consecutive direct failures, recovery on the
 next fast tick without OS adapter events, suppression of extra notifications,
 protection against an ICMP target failing while external TLS still works, and
