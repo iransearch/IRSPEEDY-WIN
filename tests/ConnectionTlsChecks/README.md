@@ -6,6 +6,10 @@ CA is trusted only in the test child process; production certificate checks rema
 intact. Successful probes send no application HTTP request after TLS negotiation.
 The direct-mode fixture binds loopback port 443 and requires that port to be free
 and permitted. No Internet destination is contacted.
+For restricted environments, `SKIP_PRIVILEGED_TLS_FIXTURE=1` explicitly skips
+only that port-443 fixture. The CONNECT, verified-route and cancellation checks
+still run on unprivileged loopback ports. Route callbacks must receive the exact
+source port while TLS is open; TLS or route failure cannot claim recovery.
 
 Run `python3 tests/ConnectionTestChecks/run.py /path/to/dotnet` for presentation,
 active-session invalidation and animation lifecycle checks with UI/network doubles.

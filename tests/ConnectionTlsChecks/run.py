@@ -33,9 +33,14 @@ class Program {
   using var trusted = new X509Certificate2(args[0], "");
   using var untrusted = new X509Certificate2(args[1], "");
   await Probe(trusted,true,"tls-probe.invalid",true,"CONNECT tunnel uses remote hostname and TLS, without an HTTP page request");
-  await Probe(trusted,false,"localhost",true,"system-tunnel mode performs TCP and verified TLS");
+  if(Environment.GetEnvironmentVariable("SKIP_PRIVILEGED_TLS_FIXTURE")!="1")
+   await Probe(trusted,false,"localhost",true,"system-tunnel mode performs TCP and verified TLS");
+  else Console.WriteLine("SKIP direct TLS fixture: loopback port 443 unavailable in this environment");
   await Probe(trusted,true,"wrong-probe.invalid",false,"certificate hostname mismatch is rejected");
   await Probe(untrusted,true,"tls-probe.invalid",false,"untrusted certificate is rejected");
+  await Probe(trusted,true,"tls-probe.invalid",true,"verified TLS route is checked while its exact socket remains open",true,1);
+  await Probe(trusted,true,"tls-probe.invalid",false,"successful TLS on an unconfirmed main route is rejected",false,1);
+  await Probe(untrusted,true,"tls-probe.invalid",false,"route evidence cannot override an untrusted TLS certificate",true,0);
   await ProxyFailure("HTTP/1.1 502 Bad Gateway\r\n\r\n",false,"rejected CONNECT fails");
   await ProxyFailure("not-http 200 OK\r\n\r\n",false,"malformed CONNECT status fails");
   await ProxyFailure(new string('X',8192),false,"oversized CONNECT header fails");
@@ -56,14 +61,15 @@ class Program {
   }
   throw new IOException();
  }
- static async Task Probe(X509Certificate2 cert,bool proxy,string host,bool expected,string name) {
+ static async Task Probe(X509Certificate2 cert,bool proxy,string host,bool expected,string name,bool? route=null,int expectedRouteCalls=0) {
   var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
   int port=((IPEndPoint)listener.LocalEndpoint).Port;
   // Direct mode has a fixed destination port 443. Bind that port only for this case.
   if(!proxy) {listener.Stop();listener=new TcpListener(IPAddress.Loopback,443);listener.Start();}
-  string header=null;int applicationBytes=0;
+  string header=null;int applicationBytes=0,sourcePort=0,routeCalls=0;
   var server=Task.Run(async()=> {
    using var connection=await listener.AcceptTcpClientAsync();
+   sourcePort=((IPEndPoint)connection.Client.RemoteEndPoint).Port;
    var stream=connection.GetStream();
    if(proxy) {
     header=await ReadHeader(stream);
@@ -77,9 +83,14 @@ class Program {
    } catch(AuthenticationException) {} catch(IOException) {}
   });
   try {
-   bool result=await ConnectionTlsTest.CheckAsync(host,3000,proxy ? port : (int?)null,CancellationToken.None);
+   Func<int,CancellationToken,Task<bool>> confirmRoute=route.HasValue ? (source,token)=> {
+    Check(source==sourcePort&&!server.IsCompleted&&!token.IsCancellationRequested,"route confirmation matches the live TLS socket");
+    routeCalls++;
+    return Task.FromResult(route.Value);
+   } : null;
+   bool result=await ConnectionTlsTest.CheckAsync(host,3000,proxy ? port : (int?)null,CancellationToken.None,confirmRoute);
    await server.WaitAsync(TimeSpan.FromSeconds(5));
-   Check(result==expected && applicationBytes==0 && (!proxy || header.StartsWith("CONNECT "+host+":443 HTTP/1.1\r\n")),name);
+   Check(result==expected && applicationBytes==0 && routeCalls==expectedRouteCalls && (!proxy || header.StartsWith("CONNECT "+host+":443 HTTP/1.1\r\n")),name);
   } finally {listener.Stop();}
  }
  static async Task ProxyFailure(string response,bool cancel,string name) {

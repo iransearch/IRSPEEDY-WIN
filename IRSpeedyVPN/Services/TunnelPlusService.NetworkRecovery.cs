@@ -1,7 +1,6 @@
 using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Services.Libcore;
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,7 +9,6 @@ namespace IRSpeedyVPN.Services
     partial class TunnelPlusService
     {
         private NetworkRecoverySession networkRecovery;
-        private long networkRecoveryAfterMs;
         private readonly object poolAvailabilityGate = new object();
         private Task<bool> poolAvailabilityTask = Task.FromResult(true);
         private CancellationTokenSource recoveryLifetime;
@@ -26,8 +24,8 @@ namespace IRSpeedyVPN.Services
             try
             {
                 var results = await Task.WhenAll(
-                    ConnectionTlsTest.CheckAsync("www.microsoft.com", 1500, port, lifetime.Token),
-                    ConnectionTlsTest.CheckAsync("www.cloudflare.com", 1500, port, lifetime.Token)).ConfigureAwait(false);
+                    CheckRecoveryTlsAsync("www.microsoft.com", 1500, port, autoSelectorPlan != null, lifetime.Token),
+                    CheckRecoveryTlsAsync("www.cloudflare.com", 1500, port, autoSelectorPlan != null, lifetime.Token)).ConfigureAwait(false);
                 return !lifetime.IsCancellationRequested && !userCancelRequested && IsConnected
                     && generation == Interlocked.Read(ref connectionGeneration)
                     && ReferenceEquals(gInfo?.CurrentService, this) && (results[0] || results[1]);
@@ -41,7 +39,6 @@ namespace IRSpeedyVPN.Services
             {
                 if (!online && RecoveryStatus != ConnectionRecoveryStatus.WaitingForInternet)
                 {
-                    Interlocked.Exchange(ref networkRecoveryAfterMs, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
                     QueuePoolAvailability(false, CancellationToken.None);
                 }
                 networkRecovery?.Observe(online);
@@ -55,7 +52,6 @@ namespace IRSpeedyVPN.Services
             int port = lastListenPort;
             bool pooled = autoSelectorPlan != null;
             recoveryLifetime = new CancellationTokenSource();
-            Interlocked.Exchange(ref networkRecoveryAfterMs, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
             var session = new NetworkRecoverySession(async token =>
             {
                 if (userCancelRequested || !IsConnected || generation != Interlocked.Read(ref connectionGeneration)
@@ -65,15 +61,14 @@ namespace IRSpeedyVPN.Services
                 var results = await Task.WhenAll(
                     // Keep these outside the AI domain list: an AI-only success
                     // must not claim that the main VPN path has recovered.
-                    ConnectionTlsTest.CheckAsync("www.microsoft.com", 5000, port, token),
-                    ConnectionTlsTest.CheckAsync("www.cloudflare.com", 5000, port, token),
-                    Task.Run(() => !pooled || ConfirmMainPoolRecovery(token), token)).ConfigureAwait(false);
+                    CheckRecoveryTlsAsync("www.microsoft.com", 5000, port, pooled, token),
+                    CheckRecoveryTlsAsync("www.cloudflare.com", 5000, port, pooled, token)).ConfigureAwait(false);
                 token.ThrowIfCancellationRequested();
                 if (userCancelRequested || generation != Interlocked.Read(ref connectionGeneration)
                     || !ReferenceEquals(gInfo?.CurrentService, this)) throw new OperationCanceledException();
-                bool usable = results[2] && (results[0] || results[1]);
+                bool usable = results[0] || results[1];
                 Diagnostic("network-return-path", "externalTlsConfirmed=" + (results[0] || results[1])
-                    + " mainPoolConfirmed=" + results[2]);
+                    + " mainRouteRequired=" + pooled + " recoveryConfirmed=" + usable);
                 if (!usable) RequestConnectionState("network-return-failed");
                 return usable;
             }, requestRecovery: token => pooled ? QueuePoolAvailability(true, token) : Task.FromResult(true));
@@ -129,19 +124,29 @@ namespace IRSpeedyVPN.Services
             }
         }
 
-        private bool ConfirmMainPoolRecovery(CancellationToken token)
+        private Task<bool> CheckRecoveryTlsAsync(string host, int timeoutMs, int port, bool pooled,
+            CancellationToken token)
         {
-            try
+            return ConnectionTlsTest.CheckAsync(host, timeoutMs, port, token,
+                pooled ? (Func<int, CancellationToken, Task<bool>>)ConfirmMainPoolRouteAsync : null);
+        }
+
+        private Task<bool> ConfirmMainPoolRouteAsync(int sourcePort, CancellationToken token)
+        {
+            return Task.Run(() =>
             {
-                var pools = new LibcoreServiceClient("127.0.0.1", CorePort, 750).QueryAutoSelectors(750, token);
-                return MainPoolRecoveryProof.Confirmed(pools, Interlocked.Read(ref networkRecoveryAfterMs));
-            }
-            catch (OperationCanceledException) { throw; }
-            catch (Exception ex)
-            {
-                Diagnostic("network-return-pool-unavailable", "exception=" + ex.GetType().Name);
-                return false;
-            }
+                try
+                {
+                    var connections = new LibcoreServiceClient("127.0.0.1", CorePort, 750).QueryConnections(750, token);
+                    return MainPoolRecoveryProof.Confirmed(connections, sourcePort);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex)
+                {
+                    Diagnostic("network-return-route-unavailable", "exception=" + ex.GetType().Name);
+                    return false;
+                }
+            }, token);
         }
 
         private void EndNetworkRecoverySession()

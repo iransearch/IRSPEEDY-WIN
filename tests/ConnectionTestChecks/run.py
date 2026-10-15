@@ -86,7 +86,7 @@ namespace IRSpeedyVPN.UserControls {
   private Info globalInfo=new Info();
   public bool IsLoaded=true, IsVisible=true;
   public Control TestConnectionMenu=new Control(), ConnectionTestVisual=new Control(), ConnectionTestStatus=new Control(), ConnectedCheckBadge=new Control();
-  public Control NetworkRecoveryStatus=new Control();
+  public Control NetworkRecoveryStatus=new Control(), NetworkRecoveryBanner=new Control();
   private Storyboard StartMotion(string key) { return new Storyboard(); }
   public UCUserInfo(int port) { globalInfo.CurrentService=new Services.TunnelPlusService{HttpPort=port}; SetConnectionTestPending(false); }
   public void Start() { ConnectionTest_PreviewMouseDown(this,null); }
@@ -95,6 +95,7 @@ namespace IRSpeedyVPN.UserControls {
   public void ReplaceSession() { globalInfo.ConnectionTime=globalInfo.ConnectionTime.AddSeconds(1); }
   public bool Pending => connectionTestRequest!=null;
   public void Recovering() { ((Services.TunnelPlusService)globalInfo.CurrentService).RecoveryStatus=Services.ConnectionRecoveryStatus.Impaired; RefreshNetworkRecoveryUi(); }
+  public void Recovered() { ((Services.TunnelPlusService)globalInfo.CurrentService).RecoveryStatus=Services.ConnectionRecoveryStatus.None; RefreshNetworkRecoveryUi(); }
  }
 }
 class Program {
@@ -132,7 +133,13 @@ class Program {
   await Wait(()=>ConnectionTlsTest.Calls>0); ConnectionTlsTest.Gate.Set(); await Wait(()=>!view.Pending);
   Check(IRSpeedyVPN.Services.TunnelPlusService.SnapshotRequests==1&&PingResult.Shown==2,"all-failed manual test requests one snapshot and still displays results");
   view.Recovering();
-  Check(!view.ConnectedCheckBadge.IsVisible&&view.NetworkRecoveryStatus.IsVisible,"recovery hides connected badge after manual test completes");
+  Check(!view.ConnectedCheckBadge.IsVisible&&view.NetworkRecoveryBanner.IsVisible,"recovery hides connected badge after manual test completes");
+  ConnectionTlsTest.Reset(5566); view.Start(); await Wait(()=>ConnectionTlsTest.Calls>0);
+  Check(!view.NetworkRecoveryBanner.IsVisible&&view.ConnectionTestStatus.IsVisible,"manual test and recovery banners do not overlap");
+  ConnectionTlsTest.Gate.Set(); await Wait(()=>!view.Pending);
+  Check(view.NetworkRecoveryBanner.IsVisible,"pending recovery banner returns after the manual test");
+  view.Recovered();
+  Check(view.ConnectedCheckBadge.IsVisible&&!view.NetworkRecoveryBanner.IsVisible,"confirmed recovery clears the banner and restores the connected badge");
  }
 }
 '''

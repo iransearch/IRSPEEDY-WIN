@@ -39,24 +39,54 @@ internal static class Program
         string text=Encoding.UTF8.GetString(body);
         Check(text.Contains("proxy")&&text.Contains(action)&&!text.Contains("ai-proxy"),"Availability acted on wrong pool/action");
     }
+    private static byte[] TextField(int field,string value) => BytesField(field,Encoding.UTF8.GetBytes(value));
+    private static byte[] BytesField(int field,byte[] value)
+    {
+        var bytes=new List<byte>(); bytes.Add((byte)((field<<3)|2));
+        int size=value.Length;
+        while(size>=128){bytes.Add((byte)((size&127)|128));size>>=7;}
+        bytes.Add((byte)size); bytes.AddRange(value); return bytes.ToArray();
+    }
+    private static QueryConnectionsResponse Snapshot(string source,string domain)
+    {
+        var connection=new List<byte>();
+        connection.AddRange(TextField(1,"probe"));connection.AddRange(TextField(6,"tcp"));
+        connection.AddRange(TextField(9,domain));connection.AddRange(TextField(14,source));
+        connection.AddRange(TextField(12,"smart-proxy-1"));connection.AddRange(TextField(12,"proxy"));
+        return LibcoreProto.DecodeQueryConnections(BytesField(1,connection.ToArray()));
+    }
     static async Task Main()
     {
-        var pools = new QueryAutoSelectorsResponse();
-        var ai = new AutoSelectorStatus { Tag="ai-proxy", MembersQualified=1 };
-        ai.Members.Add(new AutoSelectorMember { Qualified=true, LastOkMs=200, LastProbeMs=200 });
-        pools.Groups.Add(ai);
-        Check(!MainPoolRecoveryProof.Confirmed(pools, 100), "AI-only success claimed main recovery");
-        var main = new AutoSelectorStatus { Tag="proxy", MembersQualified=1 };
-        var member = new AutoSelectorMember { Qualified=true, LastOkMs=50, LastProbeMs=50 };
-        main.Members.Add(member); pools.Groups.Add(main);
-        Check(!MainPoolRecoveryProof.Confirmed(pools, 100), "Old healthy sample claimed recovery");
-        member.LastOkMs=210; member.LastProbeMs=200;
-        Check(!MainPoolRecoveryProof.Confirmed(pools, 100), "Successful local dial erased failed probe");
-        member.LastOkMs=200;
-        Check(MainPoolRecoveryProof.Confirmed(pools, 100), "Fresh qualified main proof was rejected");
-        main.Suspended=true;
-        Check(!MainPoolRecoveryProof.Confirmed(pools, 100), "Suspended main was declared recovered");
-        Console.WriteLine("PASS recovery requires fresh qualified main-pool proof, independent of AI/direct routes");
+        // TLS success is required by the caller before this route lookup. The
+        // log's working fallback had zero qualified members and old probe data;
+        // neither is a reason to leave a proven live main-path TLS in recovery.
+        var connections = Snapshot("127.0.0.1:34567","www.microsoft.com");
+        var flow = connections.Active[0];
+        Check(MainPoolRecoveryProof.Confirmed(connections,34567), "Live main TLS flow was rejected without qualified pool samples");
+        Check(!MainPoolRecoveryProof.Confirmed(connections,34568), "An unrelated main flow claimed recovery");
+        Check(!MainPoolRecoveryProof.Confirmed(connections,0), "Missing source port claimed recovery");
+        connections.Active.Clear(); connections.Closed.Add(flow);
+        Check(!MainPoolRecoveryProof.Confirmed(connections,34567), "An old closed flow claimed recovery");
+        connections.Active.Add(flow);
+        flow.Chain.Clear(); flow.Chain.Add("ai-proxy");
+        Check(!MainPoolRecoveryProof.Confirmed(connections,34567), "AI-only TLS claimed main recovery");
+        flow.Chain.Add("proxy");
+        Check(!MainPoolRecoveryProof.Confirmed(connections,34567), "AI/main mixed route claimed main recovery");
+        flow.Chain.Clear(); flow.Chain.Add("direct");
+        Check(!MainPoolRecoveryProof.Confirmed(connections,34567), "Direct TLS claimed VPN recovery");
+        flow.Chain.Add("proxy");
+        Check(!MainPoolRecoveryProof.Confirmed(connections,34567), "Direct/main mixed route claimed VPN recovery");
+        flow.Chain.Clear(); flow.Chain.Add("proxy"); flow.IsRecoveryTarget=false;
+        Check(!MainPoolRecoveryProof.Confirmed(connections,34567), "Unrelated target claimed recovery");
+        flow.IsRecoveryTarget=true; flow.Network="udp";
+        Check(!MainPoolRecoveryProof.Confirmed(connections,34567), "UDP traffic matched TCP/TLS proof");
+        Check(!MainPoolRecoveryProof.Confirmed(null,34567), "Unavailable Core telemetry claimed recovery");
+        Check(!MainPoolRecoveryProof.Confirmed(Snapshot("203.0.113.8:34567","www.microsoft.com"),34567), "Remote client source matched a local TLS probe");
+        Check(!MainPoolRecoveryProof.Confirmed(Snapshot("127.0.0.1:34567","www.microsoft.com.evil.invalid"),34567), "Unrelated domain matched a fixed recovery target");
+        Check(!MainPoolRecoveryProof.Confirmed(Snapshot("","www.microsoft.com"),34567), "Absent source metadata claimed recovery");
+        Check(MainPoolRecoveryProof.Confirmed(Snapshot("127.0.0.1:34567","www.cloudflare.com"),34567), "Second recovery endpoint was rejected");
+        Check(MainPoolRecoveryProof.Confirmed(Snapshot("[::ffff:127.0.0.1]:34567","www.microsoft.com"),34567), "Dual-stack listener's mapped IPv4 source was rejected");
+        Console.WriteLine("PASS live main-path TLS proof is independent of pool ranking and rejects direct, AI, stale and unrelated flows");
         int calls = 0;
         var first = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         var second = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);

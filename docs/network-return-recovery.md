@@ -14,8 +14,20 @@ ten-minute/four-ping notifications remain separate from recovery signals.
 The application sends ordered `network-down` / `network-return` actions for the
 explicit `proxy` tag. Each dedicated RPC has a 750 ms deadline, uses the active
 connection generation and is cancelled on disconnect. Return is acknowledged
-once before the external TLS and fresh-qualified-main-pool proof are checked.
+once before external TLS through the main path is checked.
 The observer does not start a sweep on every confirmation retry.
+
+Recovery UI no longer waits for the selector's qualification history. In the
+2026-10-15 report, main-path traffic and trusted TLS worked at 04:07:23 while
+the selector had zero qualified members: its separate URL probes kept failing.
+The application now keeps each verified TLS socket open and matches its exact
+loopback source port and fixed test destination against the Core's active
+connection chain. A `proxy` chain confirms main VPN recovery; direct, AI-only,
+closed, unrelated or unreported flows do not. This uses existing QueryConnections
+metadata and changes no routing, DNS, qualification thresholds or Core lifecycle.
+The banner overlays the rocket's fixed area, so showing/hiding recovery cannot
+push the server/account cards or disconnect button down. It yields to a manual
+connection test and restores the connected badge when recovery is confirmed.
 
 The matching Throne-G core cancels old probes and interval jitter, suspends checks
 while offline, and schedules a coalesced full sweep immediately on return. The

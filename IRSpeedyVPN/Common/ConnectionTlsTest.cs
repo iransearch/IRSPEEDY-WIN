@@ -14,13 +14,15 @@ namespace IRSpeedyVPN.Common
     internal static class ConnectionTlsTest
     {
         internal static async Task<bool> CheckAsync(string host, int timeoutMs, int? httpPort,
-            CancellationToken cancellation)
+            CancellationToken cancellation, Func<int, CancellationToken, Task<bool>> confirmProxyRoute = null)
         {
             if (Uri.CheckHostName(host) != UriHostNameType.Dns)
                 throw new ArgumentException("A DNS hostname is required.", nameof(host));
             if (timeoutMs <= 0) throw new ArgumentOutOfRangeException(nameof(timeoutMs));
             if (httpPort.HasValue && (httpPort.Value <= 0 || httpPort.Value > 65535))
                 throw new ArgumentOutOfRangeException(nameof(httpPort));
+            if (confirmProxyRoute != null && !httpPort.HasValue)
+                throw new ArgumentException("Route confirmation requires a local proxy.", nameof(httpPort));
 
             using (var deadline = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
             using (var client = new TcpClient())
@@ -51,6 +53,16 @@ namespace IRSpeedyVPN.Common
                     {
                         await tls.AuthenticateAsClientAsync(host, new X509CertificateCollection(),
                             SslProtocols.Tls12, true).ConfigureAwait(false);
+                        deadline.Token.ThrowIfCancellationRequested();
+                        // Keep this exact TLS socket open while the Core reports its
+                        // route. An unrelated/direct/AI flow cannot prove VPN recovery.
+                        if (confirmProxyRoute != null && !await confirmProxyRoute(
+                            ((IPEndPoint)client.Client.LocalEndPoint).Port, deadline.Token).ConfigureAwait(false))
+                        {
+                            LogHelper.WriteExLog("[ConnectionTest] host=" + host
+                                + " test=tcp-tls result=failed error=UnconfirmedMainRoute");
+                            return false;
+                        }
                         deadline.Token.ThrowIfCancellationRequested();
                         LogHelper.WriteExLog("[ConnectionTest] host=" + host + " test=tcp-tls route="
                             + (httpPort.HasValue ? "http-proxy:" + httpPort.Value : "system-tunnel")

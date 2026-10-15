@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net;
 
 namespace IRSpeedyVPN.Services.Libcore
 {
@@ -10,6 +11,8 @@ namespace IRSpeedyVPN.Services.Libcore
         public string Process = "";
         public string ProcessPath = "";
         public string Outbound = "", Network = "", DiagnosticTarget = "other";
+        internal int LoopbackSourcePort;
+        internal bool IsRecoveryTarget;
         public readonly List<string> Chain = new List<string>();
         public long Upload;
         public long Download;
@@ -25,7 +28,9 @@ namespace IRSpeedyVPN.Services.Libcore
     {
         // Throne libcore.proto: active=1, recently-closed (non-draining)=2.
         // Retain usage and routing tags. Classify the app's fixed IP providers,
-        // but never retain browsing destinations, source addresses or domains.
+        // Only a loopback source port and the fixed recovery-target classification
+        // are retained for matching the app's live TLS socket. No source addresses
+        // or browsing destinations/domains are retained.
         public static QueryConnectionsResponse DecodeQueryConnections(byte[] data)
         {
             var result = new QueryConnectionsResponse();
@@ -62,21 +67,36 @@ namespace IRSpeedyVPN.Services.Libcore
                     if (value < 0) throw new InvalidDataException("Negative traffic counter.");
                     if (field == 3) row.Upload = value; else row.Download = value;
                 }
-                else if (wire == WireLengthDelimited && (field == 5 || field == 6 || field == 7 || field == 9 || field == 12))
+                else if (wire == WireLengthDelimited && (field == 5 || field == 6 || field == 7 || field == 9 || field == 12 || field == 14))
                 {
                     string value = reader.ReadString();
                     if (field == 5) row.Outbound = value;
                     else if (field == 6) row.Network = value;
                     else if (field == 12) { if (row.Chain.Count < 16) row.Chain.Add(value); }
+                    else if (field == 14) row.LoopbackSourcePort = LoopbackPort(value);
                     else
                     {
                         string target = DiagnosticTarget(value);
                         if (target != "other") row.DiagnosticTarget = target;
+                        if (value == "www.microsoft.com" || value == "www.microsoft.com:443"
+                            || value == "www.cloudflare.com" || value == "www.cloudflare.com:443")
+                            row.IsRecoveryTarget = true;
                     }
                 }
                 else reader.SkipField(wire);
             }
             return row;
+        }
+
+        private static int LoopbackPort(string source)
+        {
+            int colon = source.LastIndexOf(':');
+            IPAddress address;
+            int port;
+            return colon > 0 && IPAddress.TryParse(source.Substring(0, colon).Trim('[', ']'), out address)
+                && (address.IsIPv4MappedToIPv6 ? address.MapToIPv4() : address).Equals(IPAddress.Loopback)
+                && int.TryParse(source.Substring(colon + 1), out port)
+                && port > 0 && port <= 65535 ? port : 0;
         }
 
         internal static string DiagnosticTarget(string value)

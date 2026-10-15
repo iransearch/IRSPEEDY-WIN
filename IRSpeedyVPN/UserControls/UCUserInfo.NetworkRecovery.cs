@@ -9,10 +9,12 @@ namespace IRSpeedyVPN.UserControls
         {
             var status = (globalInfo?.CurrentService as TunnelPlusService)?.RecoveryStatus
                 ?? ConnectionRecoveryStatus.None;
-            NetworkRecoveryStatus.Visibility = status == ConnectionRecoveryStatus.None ? Visibility.Collapsed : Visibility.Visible;
+            // The banner overlays the rocket's existing fixed area. Recovery and
+            // manual tests never resize the content or move the account/server cards.
+            NetworkRecoveryBanner.Visibility = status != ConnectionRecoveryStatus.None && connectionTestRequest == null
+                ? Visibility.Visible : Visibility.Collapsed;
             NetworkRecoveryStatus.Text = status == ConnectionRecoveryStatus.WaitingForInternet
-                ? "در انتظار برگشت اینترنت" : status == ConnectionRecoveryStatus.Recovering
-                ? "در حال بازیابی اتصال…" : "ارتباط VPN برقرار نشده؛ در حال بازیابی…";
+                ? "در انتظار برگشت اینترنت" : "در حال بازیابی اتصال…";
             ConnectedCheckBadge.Visibility = status == ConnectionRecoveryStatus.None && connectionTestRequest == null
                 ? Visibility.Visible : Visibility.Collapsed;
         }

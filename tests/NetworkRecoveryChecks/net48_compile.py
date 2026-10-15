@@ -46,7 +46,7 @@ namespace IRSpeedyVPN {
 namespace IRSpeedyVPN.UserControls {
  public partial class UCUserInfo:UserControl {
   IRSpeedyVPN.Info globalInfo;CancellationTokenSource connectionTestRequest;
-  TextBlock NetworkRecoveryStatus;UIElement ConnectedCheckBadge;
+  TextBlock NetworkRecoveryStatus;UIElement NetworkRecoveryBanner,ConnectedCheckBadge;
  }
 }
 '''

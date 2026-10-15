@@ -136,6 +136,13 @@
           <TextBlock Text="در حال تست اتصال…" FontSize="13" Foreground="{DynamicResource TextPrimaryBrush}"
                      FlowDirection="RightToLeft" HorizontalAlignment="Center" VerticalAlignment="Center"/>
         </Border>
+        <Border x:Name="NetworkRecoveryBanner" Width="280" Height="42" Visibility="Collapsed"
+                CornerRadius="21" VerticalAlignment="Bottom" Margin="0,0,0,16" IsHitTestVisible="False"
+                Background="{DynamicResource Theme.SurfaceBrush}" BorderBrush="{DynamicResource AccentBrush}" BorderThickness="1">
+          <TextBlock x:Name="NetworkRecoveryStatus" FontSize="12" Foreground="{DynamicResource TextBodyBrush}"
+                     FlowDirection="RightToLeft" TextAlignment="Center" TextWrapping="NoWrap"
+                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+        </Border>
         <Border Width="72" Height="72" Background="{DynamicResource ConnectedGreenBrush}" BorderBrush="{DynamicResource WindowBgBottomBrush}" BorderThickness="6" CornerRadius="36" VerticalAlignment="Bottom" Margin="0,0,0,4" x:Name="ConnectedCheckBadge">
           <Viewbox Width="26" Height="26" FlowDirection="LeftToRight"><Canvas Width="12" Height="12"><Path Data="M2.2,6.3 L4.8,8.9 L9.8,3.5" Stroke="White" StrokeThickness="1.8" FlowDirection="LeftToRight" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"/>
         </Canvas></Viewbox></Border>
@@ -190,8 +197,6 @@
           </Path.Stroke>
         </Path>
       </Grid>
-      <TextBlock x:Name="NetworkRecoveryStatus" Visibility="Collapsed" Margin="0,8,0,0" FontSize="12"
-                 Foreground="{DynamicResource TextBodyBrush}" HorizontalAlignment="Center" TextWrapping="Wrap" TextAlignment="Center"/>
       <Border Style="{StaticResource DesignInfoCard}" Margin="0,16,0,0" x:Name="ConnectedAccountCard" Height="106">
         <Grid>
           <Grid.RowDefinitions>
