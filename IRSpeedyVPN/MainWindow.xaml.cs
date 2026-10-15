@@ -83,7 +83,7 @@ namespace IRSpeedyVPN
             InitializeComponent();
             mainTimer = new Timer(mainTimerCallback, null, int.MaxValue, int.MaxValue);
             SetupNotify();
-            txtVersion.Text = "v" + Assembly.GetExecutingAssembly().GetName().Version.ToString();
+            txtVersion.Text = "v" + Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
 
             internetConnectivityMonitor = new InternetConnectivityMonitor(
                 () => (AppServices.GlobalInfo?.CurrentService as TunnelPlusService)?.IsTunnelConnected == true,

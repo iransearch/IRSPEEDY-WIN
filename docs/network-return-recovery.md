@@ -6,7 +6,7 @@ to sweep immediately, leaving it behind the 900-second normal interval. Failed
 samples from the outage could also keep a working member outside the qualified set.
 
 While connected, or while the internet is known offline, the direct IP watcher
-checks every five seconds. Four consecutive failed fast pings are needed to
+checks every fifteen seconds. Four consecutive failed fast pings are needed to
 declare an outage. Before suspending a connected VPN it checks external TLS;
 failure of the fixed ICMP endpoint alone cannot stop a working path. The existing
 ten-minute/four-ping notifications remain separate from recovery signals.

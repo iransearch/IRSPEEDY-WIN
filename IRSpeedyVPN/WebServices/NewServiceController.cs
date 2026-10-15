@@ -177,7 +177,7 @@ namespace IRSpeedyVPN.WebServices
                 "GetSettings",
                 (service, timeoutSeconds) =>
             {
-                string version = Assembly.GetExecutingAssembly().GetName().Version.ToString();
+                string version = Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
                 string url = $"api/version?type=windows&version_number={Utils.UrlEncode(version)}";
                 var result = service.SendRequest<DefaultPlainResponse<SettingInfo>>(
                     url, null, null, null, null, timeoutSeconds, skipDoh: true);

@@ -26,7 +26,7 @@ namespace IRSpeedyVPN.Services
     /// User-facing connectivity watcher.
     /// Every ten minutes it sends four ICMP pings to 185.143.233.200.
     /// Any successful reply marks the cycle online. Four failures trigger an
-    /// offline notification on every failed cycle. A lightweight five-second
+    /// offline notification on every failed cycle. A lightweight fifteen-second
     /// signal while connected/offline also detects WAN recovery without an OS
     /// adapter event. Fast signals do not produce additional notifications.
     /// </summary>
@@ -82,7 +82,7 @@ namespace IRSpeedyVPN.Services
                 TimeSpan.Zero,
                 TimeSpan.FromMinutes(10));
             recoveryTimer = new Timer(_ => Task.Run(CheckFastAsync), null,
-                TimeSpan.FromSeconds(5), TimeSpan.FromSeconds(5));
+                TimeSpan.FromSeconds(15), TimeSpan.FromSeconds(15));
         }
 
         private void NetworkChange_NetworkAvailabilityChanged(

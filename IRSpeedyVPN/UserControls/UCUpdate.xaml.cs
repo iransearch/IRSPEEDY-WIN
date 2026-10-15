@@ -42,7 +42,7 @@ namespace IRSpeedyVPN.UserControls
         {
             this.dlLink = dlLink;
             txtComment.Text = comment;
-            txtVersion.Text = version.ToString();
+            txtVersion.Text = version.Build >= 0 && version.Revision <= 0 ? version.ToString(3) : version.ToString();
         } 
         private void UserControl_Loaded(object sender, RoutedEventArgs e)
         {
