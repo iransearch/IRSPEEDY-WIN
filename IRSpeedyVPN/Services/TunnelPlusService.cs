@@ -497,6 +497,7 @@ namespace IRSpeedyVPN.Services
                 configData = SingBox.TunBrowserCompatibility.Apply(configData);
                 var split = SplitTunneling.SplitTunnelStore.Load();
                 configData = SplitTunneling.SplitTunnelPolicyBuilder.Apply(configData, split, System.Windows.Forms.Application.ExecutablePath);
+                configData = SingBox.ParallelDnsRouting.Apply(configData);
                 configData = Traffic.TrafficConfiguration.Enable(configData);
                 configData = SingBox.VpnTimeZoneRouting.Apply(configData);
                 if (split.Enabled)
@@ -506,7 +507,7 @@ namespace IRSpeedyVPN.Services
             }
             catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is InvalidOperationException || ex is ArgumentException)
             {
-                error = "تنظیمات تقسیم تونل معتبر نیست؛ تنظیمات برنامه‌ها را بررسی کنید.";
+                error = "تنظیمات مسیریابی یا DNS معتبر نیست؛ تنظیمات برنامه‌ها را بررسی کنید.";
                 return false;
             }
             Diagnostic("config-apply-begin", "configId=" + ConnectionDiagnostics.Fingerprint(configData)
