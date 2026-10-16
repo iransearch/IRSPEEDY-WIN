@@ -39,7 +39,8 @@ namespace IRSpeedyVPN.Services.Xray {
   public class XraySocksInfo{public string Link,Tag,User,Pass;public int Port;}
   public static string UrlTestRefusalReason(string s)=>s.Contains("unsupported")?"unsupported":null;
   public static bool LinkNeedsXrayForUrlTest(string s)=>s.Contains("xray");
-  public static string GetUrlTestXrayConfig(List<XraySocksInfo> infos)=>"fixture-xray";
+  public const string UrlTestOutboundDnsStrategy="ForceIP";
+  public static string GetUrlTestXrayConfig(List<XraySocksInfo> infos,bool useCoreDns=false){if(!useCoreDns)throw new Exception("probe resolver was not opted in");return "fixture-xray";}
  }
 }
 namespace IRSpeedyVPN.Services {
@@ -77,6 +78,8 @@ tests = r'''
     Check(SingBox.ConfigGenerator.Chains.Keys.SequenceEqual(urls.Select(u=>u.url)),"config preserves supplied member order");
     Check(SingBox.ConfigGenerator.Chains[urls[0].url].SequenceEqual(new[]{"vless://chain"})&&SingBox.ConfigGenerator.Endpoints.ContainsKey(urls[1].url),"mixed-country runner resolves each config's own chain and SNI");
     Check(req.NeedXray&&req.MaxConcurrency==15&&req.TestTimeoutMs==5000,"refresh retains Core Xray/concurrency/timeout policy");
+    Check(req.Url=="https://example.invalid/probe","refresh retains the configured health-test URL");
+    Check(req.XrayOutboundDnsStrategy==Xray.ConfigGenerator.UrlTestOutboundDnsStrategy,"refresh binds Xray DNS to the probe box resolver without OS fallback");
     var result=new TestResp{Results=req.OutboundTags.Select((t,i)=>new URLTestResp{OutboundTag=t,LatencyMs=100+i}).ToList()};
     report(result);return result;
    };

@@ -6,6 +6,7 @@
         public string server { get; set; }
         public int? server_port { get; set; }
         public string path { get; set; }
+        public Tls tls { get; set; }
         public string domain_resolver { get; set; }
         public string detour { get; set; }
         public string tag { get; set; }

@@ -107,26 +107,39 @@ and successful new connections. Include DNS failure: it must return an error,
 not recursively resolve through the proxy. Recheck AI-only fallback and empty-AI
 blocking. No periodic health check or network-triggered Core restart is added.
 
-# DNS transport and initial-probe parity
+# Dedicated DoH for initial server probes
 
-Website DNS (`dns-remote`) uses `https://1.1.1.1/dns-query` through the `proxy`
-detour, matching Throne's HTTPS conversion for DNS carried by Xray. The DNS model
-retains `/dns-query` during serialization. Bootstrap DNS (`dns-direct`) remains
-UDP `1.1.1.1` through the physical network, without a proxy dependency.
+The existing HTTP/HTTPS URL test, primary/alternate URLs, timeouts, concurrency,
+result selection and per-server routing stay unchanged. Only the probe box's
+DNS resolver changes from OS/local DNS to Google DoH: `8.8.8.8`, `/dns-query`,
+verified TLS with SNI `dns.google`. The literal IP needs no bootstrap OS lookup.
+With no proxy detour and `auto_detect_interface=true`, DoH uses the physical
+network and can resolve server domains before any candidate or Pool is up.
+This is deliberately separate from live website DNS racing and live Pool
+bootstrap DNS, neither of which changes.
 
-Initial server tests and their alternate passes use the same direct DNS transport
-and native `prefer_ipv4` default resolver as live connections. Xray-backed normal
-and VOD tests explicitly pass `ForceIP` in `TestReq` field 14 and opt into the
-same socket normalization as live main/AI Pools, including XHTTP download
-settings. A DNS error must fail the test rather than fall back to the OS resolver.
-This aligns DNS while preserving existing native/Xray protocol selection.
+Normal and VOD Xray probes opt into socket normalization and send `ForceIP` in
+TestReq field 14. XHTTP upload/download sockets and Hysteria2 use the dedicated
+probe box resolver; DNS errors must not silently fall back to OS DNS. The
+alternate URL pass retains the same config and strategy. Default generator
+calls without this explicit opt-in retain their previous behavior.
 
-The checks compare live and probe transport settings for Hysteria2, gRPC, XHTTP
-and literal IPs, verify exact field-14 bytes, and preserve unrelated socket
-settings. `UrlTestRetryChecks` verifies the alternate pass retains `ForceIP`.
-Core support is present at `iransearch/Throne-G` commit
-`c0fa2071bda243762b6387e56355f8a4242bcad5`; these changes require an application
-rebuild, not a new Core build. Older cores may ignore field 14.
+Checks cover typed TLS/SNI preservation, independent DoH configuration,
+Hysteria2 and XHTTP transports, exact field-14 bytes, real normal-test dispatch,
+and alternate-pass policy retention. Core support was checked at
+`iransearch/Throne-G` commit `5cc83398864bfea713efd0e43996c518afb83761`.
+No new Core build is required. Older cores may ignore field 14.
 
-Windows acceptance still needs a real DNS failure and network interruption test
-with the packaged Core; these deterministic checks do not prove outage recovery.
+`IRSPEEDY_PROBE_DNS_FIXTURE=/absolute/path/probe.json` exports the DNS profile
+when running this harness for strict schema/DoH transport checks against the
+pinned sing-box source. Windows acceptance still requires the packaged client,
+including a DoH failure and a network switch. These checks do not prove that
+Google DoH is reachable from every user's physical network.
+
+```sh
+GO=/path/to/go python tests/HysteriaXrayChecks/run-probe-doh-core.py /path/to/sing-box /absolute/path/probe.json
+```
+
+This uses the real HTTPS transport, direct dialer, verified TLS/SNI and DNS wire
+messages with a local test server; it validates successful resolution and DoH
+failure handling without contacting public services.

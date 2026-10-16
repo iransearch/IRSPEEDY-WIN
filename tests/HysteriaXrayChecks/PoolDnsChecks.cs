@@ -95,16 +95,41 @@ internal static class PoolDnsChecks
             && (string)serializedRemote["detour"] == "proxy", "DNS model discarded DoH path or VPN detour");
         var probeBox = JObject.Parse(IRSpeedyVPN.Services.SingBox.Samples.sg_UrlTest);
         var probeDirect = probeBox["dns"]["servers"].Single(x => (string)x["tag"] == "dns-direct");
-        Check((string)probeDirect["type"] == "local"
-            && (string)probeDirect["domain_resolver"] == "dns-local"
+        Check(probeBox["dns"]["servers"].Count() == 1
+            && (string)probeDirect["type"] == "https" && (string)probeDirect["server"] == "8.8.8.8"
+            && (string)probeDirect["path"] == "/dns-query" && probeDirect["domain_resolver"] == null
+            && probeDirect["detour"] == null && (bool)probeDirect["tls"]["enabled"]
+            && (string)probeDirect["tls"]["server_name"] == "dns.google"
+            && (bool?)probeDirect["tls"]["insecure"] != true
+            && (bool)probeBox["route"]["auto_detect_interface"]
             && (string)probeBox["route"]["default_domain_resolver"]["server"] == "dns-direct"
             && string.IsNullOrEmpty((string)probeBox["route"]["default_domain_resolver"]["strategy"]),
-            "Server test DNS is no longer isolated from live Pool DNS");
+            "Probe DNS must use dedicated verified Google DoH without OS DNS or a VPN dependency");
+        var typedProbe = JObject.FromObject(probeDirect.ToObject<IRSpeedyVPN.Services.SingBox.DnsServer>());
+        Check((string)typedProbe["tls"]["server_name"] == "dns.google" && (bool)typedProbe["tls"]["enabled"],
+            "Typed DNS model discarded probe TLS/SNI settings");
         Check((string)probe["outbounds"][0]["streamSettings"]["sockopt"]["domainStrategy"] == "UseIP",
-            "Server test Xray sockets inherited live Pool DNS");
+            "Non-opted-in generator call changed DNS strategy");
+
+        var strictProbe = JObject.Parse(ConfigGenerator.GetUrlTestXrayConfig(new List<ConfigGenerator.XraySocksInfo> {
+            new ConfigGenerator.XraySocksInfo { Link = "vless://pool-xhttp", Tag = "xhttp-probe", Port = 19006, User = "user", Pass = "pass" },
+            new ConfigGenerator.XraySocksInfo { Link = "hy2://fixture", Tag = "hy-probe", Port = 19007, User = "user", Pass = "pass" }
+        }, useCoreDns: true));
+        Check(!strictProbe.SelectTokens("$..sockopt.domainStrategy").Any()
+            && (string)strictProbe["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"]["downloadSettings"]["address"] == "download.pool.example"
+            && (int)strictProbe["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"]["downloadSettings"]["sockopt"]["mark"] == 37,
+            "XHTTP upload/download probes must inherit dedicated DoH without altering transport options");
+        Check(ConfigGenerator.UrlTestOutboundDnsStrategy == "ForceIP", "DoH lookup errors may silently fall back to OS DNS");
+        var request = new TestReq { Config = probeBox.ToString(), NeedXray = true, XrayConfig = strictProbe.ToString() };
+        var unwired = LibcoreProto.EncodeTestReq(request);
+        request.XrayOutboundDnsStrategy = ConfigGenerator.UrlTestOutboundDnsStrategy;
+        Check(LibcoreProto.EncodeTestReq(request).SequenceEqual(unwired.Concat(new byte[] { 0x72, 0x07 }
+            .Concat(Encoding.ASCII.GetBytes("ForceIP")))), "Probe RPC lost strict DoH resolver in field 14");
+        var fixturePath = Environment.GetEnvironmentVariable("IRSPEEDY_PROBE_DNS_FIXTURE");
+        if (!string.IsNullOrEmpty(fixturePath)) System.IO.File.WriteAllText(fixturePath, probeBox.ToString());
 
         CheckStartWire(config.ToString());
-        Console.WriteLine("PASS: live Cloudflare DoH/ForceIP preserved; server-test DNS and Xray probe routing remain isolated.");
+        Console.WriteLine("PASS: isolated Google DoH probe DNS, TLS model, XHTTP/Hysteria normalization and strict field 14; live DNS remains unchanged.");
     }
 
     private static VmessItem Node(string network, string address)

@@ -50,8 +50,8 @@ internal static class Program
             Check(request.Url == UrlTestRetryPolicy.RetryUrl && request.Config == batch.Config
                 && request.XrayConfig == batch.XrayConfig && request.TestTimeoutMs == batch.TestTimeoutMs,
                 "Retry changed routing/timeout");
-            Check(string.IsNullOrEmpty(request.XrayOutboundDnsStrategy),
-                "Alternate server test inherited live Pool DNS strategy");
+            Check(request.XrayOutboundDnsStrategy == "ForceIP",
+                "Alternate server test lost the probe box's strict DoH resolver");
             // Unexpected fast tag and errored positive latency must not affect final results.
             return new TestResp { Results = new List<URLTestResp> {
                 new URLTestResp { OutboundTag = "0", LatencyMs = 1 },
@@ -211,6 +211,7 @@ internal static class Program
     private static TestReq Request() => new TestReq
     {
         Url = "https://example.invalid/probe", Config = "test-config", XrayConfig = "test-xray",
-        OutboundTags = new List<string> { "0" }, NeedXray = true, MaxConcurrency = 15, TestTimeoutMs = 5000
+        OutboundTags = new List<string> { "0" }, NeedXray = true, MaxConcurrency = 15, TestTimeoutMs = 5000,
+        XrayOutboundDnsStrategy = "ForceIP"
     };
 }

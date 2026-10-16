@@ -276,20 +276,22 @@ namespace IRSpeedyVPN.Services.SingBox
 }";
 
         // Server tests are intentionally isolated from live Pool/AI DNS policy.
-        // Keep their resolver local to the test config so connection DNS changes
-        // cannot alter latency/failure results.
+        // Resolve probe server domains with dedicated DoH over the physical
+        // interface. An IP endpoint avoids OS DNS/bootstrap recursion; this must
+        // not depend on the live Pool or the server being tested.
         public static string sg_UrlTest = @"{
     ""dns"": {
         ""rules"": [],
         ""servers"": [
             {
-                ""domain_resolver"": ""dns-local"",
                 ""tag"": ""dns-direct"",
-                ""type"": ""local""
-            },
-            {
-                ""tag"": ""dns-local"",
-                ""type"": ""local""
+                ""type"": ""https"",
+                ""server"": ""8.8.8.8"",
+                ""path"": ""/dns-query"",
+                ""tls"": {
+                    ""enabled"": true,
+                    ""server_name"": ""dns.google""
+                }
             }
         ]
     },
