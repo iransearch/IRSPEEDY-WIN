@@ -1,4 +1,4 @@
-using IRSpeedyVPN.Common;
+﻿using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Components.ServerListControl;
 using IRSpeedyVPN.Events;
 using IRSpeedyVPN.Interfaces;
@@ -39,7 +39,10 @@ namespace IRSpeedyVPN.UserControls
 
         internal IVPNService selectedService;
         internal void MarkSuccessfulConnection(IVPNService service)
-            => countryPicker.MarkSuccessfulConnection(service);
+        {
+            probeCache?.RecordConnectionResults(service);
+            countryPicker.MarkSuccessfulConnection(service);
+        }
         private string selectedProtocol;
         private string _selectedServiceName;
         private bool _isLoading = true;
@@ -362,14 +365,24 @@ namespace IRSpeedyVPN.UserControls
                                         countryPicker.ShowGroupProgress(service, latency);
                                 }));
                             }) : null, () => token.IsCancellationRequested, token,
-                                prioritizeFailed: cache.PrioritizeFailedServers);
+                                prioritizeFailed: cache.PrioritizeFailedServers,
+                                memberProgress: (url, latency) =>
+                                {
+                                    // A completed successful member remains useful even
+                                    // if Connect/logout cancels the rest of this country.
+                                    if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested && latency > 0)
+                                        cache.RecordRefreshMember(service, url, latency, DateTime.UtcNow);
+                                });
                         else service.UrlTest();
                     }
                     catch (Exception ex) { LogHelper.WriteLog(ex); }
                     finally { Interlocked.Exchange(ref acceptingProgress, 0); }
 
                     if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
+                    {
                         cache.Restore(service);
+                        cache.PersistQueue();
+                    }
                     else
                         cache.Record(service, started);
                 });

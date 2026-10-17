@@ -350,6 +350,29 @@ namespace IRSpeedyVPN.Services
             }
         }
 
+        // Connection-time probes run after list checks have drained. Commit their
+        // real successful measurements before logout/API replacement can rebind.
+        // A successful connection alone does not invent a ping or complete a row.
+        internal void RecordConnectionResults(IVPNService service)
+        {
+            lock (gate)
+            {
+                if (service == null || !rowKeys.ContainsKey(service)) return;
+                foreach (var url in service.GetServerUrls() ?? new List<Url>())
+                {
+                    if (url == null || url.latency <= 0 || url.latencychkTime == default(DateTime)
+                        || !bound.TryGetValue(url, out var key)) continue;
+                    var checkedUtc = url.latencychkTime.ToUniversalTime();
+                    if (state.Results.TryGetValue(key, out var previous) && previous.CheckedUtc > checkedUtc) continue;
+                    var result = new Result { Latency = url.latency, CheckedUtc = checkedUtc,
+                        LastSuccess = url.latency, LastSuccessUtc = checkedUtc };
+                    state.Results[key] = result;
+                    foreach (var item in bound.Where(p => p.Value == key)) Apply(item.Key, result);
+                }
+                Save();
+            }
+        }
+
         internal void Restore(IVPNService service)
         {
             lock (gate)

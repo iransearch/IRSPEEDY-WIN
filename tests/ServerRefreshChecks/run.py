@@ -15,8 +15,9 @@ class TunnelPlusService : IVPNService {
  public List<Url> urls=new List<Url>(); public List<Url> GetServerUrls()=>urls;
  public static ConcurrentQueue<string> Calls=new ConcurrentQueue<string>(); public static ConcurrentQueue<bool> FailedPriorityCalls=new ConcurrentQueue<bool>(); public static volatile bool Hold,Fail; public static string HoldCountry;
  public static Action<TunnelPlusService,Action<long>,Func<bool>> Probe;
- public void UrlTest(){} public void UrlTestFull(object a,bool b,Action<long> progress,Func<bool> cancel,CancellationToken cancellation,bool prioritizeFailed=false){
- Calls.Enqueue(CountryCode+ID); FailedPriorityCalls.Enqueue(prioritizeFailed); Probe?.Invoke(this,progress,cancel);
+ public static Action<Url,long> MemberProgress;
+ public void UrlTest(){} public void UrlTestFull(object a,bool b,Action<long> progress,Func<bool> cancel,CancellationToken cancellation,bool prioritizeFailed=false,Action<Url,long> memberProgress=null){
+ MemberProgress=memberProgress;Calls.Enqueue(CountryCode+ID); FailedPriorityCalls.Enqueue(prioritizeFailed); Probe?.Invoke(this,progress,cancel);
  while((Hold || HoldCountry==CountryCode) && !cancel()) Thread.Sleep(1);
  if(!cancel()) foreach(var u in urls){u.latency=Fail?-1:100+ID;u.latencychkTime=DateTime.Now;}
  }
@@ -75,6 +76,24 @@ tests = r'''
  static async Task MainAsync(){
  string dir=Path.Combine(Path.GetTempPath(),"irspeedy-check-"+Guid.NewGuid());Directory.CreateDirectory(dir);
  try{
+ // Real successful member measurements must survive Connect/logout cancellation.
+ var selected=new Program();var selectedRow=S("DE",901);selected._currentServices=new IVPNService[]{selectedRow};
+ selected.probeCache=new ServerCheckCache("logout-user","xfast",dir);selected.probeCache.Bind(selected._currentServices);
+ TunnelPlusService.Hold=true;TunnelPlusService.Probe=(service,progress,cancel)=>{
+   service.urls[0].latency=175;service.urls[0].latencychkTime=DateTime.Now;
+   TunnelPlusService.MemberProgress(service.urls[0],175);
+ };
+ selected.ResumeServerChecksAfterCleanup();await Until(()=>TunnelPlusService.MemberProgress!=null&&selectedRow.urls[0].LastSuccessfulLatency==175);
+ selected.PauseServerChecksForConnection();await selected.DrainServerChecksAsync();await selected.Settle();
+ var afterLogout=S("DE",901);var loginCache=new ServerCheckCache("logout-user","xfast",dir);loginCache.Bind(new[]{afterLogout});
+ Check(afterLogout.urls[0].latency==175&&afterLogout.urls[0].LastSuccessfulLatency==175,"selected successful member survives logout/login while country test is canceled");
+ Check(!loginCache.InitialScanCompleted,"a preserved member does not fabricate a completed country scan");
+ afterLogout.urls[0].latency=155;afterLogout.urls[0].latencychkTime=DateTime.Now;loginCache.RecordConnectionResults(afterLogout);
+ var afterRestart=S("DE",901);new ServerCheckCache("logout-user","xfast",dir).Bind(new[]{afterRestart});
+ Check(afterRestart.urls[0].latency==155,"connection-time successful probe survives service replacement and restart");
+ var otherUser=S("DE",901);new ServerCheckCache("another-user","xfast",dir).Bind(new[]{otherUser});
+ Check(otherUser.urls[0].latency==0,"logout/login never carries the selected result to another account");
+ TunnelPlusService.Hold=false;TunnelPlusService.Probe=null;TunnelPlusService.MemberProgress=null;
  // Drive the production scheduler while the fake RPC remains in flight. The
  // final URL value differs from progress so a late callback is observable.
  var live=new Program();var liveService=S("DE",21);live._currentServices=new IVPNService[]{liveService};

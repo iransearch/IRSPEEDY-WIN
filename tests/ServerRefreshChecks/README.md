@@ -23,7 +23,8 @@ Disconnect priority coverage uses the latest completed row result: all-failed,
 unknown or incomplete rows first, followed by rows with at least one success.
 It checks numbered rows independently, stable country/ID order within both groups,
 success-to-failure history, persistence/reload, cancellation with partially mutated
-members and pending order after results change or an API rebind. It also checks
+members, successful-member persistence through Connect/logout, connection-time
+probe persistence, account isolation and pending order after results change or an API rebind. It also checks
 that only disconnect rounds ask the RPC to prioritize failed server links, and
 that a response lacking fresh results for every member keeps the last complete
 row outcome for priority, including after URL reorder and reload.

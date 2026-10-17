@@ -28,7 +28,8 @@ namespace IRSpeedyVPN.Services.SingBox {
  static class ConfigGenerator {
   public class EndpointOverride{public string Server;public int ServerPort;}
   public static Dictionary<string,string[]> Chains;public static Dictionary<string,EndpointOverride> Endpoints;
-  public static string GetUrlTestConfig(Dictionary<string,string[]> urls,int port,out Dictionary<string,string> tags,Dictionary<string,EndpointOverride> endpoints,Dictionary<string,Tuple<int,string,string>> socks,string prefix){
+  public static string[] GetRejectedProbeLinks(string config,string error,Dictionary<string,string> tags)=>new string[0];
+  public static string GetUrlTestConfig(Dictionary<string,string[]> urls,int port,out Dictionary<string,string> tags,Dictionary<string,EndpointOverride> endpoints,Dictionary<string,Tuple<int,string,string>> socks,string prefix,Dictionary<string,string> rejected=null){
    Chains=new Dictionary<string,string[]>(urls);Endpoints=new Dictionary<string,EndpointOverride>(endpoints);
    tags=urls.Select((p,i)=>new{Tag=prefix+i,Link=p.Key}).ToDictionary(p=>p.Tag,p=>p.Link);return "fixture";
   }

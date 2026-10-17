@@ -109,37 +109,65 @@ blocking. No periodic health check or network-triggered Core restart is added.
 
 # Dedicated DoH for initial server probes
 
-The existing HTTP/HTTPS URL test, primary/alternate URLs, timeouts, concurrency,
-result selection and per-server routing stay unchanged. Only the probe box's
-DNS resolver changes from OS/local DNS to Google DoH: `8.8.8.8`, `/dns-query`,
-verified TLS with SNI `dns.google`. The literal IP needs no bootstrap OS lookup.
-With no proxy detour and `auto_detect_interface=true`, DoH uses the physical
-network and can resolve server domains before any candidate or Pool is up.
-This is deliberately separate from live website DNS racing and live Pool
-bootstrap DNS, neither of which changes.
+The existing HTTP/HTTPS health tests, primary/alternate URLs, timeouts,
+concurrency and best-result policy remain unchanged. `sg_UrlTest` now pins
+`dns-direct` to the Throne Core's `https-race` transport. Its three children are
+Google (8.8.8.8 / dns.google), Cloudflare (1.1.1.1 / cloudflare-dns.com), and
+Yandex Basic (77.88.8.8 / common.dot.dns.yandex.net), all verified HTTPS
+`/dns-query`, literal IP endpoints, no detour, no system DNS fallback.
+`auto_detect_interface` retains physical network routing before a VPN exists.
 
-Normal and VOD Xray probes opt into socket normalization and send `ForceIP` in
-TestReq field 14. XHTTP upload/download sockets and Hysteria2 use the dedicated
-probe box resolver; DNS errors must not silently fall back to OS DNS. The
-alternate URL pass retains the same config and strategy. Default generator
-calls without this explicit opt-in retain their previous behavior.
+All children start together with a four-second upper bound (or earlier parent
+cancellation). The first valid NOERROR, NODATA or NXDOMAIN returns immediately;
+losers are canceled without joining. Errors, SERVFAIL, REFUSED, truncated and
+mismatched responses cannot win. All-provider failure returns an error.
 
-Checks cover typed TLS/SNI preservation, independent DoH configuration,
-Hysteria2 and XHTTP transports, exact field-14 bytes, real normal-test dispatch,
-and alternate-pass policy retention. Core support was checked at
-`iransearch/Throne-G` commit `5cc83398864bfea713efd0e43996c518afb83761`.
-No new Core build is required. Older cores may ignore field 14.
+**Requires the matching updated Throne-G Core** on branch
+`update/fc668b60-core-only-1.3.0-beta.1` with `internal/probedns`. Build Core first,
+replace the packaged runtime in the existing single-file builder, then build the
+app on `agent/core-startup-diagnostics-fix`. The previous Core at `5cc8339` rejects
+`https-race`; updating the app alone is insufficient. This source change does not
+replace `Resources/Files.zip` automatically. The sing-box dependency pin remains
+f154bec; the composite transport is implemented in Throne-G, not the dependency.
 
-`IRSPEEDY_PROBE_DNS_FIXTURE=/absolute/path/probe.json` exports the DNS profile
-when running this harness for strict schema/DoH transport checks against the
-pinned sing-box source. Windows acceptance still requires the packaged client,
-including a DoH failure and a network switch. These checks do not prove that
-Google DoH is reachable from every user's physical network.
+Both normal and VOD Xray probes still opt into socket normalization and send
+`ForceIP` in TestReq field 14. Pinning `dns-direct` now resolves through the actual
+composite transport for both native and Xray server domains; DNS rule fan-out
+alone would be bypassed by these pinned paths. Live website DNS racing and live
+Pool bootstrap DNS remain unchanged.
+
+Run `dotnet run --project tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj`
+and `python tests/HysteriaXrayChecks/native_probe_checks.py /path/to/dotnet`.
+The latter compiles the production native conversion methods and models with
+parsed-node fixtures; stream setup can deliberately throw. It verifies valid
+Shadowsocks without legacy settings, invalid cipher/key/port isolation, atomic
+chain rollback, typed resolver retention and exact Core rejection mapping.
+It does not test URI parsing or all stream transports.
+
+`IRSPEEDY_PROBE_DNS_FIXTURE=/absolute/path/probe.json` exports the profile from
+the main harness. `IRSPEEDY_NATIVE_PROBE_FIXTURE=/absolute/path/native.json`
+exports a real native probe config from the Python harness. Validate either:
 
 ```sh
-GO=/path/to/go python tests/HysteriaXrayChecks/run-probe-doh-core.py /path/to/sing-box /absolute/path/probe.json
+GO=/path/to/go python tests/HysteriaXrayChecks/run-probe-doh-core.py /path/to/Throne-G /absolute/path/probe.json
 ```
 
-This uses the real HTTPS transport, direct dialer, verified TLS/SNI and DNS wire
-messages with a local test server; it validates successful resolution and DoH
-failure handling without contacting public services.
+Core tests use real verified HTTPS POST DNS packets against local test servers,
+all three winners, canceled/stalled losers, invalid TLS, provider failure, and
+both actual native and Xray pinned resolver paths (IPv4/IPv6). They do not prove
+public provider reachability or a live Windows connection. Two existing
+`internal/xraydns` full-box tests cannot start Linux netlink in this restricted
+environment; the new pinned-resolver tests avoid changing host networking.
+
+# Result persistence at connection/logout
+
+A valid member success received during a country scan is kept in the scoped
+cache even if Connect/logout cancels remaining members. Cancellation still
+rolls back unreported mutations and late callbacks cannot commit. This does not
+mark an incomplete country scan as complete or change its disconnect priority.
+Connection-time successful probe results are also recorded when connection
+success is presented. Re-login/restart restores measurements by full config
+fingerprint; another account or changed config does not inherit them. No ping
+is invented from connection success, and manual refresh still clears results.
+See `tests/ServerRefreshChecks/run.py` for cancellation, file reload, account
+isolation and connection-time result checks.

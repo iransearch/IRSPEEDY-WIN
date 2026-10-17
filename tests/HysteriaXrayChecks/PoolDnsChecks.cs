@@ -95,19 +95,21 @@ internal static class PoolDnsChecks
             && (string)serializedRemote["detour"] == "proxy", "DNS model discarded DoH path or VPN detour");
         var probeBox = JObject.Parse(IRSpeedyVPN.Services.SingBox.Samples.sg_UrlTest);
         var probeDirect = probeBox["dns"]["servers"].Single(x => (string)x["tag"] == "dns-direct");
-        Check(probeBox["dns"]["servers"].Count() == 1
-            && (string)probeDirect["type"] == "https" && (string)probeDirect["server"] == "8.8.8.8"
-            && (string)probeDirect["path"] == "/dns-query" && probeDirect["domain_resolver"] == null
-            && probeDirect["detour"] == null && (bool)probeDirect["tls"]["enabled"]
-            && (string)probeDirect["tls"]["server_name"] == "dns.google"
-            && (bool?)probeDirect["tls"]["insecure"] != true
+        Check(probeBox["dns"]["servers"].Count() == 1 && (string)probeDirect["type"] == "https-race"
             && (bool)probeBox["route"]["auto_detect_interface"]
-            && (string)probeBox["route"]["default_domain_resolver"]["server"] == "dns-direct"
-            && string.IsNullOrEmpty((string)probeBox["route"]["default_domain_resolver"]["strategy"]),
-            "Probe DNS must use dedicated verified Google DoH without OS DNS or a VPN dependency");
+            && (string)probeBox["route"]["default_domain_resolver"]["server"] == "dns-direct",
+            "Probe DNS must pin a direct composite DoH resolver");
+        var providers = probeDirect["servers"].ToArray();
+        var ips = new[] { "8.8.8.8", "1.1.1.1", "77.88.8.8" };
+        var names = new[] { "dns.google", "cloudflare-dns.com", "common.dot.dns.yandex.net" };
+        Check(providers.Length == 3 && providers.Select((p, i) => (string)p["server"] == ips[i]
+            && (string)p["path"] == "/dns-query" && p["detour"] == null && p["domain_resolver"] == null
+            && (bool)p["tls"]["enabled"] && (bool?)p["tls"]["insecure"] != true
+            && (string)p["tls"]["server_name"] == names[i]).All(x => x),
+            "Probe race must retain three verified independent direct DoH providers");
         var typedProbe = JObject.FromObject(probeDirect.ToObject<IRSpeedyVPN.Services.SingBox.DnsServer>());
-        Check((string)typedProbe["tls"]["server_name"] == "dns.google" && (bool)typedProbe["tls"]["enabled"],
-            "Typed DNS model discarded probe TLS/SNI settings");
+        Check(typedProbe["servers"].Count() == 3 && (string)typedProbe["servers"][2]["tls"]["server_name"] == names[2],
+            "Typed DNS model discarded composite probe providers/TLS");
         Check((string)probe["outbounds"][0]["streamSettings"]["sockopt"]["domainStrategy"] == "UseIP",
             "Non-opted-in generator call changed DNS strategy");
 
@@ -129,7 +131,7 @@ internal static class PoolDnsChecks
         if (!string.IsNullOrEmpty(fixturePath)) System.IO.File.WriteAllText(fixturePath, probeBox.ToString());
 
         CheckStartWire(config.ToString());
-        Console.WriteLine("PASS: isolated Google DoH probe DNS, TLS model, XHTTP/Hysteria normalization and strict field 14; live DNS remains unchanged.");
+        Console.WriteLine("PASS: isolated three-provider DoH probe DNS, TLS model, XHTTP/Hysteria normalization and strict field 14; live DNS remains unchanged.");
     }
 
     private static VmessItem Node(string network, string address)

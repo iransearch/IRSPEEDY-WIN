@@ -1,4 +1,4 @@
-using IRSpeedyVPN.Common;
+﻿using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Events;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
@@ -1093,7 +1093,7 @@ namespace IRSpeedyVPN.Services
                         return;
 
                     TestResp resp;
-                    Dictionary<string, string> tagToUrl;
+                    Dictionary<string, string> tagToUrl = null;
                     lock (grpcLock)
                     {
                         if (isCancelled())
@@ -1106,13 +1106,25 @@ namespace IRSpeedyVPN.Services
                             if (isCancelled()) return;
                             if (allUrls.Count == 0) return;
                             var activeXray = xrayInfos.Where(info => allUrls.ContainsKey(info.Link)).ToList();
+                            string configData = null;
                             try
                             {
                                 // QueryURLTest can contain cached results from earlier
                                 // countries. Only this test's unique tags may update its row.
-                                var configData = SingBox.ConfigGenerator.GetUrlTestConfig(allUrls, port,
+                                var rejectedNative = new Dictionary<string, string>();
+                                configData = SingBox.ConfigGenerator.GetUrlTestConfig(allUrls, port,
                                     out tagToUrl, urlTestOverrides, socksOverrides,
-                                    "urltest-" + Guid.NewGuid().ToString("N") + "-");
+                                    "urltest-" + Guid.NewGuid().ToString("N") + "-", rejectedNative);
+                                foreach (var rejected in rejectedNative)
+                                {
+                                    allUrls.Remove(rejected.Key);
+                                    foreach (var item in sourceUrls.Where(u => u.url == rejected.Key))
+                                    { item.latency = -1; item.latencychkTime = DateTime.Now; }
+                                    LogHelper.WriteExLog("[UrlTest] stage=candidate-rejected reason=" + rejected.Value
+                                        + ProbeContext(testId, rejected.Key));
+                                    if (!isCancelled() && urlObjects.TryGetValue(rejected.Key, out var itemObject))
+                                        memberCompleted?.Invoke(itemObject, -1);
+                                }
                                 if (tagToUrl.Count == 0) return;
                                 bool needXray = activeXray.Count > 0;
                                 string xrayConfig = needXray
@@ -1187,18 +1199,22 @@ namespace IRSpeedyVPN.Services
                                     @"failed to build outbound config with tag (xray-\d+)(?=\s|>|$)");
                                 var rejectedInfo = match.Success
                                     ? activeXray.FirstOrDefault(info => info.Tag == match.Groups[1].Value) : null;
-                                if (rejectedInfo == null || !allUrls.Remove(rejectedInfo.Link)) throw;
-                                socksOverrides.Remove(rejectedInfo.Link);
-                                foreach (var rejected in sourceUrls.Where(item => item.url == rejectedInfo.Link))
+                                var rejectedLinks = rejectedInfo != null ? new[] { rejectedInfo.Link }
+                                    : SingBox.ConfigGenerator.GetRejectedProbeLinks(configData, ex.Message, tagToUrl);
+                                if (rejectedLinks.Length == 0) throw;
+                                bool removed = false;
+                                foreach (var rejectedLink in rejectedLinks)
                                 {
-                                    rejected.latency = -1;
-                                    rejected.latencychkTime = DateTime.Now;
+                                    if (!allUrls.Remove(rejectedLink)) continue;
+                                    removed = true;
+                                    socksOverrides.Remove(rejectedLink);
+                                    foreach (var rejected in sourceUrls.Where(item => item.url == rejectedLink))
+                                    { rejected.latency = -1; rejected.latencychkTime = DateTime.Now; }
+                                    LogHelper.WriteExLog("[UrlTest] stage=candidate-rejected reason=core-config-rejected remaining=" + allUrls.Count
+                                        + ProbeContext(testId, rejectedLink));
+                                    if (!isCancelled() && urlObjects.TryGetValue(rejectedLink, out var refused)) memberCompleted?.Invoke(refused, -1);
                                 }
-                                LogHelper.WriteExLog("[UrlTest] stage=candidate-rejected candidate="
-                                    + sourceUrls.FindIndex(item => item.url == rejectedInfo.Link)
-                                    + " reason=core-config-rejected remaining=" + allUrls.Count
-                                    + ProbeContext(testId, rejectedInfo.Link));
-                                if (!isCancelled() && urlObjects.TryGetValue(rejectedInfo.Link, out var refused)) memberCompleted?.Invoke(refused, -1);
+                                if (!removed) throw;
                                 // Every retry removes one member. Keep the original infos
                                 // for finally's port cleanup; use activeXray for config only.
                             }

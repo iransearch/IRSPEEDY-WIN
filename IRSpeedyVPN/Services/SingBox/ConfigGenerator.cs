@@ -206,7 +206,7 @@ namespace IRSpeedyVPN.Services.SingBox
             return res;
         }
 
-        public static string GetUrlTestConfig(Dictionary<string, string[]> links, int port, out Dictionary<string, string> tagToUrl, Dictionary<string, EndpointOverride> endpointOverrides = null, Dictionary<string, Tuple<int, string, string>> socksOverrides = null, string tagPrefix = "")
+        public static string GetUrlTestConfig(Dictionary<string, string[]> links, int port, out Dictionary<string, string> tagToUrl, Dictionary<string, EndpointOverride> endpointOverrides = null, Dictionary<string, Tuple<int, string, string>> socksOverrides = null, string tagPrefix = "", Dictionary<string, string> rejected = null)
         {
             if (links == null)
             {
@@ -233,47 +233,88 @@ namespace IRSpeedyVPN.Services.SingBox
 
                 var tag = tagPrefix + (idx == 0 ? "proxy" : $"proxy-{idx}");
 
-                if (!isSocks)
+                // Build each member and its chain atomically. A failed conversion
+                // must never insert a half-built outbound into the shared probe box.
+                int firstOutbound = cfg.outbounds.Count;
+                try
                 {
-                    string msg;
-                    var item = ShareHandler.ImportFromConfigLink(link.Key, out msg);
-                    if (item == null)
+                    if (!isSocks)
                     {
-                        continue;
-                    }
-
-                    if (item.configType == EConfigType.Hysteria2)
-                        throw new InvalidOperationException("Hysteria2 URL tests require an Xray SOCKS override.");
-
-                    var outbound = new Outbound();
-                    FillOutboundForItem(outbound, item);
-                    ApplyEndpointOverride(outbound, endpointOverrides != null && endpointOverrides.TryGetValue(link.Key, out var endpointOverride) ? endpointOverride : null);
-                    outbound.tag = tag;
-
-                    if (link.Value != null)
-                    {
-                        string detour;
-                        var chainOutbounds = CreateChainOutbound(link.Value, $"{idx}", out detour, out msg);
-                        if (chainOutbounds.Count() > 0)
+                        string msg;
+                        var item = ShareHandler.ImportFromConfigLink(link.Key, out msg);
+                        if (item == null)
                         {
-                            cfg.outbounds.AddRange(chainOutbounds);
-                            outbound.detour = detour;
+                            throw new InvalidOperationException("invalid-link");
                         }
-                    }
 
-                    cfg.outbounds.Add(outbound);
-                    tagToUrl[tag] = link.Key;
+                        if (item.configType == EConfigType.Hysteria2)
+                            throw new InvalidOperationException("Hysteria2 URL tests require an Xray SOCKS override.");
+
+                        var outbound = new Outbound();
+                        FillOutboundForItem(outbound, item, true);
+                        ValidateProbeOutbound(outbound);
+                        ApplyEndpointOverride(outbound, endpointOverrides != null && endpointOverrides.TryGetValue(link.Key, out var endpointOverride) ? endpointOverride : null);
+                        outbound.tag = tag;
+
+                        if (link.Value != null)
+                        {
+                            string detour;
+                            var chainOutbounds = CreateChainOutbound(link.Value, $"{idx}", out detour, out msg, true);
+                            if (chainOutbounds.Count() > 0)
+                            {
+                                cfg.outbounds.AddRange(chainOutbounds);
+                                outbound.detour = detour;
+                            }
+                        }
+
+                        cfg.outbounds.Add(outbound);
+                        tagToUrl[tag] = link.Key;
+                    }
+                    else
+                    {
+                        var outbound = CreateXraySocksOutbound(tag, socks.Item1, socks.Item2, socks.Item3);
+                        cfg.outbounds.Add(outbound);
+                        tagToUrl[tag] = link.Key;
+                    }
                 }
-                else
+                catch (Exception ex)
                 {
-                    var outbound = CreateXraySocksOutbound(tag, socks.Item1, socks.Item2, socks.Item3);
-                    cfg.outbounds.Add(outbound);
-                    tagToUrl[tag] = link.Key;
+                    cfg.outbounds.RemoveRange(firstOutbound, cfg.outbounds.Count - firstOutbound);
+                    if (rejected != null) rejected[link.Key] = "invalid-probe-config-" + ex.GetType().Name;
+                    continue;
                 }
                 idx++;
             }
 
             return Utils.ToJson(cfg);
+        }
+
+        // Accept only the exact Core decode/constructor error for this config.
+        // Network, DNS, transport and global config failures cannot prune members.
+        public static string[] GetRejectedProbeLinks(string config, string error, Dictionary<string, string> tags)
+        {
+            if (config == null || error == null || tags == null) return new string[0];
+            string suffix = null;
+            foreach (var prefix in new[] { "decode config at " + config + ": outbounds[", "create service: initialize outbound[" })
+                if (error.StartsWith(prefix, StringComparison.Ordinal)) { suffix = error.Substring(prefix.Length); break; }
+            if (suffix == null) return new string[0];
+            int end = suffix.IndexOf("]: ", StringComparison.Ordinal);
+            if (end < 0 || !int.TryParse(suffix.Substring(0, end), out var index)) return new string[0];
+            var cfg = Utils.FromJson<SingBoxConfig>(config);
+            if (index < 0 || index >= cfg.outbounds.Count) return new string[0];
+            var rejectedTag = cfg.outbounds[index].tag;
+            var byTag = cfg.outbounds.Where(o => !string.IsNullOrEmpty(o.tag)).ToDictionary(o => o.tag);
+            return tags.Where(pair =>
+            {
+                var seen = new HashSet<string>();
+                string tag = pair.Key;
+                while (tag != null && seen.Add(tag) && byTag.TryGetValue(tag, out var outbound))
+                {
+                    if (tag == rejectedTag) return true;
+                    tag = outbound.detour;
+                }
+                return false;
+            }).Select(pair => pair.Value).Distinct(StringComparer.Ordinal).ToArray();
         }
 
         private static void ApplyEndpointOverride(Outbound outbound, EndpointOverride endpointOverride)
@@ -287,7 +328,7 @@ namespace IRSpeedyVPN.Services.SingBox
             if (endpointOverride.ServerPort > 0)
                 outbound.server_port = endpointOverride.ServerPort;
         }
-        private static List<Outbound> CreateChainOutbound(string[] chainLinks,string proxTag,out string detour,out string msg)
+        private static List<Outbound> CreateChainOutbound(string[] chainLinks,string proxTag,out string detour,out string msg, bool strict = false)
         {
             List<Outbound> outbounds = new List<Outbound>();
             int idy = 0;
@@ -302,7 +343,8 @@ namespace IRSpeedyVPN.Services.SingBox
                 idy++;
                 var item = ShareHandler.ImportFromConfigLink(lnk, out msg);
                 var outboundchain = new Outbound();
-                FillOutboundForItem(outboundchain, item);
+                FillOutboundForItem(outboundchain, item, strict);
+                if (strict) ValidateProbeOutbound(outboundchain);
                 outboundchain.detour = detour;
                 detour = outboundchain.tag = $"chain-{proxTag}-{idy}";
                 outbounds.Add(outboundchain);
@@ -311,6 +353,20 @@ namespace IRSpeedyVPN.Services.SingBox
             return outbounds;
 
         }
+        private static void ValidateProbeOutbound(Outbound outbound)
+        {
+            if (string.IsNullOrWhiteSpace(outbound.type) || string.IsNullOrWhiteSpace(outbound.server)
+                || !outbound.server_port.HasValue || outbound.server_port < 1 || outbound.server_port > 65535)
+                throw new InvalidOperationException("incomplete-probe-outbound");
+            if (outbound.type == Global.ssProtocolLite && outbound.method.StartsWith("2022-", StringComparison.Ordinal))
+            {
+                int keyLength = outbound.method == "2022-blake3-aes-128-gcm" ? 16 : 32;
+                foreach (var key in (outbound.password ?? "").Split(':'))
+                    if (Convert.FromBase64String(key).Length != keyLength)
+                        throw new InvalidOperationException("invalid-shadowsocks-key");
+            }
+        }
+
         private static Outbound CloneOutbound(Outbound source)
         {
             if (source == null)
@@ -321,10 +377,11 @@ namespace IRSpeedyVPN.Services.SingBox
             return Utils.FromJson<Outbound>(json);
         }
 
-        private static void FillOutboundForItem(Outbound outbound, VmessItem node)
+        private static void FillOutboundForItem(Outbound outbound, VmessItem node, bool strict = false)
         {
             if (outbound == null || node == null)
             {
+                if (strict) throw new InvalidOperationException("invalid-outbound");
                 return;
             }
 
@@ -346,7 +403,10 @@ namespace IRSpeedyVPN.Services.SingBox
                     outbound.server = node.address;
                     outbound.server_port = node.port;
                     outbound.password = node.id;
-                    outbound.method = LazyConfig.Instance.GetShadowsocksSecuritys(node).Contains(node.security) ? node.security : "none";
+                    // This is a sing-box outbound, independent of legacy V2Ray settings.
+                    if (!Global.ssSecuritysInSagerNet.Contains(node.security))
+                        throw new InvalidOperationException("unsupported-shadowsocks-method");
+                    outbound.method = node.security;
                     outbound.multiplex = null;
                     boundStreamSettings(node, "out", outbound);
                     outbound.type = Global.ssProtocolLite;
@@ -511,6 +571,7 @@ namespace IRSpeedyVPN.Services.SingBox
             }
             catch (Exception ex)
             {
+                if (strict) throw;
                 Utils.SaveLog(ex.Message, ex);
             }
         }
