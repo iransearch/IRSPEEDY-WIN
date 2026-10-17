@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -10,10 +11,12 @@ namespace IRSpeedyVPN.Services
     // and never changes Core, TUN, proxy settings or the active service.
     internal sealed class NetworkRecoverySession : IDisposable
     {
+        internal const int RetryIntervalMs = 15000;
         private readonly object gate = new object();
         private readonly Func<CancellationToken, Task<bool>> confirm;
         private readonly Func<CancellationToken, Task<bool>> requestRecovery;
         private readonly Func<int, CancellationToken, Task> delay;
+        private readonly Func<long> elapsedMilliseconds;
         private CancellationTokenSource worker;
         private bool disposed;
         private volatile ConnectionRecoveryStatus status;
@@ -21,11 +24,14 @@ namespace IRSpeedyVPN.Services
 
         internal NetworkRecoverySession(Func<CancellationToken, Task<bool>> confirm,
             Func<int, CancellationToken, Task> delay = null,
-            Func<CancellationToken, Task<bool>> requestRecovery = null)
+            Func<CancellationToken, Task<bool>> requestRecovery = null,
+            Func<long> elapsedMilliseconds = null)
         {
             this.confirm = confirm ?? throw new ArgumentNullException(nameof(confirm));
             this.delay = delay ?? ((ms, token) => Task.Delay(ms, token));
             this.requestRecovery = requestRecovery;
+            var clock = Stopwatch.StartNew();
+            this.elapsedMilliseconds = elapsedMilliseconds ?? (() => clock.ElapsedMilliseconds);
         }
 
         internal void Observe(bool online)
@@ -54,16 +60,21 @@ namespace IRSpeedyVPN.Services
         {
             try
             {
-                bool requested = requestRecovery == null;
-                for (int attempt = 0; ; attempt++)
+                while (true)
                 {
+                    if (!IsCurrent(request)) return;
                     request.Token.ThrowIfCancellationRequested();
+                    long started = elapsedMilliseconds();
                     bool usable;
                     try
                     {
-                        // One acknowledged immediate sweep per return. Retry only
-                        // an unavailable RPC, never start overlapping pool sweeps.
-                        if (!requested) requested = await requestRecovery(request.Token).ConfigureAwait(false);
+                        // An RPC acknowledgement is not a recovered VPN. Keep
+                        // requesting the main Pool sweep until TLS proves its path.
+                        // Core coalesces requests while a sweep is still in flight.
+                        bool requested = requestRecovery == null
+                            || await requestRecovery(request.Token).ConfigureAwait(false);
+                        if (!IsCurrent(request)) return;
+                        request.Token.ThrowIfCancellationRequested();
                         usable = requested && await confirm(request.Token).ConfigureAwait(false);
                     }
                     catch (OperationCanceledException) { throw; }
@@ -75,7 +86,11 @@ namespace IRSpeedyVPN.Services
                         status = usable ? ConnectionRecoveryStatus.None : ConnectionRecoveryStatus.Impaired;
                     }
                     if (usable) return;
-                    await delay(attempt < 12 ? 5000 : 30000, request.Token).ConfigureAwait(false);
+                    // Start-to-start cadence includes RPC/TLS time. Slow work
+                    // delays the next cycle without queuing overlapping workers.
+                    long spent = Math.Max(0, elapsedMilliseconds() - started);
+                    int remaining = (int)Math.Max(0, RetryIntervalMs - Math.Min(RetryIntervalMs, spent));
+                    await delay(remaining, request.Token).ConfigureAwait(false);
                 }
             }
             catch (OperationCanceledException) { }
@@ -84,6 +99,12 @@ namespace IRSpeedyVPN.Services
                 lock (gate) { if (worker == request) worker = null; }
                 request.Dispose();
             }
+        }
+
+        private bool IsCurrent(CancellationTokenSource request)
+        {
+            lock (gate)
+                return !disposed && worker == request && !request.IsCancellationRequested;
         }
 
         private static void CancelWithoutWaiting(CancellationTokenSource request)

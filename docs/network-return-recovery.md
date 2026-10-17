@@ -18,9 +18,21 @@ The UI ignores queued notifications superseded by a newer connectivity state.
 
 The application sends ordered `network-down` / `network-return` actions for the
 explicit `proxy` tag. Each dedicated RPC has a 750 ms deadline, uses the active
-connection generation and is cancelled on disconnect. Return is acknowledged
-once before external TLS through the main path is checked.
-The observer does not start a sweep on every confirmation retry.
+connection generation and is cancelled on disconnect. Return requests a main-pool
+sweep immediately, then repeats every fifteen seconds while recovery remains
+unconfirmed. Each cycle requests the sweep before external TLS through the main
+path is checked. The fifteen-second start-to-start period includes RPC/TLS time;
+slow cycles run sequentially without catch-up bursts. Core coalesces a request
+with an already-running sweep, retaining its concurrency bound and transport
+repair budget. An acknowledgement alone never stops retries or clears the UI.
+
+Retrying does not fall back to the normal 900-second interval after the initial
+sweep fails, or after the two-minute transport repair budget expires. It stops
+only on verified main-path TLS, a new offline signal, disconnect, or disposal.
+Ordinary connected sessions do not gain periodic Pool sweeps. Main and AI pools
+remain separate; Core/TUN, DNS, qualification thresholds and normal timers remain
+unchanged. This retry fix needs an app build; the existing matching Core actions
+already coalesce repeated network-return calls.
 
 Recovery UI no longer waits for the selector's qualification history. In the
 2026-10-15 report, main-path traffic and trusted TLS worked at 04:07:23 while

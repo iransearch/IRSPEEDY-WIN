@@ -17,8 +17,15 @@ next fast tick without OS adapter events, one toast signal per confirmed outage,
 deduplication across periodic/fast checks and rearming after an online transition,
 protection against an ICMP target failing while external TLS still works, and
 production RPC ordering/cancellation using a local TCP server. The main-pool
-return command is acknowledged once before recovery proof is queried. Recovery
-proof matches a verified TLS socket's exact loopback source port and fixed host
+return command precedes recovery proof in every cycle. A virtual-clock regression
+runs eighteen cycles beyond the old two-minute recovery budget, verifies the
+fifteen-second start-to-start cadence includes the five-second TLS timeout,
+checks repeated online signals cannot overlap the worker, and stops scheduling
+on main-path proof. Pending/failed RPCs and disconnect during the retry wait
+cannot send late requests or revive a disposed session. The existing Core
+coalesces repeated return commands while a sweep is running.
+
+Recovery proof matches a verified TLS socket's exact loopback source port and fixed host
 to an active `proxy` chain, independently of stale URL-test rankings. Tests reject
 direct/AI-only, closed, unrelated, non-loopback and missing-source telemetry.
 

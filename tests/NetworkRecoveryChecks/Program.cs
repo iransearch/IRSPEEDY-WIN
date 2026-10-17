@@ -55,6 +55,86 @@ internal static class Program
         connection.AddRange(TextField(12,"smart-proxy-1"));connection.AddRange(TextField(12,"proxy"));
         return LibcoreProto.DecodeQueryConnections(BytesField(1,connection.ToArray()));
     }
+    private static async Task RepeatedRecoveryChecks()
+    {
+        // Advance virtual time through an outage lasting longer than the old
+        // two-minute repair window; no real 15-second sleeps in this regression.
+        long now = 0;
+        int requests = 0, confirmations = 0, waits = 0, waitMs = -1;
+        bool healthy = false;
+        var starts = new List<long>();
+        TaskCompletionSource<bool> tick = null;
+        using (var session = new NetworkRecoverySession(token =>
+        {
+            Check(requests == confirmations + 1, "A TLS proof skipped its recovery request");
+            confirmations++;
+            now += 5000; // Simulate the real five-second TLS timeout.
+            return Task.FromResult(healthy);
+        }, (ms, token) =>
+        {
+            waitMs = ms;
+            var next = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            token.Register(() => next.TrySetCanceled());
+            tick = next;
+            Interlocked.Increment(ref waits);
+            return tick.Task;
+        }, token =>
+        {
+            starts.Add(now);
+            Interlocked.Increment(ref requests);
+            return Task.FromResult(true);
+        }, () => now))
+        {
+            session.Observe(true);
+            Check(requests == 0, "Connected state started permanent pool checks");
+            session.Observe(false);
+            Check(requests == 0, "Offline state started pool checks");
+            session.Observe(true);
+            for (int cycle = 0; cycle < 17; cycle++)
+            {
+                await Until(() => Volatile.Read(ref waits) == cycle + 1);
+                Check(starts[cycle] == cycle * 15000L && waitMs == 10000,
+                    "RPC/TLS time drifted the recovery cadence beyond fifteen seconds");
+                Check(requests == cycle + 1 && confirmations == requests,
+                    "Failed TLS stopped re-requesting pool sweeps");
+                session.Observe(true); session.Observe(true);
+                Check(requests == cycle + 1, "Online signals overlapped the active recovery worker");
+                if (cycle == 16) healthy = true;
+                now += waitMs;
+                tick.SetResult(true);
+            }
+            await Until(() => session.Status == ConnectionRecoveryStatus.None);
+            Check(requests == 18 && confirmations == 18 && waits == 17,
+                "A proven healthy path did not stop recovery scheduling");
+            session.Observe(true);
+            await Task.Delay(30);
+            Check(requests == 18, "Healthy steady state restarted recovery pool sweeps");
+        }
+        Console.WriteLine("PASS immediate and fifteen-second pool retries continue past two minutes, account for TLS duration, coalesce online signals and stop on proof");
+
+        int rpcCalls = 0, proofCalls = 0;
+        var rpc = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var retry = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        int retryDelay = -1;
+        var pendingSession = new NetworkRecoverySession(token =>
+        { Interlocked.Increment(ref proofCalls); return Task.FromResult(true); }, (ms, token) =>
+        { retryDelay = ms; return retry.Task; }, token =>
+        { Interlocked.Increment(ref rpcCalls); return rpc.Task; }, () => 0);
+        pendingSession.Observe(false); pendingSession.Observe(true);
+        await Until(() => rpcCalls == 1);
+        pendingSession.Observe(true);
+        Check(rpcCalls == 1 && proofCalls == 0, "A pending RPC overlapped or TLS overtook it");
+        rpc.SetResult(false);
+        await Until(() => retryDelay == 15000);
+        Check(proofCalls == 0, "Unavailable recovery RPC claimed a usable path");
+        pendingSession.Dispose();
+        retry.SetResult(true);
+        await Task.Delay(30);
+        Check(rpcCalls == 1 && pendingSession.Status == ConnectionRecoveryStatus.None,
+            "Disconnect during the retry wait revived a pool request");
+        Console.WriteLine("PASS pending/failed RPCs stay ordered and disconnect cancels scheduled retries");
+    }
+
     static async Task Main()
     {
         // TLS success is required by the caller before this route lookup. The
@@ -206,7 +286,7 @@ internal static class Program
         var retryGate = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
         using (var ordered = new NetworkRecoverySession(token =>
         {
-            Check(requests==1, "TLS proof started before pool-return RPC");
+            Check(requests==confirmations+1, "TLS proof started before this cycle's pool-return RPC");
             return Interlocked.Increment(ref confirmations)==1 ? failedProof.Task : retryProof.Task;
         }, (ms,token)=>retryGate.Task, token=>{ Interlocked.Increment(ref requests); return Task.FromResult(true); }))
         {
@@ -214,10 +294,11 @@ internal static class Program
             await Until(()=>confirmations==1);
             failedProof.SetResult(false); await Until(()=>ordered.Status==ConnectionRecoveryStatus.Impaired);
             retryGate.SetResult(true); await Until(()=>confirmations==2);
-            Check(requests==1, "Every recovery proof launched another pool sweep");
+            Check(requests==2, "An acknowledged failed sweep prevented the next recovery sweep");
             retryProof.SetResult(true); await Until(()=>ordered.Status==ConnectionRecoveryStatus.None);
         }
-        Console.WriteLine("PASS immediate pool-return RPC precedes proof and is acknowledged once per return");
+        Console.WriteLine("PASS each recovery retry requests a main-pool sweep before TLS proof");
+        await RepeatedRecoveryChecks();
 
         var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
         var service=TunnelPlusService.RecoveryFixture(((IPEndPoint)listener.LocalEndpoint).Port);
