@@ -10,9 +10,17 @@ fixture = ast.parse(Path(__file__).with_name('run.py').read_text())
 stubs = next(ast.literal_eval(n.value) for n in fixture.body if isinstance(n, ast.Assign)
              and any(isinstance(t, ast.Name) and t.id == 'stubs' for t in n.targets))
 stubs = stubs.replace('bool manualRefreshBusy,manualRefreshExternalPause;Task manualRefreshTask=Task.CompletedTask;void CancelManualRefresh(){}',
-                      'bool IsLoaded=true,_isUrlTestSupported=true;int HeaderUpdates;void UpdateHeaderIcons(){HeaderUpdates++;}')
+                      'bool IsLoaded=true,_isUrlTestSupported=true;int HeaderUpdates;void UpdateHeaderIcons(){HeaderUpdates++;} Func<Func<bool>,CancellationToken,Task<bool>> RefreshServerListRequest=(current,token)=>Task.FromResult(current());')
 source = (root / 'IRSpeedyVPN/UserControls/UCServerList.xaml.cs').read_text()
 region = source.split('        #region Background URL tests', 1)[1].split('        #endregion', 1)[0]
+binding = source.split('        #region Country picker', 1)[1].split('        #endregion', 1)[0]
+refresh = (root / 'IRSpeedyVPN/UserControls/UCServerList.Refresh.cs').read_text()
+binding += refresh[refresh.index('        internal void RefreshServicesFromFactory('):refresh.rfind('\n    }')]
+stubs = stubs.replace('string Country {get;} List<Url>', 'string Country {get;} int Order{get;} byte CountryIndex{get;set;} string[] Protocols{get;} Url SelectedServerUrl{get;} List<Url>')
+stubs = stubs.replace('class TunnelPlusService : IVPNService {', 'interface ISmartFastConnection {bool IsSmartFast{get;}}\nclass TunnelPlusService : IVPNService {\n public int Order=>0;public byte CountryIndex{get;set;}public string[] Protocols=>new[]{"vless"};public Url SelectedServerUrl=>null;')
+stubs = stubs.replace('class Info { public object CurrentService;', 'class Info {public string Username="user"; public IVPNService CurrentService;')
+stubs = stubs.replace('class Program {', 'class Factory {public List<IVPNService> Services;}\nclass Program {\n Factory serviceFactory=new Factory();string _selectedServiceName="xfast",selectedProtocol;bool _isLoading;IVPNService selectedService;')
+stubs = stubs.replace('public int Updates,Progresses;', 'public IVPNService SelectedService;public void Load(IVPNService[] s,bool supported){}public int Updates,Progresses;')
 manual = (root / 'IRSpeedyVPN/UserControls/UCServerList.ServerResultsRefresh.cs').read_text()
 manual = manual[manual.index('        private bool manualRefreshBusy;'):manual.rfind('\n    }')]
 tests = r'''
@@ -21,7 +29,7 @@ tests = r'''
  static TunnelPlusService S(string country,int id,int members=1)=>new TunnelPlusService{ID=id,CountryCode=country,
    urls=Enumerable.Range(0,members).Select(i=>new Url{url="vless://fixture-"+id+"-"+i,extra_field_1="chain-"+id+"-"+i,chainproxy=1}).ToList()};
  static async Task Until(Func<bool> condition){for(int i=0;i<1000&&!condition();i++)await Task.Delay(2);Check(condition(),"async condition settled");}
- static Program View(string dir,params TunnelPlusService[] rows){var p=new Program{_currentServices=rows};p.probeCache=new ServerCheckCache(Guid.NewGuid().ToString(),"xfast",dir);p.probeCache.Bind(rows);return p;}
+ static Program View(string dir,params TunnelPlusService[] rows){var p=new Program{_currentServices=rows};p.probeCacheContext="user\nxfast\n";p.probeCache=new ServerCheckCache(Guid.NewGuid().ToString(),"xfast",dir);p.probeCache.Bind(rows);return p;}
  static void Main()=>new UiContext().Run(Run);
  static async Task Run(){
   string dir=Path.Combine(Path.GetTempPath(),"manual-refresh-"+Guid.NewGuid());Directory.CreateDirectory(dir);
@@ -52,6 +60,60 @@ tests = r'''
    cache.Bind(replacement);cache.RecordRefreshMember(rows[0],rows[0].urls[0],999,DateTime.UtcNow);
    Check(!cache.ClearForManualRefresh(rows)&&replacement[0].urls[0].latency==0,"obsolete API objects cannot clear/commit replacement rows");
    cache.FinishManualRefresh(rows);Check(!cache.InitialScanCompleted,"obsolete manual round cannot mark the replacement initial scan complete");
+
+   // The API phase precedes clearing/probing and owns the pause through rebind.
+   var fresh=View(dir,S("DE",61));fresh._currentServices[0].GetServerUrls()[0].latency=96;
+   var updated=new[]{S("US",62,2)};var release=new TaskCompletionSource<bool>();int fetches=0;
+   fresh.RefreshServerListRequest=async (current,token)=>{
+    fetches++;Check(current()&&fresh.probesPaused,"API fetch starts only after the old scan drained");
+    await release.Task;if(!current())return false;
+    fresh.serviceFactory.Services=updated.Cast<IVPNService>().ToList();fresh.RefreshServicesFromFactory(true);
+    Check(current()==false&&!token.IsCancellationRequested,"own API rebind changes snapshot without canceling its manual round");return true;
+   };
+   int batches=0;TunnelPlusService.ManualProbe=(u,t,p,c)=>{
+    batches++;Check(u.Length==2&&u.All(x=>x.url.Contains("62-")),"manual plan uses new API members and excludes removed servers");
+    foreach(var url in u)c(url,88);
+   };
+   fresh.RefreshServerResults();fresh.RefreshServerResults();await Task.Delay(20);
+   Check(fetches==1&&batches==0&&fresh._currentServices[0].GetServerUrls()[0].latency==96,"duplicate clicks share API request and old results remain until fetch succeeds");
+   release.SetResult(true);await fresh.manualRefreshTask;
+   Check(batches==1&&updated.All(s=>s.urls.All(u=>u.latency==88))&&fresh.probeCache.InitialScanCompleted,"fresh API snapshot completes one manual round without an automatic scan");
+
+   var unavailable=View(dir,S("DE",63));var previous=unavailable._currentServices[0].GetServerUrls()[0];
+   previous.latency=97;previous.latencychkTime=DateTime.Now;unavailable.probeCache.Record(unavailable._currentServices[0],DateTime.Now.AddSeconds(-1));
+   unavailable.RefreshServerListRequest=(c,t)=>Task.FromResult(false);
+   int fallbackCalls=0;
+   TunnelPlusService.ManualProbe=(u,t,p,c)=>{
+    fallbackCalls++;Check(previous.latency==97&&previous.LastSuccessfulLatency==97,"API failure retains previous measurements when fallback test begins");
+    Check(u.Length==1&&u[0].url==previous.url,"failed API fetch tests the previous list");
+    c(u[0],124);
+   };
+   unavailable.RefreshServerResults();await unavailable.manualRefreshTask;
+   Check(fallbackCalls==1&&previous.latency==124&&previous.LastSuccessfulLatency==124&&!unavailable.manualRefreshBusy,"fallback commits fresh results and finishes after API failure");
+   var retained=View(dir,S("DE",66,2));var retainedRow=retained._currentServices[0];
+   foreach(var u in retainedRow.GetServerUrls()){u.latency=98;u.latencychkTime=DateTime.Now;}
+   retained.probeCache.Record(retainedRow,DateTime.Now.AddSeconds(-1));
+   retained.RefreshServerListRequest=(c,t)=>Task.FromResult(false);bool fallbackEntered=false;
+   TunnelPlusService.ManualProbe=(u,t,p,c)=>{
+    c(u.Single(x=>x.url.EndsWith("-0")),126);fallbackEntered=true;
+    while(!t.IsCancellationRequested)Thread.Sleep(1);t.ThrowIfCancellationRequested();
+   };
+   retained.RefreshServerResults();await Until(()=>fallbackEntered);retained.PauseServerChecks();await retained.DrainServerChecksAsync();
+   Check(retainedRow.GetServerUrls()[0].latency==126&&retainedRow.GetServerUrls()[1].latency==98,"canceled fallback preserves fresh finalized member and old untested member");
+   TunnelPlusService.ManualProbe=(u,t,p,c)=>{throw new Exception("canceled/empty API phase must not probe");};
+
+   var downloading=View(dir,S("DE",64));var download=new TaskCompletionSource<bool>();
+   downloading.RefreshServerListRequest=async (c,t)=>{await download.Task;return c();};
+   downloading.RefreshServerResults();downloading.PauseServerChecksForConnection();download.SetResult(true);
+   await downloading.DrainServerChecksAsync();
+   Check(downloading.probesPaused&&downloading.probesRequireDisconnect&&!downloading.manualRefreshBusy,"connection cancellation during API phase cannot start a test or resume checks");
+
+   var empty=View(dir,S("DE",65));empty.RefreshServerListRequest=(c,t)=>{
+    empty.probeCacheContext="user\n\n";empty.serviceFactory.Services=new List<IVPNService>();
+    empty.RefreshServicesFromFactory(true);return Task.FromResult(true);
+   };
+   empty.RefreshServerResults();await empty.manualRefreshTask;
+   Check(empty._currentServices.Length==0&&!empty.manualRefreshBusy,"empty fresh list ends refresh without testing removed members");
 
    // Early per-country finish and provisional minimum; final updates run on UI.
    var live=View(dir,S("DE",21,2),S("US",22,1));var originals=live._currentServices.SelectMany(s=>s.GetServerUrls()).ToArray();
@@ -84,7 +146,7 @@ tests = r'''
    late(lateUrl,999);await Task.Delay(20);
    Check(!cancel.manualRefreshBusy&&cancel.probesPaused&&cancel.probesRequireDisconnect&&!cancel.probeRunning,"connection waits for cancellation drain and retains pause ownership");
    Check(cancel._currentServices[0].GetServerUrls().All(u=>u.latency==0)&&cancel.countryPicker.Displayed!=999,"late canceled results cannot resurrect old or provisional values");
-   cancel.globalInfo.CurrentService=new object();before=cancel.HeaderUpdates;cancel.RefreshServerResults();Check(!cancel.manualRefreshBusy&&cancel.HeaderUpdates==before,"connected VPN cannot start refresh");
+   cancel.globalInfo.CurrentService=S("US",99);before=cancel.HeaderUpdates;cancel.RefreshServerResults();Check(!cancel.manualRefreshBusy&&cancel.HeaderUpdates==before,"connected VPN cannot start refresh");
 
    // A finalized member of an unfinished row survives cancellation/reload;
    // provisional measurements and prior history never do.
@@ -113,7 +175,7 @@ tests = r'''
 '''
 with tempfile.TemporaryDirectory(prefix='manual-refresh-checks-') as directory:
     path = Path(directory)
-    (path / 'Program.cs').write_text(stubs + region + manual + tests)
+    (path / 'Program.cs').write_text(stubs + region + binding + manual + tests)
     includes = ''.join(f'<Compile Include="{root / source}" />' for source in [
         'IRSpeedyVPN/Services/ServerCheckCache.cs', 'IRSpeedyVPN/Services/ServerRefreshPlan.cs', 'IRSpeedyVPN/Models/NewService/Url.cs'])
     (path / 'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion><NuGetAudit>false</NuGetAudit><NoWarn>CS0169;CS0414</NoWarn></PropertyGroup><ItemGroup>' + includes + '<PackageReference Include="Newtonsoft.Json" Version="12.0.2" /></ItemGroup></Project>')

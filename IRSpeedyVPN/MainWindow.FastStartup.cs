@@ -18,7 +18,7 @@ namespace IRSpeedyVPN
         private System.Diagnostics.Stopwatch startupPresentationTime;
         private Timer sessionMaintenanceTimer;
         private int sessionMaintenanceTick;
-        private int serverRefreshBusy;
+        private readonly SemaphoreSlim serverRefreshGate = new SemaphoreSlim(1, 1);
         private string sessionMaintenanceUser;
 
         private const int SessionMaintenancePeriodMs = 30 * 60 * 1000;
@@ -40,6 +40,7 @@ namespace IRSpeedyVPN
             Interlocked.Exchange(ref Initialized, 1);
 
             uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
+            uCServerList.RefreshServerListRequest = RefreshServerListForManualCheckAsync;
             uCServerList.OnLoadingRequest += OnLoadingRequest;
             uCServerList.Loaded += FastStartup_ServerListLoaded;
             uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
@@ -424,17 +425,55 @@ namespace IRSpeedyVPN
         /// </summary>
         private void ValidateSessionAndRefreshServerList()
         {
-            if (Interlocked.Exchange(ref serverRefreshBusy, 1) != 0)
-                return;
+            if (!serverRefreshGate.Wait(0)) return;
+            try { RefreshAuthenticatedServerList(); }
+            finally { serverRefreshGate.Release(); }
+        }
 
+        private async Task<bool> RefreshServerListForManualCheckAsync(Func<bool> current, CancellationToken token)
+        {
+            await serverRefreshGate.WaitAsync(token);
+            Task<bool> refresh;
             try
             {
+                token.ThrowIfCancellationRequested();
+                if (!current() || !IsUserLogin) { serverRefreshGate.Release(); return false; }
+                ShowMessage("");
+                // Login2 is synchronous. Let Connect/logout cancel their wait
+                // immediately; its late response is guarded and the worker keeps
+                // the API gate until the request actually ends.
+                refresh = Task.Run(() =>
+                {
+                    try { return !LoadLocal && RefreshAuthenticatedServerList(current); }
+                    finally { serverRefreshGate.Release(); }
+                });
+            }
+            catch { serverRefreshGate.Release(); throw; }
+            var canceled = new TaskCompletionSource<bool>();
+            using (token.Register(() => canceled.TrySetCanceled()))
+            {
+                await Task.WhenAny(refresh, canceled.Task);
+                token.ThrowIfCancellationRequested();
+                bool refreshed = await refresh;
+                if (!refreshed && current() && IsUserLogin)
+                    ShowMessage("دریافت لیست ناموفق بود؛ بررسی لیست قبلی آغاز می‌شود.");
+                return refreshed;
+            }
+        }
+
+        private bool RefreshAuthenticatedServerList(Func<bool> canApply = null)
+        {
+            bool refreshed = false;
+            try
+            {
+                if (canApply != null && !canApply()) return false;
                 var username = gInfo?.Username;
                 var password = gInfo?.Password;
+                long sessionVersion = Interlocked.Read(ref connectionRequestVersion);
                 if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
                 {
                     LogoutInvalidSession("نشست کاربری معتبر نیست، لطفاً دوباره وارد شوید");
-                    return;
+                    return false;
                 }
 
                 var response = serviceController.Login2(username, password);
@@ -442,7 +481,9 @@ namespace IRSpeedyVPN
                 // An old in-flight refresh must never log out or restore the previous password.
                 Dispatcher.Invoke((Action)(() =>
                 {
-                    if (!IsUserLogin || gInfo.Username != username || gInfo.Password != password) return;
+                    if (!IsUserLogin || gInfo.Username != username || gInfo.Password != password
+                        || sessionVersion != Interlocked.Read(ref connectionRequestVersion)
+                        || (canApply != null && !canApply())) return;
                     if (response == null)
                         return;
 
@@ -503,12 +544,14 @@ namespace IRSpeedyVPN
                         gInfo.Import(account, password, localResource.TempPath);
                         gInfo.CurrentService = currentService;
                         gInfo.ServerResponse = response.ResponseData.DecryptedString;
-                        uCServerList.RefreshServicesFromFactory();
+                        uCServerList.RefreshServicesFromFactory(preserveManualRefresh: canApply != null);
+                        refreshed = true;
                     }
 
                     if (IsRememberChecked)
                         localResource.SaveConfig(account, password);
                 }));
+                return refreshed;
             }
             catch (Exception ex)
             {
@@ -516,10 +559,7 @@ namespace IRSpeedyVPN
                 // log out a valid user unless the API explicitly rejected credentials,
                 // session/device token, or returned an invalid account status.
                 LogHelper.WriteLog(ex);
-            }
-            finally
-            {
-                Interlocked.Exchange(ref serverRefreshBusy, 0);
+                return refreshed;
             }
         }
 

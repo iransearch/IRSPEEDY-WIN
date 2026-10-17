@@ -36,6 +36,7 @@ namespace IRSpeedyVPN.UserControls
             Func<IVPNService> prepareService);
         internal event LoadingRequest OnLoadingRequest;
         internal event ConnectRequest OnConnectRequest;
+        internal Func<Func<bool>, CancellationToken, Task<bool>> RefreshServerListRequest { get; set; }
 
         internal IVPNService selectedService;
         internal void MarkSuccessfulConnection(IVPNService service)
@@ -142,10 +143,8 @@ namespace IRSpeedyVPN.UserControls
 
         #region Country picker
 
-        private void RefreshCountry(string protocol)
+        private void RefreshCountry(string protocol, bool preserveManualRefresh = false)
         {
-            if (_selectedServiceName == null) return;
-
             var services = serviceFactory.Services
                 .Where(x => x.Name == _selectedServiceName && (protocol == null || x.Protocols.Contains(protocol)))
                 .OrderBy(x => x.Country).ToArray();
@@ -160,7 +159,7 @@ namespace IRSpeedyVPN.UserControls
 
             // Retire an old API-list scan before rebinding replacement service objects.
             _urlTestCts?.Cancel();
-            CancelManualRefresh();
+            if (!preserveManualRefresh) CancelManualRefresh();
             _currentServices = services;
             string context = (globalInfo?.Username ?? "") + "\n" + _selectedServiceName + "\n" + (protocol ?? "");
             if (probeCache == null || probeCacheContext != context)

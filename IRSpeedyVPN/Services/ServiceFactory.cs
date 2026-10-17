@@ -37,7 +37,7 @@ namespace IRSpeedyVPN.Services
                     url.latencychkTime = previous.latencychkTime;
                 }
             }
-            services = new List<IVPNService>();
+            var refreshedServices = new List<IVPNService>();
             foreach(var g in groups)
             {
                 foreach(var s in g.servers)
@@ -56,11 +56,12 @@ namespace IRSpeedyVPN.Services
                             vpnervice = new TunnelPlusService(s, globalInfo);
                             vpnervice.Name = g.title;
                         }
-                        services.Add((IVPNService)vpnervice);
+                        refreshedServices.Add((IVPNService)vpnervice);
                     }
                 }
             }
-
+            // A malformed response/config must leave the previous usable list intact.
+            services = refreshedServices;
         }
         public void RenewServiceList(List<Server> servers)
         {

@@ -43,7 +43,7 @@ namespace IRSpeedyVPN.UserControls
             manualRefreshCancellation = cancellation;
             var token = cancellation.Token;
             long generation = ++manualRefreshGeneration;
-            bool cacheCleared = false;
+            bool refreshStarted = false;
             Func<bool> current = () => !token.IsCancellationRequested && generation == manualRefreshGeneration
                 && ReferenceEquals(services, _currentServices) && ReferenceEquals(cache, probeCache)
                 && globalInfo?.CurrentService == null && !probesRequireDisconnect;
@@ -52,16 +52,35 @@ namespace IRSpeedyVPN.UserControls
                 await probeTask;
                 if (!current()) return;
                 probeRestartRequested = false; probeWakeRequested = false;
-                cacheCleared = await Task.Run(() => current() && cache.ClearForManualRefresh(services));
-                if (!cacheCleared) return;
+                // Fetch and bind the latest API snapshot while this round owns
+                // the pause. A failed fetch tests the old list without erasing
+                // its committed results; cancellation still stops the round.
+                bool listRefreshed = RefreshServerListRequest != null && await RefreshServerListRequest(current, token);
+                if (listRefreshed)
+                {
+                    services = _currentServices;
+                    cache = probeCache;
+                }
                 if (!current()) return;
-                foreach (var service in services.OfType<TunnelPlusService>()) service.ResetListTestResult();
-                countryPicker.ResetTestResults();
+                refreshStarted = await Task.Run(() =>
+                {
+                    if (!current()) return false;
+                    if (listRefreshed) return cache.ClearForManualRefresh(services);
+                    cache.StopRound();
+                    return true;
+                });
+                if (!refreshStarted) return;
+                if (!current()) return;
+                if (listRefreshed)
+                {
+                    foreach (var service in services.OfType<TunnelPlusService>()) service.ResetListTestResult();
+                    countryPicker.ResetTestResults();
+                }
                 var plan = new ServerRefreshPlan(services);
                 var finishedRows = new ConcurrentDictionary<IVPNService, bool>();
                 var bestByRow = new ConcurrentDictionary<IVPNService, long>();
                 UrlTestCoordinator.BeginBatch();
-                LogHelper.WriteExLog("[ServerChecks] manual-refresh-begin candidates=" + plan.Total);
+                LogHelper.WriteExLog("[ServerChecks] manual-refresh-begin candidates=" + plan.Total + " listRefreshed=" + listRefreshed);
                 while (current() && plan.HasPending)
                 {
                     var batch = plan.TakeBatch();
@@ -74,7 +93,7 @@ namespace IRSpeedyVPN.UserControls
                         Action<Url, long> progress = (url, latency) =>
                         {
                             ServerRefreshPlan.Candidate member;
-                            if (latency <= 0 || !current() || !members.TryGetValue(url, out member)) return;
+                            if (!listRefreshed || latency <= 0 || !current() || !members.TryGetValue(url, out member)) return;
                             foreach (var owner in member.Owners.Select(o => o.Service).Distinct())
                             {
                                 bestByRow.AddOrUpdate(owner, latency, (s, old) => Math.Min(old, latency));
@@ -122,7 +141,7 @@ namespace IRSpeedyVPN.UserControls
             {
                 // Keep already finalized members if cancellation interrupted an
                 // unfinished row/batch; provisional progress is never persisted.
-                if (cacheCleared) await Task.Run(() => cache.PersistQueue());
+                if (refreshStarted) await Task.Run(() => cache.PersistQueue());
                 if (ReferenceEquals(services, _currentServices))
                 {
                     foreach (var service in services)

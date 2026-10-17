@@ -7,15 +7,15 @@ namespace IRSpeedyVPN.UserControls
     public partial class UCServerList
     {
         /// <summary>
-        /// Rebind the visible server picker after the 30-minute background refresh.
+        /// Rebind the visible server picker after an API refresh.
         /// If the user is on the connection-info screen, do nothing here; the normal
         /// Loaded handler will bind the fresh ServiceFactory list when they return.
         /// </summary>
-        internal void RefreshServicesFromFactory()
+        internal void RefreshServicesFromFactory(bool preserveManualRefresh = false)
         {
             if (!Dispatcher.CheckAccess())
             {
-                Dispatcher.BeginInvoke((Action)RefreshServicesFromFactory);
+                Dispatcher.BeginInvoke((Action)(() => RefreshServicesFromFactory(preserveManualRefresh)));
                 return;
             }
 
@@ -52,7 +52,7 @@ namespace IRSpeedyVPN.UserControls
                 ? (selectedProtocol != null && protocols.Contains(selectedProtocol) ? selectedProtocol : protocols[0])
                 : null;
 
-            RefreshCountry(selectedProtocol);
+            RefreshCountry(selectedProtocol, preserveManualRefresh);
             UpdateHeaderIcons();
         }
     }

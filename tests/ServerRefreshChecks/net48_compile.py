@@ -67,6 +67,7 @@ stubs += r'''namespace IRSpeedyVPN.UserControls {
   IVPNService[] _currentServices;GlobalInfo globalInfo;CancellationTokenSource _urlTestCts;
   Components.ServerListControl.ServerCountryPicker countryPicker=new Components.ServerListControl.ServerCountryPicker();
   bool _isUrlTestSupported;IVPNService selectedService;
+  internal Func<Func<bool>,CancellationToken,Task<bool>> RefreshServerListRequest {get;set;}
   MainWindow GetMainWindow()=>null;IVPNService GetFallbackService()=>null;void RemoveBaseService(){}void OpenServiceSettings(){}
 ''' + region + header + '\n} }\n'
 with tempfile.TemporaryDirectory(prefix='server-refresh-net48-') as directory:

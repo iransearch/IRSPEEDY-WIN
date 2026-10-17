@@ -31,7 +31,7 @@ class ServerList {
  public bool probesPaused=true;
  public bool probesRequireDisconnect=true,probeRestartRequested=true,probeLoginRoundRequested;
  PREPARE_METHOD
- public bool Drained; public Task DrainServerChecksAsync(){Drained=true;return Task.CompletedTask;} public void PauseServerChecks(){} public void RefreshServicesFromFactory(){} }
+ public bool Drained; public Task DrainServerChecksAsync(){Drained=true;return Task.CompletedTask;} public void PauseServerChecks(){} public void RefreshServicesFromFactory(bool preserveManualRefresh=false){} }
 class ProbeTimer {public bool Stopped; public void Stop(){Stopped=true;} }
 class Factory { public void RenewServiceList(object groups){} }
 class FakeDispatcher { public Action Before;public void Invoke(Action action){Before?.Invoke();action();} }
@@ -41,7 +41,7 @@ class Cache {public string TempPath="temp";public string Password="old";public i
 class LogHelper {public static void WriteExLog(string s){} public static void WriteLog(Exception e){} }
 static class VpnTimeZone { public static DateTime AccountNow=>DateTime.Now; }
 class Program {
- int serverRefreshBusy;FakeDispatcher Dispatcher=new FakeDispatcher();Factory serviceFactory=new Factory();
+ readonly SemaphoreSlim serverRefreshGate=new SemaphoreSlim(1,1);bool LoadLocal;FakeDispatcher Dispatcher=new FakeDispatcher();Factory serviceFactory=new Factory();
  void LogoutInvalidSession(string m){IsUserLogin=false;}void RechareLogout(bool value){IsUserLogin=false;}
  bool IsExplicitSessionFailure(HttpStatusCode s)=>s==HttpStatusCode.Forbidden;
  bool IsUserLogin=true,loginPresentationActive,IsRememberChecked=true;long connectionRequestVersion;

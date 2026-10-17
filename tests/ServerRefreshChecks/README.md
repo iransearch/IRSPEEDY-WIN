@@ -6,6 +6,10 @@ to check the production RPC's failed-first member ordering and stable fallback o
 Run `python3 tests/ServerRefreshChecks/manual_refresh.py /path/to/dotnet`
 to exercise the global configuration shuffle, independent numbered rows, persistent
 cache clearing, partial/final updates, duplicate clicks, API replacement and cancellation.
+Run `python3 tests/ServerRefreshChecks/api_refresh.py /path/to/dotnet`
+to exercise the authenticated API phase, transactional list replacement, shared
+maintenance gate, stale-response guards and prompt cancellation. Add `--net48`
+to compile those production methods against .NET Framework 4.8.
 Run `python3 tests/ServerRefreshChecks/core_dispatch.py /path/to/dotnet`
 to exercise the actual batch runner and full URL-test method with a fake Core transport,
 including tag mapping, chain/SNI metadata, config rejection, port release and cancellation.
@@ -33,8 +37,13 @@ It does not exercise the Windows renderer, real Core RPC or Windows routing.
 Manual Windows acceptance:
 - Refresh appears beside logout on the server-list header, in both themes;
   settings and the Windows minimize/close controls retain their positions.
-- Click refresh during the initial/disconnect scan: drain the old RPC, erase all
-  pings/history, show placeholders, and scan a single global shuffled config queue.
+- Click refresh during the initial/disconnect scan: drain the old RPC, fetch and bind
+  the latest authenticated server list, then erase pings/history, show placeholders,
+  and scan a single global shuffled config queue built from the new list.
+  If the fetch fails, retain the previous list and measurements and test that list;
+  replace each old measurement only with a finalized fresh member result.
+  A malformed response must not leave a partially replaced list. Canceling during
+  the fetch must allow Connect/logout promptly and ignore the late API response.
   Search filtering does not limit testing. Smart remains fixed, the last successful
   connection stays starred below Smart, and the selection resets to Smart.
 - Partial minimum pings appear in place; only fully completed numbered rows reorder.

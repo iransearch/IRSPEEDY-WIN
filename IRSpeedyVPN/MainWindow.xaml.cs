@@ -297,6 +297,7 @@ namespace IRSpeedyVPN
             {
                 //                Initialized = 1;
                 uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
+                uCServerList.RefreshServerListRequest = RefreshServerListForManualCheckAsync;
                 uCServerList.OnLoadingRequest += OnLoadingRequest;
                 uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
                 uCUserInfo.OnChangeServerRequest += UCUserInfo_OnChangeServerRequest;
