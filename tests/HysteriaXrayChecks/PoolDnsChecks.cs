@@ -95,21 +95,18 @@ internal static class PoolDnsChecks
             && (string)serializedRemote["detour"] == "proxy", "DNS model discarded DoH path or VPN detour");
         var probeBox = JObject.Parse(IRSpeedyVPN.Services.SingBox.Samples.sg_UrlTest);
         var probeDirect = probeBox["dns"]["servers"].Single(x => (string)x["tag"] == "dns-direct");
-        Check(probeBox["dns"]["servers"].Count() == 1 && (string)probeDirect["type"] == "https-race"
+        Check(probeBox["dns"]["servers"].Count() == 2 && (string)probeDirect["type"] == "local"
+            && (string)probeDirect["domain_resolver"] == "dns-local"
+            && probeBox["dns"]["servers"].Any(p => (string)p["tag"] == "dns-local" && (string)p["type"] == "local")
             && (bool)probeBox["route"]["auto_detect_interface"]
             && (string)probeBox["route"]["default_domain_resolver"]["server"] == "dns-direct",
-            "Probe DNS must pin a direct composite DoH resolver");
-        var providers = probeDirect["servers"].ToArray();
-        var ips = new[] { "8.8.8.8", "1.1.1.1", "77.88.8.8" };
-        var names = new[] { "dns.google", "cloudflare-dns.com", "common.dot.dns.yandex.net" };
-        Check(providers.Length == 3 && providers.Select((p, i) => (string)p["server"] == ips[i]
-            && (string)p["path"] == "/dns-query" && p["detour"] == null && p["domain_resolver"] == null
-            && (bool)p["tls"]["enabled"] && (bool?)p["tls"]["insecure"] != true
-            && (string)p["tls"]["server_name"] == names[i]).All(x => x),
-            "Probe race must retain three verified independent direct DoH providers");
+            "Probe DNS must restore the original local/system profile");
+        Check(probeBox["dns"]["servers"].All(p => p["server"] == null && p["path"] == null
+            && p["tls"] == null && p["detour"] == null && p["servers"] == null),
+            "Server probes must not require public DoH or a VPN");
         var typedProbe = JObject.FromObject(probeDirect.ToObject<IRSpeedyVPN.Services.SingBox.DnsServer>());
-        Check(typedProbe["servers"].Count() == 3 && (string)typedProbe["servers"][2]["tls"]["server_name"] == names[2],
-            "Typed DNS model discarded composite probe providers/TLS");
+        Check((string)typedProbe["type"] == "local" && (string)typedProbe["domain_resolver"] == "dns-local",
+            "Typed DNS model discarded the restored local resolver");
         Check((string)probe["outbounds"][0]["streamSettings"]["sockopt"]["domainStrategy"] == "UseIP",
             "Non-opted-in generator call changed DNS strategy");
 
@@ -120,18 +117,18 @@ internal static class PoolDnsChecks
         Check(!strictProbe.SelectTokens("$..sockopt.domainStrategy").Any()
             && (string)strictProbe["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"]["downloadSettings"]["address"] == "download.pool.example"
             && (int)strictProbe["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"]["downloadSettings"]["sockopt"]["mark"] == 37,
-            "XHTTP upload/download probes must inherit dedicated DoH without altering transport options");
-        Check(ConfigGenerator.UrlTestOutboundDnsStrategy == "ForceIP", "DoH lookup errors may silently fall back to OS DNS");
+            "XHTTP upload/download probes must inherit isolated local/system DNS without altering transport options");
+        Check(ConfigGenerator.UrlTestOutboundDnsStrategy == "ForceIP", "Probe resolver strategy changed");
         var request = new TestReq { Config = probeBox.ToString(), NeedXray = true, XrayConfig = strictProbe.ToString() };
         var unwired = LibcoreProto.EncodeTestReq(request);
         request.XrayOutboundDnsStrategy = ConfigGenerator.UrlTestOutboundDnsStrategy;
         Check(LibcoreProto.EncodeTestReq(request).SequenceEqual(unwired.Concat(new byte[] { 0x72, 0x07 }
-            .Concat(Encoding.ASCII.GetBytes("ForceIP")))), "Probe RPC lost strict DoH resolver in field 14");
+            .Concat(Encoding.ASCII.GetBytes("ForceIP")))), "Probe RPC lost its isolated resolver strategy in field 14");
         var fixturePath = Environment.GetEnvironmentVariable("IRSPEEDY_PROBE_DNS_FIXTURE");
         if (!string.IsNullOrEmpty(fixturePath)) System.IO.File.WriteAllText(fixturePath, probeBox.ToString());
 
         CheckStartWire(config.ToString());
-        Console.WriteLine("PASS: isolated three-provider DoH probe DNS, TLS model, XHTTP/Hysteria normalization and strict field 14; live DNS remains unchanged.");
+        Console.WriteLine("PASS: restored local/system probe DNS, XHTTP/Hysteria normalization and strict field 14; live DNS remains unchanged.");
     }
 
     private static VmessItem Node(string network, string address)

@@ -39,7 +39,7 @@ Check(tags.Count==2&&tags.Values.Contains("valid")&&tags.Values.Contains("valid2
 Check(rejected.Count==6&&!rejected.Values.Any(v=>v.Contains("secret")),"all rejected members are accounted for without secrets");
 Check(cfg.outbounds.Count==3&&cfg.outbounds.All(o=>!string.IsNullOrEmpty(o.type)),"partial outbounds and chains are rolled back atomically");
 Check(cfg.outbounds[1].type=="shadowsocks"&&cfg.outbounds[1].method=="aes-128-gcm"&&cfg.outbounds[1].password=="test-secret","Shadowsocks conversion works with no legacy LazyConfig initialization");
-Check(cfg.dns.servers[0].servers.Count==3&&cfg.dns.servers[0].type=="https-race","actual typed probe generator preserves all resolver providers");
+Check(cfg.dns.servers.Count==2&&cfg.dns.servers.All(d=>d.type=="local")&&cfg.dns.servers[0].domain_resolver=="dns-local","actual typed probe generator preserves the original system DNS profile");
 Check(tags.Keys.Distinct().Count()==tags.Count,"rejections do not duplicate accepted tags");
 Check(IRSpeedyVPN.Services.SingBox.ConfigGenerator.GetRejectedProbeLinks(json,"create service: initialize outbound[1]: invalid key",tags).SequenceEqual(new[]{"valid"}),"native constructor error prunes only its exact owner");
 Check(IRSpeedyVPN.Services.SingBox.ConfigGenerator.GetRejectedProbeLinks(json,"decode config at "+json+": outbounds[2]: unknown outbound type: ",tags).SequenceEqual(new[]{"valid2022"}),"native decode index maps to the exact member");

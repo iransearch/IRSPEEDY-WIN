@@ -88,8 +88,9 @@ namespace IRSpeedyVPN.Services.Xray
             return Utils.ToJson(cfg);
         }
 
-        // Probe box dns-direct is its own DoH resolver, independent of live AI/Pool.
-        // ForceIP propagates DoH errors instead of silently falling back to OS DNS.
+        // Probe box dns-direct uses the physical network's local/system DNS.
+        // Keep Xray (including XHTTP download sockets) on this isolated resolver;
+        // live AI/Pool and website DNS policies are independent.
         internal const string UrlTestOutboundDnsStrategy = "ForceIP";
 
         /// <summary>

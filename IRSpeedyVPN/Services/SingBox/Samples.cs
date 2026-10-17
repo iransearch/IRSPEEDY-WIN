@@ -282,15 +282,17 @@ namespace IRSpeedyVPN.Services.SingBox
         public static string sg_UrlTest = @"{
     ""dns"": {
         ""rules"": [],
-        ""servers"": [{
-            ""tag"": ""dns-direct"",
-            ""type"": ""https-race"",
-            ""servers"": [
-                {""server"": ""8.8.8.8"", ""path"": ""/dns-query"", ""tls"": {""enabled"": true, ""server_name"": ""dns.google""}},
-                {""server"": ""1.1.1.1"", ""path"": ""/dns-query"", ""tls"": {""enabled"": true, ""server_name"": ""cloudflare-dns.com""}},
-                {""server"": ""77.88.8.8"", ""path"": ""/dns-query"", ""tls"": {""enabled"": true, ""server_name"": ""common.dot.dns.yandex.net""}}
-            ]
-        }]
+        ""servers"": [
+            {
+                ""domain_resolver"": ""dns-local"",
+                ""tag"": ""dns-direct"",
+                ""type"": ""local""
+            },
+            {
+                ""tag"": ""dns-local"",
+                ""type"": ""local""
+            }
+        ]
     },
     ""endpoints"": [],
     ""log"": {

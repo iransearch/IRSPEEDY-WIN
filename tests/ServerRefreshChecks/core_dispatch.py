@@ -80,7 +80,7 @@ tests = r'''
     Check(SingBox.ConfigGenerator.Chains[urls[0].url].SequenceEqual(new[]{"vless://chain"})&&SingBox.ConfigGenerator.Endpoints.ContainsKey(urls[1].url),"mixed-country runner resolves each config's own chain and SNI");
     Check(req.NeedXray&&req.MaxConcurrency==15&&req.TestTimeoutMs==5000,"refresh retains Core Xray/concurrency/timeout policy");
     Check(req.Url=="https://example.invalid/probe","refresh retains the configured health-test URL");
-    Check(req.XrayOutboundDnsStrategy==Xray.ConfigGenerator.UrlTestOutboundDnsStrategy,"refresh binds Xray DNS to the probe box resolver without OS fallback");
+    Check(req.XrayOutboundDnsStrategy==Xray.ConfigGenerator.UrlTestOutboundDnsStrategy,"refresh binds Xray DNS to the isolated probe box resolver");
     var result=new TestResp{Results=req.OutboundTags.Select((t,i)=>new URLTestResp{OutboundTag=t,LatencyMs=100+i}).ToList()};
     report(result);return result;
    };
