@@ -6,6 +6,10 @@ to check the production RPC's failed-first member ordering and stable fallback o
 Run `python3 tests/ServerRefreshChecks/manual_refresh.py /path/to/dotnet`
 to exercise the global configuration shuffle, independent numbered rows, persistent
 cache clearing, partial/final updates, duplicate clicks, API replacement and cancellation.
+The Greece regression runs the production retry policy through manual callbacks:
+cancel during a pending primary request or >500ms alternate retry, then reload
+the real cache. Measured successes survive; untested members stay unknown, late
+callbacks are rejected, and an unfinished row is not marked complete.
 Run `python3 tests/ServerRefreshChecks/api_refresh.py /path/to/dotnet`
 to exercise the authenticated API phase, transactional list replacement, shared
 maintenance gate, stale-response guards and prompt cancellation. Add `--net48`
@@ -41,7 +45,8 @@ Manual Windows acceptance:
   the latest authenticated server list, then erase pings/history, show placeholders,
   and scan a single global shuffled config queue built from the new list.
   If the fetch fails, retain the previous list and measurements and test that list;
-  replace each old measurement only with a finalized fresh member result.
+  replace member measurements as actual successful probes arrive. Untested members
+  retain their old measurements.
   A malformed response must not leave a partially replaced list. Canceling during
   the fetch must allow Connect/logout promptly and ignore the late API response.
   Search filtering does not limit testing. Smart remains fixed, the last successful
@@ -53,7 +58,8 @@ Manual Windows acceptance:
   its animation clock; restoring restarts it while busy. Check the optional base-service
   action also fits without overlapping the wordmark. A final failure stops the spinner.
 - Connect/logout during refresh cancels and drains it before lifecycle work continues;
-  provisional values disappear and late callbacks cannot restore old results.
+  every actual successful measurement already shown survives in the row and on disk;
+  late callbacks cannot change it after cancellation.
 - An explicit refresh after a failed connection is allowed while disconnected.
   Merely returning to the list never resumes a consumed scan.
 - Initial list checks all countries once.
@@ -81,7 +87,9 @@ Manual Windows acceptance:
 - During the initial scan, include a fast successful member and a member that times out: the first ping
   appears while the remaining members/retry are still running. Ordering stays
   stable until the final result; the provisional status clears on completion.
-- Cancel after a provisional ping appears: the cached result and availability
-  return before connection startup. An old tooltip must not label it as a new test.
+- During manual refresh, connect after the first ping appears while its batch/retry
+  is still running. Disconnect and verify that the starred country keeps its real
+  ping and availability. Repeat with logout/login and an API rebind; untested members
+  must remain unknown and a partial row must not acquire a completed outcome.
 - During disconnect rounds, the previous result stays visible until that row's
   full test completes, then updates/reorders, including failure and recovery.

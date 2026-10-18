@@ -16,6 +16,7 @@ namespace IRSpeedyVPN.Services
         {
             internal Url Probe;
             internal readonly List<Owner> Owners = new List<Owner>();
+            internal long BestSuccessfulLatency;
             internal bool Completed;
         }
         private readonly List<Candidate> queue;

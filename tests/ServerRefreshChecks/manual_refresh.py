@@ -21,6 +21,8 @@ stubs = stubs.replace('class TunnelPlusService : IVPNService {', 'interface ISma
 stubs = stubs.replace('class Info { public object CurrentService;', 'class Info {public string Username="user"; public IVPNService CurrentService;')
 stubs = stubs.replace('class Program {', 'class Factory {public List<IVPNService> Services;}\nclass Program {\n Factory serviceFactory=new Factory();string _selectedServiceName="xfast",selectedProtocol;bool _isLoading;IVPNService selectedService;')
 stubs = stubs.replace('public int Updates,Progresses;', 'public IVPNService SelectedService;public void Load(IVPNService[] s,bool supported){}public int Updates,Progresses;')
+stubs = stubs.replace('using IRSpeedyVPN.Services;', 'using IRSpeedyVPN.Services.Libcore;using IRSpeedyVPN.Services;')
+stubs = stubs.replace('class Program {', 'class Program {string CacheAccount;')
 manual = (root / 'IRSpeedyVPN/UserControls/UCServerList.ServerResultsRefresh.cs').read_text()
 manual = manual[manual.index('        private bool manualRefreshBusy;'):manual.rfind('\n    }')]
 tests = r'''
@@ -29,7 +31,7 @@ tests = r'''
  static TunnelPlusService S(string country,int id,int members=1)=>new TunnelPlusService{ID=id,CountryCode=country,
    urls=Enumerable.Range(0,members).Select(i=>new Url{url="vless://fixture-"+id+"-"+i,extra_field_1="chain-"+id+"-"+i,chainproxy=1}).ToList()};
  static async Task Until(Func<bool> condition){for(int i=0;i<1000&&!condition();i++)await Task.Delay(2);Check(condition(),"async condition settled");}
- static Program View(string dir,params TunnelPlusService[] rows){var p=new Program{_currentServices=rows};p.probeCacheContext="user\nxfast\n";p.probeCache=new ServerCheckCache(Guid.NewGuid().ToString(),"xfast",dir);p.probeCache.Bind(rows);return p;}
+ static Program View(string dir,params TunnelPlusService[] rows){var p=new Program{_currentServices=rows,CacheAccount=Guid.NewGuid().ToString()};p.probeCacheContext="user\nxfast\n";p.probeCache=new ServerCheckCache(p.CacheAccount,"xfast",dir);p.probeCache.Bind(rows);return p;}
  static void Main()=>new UiContext().Run(Run);
  static async Task Run(){
   string dir=Path.Combine(Path.GetTempPath(),"manual-refresh-"+Guid.NewGuid());Directory.CreateDirectory(dir);
@@ -60,6 +62,35 @@ tests = r'''
    cache.Bind(replacement);cache.RecordRefreshMember(rows[0],rows[0].urls[0],999,DateTime.UtcNow);
    Check(!cache.ClearForManualRefresh(rows)&&replacement[0].urls[0].latency==0,"obsolete API objects cannot clear/commit replacement rows");
    cache.FinishManualRefresh(rows);Check(!cache.InitialScanCompleted,"obsolete manual round cannot mark the replacement initial scan complete");
+
+   // Greece regression: the production retry policy reports an actual successful
+   // ping while primary/alternate RPC work is still pending. Connect/logout must
+   // preserve that measurement even when no member-completed callback has run.
+   foreach(bool duringRetry in new[]{false,true}){
+    var greece=View(dir,S("GR",50,2));bool waiting=false;int rpcPass=0;int completed=0;
+    Action<Url,long> oldProgress=null,oldComplete=null;Url greekFirst=null;
+    long expected=duringRetry?640:720;
+    TunnelPlusService.ManualProbe=(urls,token,progress,complete)=>{
+     var ordered=urls.OrderBy(u=>u.url).ToArray();greekFirst=ordered[0];oldProgress=progress;oldComplete=complete;
+     var request=new TestReq{Url="https://example.invalid/probe",OutboundTags=new List<string>{"0","1"}};
+     Func<int,TestResp> success=latency=>new TestResp{Results=new List<URLTestResp>{new URLTestResp{OutboundTag="0",LatencyMs=latency}}};
+     UrlTestRetryPolicy.Run(request,(req,report)=>{
+      if(++rpcPass==1){report(success(720));if(duringRetry)return success(720);}
+      else report(success(640));
+      waiting=true;while(!token.IsCancellationRequested)Thread.Sleep(1);
+      report(success(1));return success(1);
+     },()=>token.IsCancellationRequested,_=>{},null,
+       result=>progress(ordered[int.Parse(result.OutboundTag)],result.LatencyMs),
+       result=>{completed++;complete(ordered[int.Parse(result.OutboundTag)],result.LatencyMs);});
+    };
+    greece.RefreshServerResults();await Until(()=>waiting&&greece.countryPicker.Displayed==expected);
+    Check(completed==0&&greece._currentServices[0].GetServerUrls()[0].latency==expected,"first real ping is cached before pending RPC/retry completes");
+    if(duringRetry)greece.PauseServerChecks();else greece.PauseServerChecksForConnection();
+    await greece.DrainServerChecksAsync();oldProgress(greekFirst,1);oldComplete(greekFirst,1);await Task.Delay(10);
+    Check(greece.countryPicker.Displayed==expected&&greece._currentServices[0].GetServerUrls()[0].latency==expected,"Connect/logout retains the measured ping and rejects post-cancel callbacks");
+    var reopened=new[]{S("GR",50,2)};var disk=new ServerCheckCache(greece.CacheAccount,"xfast",dir);disk.Bind(reopened);
+    Check(reopened[0].urls[0].latency==expected&&reopened[0].urls[0].LastSuccessfulLatency==expected&&reopened[0].urls[1].latency==0&&!disk.InitialScanCompleted,"reload/API rebind retains the successful member without inventing a full row or an untested ping");
+   }
 
    // The API phase precedes clearing/probing and owns the pause through rebind.
    var fresh=View(dir,S("DE",61));fresh._currentServices[0].GetServerUrls()[0].latency=96;
@@ -124,11 +155,11 @@ tests = r'''
     progress(de[0],80);progress(de[1],400);Thread.Sleep(20);
     Check(live.countryPicker.Displayed==80,"slower partial results do not replace a faster row result");
     complete(us,70);Thread.Sleep(20);Check(live.countryPicker.Updates==1,"one finished country moves while another country is still testing");
-    complete(de[0],80);complete(de[1],-1);progress(us,999);
+    complete(de[0],80);complete(de[1],400);progress(us,999);
    };
    live.RefreshServerResults();await live.manualRefreshTask;await Task.Delay(20);
    Check(!live.manualRefreshBusy&&live.probeCache.InitialScanCompleted&&live.countryPicker.Updates==2,"manual round finishes once with per-row updates");
-   Check(live._currentServices[0].GetServerUrls().Select(u=>u.latency).OrderBy(x=>x).SequenceEqual(new long[]{-1,80}),"final member success/failure is preserved independently of shuffle order");
+   Check(live._currentServices[0].GetServerUrls().Select(u=>u.latency).OrderBy(x=>x).SequenceEqual(new long[]{80,400}),"final member results are preserved independently of shuffle order");
    Check(live.countryPicker.Displayed!=999,"late progress cannot overwrite a completed country");
    int before=TunnelPlusService.Calls.Count;live.RunBackgroundUrlTests(live._currentServices);await Task.Delay(20);
    Check(TunnelPlusService.Calls.Count==before,"manual completion cannot start an automatic extra scan");
@@ -148,15 +179,34 @@ tests = r'''
    Check(cancel._currentServices[0].GetServerUrls().All(u=>u.latency==0)&&cancel.countryPicker.Displayed!=999,"late canceled results cannot resurrect old or provisional values");
    cancel.globalInfo.CurrentService=S("US",99);before=cancel.HeaderUpdates;cancel.RefreshServerResults();Check(!cancel.manualRefreshBusy&&cancel.HeaderUpdates==before,"connected VPN cannot start refresh");
 
-   // A finalized member of an unfinished row survives cancellation/reload;
-   // provisional measurements and prior history never do.
+   // Every actual successful member measurement survives cancellation/reload,
+   // including a first-pass success awaiting its alternate retry.
    var partial=View(dir,S("DE",35,2));entered=false;
    TunnelPlusService.ManualProbe=(u,t,p,c)=>{c(u.Single(x=>x.url.EndsWith("-0")),125);p(u.Single(x=>x.url.EndsWith("-1")),60);entered=true;while(!t.IsCancellationRequested)Thread.Sleep(1);t.ThrowIfCancellationRequested();};
    partial.RefreshServerResults();await Until(()=>entered);partial.PauseServerChecks();await partial.DrainServerChecksAsync();
    var rebind=new[]{S("DE",35,2)};var saved=Directory.GetFiles(dir,"*.json").Select(f=>Newtonsoft.Json.Linq.JObject.Parse(File.ReadAllText(f))).Single(o=>o["Results"].Children().Any(r=>(long)r.First["Latency"]==125));
-   Check(saved["Results"].Children().Count()==1,"unfinished row's finalized member is persisted before cancellation drain completes");
+   Check(saved["Results"].Children().Count()==2,"unfinished row's completed and in-flight successful members persist before cancellation drain completes");
    partial.probeCache.Bind(rebind);
-   Check(rebind[0].urls[0].latency==125&&rebind[0].urls[1].latency==0&&rebind[0].urls[1].LastSuccessfulLatency==0,"cancel/reload retains finalized fresh members but discards provisional measurements");
+   Check(rebind[0].urls[0].latency==125&&rebind[0].urls[1].latency==60&&rebind[0].urls[1].LastSuccessfulLatency==60,"cancel/reload retains both actual measured successes");
+
+   // A stalled/erroring RPC cannot turn an already measured success into a
+   // failure. Duplicate slower samples and callbacks for foreign URLs are ignored.
+   var measured=View(dir,S("GR",67));
+   TunnelPlusService.ManualProbe=(u,t,p,c)=>{
+    p(new Url{url="vless://not-in-batch"},1);p(u[0],720);p(u[0],640);p(u[0],900);
+    Check(measured._currentServices[0].GetServerUrls()[0].latency==640,"cache retains the best actual measurement for this member");
+   };
+   measured.RefreshServerResults();await measured.manualRefreshTask;
+   Check(measured._currentServices[0].GetServerUrls()[0].latency==640,"missing final RPC result cannot erase a valid first-pass success");
+
+   // Identical configurations across rows share a probe, but every owning row
+   // must retain the success when the shared pending RPC is canceled.
+   var sharedA=S("GR",68);var sharedB=S("US",69);
+   sharedB.urls[0].url=sharedA.urls[0].url;sharedB.urls[0].extra_field_1=sharedA.urls[0].extra_field_1;
+   var sharedView=View(dir,sharedA,sharedB);entered=false;
+   TunnelPlusService.ManualProbe=(u,t,p,c)=>{Check(u.Length==1,"shared rows still use one probe");p(u[0],730);entered=true;while(!t.IsCancellationRequested)Thread.Sleep(1);t.ThrowIfCancellationRequested();};
+   sharedView.RefreshServerResults();await Until(()=>entered);sharedView.PauseServerChecks();await sharedView.DrainServerChecksAsync();
+   Check(sharedA.urls[0].latency==730&&sharedB.urls[0].latency==730,"all owning rows retain a shared actual success after cancellation");
 
    // Missing member callbacks (RPC failure) and API replacement terminate safely.
    var failed=View(dir,S("DE",41),S("US",42));failed.probesRequireDisconnect=true;TunnelPlusService.ManualProbe=(u,t,p,c)=>{};
@@ -177,6 +227,7 @@ with tempfile.TemporaryDirectory(prefix='manual-refresh-checks-') as directory:
     path = Path(directory)
     (path / 'Program.cs').write_text(stubs + region + binding + manual + tests)
     includes = ''.join(f'<Compile Include="{root / source}" />' for source in [
-        'IRSpeedyVPN/Services/ServerCheckCache.cs', 'IRSpeedyVPN/Services/ServerRefreshPlan.cs', 'IRSpeedyVPN/Models/NewService/Url.cs'])
+        'IRSpeedyVPN/Services/ServerCheckCache.cs', 'IRSpeedyVPN/Services/ServerRefreshPlan.cs', 'IRSpeedyVPN/Models/NewService/Url.cs',
+        'IRSpeedyVPN/Services/UrlTestRetryPolicy.cs', 'IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs'])
     (path / 'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion><NuGetAudit>false</NuGetAudit><NoWarn>CS0169;CS0414</NoWarn></PropertyGroup><ItemGroup>' + includes + '<PackageReference Include="Newtonsoft.Json" Version="12.0.2" /></ItemGroup></Project>')
     subprocess.run([sys.argv[1] if len(sys.argv) > 1 else 'dotnet', 'run', '--project', str(path / 'Checks.csproj'), '-v:q'], check=True)

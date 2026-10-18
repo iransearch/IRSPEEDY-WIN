@@ -93,7 +93,16 @@ namespace IRSpeedyVPN.UserControls
                         Action<Url, long> progress = (url, latency) =>
                         {
                             ServerRefreshPlan.Candidate member;
-                            if (!listRefreshed || latency <= 0 || !current() || !members.TryGetValue(url, out member)) return;
+                            if (latency <= 0 || !current() || !members.TryGetValue(url, out member) || member.Completed
+                                || (member.BestSuccessfulLatency > 0 && latency >= member.BestSuccessfulLatency)) return;
+                            member.BestSuccessfulLatency = latency;
+                            // Progress is an actual successful probe, even when its
+                            // primary batch or >500ms retry is still pending. Commit
+                            // before making the row selectable so Connect/logout can
+                            // cancel the remaining work without losing this ping.
+                            foreach (var owner in member.Owners)
+                                cache.RecordRefreshMember(owner.Service, owner.Url, latency, DateTime.UtcNow);
+                            if (!listRefreshed) return;
                             foreach (var owner in member.Owners.Select(o => o.Service).Distinct())
                             {
                                 bestByRow.AddOrUpdate(owner, latency, (s, old) => Math.Min(old, latency));
@@ -109,6 +118,8 @@ namespace IRSpeedyVPN.UserControls
                         {
                             ServerRefreshPlan.Candidate member;
                             if (!current() || !members.TryGetValue(url, out member) || member.Completed) return;
+                            if (member.BestSuccessfulLatency > 0)
+                                latency = latency > 0 ? Math.Min(latency, member.BestSuccessfulLatency) : member.BestSuccessfulLatency;
                             var rowsDone = plan.Complete(member);
                             foreach (var owner in member.Owners)
                                 cache.RecordRefreshMember(owner.Service, owner.Url, latency, DateTime.UtcNow);
@@ -139,8 +150,8 @@ namespace IRSpeedyVPN.UserControls
             catch (Exception ex) { LogHelper.WriteLog(ex); }
             finally
             {
-                // Keep already finalized members if cancellation interrupted an
-                // unfinished row/batch; provisional progress is never persisted.
+                // Persist every actual successful measurement accepted before
+                // cancellation, including members whose batch/retry is unfinished.
                 if (refreshStarted) await Task.Run(() => cache.PersistQueue());
                 if (ReferenceEquals(services, _currentServices))
                 {
