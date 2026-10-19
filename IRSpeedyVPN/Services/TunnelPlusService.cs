@@ -129,7 +129,7 @@ namespace IRSpeedyVPN.Services
         const int CorePort = 19810;
         const int VpnCorePort = 19811;
         const int CoreConnectTimeoutMs = 8000;
-        const int CoreStartDeadlineMs = 12000;
+        const int CoreStartDeadlineMs = 30000;
         const int CoreConnectRetryDelayMs = 200;
         const int DisconnectStopDeadlineMs = 750;
         const int DisconnectKillWaitMs = 1000;        
@@ -543,7 +543,12 @@ namespace IRSpeedyVPN.Services
                 error = "Connection canceled.";
                 return false;
             }
+            var startupClock = Stopwatch.StartNew();
+            Diagnostic("core-ensure-begin");
             EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
+            Diagnostic("core-ensure-complete", "elapsedMs=" + startupClock.ElapsedMilliseconds);
+            var rpcClock = new Stopwatch();
+            var startupStage = "stop-before-start";
             ErrorResp startResp;
             try
             {
@@ -553,7 +558,10 @@ namespace IRSpeedyVPN.Services
                     if (!SafeStopCore(client))
                         throw new IOException("Core did not acknowledge Stop before Start.");
                     cancellation.ThrowIfCancellationRequested();
-                    Diagnostic("core-start-rpc-begin");
+                    Diagnostic("core-pre-start-stop-complete", "elapsedMs=" + startupClock.ElapsedMilliseconds);
+                    startupStage = "start";
+                    rpcClock.Start();
+                    Diagnostic("core-start-rpc-begin", "deadlineMs=" + CoreStartDeadlineMs);
                     return client.StartWithDeadline(new LoadConfigReq
                     {
                         CoreConfig = configData ?? "",
@@ -573,25 +581,35 @@ namespace IRSpeedyVPN.Services
             catch (TimeoutException ex)
             {
                 LogHelper.WriteLog(ex);
-                error = "Timeout connecting to core service.";
+                Diagnostic("core-start-rpc-timeout", "stage=" + startupStage
+                    + " elapsedMs=" + rpcClock.ElapsedMilliseconds + " deadlineMs=" + CoreStartDeadlineMs);
+                error = "مهلت شروع سرویس اتصال به پایان رسید؛ دوباره تلاش کنید.";
                 RecoverCoreAfterFailedStart();
                 return false;
             }
             catch (OperationCanceledException)
             {
-                Diagnostic("core-start-rpc-canceled");
+                Diagnostic("core-start-rpc-canceled", "stage=" + startupStage + " elapsedMs=" + rpcClock.ElapsedMilliseconds);
                 error = "Connection canceled.";
                 RecoverCoreAfterFailedStart();
                 return false;
             }
             catch (IOException ex)
             {
-                Diagnostic("core-start-rpc-failed", "exception=" + ex.GetType().Name);
+                Diagnostic("core-start-rpc-failed", "exception=" + ex.GetType().Name + " stage=" + startupStage + " elapsedMs=" + rpcClock.ElapsedMilliseconds);
                 error = "Core did not respond while starting. Please try again.";
                 RecoverCoreAfterFailedStart();
                 return false;
             }
-            Diagnostic("core-start-rpc-complete");
+            // Cancellation may race with the final response before the socket callback.
+            if (userCancelRequested || GetStartCancellation().IsCancellationRequested)
+            {
+                error = "Connection canceled.";
+                RecoverCoreAfterFailedStart();
+                return false;
+            }
+            Diagnostic("core-start-rpc-complete", "elapsedMs=" + rpcClock.ElapsedMilliseconds
+                + " totalMs=" + startupClock.ElapsedMilliseconds);
             Diagnostic("config-apply-result", "success=" + string.IsNullOrEmpty(startResp.Error));
             if (string.IsNullOrEmpty(startResp.Error))
                 diagnosticXrayConfigId = needXray ? ConnectionDiagnostics.Fingerprint(xrayConfig) : "none";

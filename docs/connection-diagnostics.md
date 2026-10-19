@@ -71,3 +71,26 @@ are still required. On Windows, run Germany 2 tests in the chosen mode, connect,
 then repeat after a real network switch and disconnect. Check that session,
 probe phases, network snapshots, mode and core lifecycle events are all present.
 Do not infer that `network changed` is fixed by this diagnostic-only commit.
+
+## Slow Core startup (1.4.12)
+
+Start allows up to 30 seconds for its RPC response (previously 12 seconds).
+Successful responses return immediately. Cancellation still closes only the
+Start connection; it is not delayed until the deadline. Deadline expiration is
+reported as TimeoutException, independently of transport IOException and user
+cancellation. A canceled result cannot be accepted as a successful connection.
+Existing serialized failed-start cleanup remains in place, including Stop for a
+reused Core and termination only for the process owned by this service.
+
+Application diagnostics record Core ensure time, completion of Stop before Start,
+Start RPC elapsed time and configured deadline, and the stage on failure. These
+measure application-side stages; they do not identify the internal TUN/DNS stage
+responsible for slow Core initialization. No Core binary change is required.
+The extended timeout accommodates the observed 19-second startup; it does not
+claim to remove its underlying delay.
+
+Validation: loopback RPC checks cover immediate and 13-second successful starts,
+deadline expiration, immediate cancellation and transport EOF. Existing AI recheck,
+URL-test cancellation/drain, and connection handoff checks pass. Production RPC
+and diagnostic sources compile against .NET Framework 4.8 reference assemblies.
+Full Windows packaging and live TUN/Proxy startup remain Windows acceptance checks.

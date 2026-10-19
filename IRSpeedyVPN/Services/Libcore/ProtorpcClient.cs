@@ -112,20 +112,41 @@ namespace IRSpeedyVPN.Services.Libcore
         // The Start RPC has its own connection. Closing it releases a pending read
         // immediately when the user cancels, without interrupting any other RPC.
         public TResp CallWithDeadline<TResp>(string method, byte[] requestBody,
-            Func<byte[], TResp> decode, int timeoutMs, CancellationToken cancellation)
+            Func<byte[], TResp> decode, int timeoutMs, CancellationToken cancellation, bool reportTimeout = false)
         {
             cancellation.ThrowIfCancellationRequested();
-            using (var registration = cancellation.Register(() => Dispose()))
-            using (var deadline = new Timer(_ => Dispose(), null, timeoutMs, Timeout.Infinite))
+            // Only the winner may close the socket. A timer queued after a successful
+            // response must not turn that response into a deadline failure.
+            int outcome = 0; // pending=0, completed=1, canceled=2, timed out=3
+            using (var registration = cancellation.Register(() =>
             {
-                try { return Call(method, requestBody, decode); }
-                catch (IOException) when (cancellation.IsCancellationRequested)
+                if (Interlocked.CompareExchange(ref outcome, 2, 0) == 0) Dispose();
+            }))
+            using (var deadline = new Timer(_ =>
+            {
+                if (Interlocked.CompareExchange(ref outcome, 3, 0) == 0) Dispose();
+            }, null, timeoutMs, Timeout.Infinite))
+            {
+                try
                 {
-                    throw new OperationCanceledException(cancellation);
+                    var response = Call(method, requestBody, decode);
+                    var winner = Interlocked.CompareExchange(ref outcome, 1, 0);
+                    if (winner == 2) throw new OperationCanceledException(cancellation);
+                    if (winner == 3)
+                    {
+                        if (reportTimeout) throw new TimeoutException("Core Start RPC deadline exceeded.");
+                        throw new IOException("Core RPC deadline exceeded.");
+                    }
+                    return response;
                 }
-                catch (ObjectDisposedException) when (cancellation.IsCancellationRequested)
+                catch (Exception ex) when (ex is IOException || ex is ObjectDisposedException
+                    || ex is SocketException)
                 {
-                    throw new OperationCanceledException(cancellation);
+                    var winner = Interlocked.CompareExchange(ref outcome, 1, 0);
+                    if (winner == 2) throw new OperationCanceledException(cancellation);
+                    if (winner == 3 && reportTimeout)
+                        throw new TimeoutException("Core Start RPC deadline exceeded.", ex);
+                    throw;
                 }
             }
         }

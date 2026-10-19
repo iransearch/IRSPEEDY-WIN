@@ -14,6 +14,8 @@ class Program
         await CheckUnresponsiveStart(false);
         await CheckUnresponsiveStart(true);
         await CheckResponsiveStart();
+        await CheckResponsiveStart(13000);
+        await CheckTransportFailure();
         await AutoSelectorRecheckChecks.Run();
         await UrlTestCancellationChecks.Run();
     }
@@ -36,7 +38,7 @@ class Program
                     throw new Exception("Unresponsive Start succeeded");
                 }
                 catch (OperationCanceledException) when (cancel) { }
-                catch (IOException) when (!cancel) { }
+                catch (TimeoutException) when (!cancel) { }
             });
             using (var peer = await accepted)
             {
@@ -52,16 +54,37 @@ class Program
         Console.WriteLine("PASS " + (cancel ? "user cancellation" : "Start deadline"));
     }
 
-    static async Task CheckResponsiveStart()
+    static async Task CheckTransportFailure()
+    {
+        var listener = new TcpListener(IPAddress.Loopback, 0);
+        listener.Start();
+        try
+        {
+            var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+            var accepted = listener.AcceptTcpClientAsync();
+            var call = Task.Run(() => new LibcoreServiceClient("127.0.0.1", port)
+                .StartWithDeadline(new LoadConfigReq(), 30000, CancellationToken.None));
+            using (var peer = await accepted) { }
+            if (await Task.WhenAny(call, Task.Delay(3000)) != call)
+                throw new Exception("Closed peer did not release Start");
+            try { await call; throw new Exception("Closed peer succeeded"); }
+            catch (IOException) { }
+        }
+        finally { listener.Stop(); }
+        Console.WriteLine("PASS transport failure remains distinct from timeout");
+    }
+
+    static async Task CheckResponsiveStart(int delayMs = 0)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
         var port = ((IPEndPoint)listener.LocalEndpoint).Port;
         var accepted = listener.AcceptTcpClientAsync();
         var call = Task.Run(() => new LibcoreServiceClient("127.0.0.1", port)
-            .StartWithDeadline(new LoadConfigReq(), 2000, CancellationToken.None));
+            .StartWithDeadline(new LoadConfigReq(), 30000, CancellationToken.None));
         using (var peer = await accepted)
         {
+            if (delayMs > 0) await Task.Delay(delayMs);
             // Empty protobuf response header and body, as in ExitChecks.
             await peer.GetStream().WriteAsync(new byte[] { 0, 0 }, 0, 2);
             if (await Task.WhenAny(call, Task.Delay(3000)) != call)
@@ -71,6 +94,6 @@ class Program
                 throw new Exception("Responsive Start returned an error");
         }
         listener.Stop();
-        Console.WriteLine("PASS responsive Start");
+        Console.WriteLine("PASS responsive Start delayMs=" + delayMs);
     }
 }

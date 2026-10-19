@@ -44,7 +44,7 @@ namespace IRSpeedyVPN.Services.Libcore
             cancellation.ThrowIfCancellationRequested();
             using (var client = ProtorpcClient.Connect(_host, _port, Math.Min(_timeoutMs, timeoutMs), cancellation))
                 return client.CallWithDeadline("LibcoreService.Start", LibcoreProto.EncodeLoadConfigReq(req),
-                    LibcoreProto.DecodeErrorResp, timeoutMs, cancellation);
+                    LibcoreProto.DecodeErrorResp, timeoutMs, cancellation, reportTimeout: true);
         }
 
         public ErrorResp Stop()
