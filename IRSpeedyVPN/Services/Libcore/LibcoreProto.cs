@@ -104,6 +104,31 @@ namespace IRSpeedyVPN.Services.Libcore
             return w.ToArray();
         }
 
+        public static CoreBuildInfo DecodeCoreBuildInfo(byte[] data)
+        {
+            var result = new CoreBuildInfo();
+            var r = new ProtoReader(data);
+            while (r.TryReadField(out int field, out int wire))
+            {
+                if (field == 7 && wire == WireVarint) result.ProcessId = checked((int)r.ReadVarint());
+                else if (wire == WireLengthDelimited && field >= 2 && field <= 8 && field != 7)
+                {
+                    var value = r.ReadString();
+                    switch (field)
+                    {
+                        case 2: result.SingBoxVersion = value; break;
+                        case 3: result.XrayVersion = value; break;
+                        case 4: result.Commit = value; break;
+                        case 5: result.Modified = value; break;
+                        case 6: result.Architecture = value; break;
+                        case 8: result.GoVersion = value; break;
+                    }
+                }
+                else r.SkipField(wire);
+            }
+            return result;
+        }
+
         public static ErrorResp DecodeErrorResp(byte[] data)
         {
             var resp = new ErrorResp();

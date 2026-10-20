@@ -96,26 +96,38 @@ namespace IRSpeedyVPN.Common
         // Read-only lookup: never grants lifecycle ownership to another service.
         internal static void ObserveListener(int port)
         {
+            try
+            {
+                int pid = ListenerPid(port);
+                if (pid > 0) Register(port, Process.GetProcessById(pid));
+            }
+            catch { }
+        }
+        // Always read the current listener. A remembered test-process PID can be stale.
+        internal static int ListenerPid(int port)
+        {
             IntPtr buffer = IntPtr.Zero;
             try
             {
-                if (Pid(port) > 0) return;
                 int size = 0;
-                if (GetExtendedTcpTable(IntPtr.Zero, ref size, false, 2, 3, 0) != 122 || size < 4 || size > 4 * 1024 * 1024) return;
+                if (GetExtendedTcpTable(IntPtr.Zero, ref size, false, 2, 3, 0) != 122 || size < 4 || size > 4 * 1024 * 1024) return -1;
                 buffer = Marshal.AllocHGlobal(size);
-                if (GetExtendedTcpTable(buffer, ref size, false, 2, 3, 0) != 0) return;
+                if (GetExtendedTcpTable(buffer, ref size, false, 2, 3, 0) != 0) return -1;
                 int count = Math.Min(Marshal.ReadInt32(buffer), (size - 4) / 24);
+                int found = -1;
                 for (int i = 0; i < count; i++)
                 {
                     int offset = 4 + i * 24;
                     int localPort = Marshal.ReadByte(buffer, offset + 8) * 256 + Marshal.ReadByte(buffer, offset + 9);
                     int address = Marshal.ReadInt32(buffer, offset + 4);
                     if (Marshal.ReadInt32(buffer, offset) != 2 || localPort != port || (address != 0 && address != 0x0100007f)) continue;
-                    Register(port, Process.GetProcessById(Marshal.ReadInt32(buffer, offset + 20)));
-                    return;
+                    int owner = Marshal.ReadInt32(buffer, offset + 20);
+                    if (found > 0 && owner != found) return -1;
+                    found = owner;
                 }
+                return found;
             }
-            catch { }
+            catch { return -1; }
             finally { if (buffer != IntPtr.Zero) Marshal.FreeHGlobal(buffer); }
         }
         [DllImport("iphlpapi.dll")]

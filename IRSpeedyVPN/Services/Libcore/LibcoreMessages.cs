@@ -20,6 +20,12 @@ namespace IRSpeedyVPN.Services.Libcore
         public uint RawResponseLen { get; set; }
     }
 
+    internal sealed class CoreBuildInfo
+    {
+        public string SingBoxVersion, XrayVersion, Commit, Modified, Architecture, GoVersion;
+        public int ProcessId;
+    }
+
     internal class EmptyReq { }
 
     internal class EmptyResp { }

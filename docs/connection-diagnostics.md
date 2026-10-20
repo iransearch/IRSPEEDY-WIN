@@ -94,3 +94,36 @@ deadline expiration, immediate cancellation and transport EOF. Existing AI reche
 URL-test cancellation/drain, and connection handoff checks pass. Production RPC
 and diagnostic sources compile against .NET Framework 4.8 reference assemblies.
 Full Windows packaging and live TUN/Proxy startup remain Windows acceptance checks.
+
+## Running Core identity (1.4.13)
+
+Before each connection Start, the application makes an optional, cancellable
+750ms IsPrivileged RPC to the same Core control endpoint. Additive response fields
+2–8 carry sing-box/Xray versions, Core VCS revision, source-modified state,
+architecture, PID and Go version. Core obtains VCS settings with ReadBuildInfo;
+missing build stamping stays `unknown`. This is the Core repository commit, not
+the sing-box dependency revision or the app version. Rebuild Throne-G with the
+updated proto and adapter to enable self-reported metadata. Existing builders
+regenerate the protobuf sources as before; retain Go VCS stamping and a clean
+Git checkout when making a distributable Core.
+
+Legacy Core responses still work. The app obtains the current listener owner
+from the Windows TCP listener table (not only a cached process reference) and
+reads its executable path and full SHA256. Mismatched RPC and listener PIDs reject
+the attribution; unavailable permissions/metadata stay unknown. Process lookup
+never transfers ownership or allows killing an unrelated process.
+
+`[CoreRuntimeIdentity]` is logged before Start, including successful connections.
+For a rejected Start, timeout or transport failure, the compact banner opens a
+copyable details dialog with app version, Core component versions/commit, dirty
+state, architecture, Go version, PID, actual executable path and SHA256. The
+unsupported-Pool error gets an explicit Persian summary. Raw config text is not
+copied into this report. Other app messages clear the previous report.
+
+Validation: real loopback RPC identity/legacy/deadline checks, wrong-PID rejection,
+metadata sanitization, config-secret exclusion, Go VCS extraction tests, protobuf
+regeneration, production WPF handlers and RPC/metadata compilation against net48.
+Windows executable packaging, visual inspection and real process-path/hash access
+still require the user's Windows acceptance test. First rebuild Core, then include
+that output in the existing single-file app builder; test locally before sending
+it to the affected customer.

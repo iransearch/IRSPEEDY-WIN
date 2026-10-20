@@ -550,9 +550,17 @@ namespace IRSpeedyVPN.Services
             var rpcClock = new Stopwatch();
             var startupStage = "stop-before-start";
             ErrorResp startResp;
+            var runtimeIdentity = new CoreRuntimeIdentity();
             try
             {
                 var cancellation = GetStartCancellation();
+                CoreBuildInfo buildInfo = null;
+                try { buildInfo = new LibcoreServiceClient("127.0.0.1", CorePort).QueryBuildInfo(750, cancellation); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception ex) { Diagnostic("core-identity-unavailable", "exception=" + ex.GetType().Name); }
+                runtimeIdentity = CoreRuntimeIdentity.Capture(buildInfo, CoreDiagnosticMetadata.ListenerPid(CorePort));
+                LogHelper.WriteLog("[CoreRuntimeIdentity]\n" + runtimeIdentity.Details);
+                cancellation.ThrowIfCancellationRequested();
                 startResp = ExecuteCoreCall(client =>
                 {
                     if (!SafeStopCore(client))
@@ -583,7 +591,7 @@ namespace IRSpeedyVPN.Services
                 LogHelper.WriteLog(ex);
                 Diagnostic("core-start-rpc-timeout", "stage=" + startupStage
                     + " elapsedMs=" + rpcClock.ElapsedMilliseconds + " deadlineMs=" + CoreStartDeadlineMs);
-                error = "مهلت شروع سرویس اتصال به پایان رسید؛ دوباره تلاش کنید.";
+                error = runtimeIdentity.Failure("startup-timeout");
                 RecoverCoreAfterFailedStart();
                 return false;
             }
@@ -597,7 +605,7 @@ namespace IRSpeedyVPN.Services
             catch (IOException ex)
             {
                 Diagnostic("core-start-rpc-failed", "exception=" + ex.GetType().Name + " stage=" + startupStage + " elapsedMs=" + rpcClock.ElapsedMilliseconds);
-                error = "Core did not respond while starting. Please try again.";
+                error = runtimeIdentity.Failure("rpc-transport-failure");
                 RecoverCoreAfterFailedStart();
                 return false;
             }
@@ -615,7 +623,8 @@ namespace IRSpeedyVPN.Services
                 diagnosticXrayConfigId = needXray ? ConnectionDiagnostics.Fingerprint(xrayConfig) : "none";
             if (!string.IsNullOrEmpty(startResp.Error))
             {
-                error = startResp.Error;
+                Diagnostic("core-start-config-error", "reason=" + NetworkFailureDiagnostic.CoreReason(startResp.Error));
+                error = runtimeIdentity.Failure(startResp.Error);
                 TryStopCore();
                 return false;
             }

@@ -1,4 +1,4 @@
-using IRSpeedyVPN.WebServices;
+﻿using IRSpeedyVPN.WebServices;
 using IRSpeedyVPN.UserControls;
 using IRSpeedyVPN.Windows;
 using System;
@@ -813,6 +813,30 @@ namespace IRSpeedyVPN
             notify.Visible = true;
             notify.ShowBalloonTip(5000, Title, Message, System.Windows.Forms.ToolTipIcon.Info);
         }
+        private string coreFailureDetails;
+        private void CoreFailureDetails_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            if (string.IsNullOrEmpty(coreFailureDetails)) return;
+            var report = coreFailureDetails;
+            var details = new System.Windows.Controls.TextBox
+            {
+                Text = report, IsReadOnly = true, TextWrapping = TextWrapping.Wrap,
+                VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto,
+                FlowDirection = FlowDirection.LeftToRight, Margin = new Thickness(12)
+            };
+            var copy = new System.Windows.Controls.Button { Content = "کپی گزارش خطا", Margin = new Thickness(12), Padding = new Thickness(12, 6, 12, 6) };
+            copy.Click += (s, args) => { try { Clipboard.SetText(report); } catch { } };
+            var panel = new System.Windows.Controls.DockPanel();
+            System.Windows.Controls.DockPanel.SetDock(copy, System.Windows.Controls.Dock.Bottom);
+            panel.Children.Add(copy); panel.Children.Add(details);
+            details.SetResourceReference(System.Windows.Controls.Control.BackgroundProperty, "Theme.LegacySurfaceBrush");
+            details.SetResourceReference(System.Windows.Controls.Control.ForegroundProperty, "TextPrimaryBrush");
+            var window = new Window { Title = "جزئیات خطای اتصال", Owner = this, Width = 400, Height = 420,
+                MinWidth = 320, MinHeight = 260, WindowStartupLocation = WindowStartupLocation.CenterOwner, Content = panel };
+            window.SetResourceReference(Window.BackgroundProperty, "WindowBackgroundBrush");
+            window.ShowDialog();
+        }
+
         void ShowMessage(string Message, bool success = false)
         {
             // A failed connection candidate does not mean the server list is empty.
@@ -823,6 +847,17 @@ namespace IRSpeedyVPN
             Dispatcher.Invoke((Action)(() =>
             {
                 
+                coreFailureDetails = Message != null && Message.StartsWith(CoreRuntimeIdentity.ErrorPrefix, StringComparison.Ordinal)
+                    ? Message.Substring(CoreRuntimeIdentity.ErrorPrefix.Length) : null;
+                lblErrorMessage.Cursor = coreFailureDetails != null ? System.Windows.Input.Cursors.Hand : null;
+                lblErrorMessage.ToolTip = coreFailureDetails != null ? "برای نمایش نسخهٔ Core و کپی گزارش کلیک کنید" : null;
+                if (coreFailureDetails != null)
+                {
+                    lblErrorMessage.Text = coreFailureDetails.Split('\n')[0] + "\nنمایش جزئیات خطا و نسخهٔ Core";
+                    lblErrorMessage.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty, "Theme.DangerBrush");
+                    lblErrorMessage.Visibility = Visibility.Visible;
+                    return;
+                }
                 if (!string.IsNullOrEmpty(Message))
                 {
                     lblErrorMessage.SetResourceReference(System.Windows.Controls.TextBlock.ForegroundProperty,
