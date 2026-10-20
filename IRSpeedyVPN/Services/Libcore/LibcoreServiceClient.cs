@@ -250,7 +250,10 @@ namespace IRSpeedyVPN.Services.Libcore
                     pos += 8;
                     break;
                 case 2:
-                    pos += checked((int)ReadVarint(data, ref pos));
+                    // ReadVarint advances pos. Compound assignment would capture
+                    // the old pos and skip one length-prefix byte too few.
+                    int length = checked((int)ReadVarint(data, ref pos));
+                    pos = checked(pos + length);
                     break;
                 case 5:
                     pos += 4;

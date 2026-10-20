@@ -36,16 +36,20 @@ class Program
         var report = empty.Failure("config password=secret unknown outbound type: auto-selector-round-robin");
         Check(report.Contains("Pool") && report.Contains("Core commit: unknown") && !report.Contains("secret"), "actionable report keeps missing identity explicit and excludes config secrets");
         Check(empty.Failure("startup-timeout").Contains("مهلت"), "timeout retains its distinct reason");
+        await WireQuery(false, true);
         await WireQuery(false);
         await WireQuery(true);
     }
-    static async Task WireQuery(bool stall)
+    static async Task WireQuery(bool stall, bool health = false)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
         try
         {
             var accepted = listener.AcceptTcpClientAsync();
-            var call = Task.Run(() => new LibcoreServiceClient("127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port).QueryBuildInfo(400, CancellationToken.None));
+            var call = Task.Run(() => {
+                var client = new LibcoreServiceClient("127.0.0.1", ((IPEndPoint)listener.LocalEndpoint).Port);
+                return health ? (object)client.IsPrivileged() : client.QueryBuildInfo(400, CancellationToken.None);
+            });
             using (var peer = await accepted)
             {
                 var stream = peer.GetStream();
@@ -61,7 +65,8 @@ class Program
                 }
                 Check(await Task.WhenAny(call, Task.Delay(2000)) == call, "optional identity RPC remains bounded");
                 if (stall) { try { await call; throw new Exception("stall succeeded"); } catch (IOException) { } }
-                else Check((await call).Commit == "abc123", "running Core metadata reaches client");
+                else if (health) Check(((IsPrivilegedResponse)await call).HasPrivilege, "startup health probe accepts extended identity fields");
+                else Check(((CoreBuildInfo)await call).Commit == "abc123", "running Core metadata reaches client");
             }
         }
         finally { listener.Stop(); }

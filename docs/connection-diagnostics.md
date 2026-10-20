@@ -127,3 +127,15 @@ Windows executable packaging, visual inspection and real process-path/hash acces
 still require the user's Windows acceptance test. First rebuild Core, then include
 that output in the existing single-file app builder; test locally before sending
 it to the affected customer.
+
+### Extended handshake health probe fix (1.4.14)
+
+The startup runtime validator also decodes IsPrivileged, separately from the
+identity decoder. Its unknown length-delimited field skip used `pos +=
+ReadVarint(... ref pos)`, which retained the position before reading the length
+prefix. Added identity strings exposed this off-by-prefix bug: the validator
+rejected a healthy new runtime with an unsupported protobuf wire-type error and
+kept the previous runtime active. Reading the length first and then advancing
+the updated position fixes candidate validation. A real TCP RPC regression check
+now feeds the extended identity response through the startup health decoder;
+it failed before this fix and passes afterward. Core 51aa2be is unchanged.
