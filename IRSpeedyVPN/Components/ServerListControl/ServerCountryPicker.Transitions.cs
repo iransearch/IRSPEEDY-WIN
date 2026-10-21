@@ -43,8 +43,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _rowsUpdate = null;
             bool animate = SystemParameters.ClientAreaAnimation && IsLoaded && IsVisible
                 && Window.GetWindow(this)?.WindowState != WindowState.Minimized;
-            int firstVisibleIndex = (int)Math.Max(0, ServerScroller.VerticalOffset / 60);
-            _serverList.Publish(_groups.Select(group => new ServerItem(group)), animate, firstVisibleIndex);
+            _serverList.Publish(_groups.Select(group => new ServerItem(group)), animate);
         }
 
         private void CompleteRowTransitions()

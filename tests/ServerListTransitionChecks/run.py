@@ -37,12 +37,22 @@ class Clock {
  public readonly Dictionary<ServerDisplaySlot,ServerRowTransition> Active=new Dictionary<ServerDisplaySlot,ServerRowTransition>();
  public readonly List<ServerRowTransition> Started=new List<ServerRowTransition>();
  readonly HashSet<ServerDisplaySlot> Attached=new HashSet<ServerDisplaySlot>();
- public void Attach(ServerListViewModel vm) { foreach(var slot in vm.Slots) if(Attached.Add(slot))slot.TransitionRequested+=Start; }
- void Start(ServerDisplaySlot slot,ServerRowTransition t){Active[slot]=t;Started.Add(t);}
- public void FinishWave() {
-  var wave=Active.ToArray();Active.Clear();foreach(var pair in wave)pair.Key.Finish(pair.Value);
+ public int PeakActive;
+ public void Attach(ServerListViewModel vm,int firstRealized=0) {
+  foreach(var slot in vm.Slots.Skip(firstRealized))if(Attached.Add(slot))slot.TransitionRequested+=Start;
  }
- public void Drain(ServerListViewModel vm){int limit=20;while(vm.IsTransitioning&&limit-->0)FinishWave();Check(!vm.IsTransitioning,"clock drains without a stale completion/deadlock");}
+ void Start(ServerDisplaySlot slot,ServerRowTransition t){
+  Active.Add(slot,t);Started.Add(t);PeakActive=Math.Max(PeakActive,Active.Count);
+  if(Active.Count!=1)throw new Exception("a second row started before the first finished");
+ }
+ public void FinishRow() {
+  var row=Active.Single();Active.Clear();row.Key.Finish(row.Value);
+ }
+ public void Drain(ServerListViewModel vm){
+  int limit=Math.Max(20,vm.Slots.Count*3);
+  while(vm.IsTransitioning&&limit-->0)FinishRow();
+  Check(!vm.IsTransitioning,"sequential queue drains without a stale completion/deadlock");
+ }
  public static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS "+name);}
 }
 class Program {
@@ -51,56 +61,67 @@ class Program {
  static void Check(bool value,string name)=>Clock.Check(value,name);
  static void Main(){
   var a=Group(1,true);var b=Group(2);var c=Group(3);var vm=new ServerListViewModel();
-  vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true,0);var clock=new Clock();clock.Attach(vm);
+  vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true);var clock=new Clock();clock.Attach(vm);
   Check(!vm.IsTransitioning&&vm.Slots.Count==3,"initial population is immediate");
-  b.SortKey=0;
-  vm.Publish(new[]{Snap(b),Snap(a),Snap(c)},true,0);
+  b.SortKey=0;vm.Publish(new[]{Snap(b),Snap(a),Snap(c)},true);
   Check(vm.Servers[0].Service.ID==2&&vm.Slots[0].DisplayedServer.Service.ID==1,"sorted truth changes before displayed slots");
-  Check(clock.Started.Count==2&&clock.Started[0].StaggerIndex==0&&clock.Started[1].StaggerIndex==1,"only reassigned rows sweep, in top-to-bottom order");
-  var old=vm.Slots[0].DisplayedServer; a.CountryName="changed live";a.SignalText="999 ms";a.IsSelectedCountry=false;
+  Check(clock.Started.Count==1&&clock.Active.ContainsKey(vm.Slots[0])&&vm.Slots[1].Transition==null,"only the first changed row starts; the next row has no clock");
+  var old=vm.Slots[0].DisplayedServer;a.CountryName="changed live";a.SignalText="999 ms";a.IsSelectedCountry=false;
   Check(old.CountryName=="کشور 1"&&old.SignalText=="1 ms"&&old.IsSelectedCountry,"old country, ping and selection are immutable during a sweep");
   var first=clock.Active[vm.Slots[0]];vm.Slots[0].Reveal(first);
   Check(vm.Slots[0].DisplayedServer.Service.ID==2&&!vm.Slots[0].DisplayedServer.IsSelectedCountry,"logical identity swaps only on reveal");
-  clock.FinishWave();
+  Check(clock.Started.Count==1&&vm.Slots[1].DisplayedServer.Service.ID==2,"midpoint reveal does not start the next row");
+  clock.FinishRow();
+  Check(clock.Started.Count==2&&clock.Active.ContainsKey(vm.Slots[1])&&vm.Slots[0].Transition==null,"next row starts only after full completion and old-overlay cleanup");
+  clock.FinishRow();
   Check(vm.Slots[1].DisplayedServer.Service.ID==1&&vm.Slots[1].DisplayedServer.IsSelectedCountry,"selection follows server identity into its new slot");
-  clock.Started.Clear();vm.Publish(vm.Servers.ToArray(),true,0);
+  clock.Started.Clear();vm.Publish(vm.Servers.ToArray(),true);
   Check(!vm.IsTransitioning&&clock.Started.Count==0,"identical publication skips animation");
 
   b.SignalText="—";b.IsSelectable=false;b.IsLastSuccessfulConnection=true;
-  vm.Publish(new[]{Snap(b),vm.Servers[1],Snap(c)},true,0);
-  Check(clock.Active.Count==1&&!clock.Active.Values.Single().ChangesIdentity,"ping/failure/star updates use a short fade without an identity swap");
+  vm.Publish(new[]{Snap(b),vm.Servers[1],Snap(c)},true);
+  Check(clock.Active.Count==1&&!clock.Active.Values.Single().ChangesIdentity,"ping/failure/star updates share the same single-row queue");
   clock.Drain(vm);
   Check(vm.Slots[0].DisplayedServer.SignalText=="—"&&!vm.Slots[0].DisplayedServer.IsSelectable&&vm.Slots[0].DisplayedServer.IsLastSuccessfulConnection,"failed ping and star reach the displayed snapshot");
 
   b.IsLastSuccessfulConnection=false;c.SortKey=0;b.SortKey=1;a.SortKey=2;
-  clock.Started.Clear();vm.Publish(new[]{Snap(c),Snap(b),Snap(a)},true,0);
+  clock.Started.Clear();vm.Publish(new[]{Snap(c),Snap(b),Snap(a)},true);
   a.SortKey=0;c.SortKey=1;b.SortKey=2;
-  for(int i=0;i<200;i++){b.SignalText=i+" ms";vm.Publish(new[]{Snap(b),Snap(c),Snap(a)},true,0);}
-  Check(vm.Servers[2].SignalText=="199 ms"&&clock.Started.Count==3,"rapid updates update the truth immediately and do not enqueue 200 animations");
-  clock.FinishWave();
-  Check(clock.Started.Count==6&&clock.Active.Values.All(t=>t.To==null||t.To.SignalText!="198 ms"),"next wave uses only the latest pending snapshot");
+  for(int i=0;i<200;i++){b.SignalText=i+" ms";vm.Publish(new[]{Snap(b),Snap(c),Snap(a)},true);}
+  Check(vm.Servers[2].SignalText=="199 ms"&&clock.Started.Count==1,"200 rapid updates refresh the truth while only one row is active");
+  clock.FinishRow();
+  Check(clock.Started.Count==2&&clock.Active.Values.Single().To.Service.ID==3,"waiting row reads the latest order when its turn starts");
+  clock.FinishRow();
+  Check(clock.Active.Values.Single().To.SignalText=="199 ms","a waiting row reveals the newest ping instead of a queued stale result");
   clock.Drain(vm);
-  Check(vm.Slots[2].DisplayedServer.SignalText=="199 ms","no stale ping remains after the final wave");
+  Check(clock.Started.Count==4&&vm.Slots[0].DisplayedServer.Service.ID==1&&vm.Slots[2].DisplayedServer.SignalText=="199 ms","earlier outdated slots are revisited without replaying obsolete snapshots");
 
-  b.SortKey=0;a.SortKey=1;c.SortKey=2;
-  vm.Publish(new[]{Snap(b),Snap(a),Snap(c)},true,1);
-  Check(clock.Active[vm.Slots[1]].StaggerIndex==0&&clock.Active[vm.Slots[2]].StaggerIndex==1,"scrolling starts staggering from the first visible slot");
-  var stale=clock.Active.ToArray();vm.Publish(new[]{Snap(c)},true,0);vm.CompleteImmediately();
-  foreach(var pair in stale){pair.Key.Reveal(pair.Value);pair.Key.Finish(pair.Value);}clock.Active.Clear();
-  Check(vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==3&&!vm.IsTransitioning,"minimize/disable completes the latest data and invalidates old clocks");
-  a.SortKey=0;b.SortKey=1;
-  clock.Started.Clear();vm.Publish(new[]{Snap(a),Snap(b)},true,0);clock.Drain(vm);
+  b.SortKey=0;a.SortKey=1;c.SortKey=2;vm.Publish(new[]{Snap(b),Snap(a),Snap(c)},true);
+  var stale=clock.Active.ToArray();vm.Publish(new[]{Snap(c)},true);vm.CompleteImmediately();clock.Active.Clear();
+  foreach(var pair in stale){pair.Key.Reveal(pair.Value);pair.Key.Finish(pair.Value);}
+  Check(vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==3&&!vm.IsTransitioning&&clock.Active.Count==0,"minimize/cancel flushes latest data and never starts a queued row");
+  a.SortKey=0;b.SortKey=1;clock.Started.Clear();vm.Publish(new[]{Snap(a),Snap(b)},true);clock.Drain(vm);
   Check(vm.Slots.Count==2&&vm.Slots[1].DisplayedServer.Service.ID==2,"new unrealized slots populate without waiting for a missing view");
-  clock.Attach(vm);vm.Publish(new[]{Snap(b)},true,0);clock.Drain(vm);
-  Check(vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==2,"removed rows finish revealing before trailing slots are trimmed");
-  vm.Publish(new ServerItem[0],false,0);
-  Check(vm.Slots.Count==0&&vm.Servers.Count==0,"empty list and animation-disabled path complete immediately");
-  vm.Publish(new[]{Snap(a)},true,0);
-  Check(vm.Slots.Count==1&&!vm.IsTransitioning,"single row without a realized view never waits for an animation");
-  clock.Attach(vm);vm.Publish(new[]{Snap(c)},true,0);
+  clock.Attach(vm);vm.Publish(new[]{Snap(b)},true);clock.Drain(vm);
+  Check(vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==2,"removed rows reveal sequentially before trailing slots are trimmed");
+  vm.Publish(new ServerItem[0],false);
+  Check(vm.Slots.Count==0&&vm.Servers.Count==0,"empty list and instant-update path complete immediately");
+  vm.Publish(new[]{Snap(a)},true);
+  Check(vm.Slots.Count==1&&!vm.IsTransitioning,"single unrealized row never waits for an animation");
+  clock.Attach(vm);vm.Publish(new[]{Snap(c)},true);
   Check(vm.IsTransitioning&&clock.Active.Values.Single().ChangesIdentity,"single realized row supports a complete identity reveal");
-  vm.Publish(new[]{Snap(b)},false,0);clock.FinishWave();
-  Check(!vm.IsTransitioning&&vm.Slots[0].DisplayedServer.Service.ID==2,"disabling animations mid-sweep immediately commits the latest snapshot");
+  vm.Publish(new[]{Snap(b)},false);clock.FinishRow();
+  Check(!vm.IsTransitioning&&vm.Slots[0].DisplayedServer.Service.ID==2,"instant completion during a sweep commits the latest snapshot");
+  Check(clock.PeakActive==1,"no overlap across sorting, data fades, rapid updates and cancellation");
+
+  var many=Enumerable.Range(1,4096).Select(id=>Group(id)).ToArray();var large=new ServerListViewModel();
+  large.Publish(many.Select(Snap),true);var largeClock=new Clock();largeClock.Attach(large,4095);
+  foreach(var g in many)g.SortKey=-g.Service.ID;
+  large.Publish(many.Select(Snap),true);
+  Check(largeClock.Started.Count==1&&largeClock.Active.ContainsKey(large.Slots[4095]),"4095 offscreen acknowledgments drain iteratively before the first visible row");
+  Check(large.Slots[0].DisplayedServer.Service.ID==4096,"offscreen rows commit immediately without delaying the visible light");
+  largeClock.Drain(large);
+  Check(large.Slots[4095].DisplayedServer.Service.ID==1&&largeClock.PeakActive==1,"large lists retain one active row without recursive callback growth");
  }
 }
 '''

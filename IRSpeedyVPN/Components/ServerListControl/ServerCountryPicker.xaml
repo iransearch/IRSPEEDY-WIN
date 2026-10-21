@@ -235,7 +235,7 @@
                 <Border.Effect><DropShadowEffect Color="#172340" Opacity="0.10" BlurRadius="10" ShadowDepth="3" Direction="270"/></Border.Effect>
               </Border>
               <Border BorderBrush="Transparent" BorderThickness="{TemplateBinding BorderThickness}">
-                <local:LightSweepRowTransition Slot="{Binding Mode=OneWay}" RowTemplate="{StaticResource ServerRowContent}" Padding="{TemplateBinding Padding}" Duration="0:0:0.520" StaggerDelay="0:0:0.075" BandWidth="100"/>
+                <local:LightSweepRowTransition Slot="{Binding Mode=OneWay}" RowTemplate="{StaticResource ServerRowContent}" Padding="{TemplateBinding Padding}" Duration="0:0:0.520" BandWidth="100"/>
               </Border>
             </Grid>
             <ControlTemplate.Triggers>

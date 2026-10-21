@@ -1,4 +1,4 @@
-# Server list light sweep (1.4.15)
+# Server list light sweep (1.4.18)
 
 `ServerCountryPicker.xaml` keeps the existing row artwork in `ServerRowContent`.
 Its `ServerCardButton` template hosts `LightSweepRowTransition`; the overlay is
@@ -16,7 +16,9 @@ Snapshots copy all visual values, including selection/checking/star flags; later
 probe mutations cannot silently change the old side of a running sweep.
 
 The reusable control exposes `Slot`, `RowTemplate`, `Duration` (520 ms),
-`StaggerDelay` (75 ms), `BandWidth` (100 DIP), `BandColor` and `Easing`.
+`BandWidth` (100 DIP), `BandColor` and `Easing`. Exactly one row transition can run
+at a time. The next row starts after the previous row's full completion and
+overlay cleanup, with no index-based stagger timer and no overlap.
 A single WPF `DoubleAnimation` with CubicEase/EaseInOut drives normalized progress
 `p`. In physical left-to-right coordinates its light center is
 `-BandWidth/2 + (rowWidth + BandWidth) * p`. Two content presenters have complementary
@@ -30,16 +32,19 @@ Rows retaining the same identity use a 150 ms cross-fade for changed ping/star/
 selection data; identical snapshots do not animate.
 
 Probe property notifications coalesce into one dispatcher snapshot. During a
-wave, sorted source data continues updating; only the latest pending state is
-kept. The current wave finishes, then that latest state is revealed. No queue of
-obsolete orderings is replayed, and old completion callbacks cannot overwrite a
-newer state. Clicking resolves the displayed identity against the CURRENT live
+pass, sorted source data continues updating; only the latest pending state is
+kept. The current row finishes, then the next waiting row reads its target from
+the latest source. At the end of a pass, earlier slots affected by newer results
+are revisited; unchanged slots skip animation. No queue of obsolete orderings
+is replayed, and old completion callbacks cannot overwrite a newer state.
+Clicking resolves the displayed identity against the CURRENT live
 group and health, so removed/failed servers cannot become a stale connection.
 Sorting, server pools, DNS, Core and TUN recovery behavior are unchanged.
 
 Initial population and unrealized/offscreen additions update immediately.
 Existing slots reveal additions/removals; trailing removed slots are trimmed only
-after the wave. The first visible row starts the cascade, even after scrolling.
+after the pass. Offscreen/unrealized rows complete immediately, so scrolling does
+not add an artificial delay before the first visible row starts.
 Hidden/unloaded/minimized views flush pending data and finish immediately; restore
 starts with the latest data. Resizing completes the affected row rather than
 stretching a partly revealed snapshot.
@@ -72,7 +77,9 @@ python3 tests/ServerStarGlowChecks/run.py /path/to/dotnet
 The first check exercises the production VM with a manually advanced view clock:
 snapshot isolation, midpoint identity commit, selection retention, unchanged
 rows, failure/star updates, 200 rapid publications, last-update coalescing,
-stale callbacks, offscreen staggering, additions/removals and zero/single rows.
+stale callbacks, additions/removals and zero/single rows. It asserts a peak of
+one active clock, checks that midpoint reveal cannot release the next row, and
+drains 4095 synchronous offscreen acknowledgments without recursive stack growth.
 The net48 check compiles the actual picker, view model, transition control,
 existing motion and refresh controller against WPF reference assemblies. It
 does not execute Windows XAML or establish a VPN.
@@ -80,7 +87,8 @@ does not execute Windows XAML or establish a VPN.
 Windows acceptance still required (rendering/60 FPS cannot be measured on Linux):
 
 - Build the real WPF app, re-ping several numbered countries, and verify that
-  physical left-to-right reveals cascade down with no instant row replacement.
+  physical left-to-right reveals run one row at a time, with the next row starting
+  only after the previous band has fully disappeared.
 - Select a country before it moves; check the radio and click destination both
   follow its identity. Repeat while a partial ping and a final result arrive.
 - Repeat refresh/sort during a wave; after settling, every slot must match the
@@ -88,11 +96,11 @@ Windows acceptance still required (rendering/60 FPS cannot be measured on Linux)
 - Search while sweeping; add/remove countries through a refreshed API list;
   include one country, an empty result and a failed/timeout ping (`—`, muted dot).
   Earlier successful latency remains available in the failure tooltip/cache.
-- Minimize, hide the list, resize, logout, and restore during a cascade. No old
+- Minimize, hide the list, resize, logout, and restore during a pass. No old
   animation/data should replay. Scroll to the middle before re-sorting.
 - Disable the Windows animation preference: updates must be instant.
   Check both themes, RTL text, and 100/150/200% DPI against the idle design.
-- On a low-end Windows machine, profile a ten-row cascade with WPF Perforator;
+- On a low-end Windows machine, profile a ten-row sequence with WPF Perforator;
   verify frame pacing and transient bitmap memory before claiming a 60 FPS result.
 
 ## Starred-row loading fix (1.4.16)
@@ -142,3 +150,19 @@ immutable, and the star lifecycle fix and light sweep are preserved.
 checks actual compiled Run binding mode, getter-only country loading and snapshot
 replacement without writing to the old model. Its existing already-starred row,
 hide/minimize/unload checks remain in place.
+
+## One row at a time (1.4.18)
+
+The earlier 75 ms stagger allowed several 520 ms sweeps to overlap. The scheduler
+now waits for `ServerDisplaySlot.Finish` before starting the next changed row.
+That completion notification removes the current view's clock/overlay first;
+the midpoint `Reveal` only swaps identity and never advances the queue. Short
+ping/star/selection fades use the same serial queue.
+
+Pending rows take the latest available target at their turn. A subsequent pass
+repairs only earlier rows that became outdated while the light moved downward.
+Cancellation invalidates the active callback and discards the pending sequence.
+Synchronous offscreen/unrealized completions drain in a guarded loop, avoiding
+recursive callback growth. The old stagger property/index and timers are removed.
+This scheduling applies to full-row transitions; the existing smart-card and
+probing-flag ornaments keep their separate behavior.

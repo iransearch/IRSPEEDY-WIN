@@ -59,6 +59,6 @@ using System.Windows;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 // Public releases use Major.Minor.Patch; the CLR normalizes the revision to zero.
-[assembly: AssemblyVersion("1.4.17")]
-[assembly: AssemblyFileVersion("1.4.17")]
-[assembly: AssemblyInformationalVersion("1.4.17")]
+[assembly: AssemblyVersion("1.4.18")]
+[assembly: AssemblyFileVersion("1.4.18")]
+[assembly: AssemblyInformationalVersion("1.4.18")]

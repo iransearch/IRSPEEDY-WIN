@@ -63,10 +63,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
     {
         public ServerItem From { get; }
         public ServerItem To { get; }
-        public int StaggerIndex { get; }
         public bool ChangesIdentity => From?.Identity != To?.Identity;
-        internal ServerRowTransition(ServerItem from, ServerItem to, int staggerIndex)
-        { From = from; To = to; StaggerIndex = staggerIndex; }
+        internal ServerRowTransition(ServerItem from, ServerItem to)
+        { From = from; To = to; }
     }
 
     public sealed class ServerDisplaySlot : INotifyPropertyChanged
@@ -78,10 +77,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
         // The view owns WPF clocks; the VM owns the data and completion policy.
         public event Action<ServerDisplaySlot, ServerRowTransition> TransitionRequested;
 
-        internal void Begin(ServerItem target, int staggerIndex, Action completed)
+        internal void Begin(ServerItem target, Action completed)
         {
             _completed = completed;
-            Transition = new ServerRowTransition(DisplayedServer, target, staggerIndex);
+            Transition = new ServerRowTransition(DisplayedServer, target);
             var handler = TransitionRequested;
             if (handler == null) Finish(Transition); // unrealized/offscreen row
             else handler(this, Transition);
@@ -122,10 +121,11 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public ObservableCollection<ServerItem> Servers { get; } = new ObservableCollection<ServerItem>();
         public ObservableCollection<ServerDisplaySlot> Slots { get; } = new ObservableCollection<ServerDisplaySlot>();
         public bool IsTransitioning { get; private set; }
-        private bool _initialized, _pending;
-        private int _generation, _remaining, _firstVisibleIndex;
+        private bool _initialized, _pending, _advancing;
+        private int _generation, _nextIndex;
+        private ServerDisplaySlot _activeSlot;
 
-        public void Publish(IEnumerable<ServerItem> servers, bool animate, int firstVisibleIndex)
+        public void Publish(IEnumerable<ServerItem> servers, bool animate)
         {
             var latest = ServerListRanking.Order(servers, item => item.IsLastSuccessfulConnection,
                 item => item.SortKey, item => item.CountryName, item => item.Service?.ID ?? int.MaxValue).ToArray();
@@ -135,10 +135,16 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 else Servers.Add(latest[i]);
             }
             while (Servers.Count > latest.Length) Servers.RemoveAt(Servers.Count - 1);
-            _firstVisibleIndex = firstVisibleIndex;
             _pending = true;
             if (!animate || !_initialized) CompleteImmediately();
-            else if (!IsTransitioning) StartLatestWave();
+            else if (!IsTransitioning)
+            {
+                ++_generation;
+                _nextIndex = 0;
+                _pending = false;
+                IsTransitioning = true;
+                AdvanceRows();
+            }
             _initialized = true;
         }
 
@@ -147,6 +153,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
             ++_generation; // invalidates callbacks from clocks that were canceled
             IsTransitioning = false;
             _pending = false;
+            _activeSlot = null;
+            _nextIndex = 0;
             Resize(Servers.Count);
             for (int i = 0; i < Slots.Count; i++) Slots[i].SetInstant(Servers[i]);
         }
@@ -157,34 +165,56 @@ namespace IRSpeedyVPN.Components.ServerListControl
             while (Slots.Count > count) Slots.RemoveAt(Slots.Count - 1);
         }
 
-        private void StartLatestWave()
+        private void AdvanceRows()
         {
-            _pending = false;
-            int generation = ++_generation;
-            var targets = Servers.ToArray();
-            Resize(Math.Max(Slots.Count, targets.Length));
-            var changed = new List<int>();
-            for (int i = 0; i < Slots.Count; i++)
+            // Invisible/unrealized rows may acknowledge synchronously. Drain them
+            // iteratively rather than recursing through thousands of callbacks.
+            if (_advancing) return;
+            _advancing = true;
+            try
             {
-                var target = i < targets.Length ? targets[i] : null;
-                var old = Slots[i].DisplayedServer;
-                if (old == null ? target != null : !old.LooksLike(target)) changed.Add(i);
-                else Slots[i].SetInstant(target); // also refresh the live service reference
-            }
-            IsTransitioning = changed.Count > 0;
-            _remaining = changed.Count;
-            if (!IsTransitioning) { Resize(targets.Length); return; }
-            foreach (int index in changed)
-            {
-                var target = index < targets.Length ? targets[index] : null;
-                Slots[index].Begin(target, Math.Max(0, index - _firstVisibleIndex), () =>
+                while (IsTransitioning && _activeSlot == null)
                 {
-                    if (generation != _generation || --_remaining != 0) return;
-                    IsTransitioning = false;
-                    if (_pending) StartLatestWave(); // one latest snapshot, never a queue of stale sorts
-                    else Resize(Servers.Count);
-                });
+                    Resize(Math.Max(Slots.Count, Servers.Count));
+                    if (_nextIndex >= Slots.Count)
+                    {
+                        if (_pending)
+                        {
+                            // Revisit earlier slots changed by newer results; never
+                            // replay a queue of obsolete list snapshots.
+                            _pending = false;
+                            _nextIndex = 0;
+                            continue;
+                        }
+                        IsTransitioning = false;
+                        Resize(Servers.Count);
+                        break;
+                    }
+
+                    int index = _nextIndex++;
+                    var slot = Slots[index];
+                    // Waiting rows read the latest data only when their turn starts.
+                    var target = index < Servers.Count ? Servers[index] : null;
+                    var old = slot.DisplayedServer;
+                    if (old == null ? target == null : old.LooksLike(target))
+                    {
+                        slot.SetInstant(target);
+                        continue;
+                    }
+
+                    int generation = _generation;
+                    _activeSlot = slot;
+                    slot.Begin(target, () =>
+                    {
+                        if (generation != _generation || !ReferenceEquals(_activeSlot, slot)) return;
+                        _activeSlot = null;
+                        // Finish() has already removed the old row's clock/overlay.
+                        // Only now can the next row start its own reveal.
+                        AdvanceRows();
+                    });
+                }
             }
+            finally { _advancing = false; }
         }
     }
 }

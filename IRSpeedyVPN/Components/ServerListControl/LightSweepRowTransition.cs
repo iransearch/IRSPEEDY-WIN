@@ -19,8 +19,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public static readonly DependencyProperty RowTemplateProperty = DependencyProperty.Register(nameof(RowTemplate), typeof(DataTemplate), typeof(LightSweepRowTransition));
         public static readonly DependencyProperty DurationProperty = DependencyProperty.Register(nameof(Duration), typeof(TimeSpan),
             typeof(LightSweepRowTransition), new PropertyMetadata(TimeSpan.FromMilliseconds(520)), PositiveTime);
-        public static readonly DependencyProperty StaggerDelayProperty = DependencyProperty.Register(nameof(StaggerDelay), typeof(TimeSpan),
-            typeof(LightSweepRowTransition), new PropertyMetadata(TimeSpan.FromMilliseconds(75)), NonnegativeTime);
         public static readonly DependencyProperty BandWidthProperty = DependencyProperty.Register(nameof(BandWidth), typeof(double),
             typeof(LightSweepRowTransition), new PropertyMetadata(100d), value => (double)value > 0 && !double.IsInfinity((double)value));
         public static readonly DependencyProperty BandColorProperty = DependencyProperty.Register(nameof(BandColor), typeof(Color),
@@ -33,7 +31,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public ServerDisplaySlot Slot { get => (ServerDisplaySlot)GetValue(SlotProperty); set => SetValue(SlotProperty, value); }
         public DataTemplate RowTemplate { get => (DataTemplate)GetValue(RowTemplateProperty); set => SetValue(RowTemplateProperty, value); }
         public TimeSpan Duration { get => (TimeSpan)GetValue(DurationProperty); set => SetValue(DurationProperty, value); }
-        public TimeSpan StaggerDelay { get => (TimeSpan)GetValue(StaggerDelayProperty); set => SetValue(StaggerDelayProperty, value); }
         public double BandWidth { get => (double)GetValue(BandWidthProperty); set => SetValue(BandWidthProperty, value); }
         public Color BandColor { get => (Color)GetValue(BandColorProperty); set => SetValue(BandColorProperty, value); }
         public IEasingFunction Easing { get => (IEasingFunction)GetValue(EasingProperty); set => SetValue(EasingProperty, value); }
@@ -59,7 +56,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
 
         private static bool PositiveTime(object value) => (TimeSpan)value > TimeSpan.Zero;
-        private static bool NonnegativeTime(object value) => (TimeSpan)value >= TimeSpan.Zero;
         private static void SlotChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
         {
             var row = (LightSweepRowTransition)d;
@@ -165,7 +161,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             var easing = Easing ?? new CubicEase { EasingMode = EasingMode.EaseInOut };
             var animation = new DoubleAnimation(0, 1, transition.ChangesIdentity ? Duration : TimeSpan.FromMilliseconds(150))
             {
-                BeginTime = transition.ChangesIdentity ? TimeSpan.FromTicks(StaggerDelay.Ticks * transition.StaggerIndex) : TimeSpan.Zero,
+                BeginTime = TimeSpan.Zero,
                 EasingFunction = easing,
                 FillBehavior = FillBehavior.HoldEnd
             };
