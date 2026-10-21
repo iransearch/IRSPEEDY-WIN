@@ -1,4 +1,4 @@
-# Server list light sweep (1.4.19)
+# Server list light sweep (1.4.20)
 
 `ServerCountryPicker.xaml` keeps the existing row artwork in `ServerRowContent`.
 Its `ServerCardButton` template hosts `LightSweepRowTransition`; the overlay is
@@ -20,7 +20,10 @@ The reusable control exposes `Slot`, `RowTemplate`, `Duration` (520 ms),
 at a time. The next row starts after the previous row's full completion and
 overlay cleanup, with no index-based stagger timer and no overlap.
 A WPF `Storyboard` runs native transform animations with CubicEase/EaseInOut.
-Their eased normalized progress is `p`. In physical left-to-right coordinates its light center is
+Its targets are the actual band Rectangle and content presenters, with property
+paths resolving their owned, mutable transforms. Freezable transforms must not be
+stored as direct Storyboard.Target values. Their eased normalized progress is `p`.
+In physical left-to-right coordinates its light center is
 `-BandWidth/2 + (rowWidth + BandWidth) * p`. Two content presenters have complementary
 render clips meeting at this center: new content appears on the left of the
 light and old content remains on its right. This reveals ping, name, flag and
@@ -59,7 +62,8 @@ preference independently of the existing probing/smart-card ornaments.
 
 Only native transform/opacity timelines run per frame; there is no application
 progress callback or per-frame geometry mutation. Fixed complementary clip
-rectangles translate with the band; no row positions or sizes animate. Content presenters use BitmapCache
+rectangles translate with the band; no row positions or sizes animate.
+Content presenters use BitmapCache
 only during the transition and release the second content afterward. Clipped
 offscreen rows have no sweep clock. PNG flags decode with OnLoad and are frozen/
 cached before use; vector flags freeze where supported. Flag scaling is HighQuality.
@@ -200,3 +204,38 @@ This checks direct storyboard targets, complementary native clip transforms,
 asymmetric easing/midpoint identity, full completion cleanup, short opacity fades
 and hiding an active row. It does not start any network tests or VPN service.
 It cannot run on Linux; frame pacing still requires the Windows acceptance above.
+
+## Correct timeline targets and idle-row notifications (1.4.20)
+
+The 1.4.19 native animation builder stored TranslateTransform objects directly in
+Storyboard.Target. These objects are Freezables. Clock creation snapshots the
+animation timelines, copying the target transforms instead of retaining the
+ones attached to the visible row. The identity/opacity paths targeted actual
+FrameworkElements, so logical completion alone could not prove that the light
+and clips moved. The user reported a slower app with missing animations.
+
+The builder now accepts only FrameworkElement targets. Band movement resolves
+RenderTransform.Children[1].X from the band Rectangle; complementary cuts resolve
+Clip.Transform.X from their content presenters. Both paths are constructed only
+after the owned mutable graphs have been assigned. Before the first timing tick,
+the base transform values already put the light outside the row. The single
+native storyboard, easing/key-time alignment and independent serial presentation
+queue remain. No per-frame application callback is restored.
+
+For related WPF targeting semantics, see Microsoft's [Storyboards Overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/storyboards-overview)
+and [Storyboard clock target resolution](https://source.dot.net/PresentationFramework/System/Windows/Media/Animation/Storyboard.cs.html).
+
+Unchanged slot snapshots no longer raise Transition/DisplayedServer changes that
+cause every idle presenter to rebind on each publication. New source snapshots
+and service references are still retained; a replacement service reference
+notifies its bindings, and canceling any active transition always notifies clock
+cleanup. Repeated midpoint/completion Reveal calls bind the target only once.
+The portable suite rejects the old behavior on 200 identical publications and
+checks rank-only changes, API object replacement and equal-looking cancellation.
+
+The Windows companion now checks the actual attached transforms' expected
+positions at two different clock times, their animation clocks, and reference
+identity of the FrameworkElement targets after timeline snapshotting. It is
+still a Windows-only test and has not been executed in the Linux environment.
+Portable VM/binding/effect checks and net48/WPF API compilation cannot replace
+this rendering check or establish a measured improvement in frame rate.

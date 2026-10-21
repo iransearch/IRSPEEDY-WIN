@@ -89,6 +89,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public void Reveal(ServerRowTransition transition)
         {
             if (transition == null || !ReferenceEquals(Transition, transition)) return;
+            if (ReferenceEquals(DisplayedServer, transition.To)) return;
             DisplayedServer = transition.To;
             Changed(nameof(DisplayedServer));
         }
@@ -106,11 +107,17 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         internal void SetInstant(ServerItem target)
         {
+            bool hadTransition = Transition != null;
+            bool displayChanged = DisplayedServer == null ? target != null
+                : !DisplayedServer.LooksLike(target) || !ReferenceEquals(DisplayedServer.Service, target?.Service);
             _completed = null;
             Transition = null;
             DisplayedServer = target;
-            Changed(nameof(Transition));
-            Changed(nameof(DisplayedServer));
+            // Identical publications must not rebind every idle presenter and
+            // rebuild its templates/effects while a different row is sweeping.
+            // Still retain the latest service reference and always cancel a clock.
+            if (hadTransition) Changed(nameof(Transition));
+            if (displayChanged) Changed(nameof(DisplayedServer));
         }
         private void Changed(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
     }

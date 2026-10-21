@@ -83,6 +83,23 @@ class Program {
   vm.Publish(new[]{Snap(a)},false);clock.Active.Clear();stale.Key.Reveal(stale.Value);stale.Key.Finish(stale.Value);
   Check(!vm.IsTransitioning&&pending.Count==0&&vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==1,"canceling an active queued wave flushes latest data and invalidates old completion");
  }
+ static void NoOpPublication(){
+  var g=Group(1,true);var vm=new ServerListViewModel(action=>action());
+  vm.Publish(new[]{Snap(g)},true);var slot=vm.Slots[0];var clock=new Clock();clock.Attach(vm);
+  int displays=0,transitions=0;
+  slot.PropertyChanged+=(sender,e)=>{if(e.PropertyName=="DisplayedServer")displays++;if(e.PropertyName=="Transition")transitions++;};
+  for(int i=0;i<200;i++)vm.Publish(new[]{Snap(g)},true);
+  g.SortKey=-99;vm.Publish(new[]{Snap(g)},true);
+  Check(displays==0&&transitions==0&&clock.Started.Count==0&&slot.DisplayedServer.SortKey==-99,"200 unchanged backend publications and rank-only updates cause no presenter rebind or clock restart");
+  g.Service=new Service{ID=1};vm.Publish(new[]{Snap(g)},true);
+  Check(displays==1&&ReferenceEquals(slot.DisplayedServer.Service,g.Service)&&clock.Started.Count==0,"API replacement retains the new service reference without an unnecessary sweep");
+  g.SignalText="75 ms";vm.Publish(new[]{Snap(g)},true);var fade=slot.Transition;
+  slot.Reveal(fade);slot.Reveal(fade);clock.FinishRow();
+  Check(displays==2&&transitions==1&&slot.DisplayedServer.SignalText=="75 ms","midpoint and completion bind new content only once while still notifying clock cleanup");
+  displays=0;transitions=0;slot.Begin(Snap(g),()=>{throw new Exception("canceled callback ran");});var stale=slot.Transition;
+  vm.CompleteImmediately();clock.Active.Clear();slot.Finish(stale);
+  Check(displays==0&&transitions==1&&!vm.IsTransitioning,"canceling an equal-looking transition still removes its clock without rebinding identical content");
+ }
  static void NativePlan(){
   Func<double,double> cubic=t=>t<.5?4*t*t*t:1-Math.Pow(-2*t+2,3)/2;
   foreach(double width in new[]{80d,360d,720d})foreach(double band in new[]{80d,100d,120d})
@@ -99,7 +116,7 @@ class Program {
   Check(true,"native transforms keep old/new clips under the brightest band, including asymmetric easing and narrow rows");
  }
  static void Main(){
-  QueuedPresentation();NativePlan();
+  QueuedPresentation();NativePlan();NoOpPublication();
   var a=Group(1,true);var b=Group(2);var c=Group(3);var vm=new ServerListViewModel(action=>action());
   vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true);var clock=new Clock();clock.Attach(vm);
   Check(!vm.IsTransitioning&&vm.Slots.Count==3,"initial population is immediate");

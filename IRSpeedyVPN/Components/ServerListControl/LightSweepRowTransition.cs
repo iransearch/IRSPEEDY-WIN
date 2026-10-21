@@ -149,6 +149,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 // callback, rectangle allocation or layout work as pings arrive.
                 _oldClip.Rect = new Rect(0, 0, plan.Travel, ActualHeight);
                 _nextClip.Rect = new Rect(-plan.Travel, 0, plan.Travel, ActualHeight);
+                _oldCut.X = plan.CutFrom;
+                _nextCut.X = plan.CutFrom;
                 _oldClip.Transform = _oldCut;
                 _nextClip.Transform = _nextCut;
                 _old.Clip = _oldClip;
@@ -163,7 +165,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
                 brush.Freeze();
                 _band.Fill = brush;
-                _shift = new TranslateTransform();
+                _shift = new TranslateTransform(plan.BandFrom, 0);
                 var transforms = new TransformGroup();
                 var skew = new SkewTransform(-14, 0, 0, _band.Height / 2);
                 skew.Freeze();
@@ -172,14 +174,21 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 _band.RenderTransform = transforms;
                 _band.CacheMode = new BitmapCache();
                 _band.Visibility = Visibility.Visible;
-                AddMotion(storyboard, _shift, TranslateTransform.XProperty, plan.BandFrom, plan.BandTo, duration, easing);
-                AddMotion(storyboard, _oldCut, TranslateTransform.XProperty, plan.CutFrom, plan.CutTo, duration, easing);
-                AddMotion(storyboard, _nextCut, TranslateTransform.XProperty, plan.CutFrom, plan.CutTo, duration, easing);
+                // Storyboard clocks snapshot their timelines. A Freezable stored
+                // directly in Target is copied with that snapshot; it is no longer
+                // the transform attached to the row. Start at a FrameworkElement
+                // and resolve the existing, mutable transform through its property.
+                AddMotion(storyboard, _band, new PropertyPath("(0).(1)[1].(2)",
+                    RenderTransformProperty, TransformGroup.ChildrenProperty, TranslateTransform.XProperty),
+                    plan.BandFrom, plan.BandTo, duration, easing);
+                var clipPath = new PropertyPath("(0).(1).(2)", ClipProperty, Geometry.TransformProperty, TranslateTransform.XProperty);
+                AddMotion(storyboard, _old, clipPath, plan.CutFrom, plan.CutTo, duration, easing);
+                AddMotion(storyboard, _next, clipPath, plan.CutFrom, plan.CutTo, duration, easing);
             }
             else
             {
-                AddMotion(storyboard, _old, OpacityProperty, 1, 0, duration, easing);
-                AddMotion(storyboard, _next, OpacityProperty, 0, 1, duration, easing);
+                AddMotion(storyboard, _old, new PropertyPath(OpacityProperty), 1, 0, duration, easing);
+                AddMotion(storyboard, _next, new PropertyPath(OpacityProperty), 0, 1, duration, easing);
             }
             // This marker and the native visual timelines share one clock. Invert
             // the easing once to commit identity exactly at the physical midpoint.
@@ -197,12 +206,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
             storyboard.Begin(this, true);
         }
 
-        private static void AddMotion(Storyboard storyboard, DependencyObject target, DependencyProperty property,
+        private static void AddMotion(Storyboard storyboard, FrameworkElement target, PropertyPath property,
             double from, double to, TimeSpan duration, IEasingFunction easing)
         {
             var animation = new DoubleAnimation(from, to, duration) { EasingFunction = easing };
             Storyboard.SetTarget(animation, target);
-            Storyboard.SetTargetProperty(animation, new PropertyPath(property));
+            Storyboard.SetTargetProperty(animation, property);
             storyboard.Children.Add(animation);
         }
 
