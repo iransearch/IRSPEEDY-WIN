@@ -128,8 +128,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public ServerItem From => Rows[0].From;
         public ServerItem Target => Rows[0].Target;
         internal int RevealedMask;
-        internal ServerSortPass(int generation, ServerSortRow first, ServerSortRow second)
-        { Generation = generation; Rows = new[] { first, second }; }
+        internal ServerSortPass(int generation, ServerSortRow[] rows)
+        { Generation = generation; Rows = rows; }
         internal bool Contains(ServerDisplaySlot slot) => Rows.Any(row => ReferenceEquals(row.Slot, slot));
     }
     internal sealed class ServerListViewModel
@@ -181,13 +181,20 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 var target = Servers[i];
                 if (Slots[i].DisplayedServer.Identity == target.Identity)
                 { Slots[i].SetInstant(target); continue; }
-                int partner = -1;
-                for (int j = i + 1; j < Slots.Count; j++)
-                    if (Slots[j].DisplayedServer.Identity == target.Identity) { partner = j; break; }
-                if (partner < 0) { CompleteImmediately(); return null; }
-                var displaced = Servers.First(item => item.Identity == Slots[i].DisplayedServer.Identity);
-                return _active = new ServerSortPass(_generation,
-                    new ServerSortRow(i, Slots[i], target), new ServerSortRow(partner, Slots[partner], displaced));
+                // Follow the permutation cycle. A sequence of pair swaps would
+                // carry displaced identities through intermediate positions.
+                // Every member of this cycle goes directly to its current target.
+                var positions = Slots.Select((slot, index) => new { slot, index })
+                    .ToDictionary(entry => entry.slot.DisplayedServer.Identity, entry => entry.index);
+                var rows = new List<ServerSortRow>();
+                int destination = i;
+                do
+                {
+                    rows.Add(new ServerSortRow(destination, Slots[destination], Servers[destination]));
+                    if (!positions.TryGetValue(Servers[destination].Identity, out destination))
+                    { CompleteImmediately(); return null; }
+                } while (destination != i);
+                return _active = new ServerSortPass(_generation, rows.ToArray());
             }
             _workRequested = false; return null;
         }
@@ -195,7 +202,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             if (pass == null || !ReferenceEquals(_active, pass) || pass.Generation != _generation || (pass.RevealedMask & (1 << (int)part)) != 0) return;
             pass.RevealedMask |= 1 << (int)part;
-            // Swap the same group on BOTH rows before notifying either binding.
+            // Commit the same group across the cycle before notifying any binding.
             // No blank source and no duplicate name/flag/selection at a frame boundary.
             foreach (var row in pass.Rows) row.Slot.AssignPart(part, row.Target);
             foreach (var row in pass.Rows) row.Slot.NotifyPart(part);

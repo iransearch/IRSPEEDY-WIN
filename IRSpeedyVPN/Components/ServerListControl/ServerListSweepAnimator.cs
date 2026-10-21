@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Linq;
 using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
@@ -7,7 +8,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 namespace IRSpeedyVPN.Components.ServerListControl
 {
-    // One UI-owned timeline exchanges one pair, with a band on each visible row.
+    // One UI-owned timeline commits a permutation cycle, with a band on each visible row.
     internal sealed class ServerListSweepAnimator
     {
         private readonly ServerListViewModel _model;
@@ -93,10 +94,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 // into view must show its band at the same elapsed time.
                 if (!anyVisible)
                 { _model.Finish(_pass); _pass = null; _surfaces.Clear(); _overlay.Bands.Clear(); continue; }
-                var first = _surfaces[0];
-                _timeline = _surfaces.Count == 2
-                    ? new ServerCometTimeline(first.Width, first.Centers, _surfaces[1].Width, _surfaces[1].Centers)
-                    : new ServerCometTimeline(first.Width, first.Centers);
+                _timeline = new ServerCometTimeline(_surfaces.Select(surface => surface.Width).ToArray(),
+                    _surfaces.Select(surface => surface.Centers).ToArray());
                 _overlay.ShowBand = true; StartClock(); _started = _clock.Elapsed.TotalMilliseconds;
                 _overlay.InvalidateVisual(); return;
             }

@@ -20,19 +20,20 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private int _next;
         public readonly double Width;
         public ServerCometTimeline(double width, double[] physicalCenters, double partnerWidth = 0, double[] partnerCenters = null)
+            : this(partnerCenters == null ? new[] { width } : new[] { width, partnerWidth },
+                partnerCenters == null ? new[] { physicalCenters } : new[] { physicalCenters, partnerCenters })
+        { }
+        public ServerCometTimeline(double[] widths, double[][] centers)
         {
-            Width = width;
-            var crossings = Enumerable.Range(0, physicalCenters.Length).Select(i =>
-            {
-                double crossing = ServerCometTiming.CrossingTime(Math.Max(0, Math.Min(width, physicalCenters[i])), width);
-                if (partnerCenters != null)
-                    crossing = Math.Max(crossing, ServerCometTiming.CrossingTime(Math.Max(0, Math.Min(partnerWidth, partnerCenters[i])), partnerWidth));
-                return crossing;
-            }).ToArray();
-            // Both bands must have reached a group before its atomic two-way swap.
+            Width = widths[0];
+            var crossings = Enumerable.Range(0, centers[0].Length).Select(part =>
+                Enumerable.Range(0, widths.Length).Max(row => ServerCometTiming.CrossingTime(
+                    Math.Max(0, Math.Min(widths[row], centers[row][part])), widths[row]))).ToArray();
+            // Commit each content group atomically across the complete cycle.
             _order = Enumerable.Range(0, crossings.Length).OrderBy(i => crossings[i]).ToArray();
             _crossings = _order.Select(i => crossings[i]).ToArray();
         }
+
         public void Advance(double elapsedMs, Action<int, double> reveal)
         {
             while (_next < _order.Length && elapsedMs >= _crossings[_next])

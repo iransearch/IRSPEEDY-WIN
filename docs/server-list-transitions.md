@@ -1,4 +1,4 @@
-# Server list paired comet (1.4.23)
+# Server list paired comet (1.4.24)
 
 The existing .NET Framework 4.8 WPF picker consumes the application's existing
 country order immediately after each completed country check. Its aggregation,
@@ -17,9 +17,10 @@ with the country-name group; clicks still resolve against the live group/health.
 The actual selected service is never changed by the animation.
 
 `ServerListSweepAnimator` owns one monotonic Stopwatch, one active pass and one
-CompositionTarget.Rendering subscription. Each pass directly exchanges TWO
-assigned countries and draws one noninteractive band on each visible affected
-row. Both bands share the same start and elapsed time; no other pair starts
+CompositionTarget.Rendering subscription. Each pass applies one complete permutation
+cycle directly to its final destinations and draws one noninteractive band on each
+visible affected row. A pair still uses two bands; a longer rotation uses one per
+affected row, all sharing the same start and elapsed time. No other cycle starts
 until the 800 ms pass ends. Only assigned identity changes get a pass. Same-position ping, selection and star updates bind normally without
 flashing. Check-again reset preserves the visible order and resets existing
 indicators without a band. The all-finished event starts no presentation work.
@@ -44,9 +45,9 @@ unchanged.
 Before each pass, existing content groups are measured through TransformToVisual
 into the physical LTR overlay. Inherited RTL transforms are included. The timeline
 calculates crossing times using the inverse cosine easing. For each group, the
-shared crossing is the later of the two measured row crossings. Both groups keep
-their old data until both bands have reached them, then both assignments commit
-before either binding is notified. Names, flags and selection therefore exchange
+shared crossing is the latest measured crossing across the cycle. Groups keep
+their old data until all bands have reached them, then all assignments commit
+before any binding is notified. Names, flags and selection therefore exchange
 atomically even when content centers or row widths differ. Dropped frames process
 every crossed group once. Changed content fades from opacity .2 to 1 over 400 ms on the existing
 content element itself; unchanged content gets no flash. No brightness rectangle
@@ -55,20 +56,20 @@ produce a conspicuous horizontal gray bar behind the text. Flash start times use
 logical crossing time, so late frames do not extend the effect.
 
 Two servers exchanging any two positions require ONE 800 ms pass with two lights.
-A three-country cycle resolves through two such direct exchanges (about 1.6 s,
-plus normal frame/dispatcher scheduling). Unchanged intermediate rows are skipped.
+A three- or four-country rotation also resolves in ONE 800 ms pass. Countries
+never visit intermediate slots to construct the current target order. Unchanged intermediate rows are skipped.
 There is no stagger or all-finished delay. A final group's 400 ms opacity fade
 can outlive its band; it does not draw another light or a white rectangle.
 
 ## Coalescing and lifecycle
 
-Both active rows and targets stay frozen. New notifications replace the latest
+All active rows and targets stay frozen. New notifications replace the latest
 pending order without restarting the clock. At every boundary, preparation finds
-the first mismatch against that newest order and its target's current owner.
-Those two slots exchange their countries in place. Matching positions cost no
+the first mismatch and follows its complete permutation cycle against the newest
+order. Each slot receives its final target in that same pass. Matching positions cost no
 animation time. Neither source is cleared, hidden or made vacant during sorting.
 Each content group remains a permutation of all current identities throughout
-an exchange, including inside PropertyChanged observers. Both partially committed
+an exchange, including inside PropertyChanged observers. All partially committed
 rows are protected from ordinary publications. Structural additions/removals cancel
 a partial pair and reconcile the newest membership instantly, avoiding blank cards
 or obsolete removed identities.
@@ -163,3 +164,12 @@ DPI/RTL appearance and frame pacing still require Windows acceptance. Test both
 themes at 100/150/200% DPI, rapid rechecks, search, added/removed rows, minimized
 windows and the OS reduced-motion preference. Profile a low-end Windows device
 before making a 60 FPS claim.
+
+## 1.4.24 validation
+
+Executed the production planner and timeline fixture with Roslyn C# 7.3 against
+.NET 8 reference types (inert WPF doubles): first-to-fourth regression, all 720
+six-country permutations, rapid publication/coalescing, atomic identity updates,
+selection and multi-surface crossing tests passed. UI contracts and binding checks
+passed. This run does not validate native WPF rendering or a full net48 build;
+those were not run for this revision.
