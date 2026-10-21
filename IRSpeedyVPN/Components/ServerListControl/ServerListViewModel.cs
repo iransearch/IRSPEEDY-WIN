@@ -200,35 +200,25 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public ServerSortPass TryBeginPass()
         {
             if (_active != null || !_workRequested) return null;
-            var latestById = Servers.ToDictionary(item => item.Identity);
-            var targets = PresentationOrder().Select((item, index) => new { item, index })
-                .ToDictionary(entry => entry.item.Identity, entry => entry.index);
-            int source = -1, destination = -1, distance = 0;
+            var target = PresentationOrder();
+            var rows = new List<ServerSortRow>();
             for (int i = 0; i < Slots.Count; i++)
             {
-                int targetIndex;
-                if (!targets.TryGetValue(Slots[i].DisplayedServer.Identity, out targetIndex)) continue;
-                int displacement = Math.Abs(targetIndex - i);
-                if (displacement == 0) Slots[i].SetInstant(latestById[Slots[i].DisplayedServer.Identity]);
-                // Move the furthest displaced country straight to its destination
-                // first, rather than pushing it down through successive top slots.
-                if (displacement > distance)
-                { source = i; destination = targetIndex; distance = displacement; }
+                if (Slots[i].DisplayedServer.Identity == target[i].Identity)
+                { Slots[i].SetInstant(target[i]); continue; }
+                // Freeze every changed assignment in this snapshot together.
+                // No displaced country is parked in an intermediate source slot.
+                rows.Add(new ServerSortRow(i, Slots[i], target[i]));
             }
-            if (source < 0) { _workRequested = false; return null; }
-            var displaced = latestById[Slots[destination].DisplayedServer.Identity];
-            var arriving = latestById[Slots[source].DisplayedServer.Identity];
-            return _active = new ServerSortPass(_generation, new[] {
-                new ServerSortRow(destination, Slots[destination], arriving),
-                new ServerSortRow(source, Slots[source], displaced)
-            }.OrderBy(row => row.Index).ToArray());
+            if (rows.Count == 0) { _workRequested = false; return null; }
+            return _active = new ServerSortPass(_generation, rows.ToArray());
         }
 
         public void Reveal(ServerSortPass pass, ServerRowPart part)
         {
             if (pass == null || !ReferenceEquals(_active, pass) || pass.Generation != _generation || (pass.RevealedMask & (1 << (int)part)) != 0) return;
             pass.RevealedMask |= 1 << (int)part;
-            // Commit the same group on both rows before notifying any binding.
+            // Commit this group across all changed slots before notifying any binding.
             // No blank source and no duplicate name/flag/selection at a frame boundary.
             foreach (var row in pass.Rows) row.Slot.AssignPart(part, row.Target);
             foreach (var row in pass.Rows) row.Slot.NotifyPart(part);

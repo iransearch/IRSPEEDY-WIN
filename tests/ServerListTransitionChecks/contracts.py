@@ -23,7 +23,7 @@ text=(folder/'ServerCountryPicker.xaml').read_text()
 assert text.count('<local:ServerListCometOverlay ')==1
 assert all(name not in text for name in ['LightSweepRowTransition','SmartMosaicShift','SmartCardShine'])
 assert not (folder/'LightSweepRowTransition.cs').exists() and not (folder/'LightSweepAnimationPlan.cs').exists()
-print('PASS one paired overlay host; old reorder/crossfade and smart-card light paths remain removed')
+print('PASS one multi-band overlay host; old reorder/crossfade and smart-card light paths remain removed')
 parts=[e.get(l+'ServerCometPart.Part') for e in row(ET.parse(folder/'ServerCountryPicker.xaml').getroot()).iter() if e.get(l+'ServerCometPart.Part')]
 assert sorted(parts)==sorted(['Name','Flag','Signal','Selection','Badge'])
 c=(folder/'ServerListSweepAnimator.cs').read_text();frame=c[c.index('        private void Rendering('):c.index('        private void Reveal(')]
@@ -59,7 +59,9 @@ transitions=(folder/'ServerCountryPicker.Transitions.cs').read_text()
 assert '_serverList.BeginCheckCycle();' in transitions
 assert 'completedIdentity: allowSortAnimation && !_checkCycleSetup' in completed
 assert '!item.IsChecking && _completedChecks.Contains(item.Identity)' in vm
-assert 'var targets = PresentationOrder()' in vm
+assert 'var target = PresentationOrder()' in vm
+assert 'rows.Add(new ServerSortRow(i, Slots[i], target[i]))' in vm
+assert 'var displaced' not in vm
 assert 'foreach (var assignment in _pass.Rows)' in c and 'new ServerCometBand' in c
 assert '_overlay.Bands.Add(band)' in c
-print('PASS explicit country completion gates both paired slots; each row owns a separate band')
+print('PASS explicit completion gates every moved slot; direct destinations and one band per changed row')

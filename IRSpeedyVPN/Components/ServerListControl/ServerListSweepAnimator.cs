@@ -8,7 +8,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 namespace IRSpeedyVPN.Components.ServerListControl
 {
-    // One UI-owned timeline exchanges one pair, with a band on each visible row.
+    // One UI-owned timeline reveals every changed assignment in the latest order.
     internal sealed class ServerListSweepAnimator
     {
         private readonly ServerListViewModel _model;
@@ -19,7 +19,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private readonly Action<int, double> _reveal;
         private ServerSortPass _pass;
         private ServerCometTimeline _timeline;
-        private readonly List<Surface> _surfaces = new List<Surface>(2);
+        private readonly List<Surface> _surfaces = new List<Surface>();
         private double _started;
         private sealed class Surface
         {

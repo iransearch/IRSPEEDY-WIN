@@ -14,7 +14,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
     public sealed class ServerListCometOverlay : FrameworkElement
     {
         private static readonly Brush BandBrush = CreateBandBrush();
-        internal readonly List<ServerCometBand> Bands = new List<ServerCometBand>(2);
+        internal readonly List<ServerCometBand> Bands = new List<ServerCometBand>();
         internal bool ShowBand;
         internal readonly List<ServerCometFlash> Flashes = new List<ServerCometFlash>();
         public ServerListCometOverlay() { IsHitTestVisible = false; Focusable = false; }

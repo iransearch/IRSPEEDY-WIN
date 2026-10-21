@@ -134,6 +134,14 @@ try {
         Check-FlagClocks $false
         $b.Service.GetServerUrls()[0].latency = 70; $picker.RefreshGroup($b.Service); Pump 100
         Check (!$model.IsTransitioning -and !(Field $overlay 'ShowBand') -and (Field $overlay 'Flashes').Count -eq 0) 'same-position result has no band or flash'
+        $a.Service.GetServerUrls()[0].latency = 50; $picker.RefreshGroup($a.Service)
+        Wait-For { Field $overlay 'ShowBand' }
+        $threePass = Field $animator '_pass'
+        Check ($threePass.Rows.Length -eq 3 -and @(Field $overlay 'Bands').Count -eq 3) 'three changed rows receive three simultaneous bands without a pair limit'
+        Check ((($threePass.Rows | ForEach-Object { $_.Target.Service.ID }) -join ',') -eq '1,2,3') 'all changed slots target their final identities directly'
+        Wait-For { Unique $model.Slots; !$model.IsTransitioning -and (Field $overlay 'Flashes').Count -eq 0 -and !(Field $animator '_subscribed') }
+        Check ((Order $model.Slots) -eq '1,2,3') 'three-way reorder needs no follow-up pair passes'
+
     }
     $before = Order $model.Slots
     $picker.BeginCheckCycle()
