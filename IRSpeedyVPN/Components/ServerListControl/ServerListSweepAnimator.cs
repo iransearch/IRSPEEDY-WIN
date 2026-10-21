@@ -1,12 +1,13 @@
 using System;
 using System.Diagnostics;
+using System.Collections.Generic;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 namespace IRSpeedyVPN.Components.ServerListControl
 {
-    // One UI-owned timeline and ONE painted band for the entire ItemsControl.
+    // One UI-owned timeline exchanges one pair, with a band on each visible row.
     internal sealed class ServerListSweepAnimator
     {
         private readonly ServerListViewModel _model;
@@ -17,11 +18,17 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private readonly Action<int, double> _reveal;
         private ServerSortPass _pass;
         private ServerCometTimeline _timeline;
-        private Button _row;
-        private FrameworkElement[] _groups;
-        private Rect[] _bounds;
-        private Geometry _rowClip;
-        private double _started, _rowLeft;
+        private readonly List<Surface> _surfaces = new List<Surface>(2);
+        private double _started;
+        private sealed class Surface
+        {
+            internal ServerSortRow Assignment;
+            internal Button Row;
+            internal FrameworkElement[] Groups;
+            internal double[] Centers;
+            internal double Width, Left;
+            internal ServerCometBand Band;
+        }
         private bool _subscribed;
         private DispatcherOperation _prepare;
         private Application _application;
@@ -60,25 +67,36 @@ namespace IRSpeedyVPN.Components.ServerListControl
             { _model.CompleteImmediately(); return; }
             while ((_pass = _model.TryBeginPass()) != null)
             {
-                var container = _items.ItemContainerGenerator.ContainerFromItem(_pass.Slot);
-                _row = FindRow(container, _pass.Slot);
-                if (_row == null || !_row.IsLoaded || !IsInViewport(_row))
-                { _model.Finish(_pass); _pass = null; continue; }
-                _groups = new FrameworkElement[5]; _bounds = new Rect[5]; FindGroups(_row, _groups);
-                bool valid = _row.ActualWidth > 0;
-                foreach (var element in _groups) valid &= element != null;
-                if (!valid) { _model.Finish(_pass); _pass = null; continue; }
-                var rowRect = Bounds(_row); _rowLeft = rowRect.Left;
-                _rowClip = MakeClip(_row, rowRect);
-                var centers = new double[5];
-                for (int i = 0; i < 5; i++)
-                { _bounds[i] = Bounds(_groups[i]); centers[i] = _bounds[i].Left + _bounds[i].Width / 2 - rowRect.Left; }
-                _timeline = new ServerCometTimeline(rowRect.Width, centers);
-                _overlay.BandRect = new Rect(0, -32, ServerCometTiming.BAND_WIDTH_DIP, rowRect.Height + 64);
-                var skew = new SkewTransform(ServerCometTiming.SKEW_DEG, 0, 0, rowRect.Height / 2);
-                skew.Freeze(); _overlay.BandSkew = skew; _overlay.BandClip = _rowClip;
-                _overlay.BandShift.Y = rowRect.Top;
-                _overlay.BandShift.X = rowRect.Left + ServerCometTiming.BandLeft(0, rowRect.Width);
+                _surfaces.Clear(); _overlay.Bands.Clear();
+                bool anyVisible = false;
+                foreach (var assignment in _pass.Rows)
+                {
+                    var row = FindRow(_items.ItemContainerGenerator.ContainerFromItem(assignment.Slot), assignment.Slot);
+                    if (row == null || !row.IsLoaded) continue;
+                    var groups = new FrameworkElement[5]; FindGroups(row, groups);
+                    bool valid = row.ActualWidth > 0;
+                    foreach (var element in groups) valid &= element != null;
+                    if (!valid) continue;
+                    anyVisible |= IsInViewport(row);
+                    var rect = Bounds(row); var centers = new double[5];
+                    for (int i = 0; i < 5; i++)
+                    { var bounds = Bounds(groups[i]); centers[i] = bounds.Left + bounds.Width / 2 - rect.Left; }
+                    var skew = new SkewTransform(ServerCometTiming.SKEW_DEG, 0, 0, rect.Height / 2); skew.Freeze();
+                    var band = new ServerCometBand { Rect = new Rect(0, -32, ServerCometTiming.BAND_WIDTH_DIP, rect.Height + 64),
+                        Skew = skew, Clip = MakeClip(row, rect) };
+                    band.Shift.Y = rect.Top; band.Shift.X = rect.Left + ServerCometTiming.BandLeft(0, rect.Width);
+                    _surfaces.Add(new Surface { Assignment = assignment, Row = row, Groups = groups,
+                        Centers = centers, Width = rect.Width, Left = rect.Left, Band = band });
+                    _overlay.Bands.Add(band);
+                }
+                // Keep a realized offscreen partner prepared too: scrolling it
+                // into view must show its band at the same elapsed time.
+                if (!anyVisible)
+                { _model.Finish(_pass); _pass = null; _surfaces.Clear(); _overlay.Bands.Clear(); continue; }
+                var first = _surfaces[0];
+                _timeline = _surfaces.Count == 2
+                    ? new ServerCometTimeline(first.Width, first.Centers, _surfaces[1].Width, _surfaces[1].Centers)
+                    : new ServerCometTimeline(first.Width, first.Centers);
                 _overlay.ShowBand = true; StartClock(); _started = _clock.Elapsed.TotalMilliseconds;
                 _overlay.InvalidateVisual(); return;
             }
@@ -98,12 +116,16 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (!SystemParameters.ClientAreaAnimation) { _model.CompleteImmediately(); return; }
             if (_pass != null)
             {
-                if (!_row.IsLoaded || !ReferenceEquals(_row.DataContext, _pass.Slot)) FinishPass();
+                bool valid = true;
+                foreach (var surface in _surfaces)
+                    valid &= surface.Row.IsLoaded && ReferenceEquals(surface.Row.DataContext, surface.Assignment.Slot);
+                if (!valid) FinishPass();
                 else
                 {
                     double elapsed = now - _started;
                     _timeline.Advance(elapsed, _reveal);
-                    _overlay.BandShift.X = _rowLeft + ServerCometTiming.BandLeft(elapsed, _timeline.Width);
+                    foreach (var surface in _surfaces)
+                        surface.Band.Shift.X = surface.Left + ServerCometTiming.BandLeft(elapsed, surface.Width);
                     if (elapsed >= ServerCometTiming.SORT_PASS_MS) FinishPass();
                 }
             }
@@ -121,19 +143,24 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
         private void Reveal(int index, double crossing)
         {
-            var part = (ServerRowPart)index; var before = _pass.Slot.GetPart(part);
+            var part = (ServerRowPart)index;
             _model.Reveal(_pass, part);
-            if (_pass.Target == null || !PartChanged(before, _pass.Target, part)) return;
-            if (part == ServerRowPart.Badge && !_pass.Target.IsLastSuccessfulConnection) return;
-            var element = _groups[index];
-            for (int i = _overlay.Flashes.Count - 1; i >= 0; i--)
-                if (ReferenceEquals(_overlay.Flashes[i].Element, element)) _overlay.Flashes.RemoveAt(i);
-            _overlay.Flashes.Add(new ServerCometFlash { Element = element, OwnerRow = _row, Slot = _pass.Slot, Part = part,
-                Snapshot = _pass.Target, Started = _started + crossing });
+            foreach (var surface in _surfaces)
+            {
+                var assignment = surface.Assignment;
+                if (!PartChanged(assignment.From, assignment.Target, part)) continue;
+                if (part == ServerRowPart.Badge && !assignment.Target.IsLastSuccessfulConnection) continue;
+                var element = surface.Groups[index];
+                for (int i = _overlay.Flashes.Count - 1; i >= 0; i--)
+                    if (ReferenceEquals(_overlay.Flashes[i].Element, element)) _overlay.Flashes.RemoveAt(i);
+                _overlay.Flashes.Add(new ServerCometFlash { Element = element, OwnerRow = surface.Row, Slot = assignment.Slot,
+                    Part = part, Snapshot = assignment.Target, Started = _started + crossing });
+            }
         }
         private void FinishPass()
         {
-            _model.Finish(_pass); _pass = null; _timeline = null; _overlay.ShowBand = false; QueuePrepare();
+            _model.Finish(_pass); _pass = null; _timeline = null; _surfaces.Clear();
+            _overlay.ShowBand = false; _overlay.Bands.Clear(); QueuePrepare();
         }
         private void StopIfIdle()
         {
@@ -147,14 +174,16 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (_subscribed) CompositionTarget.Rendering -= Rendering;
             _subscribed = false; _clock.Reset();
             foreach (var flash in _overlay.Flashes) flash.Element.Opacity = 1;
-            _overlay.Flashes.Clear(); _overlay.ShowBand = false; _overlay.BandClip = null; _overlay.InvalidateVisual();
+            _overlay.Flashes.Clear(); _overlay.ShowBand = false; _overlay.Bands.Clear(); _surfaces.Clear(); _overlay.InvalidateVisual();
         }
         private void RefreshGeometry()
         {
-            if (_pass != null && _row.IsLoaded)
+            foreach (var surface in _surfaces)
             {
-                var rect = Bounds(_row); _rowLeft = rect.Left;
-                _rowClip = MakeClip(_row, rect); _overlay.BandClip = _rowClip; _overlay.BandShift.Y = rect.Top;
+                if (!surface.Row.IsLoaded) continue;
+                var rect = Bounds(surface.Row);
+                if (Math.Abs(rect.Width - surface.Width) > .5) { _model.CompleteImmediately(); return; }
+                surface.Left = rect.Left; surface.Band.Clip = MakeClip(surface.Row, rect); surface.Band.Shift.Y = rect.Top;
             }
             _overlay.InvalidateVisual();
         }

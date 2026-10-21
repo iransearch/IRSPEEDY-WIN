@@ -34,15 +34,26 @@ function Wait-For([scriptblock]$condition, [int]$timeout = 6000) {
 }
 function Order($slots) { return (@($slots | ForEach-Object { $_.DisplayedServer.Service.ID }) -join ',') }
 function Unique($slots) {
-    $owners = @{}
-    for ($i=0; $i -lt $slots.Count; $i++) {
-        foreach ($part in @('SignalServer','BadgeServer','NameServer','FlagServer','SelectionServer')) {
-            $value = $slots[$i].$part
-            if ($null -eq $value) { continue }
-            if ($owners.ContainsKey($value.Identity) -and $owners[$value.Identity] -ne $i) { throw 'Duplicate visible identity' }
-            $owners[$value.Identity] = $i
+    foreach ($part in @('SignalServer','BadgeServer','NameServer','FlagServer','SelectionServer')) {
+        $owners = @{}
+        foreach ($slot in $slots) {
+            $value = $slot.$part
+            if ($null -eq $value -or $slot.IsVacant) { throw 'Blank row during paired exchange' }
+            if ($owners.ContainsKey($value.Identity)) { throw 'Duplicate identity within a displayed group' }
+            $owners[$value.Identity] = $true
         }
     }
+}
+function Check-FlagClocks([bool]$active) {
+    $running = 0
+    foreach ($shine in @(Field $picker '_probeShines')) {
+        $shift = $shine.RenderTransform.Children[1]
+        if ($shift.HasAnimatedProperties) {
+            if (!$shine.IsVisible -or !$shine.DataContext.IsChecking) { throw 'Checking sheen on an idle flag' }
+            $running++
+        }
+    }
+    Check (($active -and $running -eq 1) -or (!$active -and $running -eq 0)) 'checking flag owns its clock; idle/hidden flags have no running clock'
 }
 function Group([int]$id, [string]$name, [string]$code, [long]$ping) {
     $url = [Activator]::CreateInstance($urlType); $url.latency = $ping; $url.latencychkTime = [DateTime]::Now
@@ -76,6 +87,7 @@ try {
     Call $model 'Publish' ([object[]]@($items,$true,$false)) | Out-Null
     Pump 100
     Check ((Order $model.Slots) -eq '1,2,3' -and !(Field $overlay 'ShowBand')) 'initial population has no light'
+    Check-FlagClocks ([System.Windows.SystemParameters]::ClientAreaAnimation)
     $b.Service.GetServerUrls()[0].latency = 80
     $picker.RefreshGroup($b.Service)
     Check ($model.Servers[0].Service.ID -eq 2 -and $a.IsChecking) 'completed country sorts while another remains checking'
@@ -87,21 +99,35 @@ try {
         $c.Service.GetServerUrls()[0].latency = 200
         $picker.RefreshGroup($c.Service)
         Check ([object]::ReferenceEquals($pass,(Field $animator '_pass')) -and $started -eq (Field $animator '_started')) 'new completion coalesces without restarting current pass'
-        $shift = Field $overlay 'BandShift'; $left = $shift.X
+        $surfaces = @(Field $animator '_surfaces'); $bands = @(Field $overlay 'Bands')
+        Check ($bands.Count -eq 2 -and $pass.Rows.Length -eq 2) 'both exchanged rows have a simultaneous light band'
+        $lefts = @($bands | ForEach-Object { (Field $_ 'Shift').X })
         Pump 150
-        Check ($shift.X -gt $left -and $overlay.FlowDirection -eq [Windows.FlowDirection]::LeftToRight) 'physical light travels left to right'
+        for ($j=0; $j -lt 2; $j++) {
+            Check ((Field $bands[$j] 'Shift').X -gt $lefts[$j]) 'each band advances physically left to right'
+        }
+        Check ($overlay.FlowDirection -eq [Windows.FlowDirection]::LeftToRight) 'RTL layout does not reverse either light'
         Unique $model.Slots
-        # Check the actual measured physical centers against the current leading edge.
-        $bounds = Field $animator '_bounds'; $edge = $shift.X - (Field $animator '_rowLeft') + .85*170
+        # A group commits atomically after BOTH physical bands cross its center.
         for ($i=0; $i -lt 5; $i++) {
-            $center = $bounds[$i].Left + $bounds[$i].Width/2 - (Field $animator '_rowLeft')
+            $crossedAll = $true; $aheadOfOne = $false
+            foreach ($surface in $surfaces) {
+                $shift = Field (Field $surface 'Band') 'Shift'
+                $edge = $shift.X - (Field $surface 'Left') + .85*170
+                $center = (Field $surface 'Centers')[$i]
+                if ($edge -le $center+1) { $crossedAll = $false }
+                if ($edge -lt $center-1) { $aheadOfOne = $true }
+            }
             $part = [Enum]::ToObject($assembly.GetType($prefix+'ServerRowPart',$true),$i)
-            $shown = Call $pass.Slot 'GetPart' ([object[]]@($part))
-            if ($edge -gt $center+1) { Check ([object]::ReferenceEquals($shown,$pass.Target)) 'crossed physical group has new snapshot' }
-            if ($edge -lt $center-1) { Check ([object]::ReferenceEquals($shown,$pass.From)) 'uncrossed physical group retains old snapshot' }
+            foreach ($assignment in $pass.Rows) {
+                $shown = Call $assignment.Slot 'GetPart' ([object[]]@($part))
+                if ($crossedAll) { Check ([object]::ReferenceEquals($shown,$assignment.Target)) 'both crossed groups show their new snapshots' }
+                if ($aheadOfOne) { Check ([object]::ReferenceEquals($shown,$assignment.From)) 'both groups retain old data until their shared crossing' }
+            }
         }
         Wait-For { Unique $model.Slots; !$model.IsTransitioning -and (Field $overlay 'Flashes').Count -eq 0 -and !(Field $animator '_subscribed') }
         Check ((Order $model.Slots) -eq '2,3,1' -and $model.Slots[2].SelectionServer.IsSelectedCountry) 'latest order settles with selection on its stable identity'
+        Check-FlagClocks $true
         $b.Service.GetServerUrls()[0].latency = 70; $picker.RefreshGroup($b.Service); Pump 100
         Check (!$model.IsTransitioning -and !(Field $overlay 'ShowBand') -and (Field $overlay 'Flashes').Count -eq 0) 'same-position result has no band or flash'
     }
@@ -110,12 +136,16 @@ try {
     foreach ($g in @($a,$b,$c)) { $g.Service.GetServerUrls()[0].latency = 0 }
     $picker.ResetTestResults(); $picker.EndCheckCycleSetup(); Pump 900
     Check ((Order $model.Slots) -eq $before -and !$model.IsTransitioning -and !(Field $overlay 'ShowBand')) 'check-again reset preserves order without light'
+    $a.IsChecking = $true
     $c.Service.GetServerUrls()[0].latency = 50; $picker.RefreshGroup($c.Service); Pump 40
     $window.WindowState = [Windows.WindowState]::Minimized; Pump 100
     Check ((Order $model.Slots) -eq (Order ($model.Servers | ForEach-Object { [pscustomobject]@{DisplayedServer=$_} }))) 'minimize applies newest authoritative order'
     Check (!(Field $overlay 'ShowBand') -and !(Field $animator '_subscribed') -and (Field $overlay 'Flashes').Count -eq 0) 'minimize releases timeline and all overlays'
+    Check-FlagClocks $false
     $window.WindowState = [Windows.WindowState]::Normal; Pump 100
+    Check-FlagClocks ([System.Windows.SystemParameters]::ClientAreaAnimation)
     Check (!(Field $overlay 'ShowBand')) 'restore never replays obsolete work'
 } finally { $window.Close() }
 Check (!(Field $animator '_subscribed')) 'close/unload unsubscribes rendering'
+Check-FlagClocks $false
 Write-Output 'PASS native compiled picker comet lifecycle; no networking or VPN started'

@@ -14,21 +14,19 @@ namespace IRSpeedyVPN.Components.ServerListControl
     public sealed class ServerListCometOverlay : FrameworkElement
     {
         private static readonly Brush BandBrush = CreateBandBrush();
-        internal readonly TranslateTransform BandShift = new TranslateTransform();
-        internal Transform BandSkew;
-        internal Rect BandRect;
-        internal Geometry BandClip;
+        internal readonly List<ServerCometBand> Bands = new List<ServerCometBand>(2);
         internal bool ShowBand;
         internal readonly List<ServerCometFlash> Flashes = new List<ServerCometFlash>();
         public ServerListCometOverlay() { IsHitTestVisible = false; Focusable = false; }
         protected override Size MeasureOverride(Size availableSize) => new Size();
         protected override void OnRender(DrawingContext dc)
         {
-            if (ShowBand && BandClip != null)
-            {
-                dc.PushClip(BandClip); dc.PushTransform(BandShift); dc.PushTransform(BandSkew);
-                dc.DrawRectangle(BandBrush, null, BandRect); dc.Pop(); dc.Pop(); dc.Pop();
-            }
+            if (ShowBand)
+                foreach (var band in Bands)
+                {
+                    dc.PushClip(band.Clip); dc.PushTransform(band.Shift); dc.PushTransform(band.Skew);
+                    dc.DrawRectangle(BandBrush, null, band.Rect); dc.Pop(); dc.Pop(); dc.Pop();
+                }
             // Content fades on its own element. Painting its layout bounds here
             // produces a solid horizontal bar behind stretched country labels.
         }
@@ -45,6 +43,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
             brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
             brush.Freeze(); return brush;
         }
+    }
+    internal sealed class ServerCometBand
+    {
+        internal readonly TranslateTransform Shift = new TranslateTransform();
+        internal Transform Skew;
+        internal Rect Rect;
+        internal Geometry Clip;
     }
     internal sealed class ServerCometFlash
     {

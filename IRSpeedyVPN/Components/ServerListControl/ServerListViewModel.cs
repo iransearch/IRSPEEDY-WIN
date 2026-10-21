@@ -71,24 +71,28 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public ServerItem FlagServer => _parts[3];
         public ServerItem SelectionServer => _parts[4];
         public bool IsVacant => _parts.All(item => item == null);
-        // Vacancies retain the card's dimensions/background/disabled appearance.
+        // Membership changes are applied instantly; sorting never vacates a slot.
         public bool IsSelectable => _selectable;
         public Cursor RowCursor => IsVacant ? Cursors.Arrow : DisplayedServer?.RowCursor ?? Cursors.Arrow;
         public event PropertyChangedEventHandler PropertyChanged;
         private static readonly string[] PartNames = { nameof(SignalServer), nameof(BadgeServer), nameof(NameServer), nameof(FlagServer), nameof(SelectionServer) };
         internal ServerItem GetPart(ServerRowPart part) => _parts[(int)part];
-        internal void Reveal(ServerRowPart part, ServerItem item)
+        internal void AssignPart(ServerRowPart part, ServerItem item)
         {
             _parts[(int)part] = item;
             if (part == ServerRowPart.Name)
             {
                 DisplayedServer = item;
                 if (item != null) _selectable = item.IsSelectable;
-                Changed(nameof(DisplayedServer)); Changed(nameof(IsSelectable)); Changed(nameof(RowCursor));
             }
+        }
+        internal void NotifyPart(ServerRowPart part)
+        {
+            if (part == ServerRowPart.Name)
+            { Changed(nameof(DisplayedServer)); Changed(nameof(IsSelectable)); Changed(nameof(RowCursor)); }
             Changed(PartNames[(int)part]); Changed(nameof(IsVacant));
         }
-        internal void SetInstant(ServerItem item)
+        internal bool SetInstant(ServerItem item, bool notify = true)
         {
             var old = DisplayedServer;
             bool same = old == null ? item == null : old.LooksLike(item) && ReferenceEquals(old.Service, item?.Service);
@@ -96,22 +100,37 @@ namespace IRSpeedyVPN.Components.ServerListControl
             DisplayedServer = item;
             for (int i = 0; i < _parts.Length; i++) _parts[i] = item;
             if (item != null) _selectable = item.IsSelectable;
-            if (same && complete) return;
+            if (same && complete) return false;
+            if (notify) NotifyAll();
+            return true;
+        }
+        internal void NotifyAll()
+        {
             foreach (var name in PartNames) Changed(name);
             Changed(nameof(DisplayedServer)); Changed(nameof(IsVacant)); Changed(nameof(IsSelectable)); Changed(nameof(RowCursor));
         }
-        internal bool Contains(string identity) => identity != null && _parts.Any(item => item?.Identity == identity);
         private void Changed(string name) => PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(name));
+    }
+    internal sealed class ServerSortRow
+    {
+        public readonly int Index;
+        public readonly ServerDisplaySlot Slot;
+        public readonly ServerItem From, Target;
+        internal ServerSortRow(int index, ServerDisplaySlot slot, ServerItem target)
+        { Index = index; Slot = slot; From = slot.DisplayedServer; Target = target; }
     }
     internal sealed class ServerSortPass
     {
-        public readonly int Index, Generation;
-        public readonly ServerDisplaySlot Slot;
-        public readonly ServerItem From, Target;
-        internal bool Reserved;
+        public readonly int Generation;
+        public readonly ServerSortRow[] Rows;
+        public int Index => Rows[0].Index;
+        public ServerDisplaySlot Slot => Rows[0].Slot;
+        public ServerItem From => Rows[0].From;
+        public ServerItem Target => Rows[0].Target;
         internal int RevealedMask;
-        internal ServerSortPass(int index, int generation, ServerDisplaySlot slot, ServerItem target)
-        { Index = index; Generation = generation; Slot = slot; From = slot.DisplayedServer; Target = target; }
+        internal ServerSortPass(int generation, ServerSortRow first, ServerSortRow second)
+        { Generation = generation; Rows = new[] { first, second }; }
+        internal bool Contains(ServerDisplaySlot slot) => Rows.Any(row => ReferenceEquals(row.Slot, slot));
     }
     internal sealed class ServerListViewModel
     {
@@ -128,15 +147,18 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             var latest = source.ToArray();
             var byId = latest.ToDictionary(item => item.Identity);
+            bool membershipChanged = latest.Length != Servers.Count || Servers.Any(item => !byId.ContainsKey(item.Identity));
             for (int i = 0; i < latest.Length; i++)
                 if (i < Servers.Count) Servers[i] = latest[i]; else Servers.Add(latest[i]);
             while (Servers.Count > latest.Length) Servers.RemoveAt(Servers.Count - 1);
-            if (!_initialized || latest.Length == 0 || (!animate && allowReorder)) { CompleteImmediately(); _initialized = true; return; }
+            // Adding/removing identities is structural, not an exchange. Reconcile
+            // immediately rather than keeping an empty source card in the list.
+            if (!_initialized || membershipChanged || latest.Length == 0 || (!animate && allowReorder))
+            { CompleteImmediately(); _initialized = true; return; }
             foreach (var slot in Slots)
             {
-                if (ReferenceEquals(slot, _active?.Slot) || slot.IsVacant) continue;
-                ServerItem current;
-                slot.SetInstant(byId.TryGetValue(slot.DisplayedServer.Identity, out current) ? current : null);
+                if (_active?.Contains(slot) == true) continue;
+                slot.SetInstant(byId[slot.DisplayedServer.Identity]);
             }
             if (allowReorder) _workRequested = true;
             if (_workRequested && _active == null) WorkAvailable?.Invoke();
@@ -145,39 +167,42 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             ++_generation; _active = null; _workRequested = false;
             Resetting?.Invoke(); Resize(Servers.Count);
-            for (int i = 0; i < Slots.Count; i++) Slots[i].SetInstant(Servers[i]);
+            var changed = new List<ServerDisplaySlot>();
+            for (int i = 0; i < Slots.Count; i++)
+                if (Slots[i].SetInstant(Servers[i], notify: false)) changed.Add(Slots[i]);
+            // All identities are committed before any binding reads the new state.
+            foreach (var slot in changed) slot.NotifyAll();
         }
         public ServerSortPass TryBeginPass()
         {
             if (_active != null || !_workRequested) return null;
-            Resize(Math.Max(Slots.Count, Servers.Count));
-            // Re-plan EVERY boundary, including vacant sources, against latest truth.
             for (int i = 0; i < Slots.Count; i++)
             {
-                var target = i < Servers.Count ? Servers[i] : null;
-                if (Slots[i].DisplayedServer?.Identity == target?.Identity)
+                var target = Servers[i];
+                if (Slots[i].DisplayedServer.Identity == target.Identity)
                 { Slots[i].SetInstant(target); continue; }
-                return _active = new ServerSortPass(i, _generation, Slots[i], target);
+                int partner = -1;
+                for (int j = i + 1; j < Slots.Count; j++)
+                    if (Slots[j].DisplayedServer.Identity == target.Identity) { partner = j; break; }
+                if (partner < 0) { CompleteImmediately(); return null; }
+                var displaced = Servers.First(item => item.Identity == Slots[i].DisplayedServer.Identity);
+                return _active = new ServerSortPass(_generation,
+                    new ServerSortRow(i, Slots[i], target), new ServerSortRow(partner, Slots[partner], displaced));
             }
-            _workRequested = false; Resize(Servers.Count); return null;
+            _workRequested = false; return null;
         }
         public void Reveal(ServerSortPass pass, ServerRowPart part)
         {
-            if (!ReferenceEquals(_active, pass) || pass.Generation != _generation || (pass.RevealedMask & (1 << (int)part)) != 0) return;
+            if (pass == null || !ReferenceEquals(_active, pass) || pass.Generation != _generation || (pass.RevealedMask & (1 << (int)part)) != 0) return;
             pass.RevealedMask |= 1 << (int)part;
-            if (!pass.Reserved)
-            {
-                // Conceal the source BEFORE any target group is revealed. Progress
-                // publications cannot refill it with an obsolete identity.
-                foreach (var slot in Slots)
-                    if (!ReferenceEquals(slot, pass.Slot) && slot.Contains(pass.Target?.Identity)) slot.SetInstant(null);
-                pass.Reserved = true;
-            }
-            pass.Slot.Reveal(part, pass.Target);
+            // Swap the same group on BOTH rows before notifying either binding.
+            // No blank source and no duplicate name/flag/selection at a frame boundary.
+            foreach (var row in pass.Rows) row.Slot.AssignPart(part, row.Target);
+            foreach (var row in pass.Rows) row.Slot.NotifyPart(part);
         }
         public void Finish(ServerSortPass pass)
         {
-            if (!ReferenceEquals(_active, pass) || pass.Generation != _generation) return;
+            if (pass == null || !ReferenceEquals(_active, pass) || pass.Generation != _generation) return;
             for (int i = 0; i < 5; i++) Reveal(pass, (ServerRowPart)i);
             _active = null;
         }

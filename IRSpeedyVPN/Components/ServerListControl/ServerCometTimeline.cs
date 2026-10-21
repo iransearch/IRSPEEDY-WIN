@@ -19,11 +19,19 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private readonly double[] _crossings;
         private int _next;
         public readonly double Width;
-        public ServerCometTimeline(double width, double[] physicalCenters)
+        public ServerCometTimeline(double width, double[] physicalCenters, double partnerWidth = 0, double[] partnerCenters = null)
         {
             Width = width;
-            _order = Enumerable.Range(0, physicalCenters.Length).OrderBy(i => physicalCenters[i]).ToArray();
-            _crossings = _order.Select(i => ServerCometTiming.CrossingTime(Math.Max(0, Math.Min(width, physicalCenters[i])), width)).ToArray();
+            var crossings = Enumerable.Range(0, physicalCenters.Length).Select(i =>
+            {
+                double crossing = ServerCometTiming.CrossingTime(Math.Max(0, Math.Min(width, physicalCenters[i])), width);
+                if (partnerCenters != null)
+                    crossing = Math.Max(crossing, ServerCometTiming.CrossingTime(Math.Max(0, Math.Min(partnerWidth, partnerCenters[i])), partnerWidth));
+                return crossing;
+            }).ToArray();
+            // Both bands must have reached a group before its atomic two-way swap.
+            _order = Enumerable.Range(0, crossings.Length).OrderBy(i => crossings[i]).ToArray();
+            _crossings = _order.Select(i => crossings[i]).ToArray();
         }
         public void Advance(double elapsedMs, Action<int, double> reveal)
         {

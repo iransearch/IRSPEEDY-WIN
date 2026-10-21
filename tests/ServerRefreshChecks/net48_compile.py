@@ -28,6 +28,7 @@ linked = [
  'Components/ServerListControl/ServerCountryPicker.xaml.cs',
  'Components/ServerListControl/ServerCountryPicker.Transitions.cs',
  'Components/ServerListControl/ServerCountryPicker.Motion.cs',
+ 'Components/ServerListControl/ServerCountryPicker.ProbeShine.cs',
  'Components/ServerListControl/ServerCountryPicker.StarGlow.cs',
  'Components/ServerListControl/ServerListViewModel.cs',
  'Components/ServerListControl/ServerListRanking.cs',

@@ -161,6 +161,20 @@
                   <TextBlock Text="{Binding Initials, Mode=OneWay}" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="13" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible"/><Style.Triggers><DataTrigger Binding="{Binding HasFlag, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                   </TextBlock>
+                  <!-- Original flag sheen, only while this country is being checked. -->
+                  <Grid IsHitTestVisible="False">
+                    <Grid.Clip><EllipseGeometry Center="15,15" RadiusX="15" RadiusY="15"/></Grid.Clip>
+                    <Rectangle Width="12" Margin="0,-10" HorizontalAlignment="Left" Loaded="ProbeShine_Changed" Unloaded="ProbeShine_Unloaded" IsVisibleChanged="ProbeShine_VisibilityChanged">
+                      <Rectangle.Style><Style TargetType="Rectangle">
+                        <Setter Property="Visibility" Value="Collapsed"/>
+                        <Style.Triggers><DataTrigger Binding="{Binding IsChecking, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                      </Style></Rectangle.Style>
+                      <Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
+                        <GradientStop Color="#00FFFFFF" Offset="0"/><GradientStop Color="#8CFFFFFF" Offset="0.5"/><GradientStop Color="#00FFFFFF" Offset="1"/>
+                      </LinearGradientBrush></Rectangle.Fill>
+                      <Rectangle.RenderTransform><TransformGroup><SkewTransform AngleX="-14" CenterY="25"/><TranslateTransform X="-20"/></TransformGroup></Rectangle.RenderTransform>
+                    </Rectangle>
+                  </Grid>
                 </Grid>
                 <Grid Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
