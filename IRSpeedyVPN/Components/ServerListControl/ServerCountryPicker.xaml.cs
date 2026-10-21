@@ -349,6 +349,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         public void Load(IEnumerable<IVPNService> services, bool urlTestSupported)
         {
+            _serverList.BeginCheckCycle();
             _urlTest = urlTestSupported;
             var arr = services?.ToArray() ?? new IVPNService[0];
             var previousServiceId = _selectedGroup?.Service?.ID;
@@ -432,7 +433,11 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public void SetGroupChecking(IVPNService service, bool checking)
         {
             var group = _allGroups.FirstOrDefault(g => ReferenceEquals(g.Service, service));
-            if (group != null) group.IsChecking = checking;
+            if (group != null)
+            {
+                if (checking) _serverList.MarkChecking(LastSuccessfulServer.Key(group.Service));
+                group.IsChecking = checking;
+            }
         }
 
         public void ResetTestResults()
@@ -467,7 +472,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
             group.RefreshSignals();
             ResortGroups();
-            RefreshDisplayedRows(allowReorder: allowSortAnimation && !_checkCycleSetup);
+            RefreshDisplayedRows(allowReorder: allowSortAnimation && !_checkCycleSetup,
+                completedIdentity: allowSortAnimation && !_checkCycleSetup ? LastSuccessfulServer.Key(group.Service) : null);
         }
 
         /// <summary>

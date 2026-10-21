@@ -15,6 +15,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public void BeginCheckCycle()
         {
             CompleteRowTransitions();
+            _serverList.BeginCheckCycle();
             _checkCycleSetup = true;
         }
         public void EndCheckCycleSetup()
@@ -48,14 +49,14 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _rowsUpdate = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => RefreshDisplayedRows()));
         }
 
-        private void RefreshDisplayedRows(bool allowReorder = false, bool instant = false)
+        private void RefreshDisplayedRows(bool allowReorder = false, bool instant = false, string completedIdentity = null)
         {
             if (ServerScroller == null || icCountries == null) return;
             if (_rowsUpdate != null && _rowsUpdate.Status == DispatcherOperationStatus.Pending) _rowsUpdate.Abort();
             _rowsUpdate = null;
             bool animate = !instant && SystemParameters.ClientAreaAnimation && IsLoaded && IsVisible
                 && Window.GetWindow(this)?.WindowState != WindowState.Minimized;
-            _serverList.Publish(_groups.Select(group => new ServerItem(group)), animate, allowReorder || instant);
+            _serverList.Publish(_groups.Select(group => new ServerItem(group)), animate, allowReorder || instant, completedIdentity);
         }
 
         private void CompleteRowTransitions()

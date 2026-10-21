@@ -1,9 +1,15 @@
-# Server list paired comet (1.4.25)
+# Server list paired comet (1.4.26)
 
 The existing .NET Framework 4.8 WPF picker consumes the application's existing
-country order immediately after each completed country check. Its aggregation,
-ranking, probe execution and connection selection rules are unchanged. Partial
-results update the existing indicators in place; they do not start a sorting sweep.
+country order after each completed country check. Its aggregation, ranking, probe
+execution and connection selection rules are unchanged. Presentation eligibility
+is recorded only at the existing RefreshGroup completion notification, not from
+a partial ping, cached result or IsChecking=false alone. BOTH countries in a swap
+must have completed this cycle and must no longer be checking. Pending countries
+keep their slots. The completed subset uses the canonical ranking within the
+slots those completed countries occupy. With fewer than two completed countries
+there is no swap or light. This also applies to reduced-motion/lifecycle commits.
+Starting a new cycle or loading a new list clears completion eligibility.
 The original checking sheen is restored inside the flag of a checking country.
 
 ## Presentation
@@ -176,3 +182,15 @@ rows per pass across all 720 six-country permutations, sequential convergence,
 rapid publications, atomic group updates, selection, and timing tests. UI contracts
 and binding checks passed. Full net48 build and native WPF visual execution were
 not run for this revision.
+
+## 1.4.26 validation
+
+Executed production planner/timeline with Roslyn C# 7.3 on .NET 8 and inert WPF
+doubles. Strict-cycle cases cover zero/one completed country, an eligible distant
+pair with two pending middle countries, every group reveal preserving pending
+slots, cycle reset, and a still-checking partner being rejected. Existing 720
+permutation, rapid publication, selection and timing cases explicitly publish
+completed identities. UI/binding contracts passed. The Windows WPF fixture was
+updated to exercise two completed partners while a third country checks, and to
+assert two separate bands/transforms. It was NOT executed here; full net48 build
+and visual Windows verification remain unrun.

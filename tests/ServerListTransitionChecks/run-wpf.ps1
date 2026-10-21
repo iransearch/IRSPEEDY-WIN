@@ -84,23 +84,27 @@ try {
     $ctor = $itemType.GetConstructor($flags,$null,[Type[]]@($groupType),$null)
     for ($i=0; $i -lt 3; $i++) { $items[$i] = $ctor.Invoke([object[]]@($groups[$i])) }
     $model = Field $picker '_serverList'; $animator = Field $picker '_sweepAnimator'; $overlay = Field $picker 'CometOverlay'
-    Call $model 'Publish' ([object[]]@($items,$true,$false)) | Out-Null
+    Call $model 'Publish' ([object[]]@($items,$true,$false,$null)) | Out-Null
     Pump 100
     Check ((Order $model.Slots) -eq '1,2,3' -and !(Field $overlay 'ShowBand')) 'initial population has no light'
     Check-FlagClocks ([System.Windows.SystemParameters]::ClientAreaAnimation)
+    $a.IsChecking = $false; $c.IsChecking = $true
+    $picker.RefreshGroup($a.Service)
     $b.Service.GetServerUrls()[0].latency = 80
     $picker.RefreshGroup($b.Service)
-    Check ($model.Servers[0].Service.ID -eq 2 -and $a.IsChecking) 'completed country sorts while another remains checking'
+    Check ($model.Servers[0].Service.ID -eq 2 -and $c.IsChecking) 'completed country sorts while another remains checking'
     if (![System.Windows.SystemParameters]::ClientAreaAnimation) {
         Check ((Order $model.Slots) -eq '2,1,3' -and !$model.IsTransitioning) 'OS reduced motion applies final order immediately'
     } else {
         Wait-For { Field $overlay 'ShowBand' }
         $pass = Field $animator '_pass'; $started = Field $animator '_started'
+        $c.IsChecking = $false
         $c.Service.GetServerUrls()[0].latency = 200
         $picker.RefreshGroup($c.Service)
         Check ([object]::ReferenceEquals($pass,(Field $animator '_pass')) -and $started -eq (Field $animator '_started')) 'new completion coalesces without restarting current pass'
         $surfaces = @(Field $animator '_surfaces'); $bands = @(Field $overlay 'Bands')
         Check ($bands.Count -eq 2 -and $pass.Rows.Length -eq 2) 'both exchanged rows have a simultaneous light band'
+        Check (![object]::ReferenceEquals((Field $bands[0] 'Shift'),(Field $bands[1] 'Shift'))) 'paired bands own independent row transforms'
         $lefts = @($bands | ForEach-Object { (Field $_ 'Shift').X })
         Pump 150
         for ($j=0; $j -lt 2; $j++) {
@@ -127,7 +131,7 @@ try {
         }
         Wait-For { Unique $model.Slots; !$model.IsTransitioning -and (Field $overlay 'Flashes').Count -eq 0 -and !(Field $animator '_subscribed') }
         Check ((Order $model.Slots) -eq '2,3,1' -and $model.Slots[2].SelectionServer.IsSelectedCountry) 'latest order settles with selection on its stable identity'
-        Check-FlagClocks $true
+        Check-FlagClocks $false
         $b.Service.GetServerUrls()[0].latency = 70; $picker.RefreshGroup($b.Service); Pump 100
         Check (!$model.IsTransitioning -and !(Field $overlay 'ShowBand') -and (Field $overlay 'Flashes').Count -eq 0) 'same-position result has no band or flash'
     }
@@ -139,7 +143,7 @@ try {
     $a.IsChecking = $true
     $c.Service.GetServerUrls()[0].latency = 50; $picker.RefreshGroup($c.Service); Pump 40
     $window.WindowState = [Windows.WindowState]::Minimized; Pump 100
-    Check ((Order $model.Slots) -eq (Order ($model.Servers | ForEach-Object { [pscustomobject]@{DisplayedServer=$_} }))) 'minimize applies newest authoritative order'
+    Check ((Order $model.Slots) -eq $before) 'minimize keeps unfinished countries fixed with only one completed country'
     Check (!(Field $overlay 'ShowBand') -and !(Field $animator '_subscribed') -and (Field $overlay 'Flashes').Count -eq 0) 'minimize releases timeline and all overlays'
     Check-FlagClocks $false
     $window.WindowState = [Windows.WindowState]::Normal; Pump 100

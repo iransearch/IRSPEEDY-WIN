@@ -143,8 +143,17 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private ServerSortPass _active;
         private bool _initialized, _workRequested;
         private int _generation;
-        public void Publish(IEnumerable<ServerItem> source, bool animate, bool allowReorder = true)
+        private HashSet<string> _completedChecks = new HashSet<string>(StringComparer.Ordinal);
+        public void BeginCheckCycle()
         {
+            CompleteImmediately();
+            _completedChecks = new HashSet<string>(StringComparer.Ordinal);
+        }
+        public void MarkChecking(string identity) => _completedChecks.Remove(identity);
+        private bool CanMove(ServerItem item) => !item.IsChecking && _completedChecks.Contains(item.Identity);
+        public void Publish(IEnumerable<ServerItem> source, bool animate, bool allowReorder = true, string completedIdentity = null)
+        {
+            if (completedIdentity != null) _completedChecks.Add(completedIdentity);
             var latest = source.ToArray();
             var byId = latest.ToDictionary(item => item.Identity);
             bool membershipChanged = latest.Length != Servers.Count || Servers.Any(item => !byId.ContainsKey(item.Identity));
@@ -166,35 +175,51 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public void CompleteImmediately()
         {
             ++_generation; _active = null; _workRequested = false;
-            Resetting?.Invoke(); Resize(Servers.Count);
+            Resetting?.Invoke();
+            var final = PresentationOrder();
+            Resize(Servers.Count);
             var changed = new List<ServerDisplaySlot>();
             for (int i = 0; i < Slots.Count; i++)
-                if (Slots[i].SetInstant(Servers[i], notify: false)) changed.Add(Slots[i]);
+                if (Slots[i].SetInstant(final[i], notify: false)) changed.Add(Slots[i]);
             // All identities are committed before any binding reads the new state.
             foreach (var slot in changed) slot.NotifyAll();
+        }
+        private ServerItem[] PresentationOrder()
+        {
+            var latest = Servers.ToArray();
+            if (Slots.Count != latest.Length) return latest;
+            var byId = latest.ToDictionary(item => item.Identity);
+            if (Slots.Any(slot => slot.DisplayedServer == null || !byId.ContainsKey(slot.DisplayedServer.Identity))) return latest;
+            var ordered = latest.Where(CanMove).ToArray();
+            int next = 0;
+            return Slots.Select(slot => {
+                var item = byId[slot.DisplayedServer.Identity];
+                return CanMove(item) ? ordered[next++] : item;
+            }).ToArray();
         }
         public ServerSortPass TryBeginPass()
         {
             if (_active != null || !_workRequested) return null;
-            var targets = Servers.Select((item, index) => new { item, index })
+            var latestById = Servers.ToDictionary(item => item.Identity);
+            var targets = PresentationOrder().Select((item, index) => new { item, index })
                 .ToDictionary(entry => entry.item.Identity, entry => entry.index);
             int source = -1, destination = -1, distance = 0;
             for (int i = 0; i < Slots.Count; i++)
             {
                 int targetIndex;
-                if (!targets.TryGetValue(Slots[i].DisplayedServer.Identity, out targetIndex))
-                { CompleteImmediately(); return null; }
+                if (!targets.TryGetValue(Slots[i].DisplayedServer.Identity, out targetIndex)) continue;
                 int displacement = Math.Abs(targetIndex - i);
-                if (displacement == 0) Slots[i].SetInstant(Servers[i]);
+                if (displacement == 0) Slots[i].SetInstant(latestById[Slots[i].DisplayedServer.Identity]);
                 // Move the furthest displaced country straight to its destination
                 // first, rather than pushing it down through successive top slots.
                 if (displacement > distance)
                 { source = i; destination = targetIndex; distance = displacement; }
             }
             if (source < 0) { _workRequested = false; return null; }
-            var displaced = Servers[targets[Slots[destination].DisplayedServer.Identity]];
+            var displaced = latestById[Slots[destination].DisplayedServer.Identity];
+            var arriving = latestById[Slots[source].DisplayedServer.Identity];
             return _active = new ServerSortPass(_generation, new[] {
-                new ServerSortRow(destination, Slots[destination], Servers[destination]),
+                new ServerSortRow(destination, Slots[destination], arriving),
                 new ServerSortRow(source, Slots[source], displaced)
             }.OrderBy(row => row.Index).ToArray());
         }

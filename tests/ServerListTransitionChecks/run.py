@@ -25,6 +25,15 @@ namespace IRSpeedyVPN.Components.ServerListControl {
   public long SortKey;
  }
 }
+// Legacy planner cases explicitly publish completed identities. Strict-cycle
+// cases below call the production Publish API without this convenience adapter.
+static class CompletedFixture {
+ public static void PublishForTest(this ServerListViewModel vm,IEnumerable<ServerItem> source,bool animate,bool allowReorder=true){
+  var values=source.ToArray();bool initial=vm.Servers.Count!=values.Length||!vm.Servers.Select(item=>item.Identity).OrderBy(id=>id).SequenceEqual(values.Select(item=>item.Identity).OrderBy(id=>id));
+  foreach(var item in values)vm.Publish(values,true,false,item.Identity);
+  if(!initial||values.Length==0)vm.Publish(values,animate,allowReorder);
+ }
+}
 class Service:IVPNService { public int ID {get;set;} }
 class Program {
  static GroupItem G(int id,bool selected=false)=>new GroupItem{Service=new Service{ID=id},CountryName="کشور "+id,Initials="ک",SignalText=id+" ms",SortKey=id,IsSelectedCountry=selected};
@@ -53,16 +62,40 @@ class Program {
   }
  }
  static void Main(){
+  var strict=new ServerListViewModel();var sg=Enumerable.Range(1,4).Select(id=>G(id,id==1)).ToArray();
+  var original=sg.Select(S).ToArray();strict.Publish(original,true);strict.BeginCheckCycle();
+  var reversed=original.Reverse().ToArray();strict.Publish(reversed,true);
+  Check(strict.TryBeginPass()==null,"zero completed countries cannot move even if canonical order changes");
+  strict.Publish(reversed,true,true,original[0].Identity);
+  Check(strict.TryBeginPass()==null,"one completed country cannot swap with a pending partner");
+  strict.CompleteImmediately();
+  Check(strict.Slots.Select(slot=>slot.DisplayedServer.Service.ID).SequenceEqual(new[]{1,2,3,4}),
+    "instant/reduced-motion cleanup also pins every unfinished country");
+  strict.Publish(reversed,true,true,original[3].Identity);var eligible=strict.TryBeginPass();
+  Check(eligible!=null&&eligible.Rows.Length==2&&eligible.Rows.All(row=>row.From.Service.ID==1||row.From.Service.ID==4),
+    "only two explicitly completed countries form the active pair");
+  for(int part=0;part<5;part++){strict.Reveal(eligible,(ServerRowPart)part);Unique(strict);
+   Check(strict.Slots[1].GetPart((ServerRowPart)part).Service.ID==2&&strict.Slots[2].GetPart((ServerRowPart)part).Service.ID==3,
+     "not-started countries stay fixed during paired reveal part "+part);}
+  strict.Finish(eligible);Check(strict.TryBeginPass()==null,"pending middle countries receive no follow-up swap");
+  strict.BeginCheckCycle();strict.Publish(original,true);
+  Check(strict.TryBeginPass()==null,"new cycle forgets all previous completion eligibility");
+  sg[0].IsChecking=true;strict.Publish(sg.Select(S).Reverse(),true,true,original[0].Identity);
+  strict.Publish(sg.Select(S).Reverse(),true,true,original[3].Identity);
+  Check(strict.TryBeginPass()==null,"a still-checking country cannot become a partner from completion metadata alone");
+  sg[0].IsChecking=false;strict.MarkChecking(original[0].Identity);
+  strict.Publish(sg.Select(S).Reverse(),true,false);
+  Check(strict.TryBeginPass()==null,"stopping/canceling checking cannot restore earlier completion eligibility");
   var a=G(1,true);var b=G(2);var c=G(3);var vm=new ServerListViewModel();int work=0;vm.WorkAvailable+=()=>work++;
-  vm.Publish(new[]{S(a),S(b),S(c)},true);var stable=vm.Slots.ToArray();
+  vm.PublishForTest(new[]{S(a),S(b),S(c)},true);var stable=vm.Slots.ToArray();
   Check(!vm.IsTransitioning,"initial load has no light");var before=vm.Slots.Select(s=>s.DisplayedServer.Identity).ToArray();vm.CompleteImmediately();work=0;
-  a.IsChecking=b.IsChecking=true;a.SignalText=b.SignalText="—";vm.Publish(new[]{S(c),S(b),S(a)},true,false);
+  a.IsChecking=b.IsChecking=true;a.SignalText=b.SignalText="—";vm.PublishForTest(new[]{S(c),S(b),S(a)},true,false);
   Check(work==0&&!vm.IsTransitioning&&vm.Slots.Select(s=>s.DisplayedServer.Identity).SequenceEqual(before),"check again/reset preserves visible order with no light");
-  vm.Publish(new[]{S(c),S(b),S(a)},false,false);
+  vm.PublishForTest(new[]{S(c),S(b),S(a)},false,false);
   Check(vm.Slots.Select(s=>s.DisplayedServer.Identity).SequenceEqual(before),"reduced-motion reset also preserves visible order");
   Check(vm.Slots[0].DisplayedServer.IsChecking&&vm.Slots[0].SignalServer.SignalText=="—","pending indicators/data update normally");
-  b.IsChecking=false;b.SignalText="80 ms";vm.Publish(new[]{S(b),S(a),S(c)},true);var pass=vm.TryBeginPass();var frozen=pass.Target;
-  Check(pass.Index==0&&pass.Target.Service.ID==2&&a.IsChecking,"one country completion sorts immediately while another is checking");
+  a.IsChecking=false;b.IsChecking=false;b.SignalText="80 ms";vm.PublishForTest(new[]{S(b),S(a),S(c)},true);var pass=vm.TryBeginPass();var frozen=pass.Target;
+  Check(pass.Index==0&&pass.Target.Service.ID==2&&!a.IsChecking,"completed countries sort immediately without waiting for the full list");
   Check(vm.Servers[0].Service.ID==2&&vm.Slots[0].NameServer.Service.ID==1,"sorted truth is immediate but displayed country remains old until reveal");
   Check(vm.TryBeginPass()==null&&pass.Rows.Length==2&&pass.Rows[1].Index==1,"one active exchange freezes both affected rows");
   int notifications=0;foreach(var slot in vm.Slots)slot.PropertyChanged+=(sender,e)=>{Unique(vm);notifications++;};
@@ -70,22 +103,22 @@ class Program {
   Check(!vm.Slots[1].IsVacant&&vm.Slots[0].NameServer.Service.ID==1&&vm.Slots[1].NameServer.Service.ID==2
     &&vm.Slots[0].SignalServer.Service.ID==2&&vm.Slots[1].SignalServer.Service.ID==1,"paired group exchanges leave both cards populated while names retain old data");
   Check(notifications>0,"every binding notification observes an already atomic paired group");
-  vm.Publish(new[]{S(c),S(b),S(a)},true,false);Unique(vm);Check(vm.Slots[1].SignalServer.Service.ID==1,"progress cannot overwrite either half of the active pair");
-  for(int i=0;i<200;i++){b.SignalText=i+" ms";vm.Publish(new[]{S(c),S(b),S(a)},true);}
+  vm.PublishForTest(new[]{S(c),S(b),S(a)},true,false);Unique(vm);Check(vm.Slots[1].SignalServer.Service.ID==1,"progress cannot overwrite either half of the active pair");
+  for(int i=0;i<200;i++){b.SignalText=i+" ms";vm.PublishForTest(new[]{S(c),S(b),S(a)},true);}
   Check(ReferenceEquals(pass.Target,frozen)&&vm.Slots[0].SignalServer.SignalText=="80 ms"&&pass.Rows[1].Target.Service.ID==1,"200 completions coalesce while both active targets stay frozen");vm.Finish(pass);Unique(vm);
   var next=vm.TryBeginPass();Check(next.Index==0&&next.Target.Service.ID==3,"next boundary replans first current mismatch against newest order");vm.Finish(next);Unique(vm);Drain(vm);
   Check(vm.Slots[1].SignalServer.SignalText=="199 ms"&&vm.Slots[2].SelectionServer.IsSelectedCountry&&a.IsSelectedCountry,"latest ping and selection follow stable identity");
   Check(vm.Slots.SequenceEqual(stable),"visual slots are never reordered/replaced");
-  vm.Publish(vm.Servers.ToArray(),true);Check(vm.TryBeginPass()==null,"unchanged positions consume no pass time");
-  a.SignalText="—";a.IsSelectable=false;vm.Publish(new[]{S(c),S(b),S(a)},true,false);
+  vm.PublishForTest(vm.Servers.ToArray(),true);Check(vm.TryBeginPass()==null,"unchanged positions consume no pass time");
+  a.SignalText="—";a.IsSelectable=false;vm.PublishForTest(new[]{S(c),S(b),S(a)},true,false);
   Check(!vm.IsTransitioning&&vm.Slots[2].SignalServer.SignalText=="—"&&!vm.Slots[2].IsSelectable,"ping-only/failed data updates without any reveal pass");
-  var cycle=new ServerListViewModel();var all=new[]{S(G(1)),S(G(2)),S(G(3))};cycle.Publish(all,true);cycle.Publish(new[]{all[1],all[2],all[0]},true);
+  var cycle=new ServerListViewModel();var all=new[]{S(G(1)),S(G(2)),S(G(3))};cycle.PublishForTest(all,true);cycle.PublishForTest(new[]{all[1],all[2],all[0]},true);
   int n=Drain(cycle);Check(n==2&&n*ServerCometTiming.SORT_PASS_MS==1600,"three-country cycle resolves with sequential pairs");
-  var direct=new ServerListViewModel();direct.Publish(all,true);direct.Publish(new[]{all[2],all[1],all[0]},true);
+  var direct=new ServerListViewModel();direct.PublishForTest(all,true);direct.PublishForTest(new[]{all[2],all[1],all[0]},true);
   Check(Drain(direct)==1,"two distant servers exchange in one 800ms pass, skipping the unchanged middle row");
   var four=Enumerable.Range(1,4).Select(id=>S(G(id,id==1))).ToArray();
-  var descent=new ServerListViewModel();descent.Publish(four,true);
-  descent.Publish(new[]{four[1],four[2],four[3],four[0]},true);
+  var descent=new ServerListViewModel();descent.PublishForTest(four,true);
+  descent.PublishForTest(new[]{four[1],four[2],four[3],four[0]},true);
   var drop=descent.TryBeginPass();
   Check(drop.Rows.Length==2&&drop.Rows.Single(row=>row.Target.Service.ID==1).Index==3,
     "first-to-fourth move uses exactly two lights and targets fourth immediately");
@@ -97,17 +130,17 @@ class Program {
     "direct move preserves identity selection");
   int remainder=Drain(descent);Check(remainder==2&&descent.Slots[3].DisplayedServer.Service.ID==1,
     "remaining pairs run sequentially without moving the completed first-to-fourth country again");
-  cycle.Publish(all,true);var old=cycle.TryBeginPass();cycle.Reveal(old,ServerRowPart.Signal);cycle.CompleteImmediately();var baseline=cycle.Slots.Select(s=>s.DisplayedServer.Identity).ToArray();
-  cycle.Publish(all.Reverse(),true,false);cycle.Reveal(old,ServerRowPart.Name);cycle.Finish(old);
+  cycle.PublishForTest(all,true);var old=cycle.TryBeginPass();cycle.Reveal(old,ServerRowPart.Signal);cycle.CompleteImmediately();var baseline=cycle.Slots.Select(s=>s.DisplayedServer.Identity).ToArray();
+  cycle.PublishForTest(all.Reverse(),true,false);cycle.Reveal(old,ServerRowPart.Name);cycle.Finish(old);
   Check(!cycle.IsTransitioning&&cycle.Slots.Select(s=>s.DisplayedServer.Identity).SequenceEqual(baseline),"new cycle cancels partial presentation and stale callbacks without light");Unique(cycle);
-  cycle.Publish(new[]{all[2],S(G(4))},true);Drain(cycle);Check(cycle.Slots.Count==2&&cycle.Slots[1].DisplayedServer.Service.ID==4,"added/removed countries reconcile without duplicates or loss");
-  cycle.Publish(new ServerItem[0],true);Check(cycle.Slots.Count==0&&!cycle.IsTransitioning,"empty source cancels immediately");
-  cycle.Publish(new[]{S(G(9))},true);Drain(cycle);cycle.Publish(new[]{S(G(10))},false);Check(!cycle.IsTransitioning&&cycle.Slots[0].DisplayedServer.Service.ID==10,"single row and reduced-motion fallback apply latest state");
+  cycle.PublishForTest(new[]{all[2],S(G(4))},true);Drain(cycle);Check(cycle.Slots.Count==2&&cycle.Slots[1].DisplayedServer.Service.ID==4,"added/removed countries reconcile without duplicates or loss");
+  cycle.PublishForTest(new ServerItem[0],true);Check(cycle.Slots.Count==0&&!cycle.IsTransitioning,"empty source cancels immediately");
+  cycle.PublishForTest(new[]{S(G(9))},true);Drain(cycle);cycle.PublishForTest(new[]{S(G(10))},false);Check(!cycle.IsTransitioning&&cycle.Slots[0].DisplayedServer.Service.ID==10,"single row and reduced-motion fallback apply latest state");
   // Every permutation converges with at most N-1 sequential pairs,
   // and each intermediate notification retains all countries.
   foreach(var order in Permutations(Enumerable.Range(1,6).ToArray(),0)) {
    var exact=new ServerListViewModel();var items=Enumerable.Range(1,6).Select(id=>S(G(id))).ToArray();
-   exact.Publish(items,true);exact.Publish(order.Select(id=>items[id-1]),true);
+   exact.PublishForTest(items,true);exact.PublishForTest(order.Select(id=>items[id-1]),true);
    int passes=0;ServerSortPass step;
    while((step=exact.TryBeginPass())!=null) {
     if(step.Rows.Length!=2||++passes>5)throw new Exception("not a bounded sequential pair");
@@ -116,10 +149,10 @@ class Program {
    if(!exact.Slots.Select(slot=>slot.DisplayedServer.Service.ID).SequenceEqual(order))throw new Exception("incorrect final order");
   }
   Check(true,"all 720 six-country orders converge with exactly two active rows per pass");
-  var random=new Random(17);var churn=new ServerListViewModel();var many=Enumerable.Range(1,37).Select(id=>S(G(id,id==17))).ToArray();churn.Publish(many,true);
-  for(int i=0;i<150;i++){churn.Publish(many.OrderBy(x=>random.Next()).ToArray(),true);var active=churn.TryBeginPass();if(active!=null){churn.Reveal(active,ServerRowPart.Signal);Unique(churn);for(int j=0;j<3;j++)churn.Publish(many.OrderBy(x=>random.Next()).ToArray(),true);churn.Finish(active);Unique(churn);}}
+  var random=new Random(17);var churn=new ServerListViewModel();var many=Enumerable.Range(1,37).Select(id=>S(G(id,id==17))).ToArray();churn.PublishForTest(many,true);
+  for(int i=0;i<150;i++){churn.PublishForTest(many.OrderBy(x=>random.Next()).ToArray(),true);var active=churn.TryBeginPass();if(active!=null){churn.Reveal(active,ServerRowPart.Signal);Unique(churn);for(int j=0;j<3;j++)churn.PublishForTest(many.OrderBy(x=>random.Next()).ToArray(),true);churn.Finish(active);Unique(churn);}}
   Drain(churn);Check(churn.Slots.Select(s=>s.DisplayedServer.Service.ID).OrderBy(x=>x).SequenceEqual(Enumerable.Range(1,37)),"rapid replanning preserves every country in every group without blank rows or duplicate names/flags");
-  var large=new ServerListViewModel();var lots=Enumerable.Range(1,4096).Select(id=>S(G(id))).ToArray();large.Publish(lots,true);large.Publish(lots.Reverse(),true);int instant=0;ServerSortPass offscreen;while((offscreen=large.TryBeginPass())!=null){large.Finish(offscreen);instant++;}
+  var large=new ServerListViewModel();var lots=Enumerable.Range(1,4096).Select(id=>S(G(id))).ToArray();large.PublishForTest(lots,true);large.PublishForTest(lots.Reverse(),true);int instant=0;ServerSortPass offscreen;while((offscreen=large.TryBeginPass())!=null){large.Finish(offscreen);instant++;}
   Check(instant==2048&&!large.IsTransitioning,"4096 unrealized rows drain through 2048 iterative pairs without recursion");
   Check(ServerCometTiming.SORT_PASS_MS==800&&ServerCometTiming.FLASH_MS==400&&ServerCometTiming.BAND_WIDTH_DIP==170&&ServerCometTiming.SKEW_DEG==-18,"exact named timing and geometry constants");
   Check(Math.Abs(ServerCometTiming.Ease(.5)-.5)<1e-10&&ServerCometTiming.Ease(-1)==0&&ServerCometTiming.Ease(2)==1,"clamped accelerate-decelerate cosine easing");
@@ -134,8 +167,8 @@ class Program {
   var cycleTimes=new Dictionary<int,double>();rotatedTimeline.Advance(800,(i,t)=>cycleTimes.Add(i,t));
   Check(cycleTimes.Count==5&&Math.Abs(cycleTimes[0]-ServerCometTiming.CrossingTime(410,420))<1e-8,
     "cycle timeline waits for every affected surface before atomic reveal");
-  var live=new ServerListViewModel();live.Publish(all,true);live.Publish(new[]{all[2],all[1],all[0]},true);var retired=live.TryBeginPass();live.Reveal(retired,ServerRowPart.Name);
-  live.Publish(new[]{all[0],S(G(4))},true);live.Finish(retired);Unique(live);
+  var live=new ServerListViewModel();live.PublishForTest(all,true);live.PublishForTest(new[]{all[2],all[1],all[0]},true);var retired=live.TryBeginPass();live.Reveal(retired,ServerRowPart.Name);
+  live.PublishForTest(new[]{all[0],S(G(4))},true);live.Finish(retired);Unique(live);
   Check(!live.IsTransitioning&&live.Slots.Count==2&&live.Slots[1].DisplayedServer.Service.ID==4,"membership change cancels a partial pair and applies new countries without holes or stale callbacks");
   Check(Math.Abs(ServerCometTiming.BandLeft(400,360)-(.5*(360+.85*170)-.85*170))<1e-8,"exact band/leading-edge coordinate formula");
  }

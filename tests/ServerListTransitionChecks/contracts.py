@@ -53,3 +53,13 @@ sheen=next(e for e in row(ET.parse(folder/'ServerCountryPicker.xaml').getroot())
 assert any('IsChecking' in e.get('Binding','') and e.get('Value')=='True' for e in sheen.iter(w+'DataTrigger'))
 assert 'DrawRoundedRectangle' not in (folder/'ServerListCometOverlay.cs').read_text()
 print('PASS checking sheen is clipped inside its flag; white content rectangles remain removed')
+
+vm=(folder/'ServerListViewModel.cs').read_text()
+transitions=(folder/'ServerCountryPicker.Transitions.cs').read_text()
+assert '_serverList.BeginCheckCycle();' in transitions
+assert 'completedIdentity: allowSortAnimation && !_checkCycleSetup' in completed
+assert '!item.IsChecking && _completedChecks.Contains(item.Identity)' in vm
+assert 'var targets = PresentationOrder()' in vm
+assert 'foreach (var assignment in _pass.Rows)' in c and 'new ServerCometBand' in c
+assert '_overlay.Bands.Add(band)' in c
+print('PASS explicit country completion gates both paired slots; each row owns a separate band')
