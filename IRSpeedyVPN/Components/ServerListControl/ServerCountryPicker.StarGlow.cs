@@ -33,8 +33,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             var glow = element.Effect as DropShadowEffect;
             if (glow == null) return null;
-            // A cached row template can share a frozen effect with BOTH sweep
-            // presenters. Each visible star must own its mutable animation target.
+            // Cached row templates can share a frozen effect. Each visible star
+            // must own its mutable animation target.
             if (glow.IsFrozen)
             {
                 glow = glow.Clone();
@@ -57,7 +57,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             StopStarGlow(element);
             if (!element.IsLoaded || !element.IsVisible || !IsVisible || !SystemParameters.ClientAreaAnimation
-                || LightSweepRowTransition.IsTransitionSurface(element)
                 || _motionWindow == null || _motionWindow.WindowState == WindowState.Minimized) return;
 
             // Loaded guarantees that the local XAML Effect has been assigned.

@@ -31,6 +31,7 @@ class GroupItem {
 }
 class Scroll {public int Calls;public void ScrollToTop(){Calls++;}}
 class Picker {
+ void RefreshDisplayedRows(bool allowReorder=false){}
  internal List<GroupItem> _allGroups=new List<GroupItem>();internal List<GroupItem> Visible;
  internal string Filter="";internal IVPNService Selected;internal Scroll ServerScroller=new Scroll();
  void ApplyFilter(){Visible=_allGroups.Where(g=>g.CountryName.Contains(Filter)).ToList();}

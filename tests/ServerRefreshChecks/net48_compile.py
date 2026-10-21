@@ -31,8 +31,9 @@ linked = [
  'Components/ServerListControl/ServerCountryPicker.StarGlow.cs',
  'Components/ServerListControl/ServerListViewModel.cs',
  'Components/ServerListControl/ServerListRanking.cs',
- 'Components/ServerListControl/LightSweepRowTransition.cs',
- 'Components/ServerListControl/LightSweepAnimationPlan.cs',
+ 'Components/ServerListControl/ServerCometTimeline.cs',
+ 'Components/ServerListControl/ServerListCometOverlay.cs',
+ 'Components/ServerListControl/ServerListSweepAnimator.cs',
 ]
 stubs = r'''using System;using System.Linq;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
 using System.Windows;using System.Windows.Controls;using System.Windows.Media;
@@ -61,6 +62,7 @@ namespace IRSpeedyVPN.Services {
 stubs += r'''namespace IRSpeedyVPN.Components.ServerListControl {
  public partial class ServerCountryPicker {
   Grid SmartCardHost=new Grid(),EmptyResults=new Grid(),smartCheck=new Grid();
+  ServerListCometOverlay CometOverlay=new ServerListCometOverlay();
   ScrollViewer ServerScroller=new ScrollViewer();ItemsControl icCountries=new ItemsControl();void InitializeComponent(){}
   Button smartCard=new Button();System.Windows.Shapes.Path SmartCardShine=new System.Windows.Shapes.Path();TranslateTransform SmartMosaicShift=new TranslateTransform();
  }

@@ -1,241 +1,144 @@
-# Server list light sweep (1.4.20)
+# Server list comet (1.4.21)
 
-`ServerCountryPicker.xaml` keeps the existing row artwork in `ServerRowContent`.
-Its `ServerCardButton` template hosts `LightSweepRowTransition`; the overlay is
-not hit testable, has a soft white/cyan gradient, and is clipped to the card's
-14-DIP rounded corners. Idle spacing, fonts, colors, selection artwork and the
-meaning of the last-successful-connection star are retained.
+The existing .NET Framework 4.8 WPF picker consumes the application's existing
+country order immediately after each completed country check. Its aggregation,
+ranking, probe execution and connection selection rules are unchanged. Partial
+results update the existing indicators in place; they do not start a sweep.
 
-## Data and timing
+## Presentation
 
-`ServerListViewModel.Servers` is an `ObservableCollection<ServerItem>` containing
-the latest filtered, sorted snapshots. The existing probe/pool models remain
-authoritative for health and connection selection. `Slots` is a separate stable
-collection whose `DisplayedServer` can temporarily be the previous snapshot.
-Snapshots copy all visual values, including selection/checking/star flags; later
-probe mutations cannot silently change the old side of a running sweep.
+`ServerListViewModel.Servers` holds immutable `ServerItem` snapshots in the latest
+real order. The ItemsControl binds only to stable `ServerDisplaySlot` objects.
+Each slot has five separately revealed snapshots: signal, existing connection
+badge, country name, flag and selection. No visual collection Move or row
+translation occurs. `DisplayedServer` (including the click identity) commits
+with the country-name group; clicks still resolve against the live group/health.
+The actual selected service is never changed by the animation.
 
-The reusable control exposes `Slot`, `RowTemplate`, `Duration` (520 ms),
-`BandWidth` (100 DIP), `BandColor` and `Easing`. Exactly one row transition can run
-at a time. The next row starts after the previous row's full completion and
-overlay cleanup, with no index-based stagger timer and no overlap.
-A WPF `Storyboard` runs native transform animations with CubicEase/EaseInOut.
-Its targets are the actual band Rectangle and content presenters, with property
-paths resolving their owned, mutable transforms. Freezable transforms must not be
-stored as direct Storyboard.Target values. Their eased normalized progress is `p`.
-In physical left-to-right coordinates its light center is
-`-BandWidth/2 + (rowWidth + BandWidth) * p`. Two content presenters have complementary
-render clips meeting at this center: new content appears on the left of the
-light and old content remains on its right. This reveals ping, name, flag and
-radio at their own positions instead of swapping the entire row ahead of the
-light. A discrete keyframe on the same storyboard commits `DisplayedServer`/button
-identity exactly when the light center crosses the row midpoint; completion
-commits it again safely. The easing is inverted once to find this key time, which
-also supports asymmetric monotonic easing. There is no independent timer that
-can drift relative to the animation.
-Rows retaining the same identity use a 150 ms cross-fade for changed ping/star/
-selection data; identical snapshots do not animate.
+`ServerListSweepAnimator` owns one monotonic Stopwatch, one active pass and one
+CompositionTarget.Rendering subscription. `ServerListCometOverlay` draws exactly
+one noninteractive band across the entire list. Only an assigned identity change
+gets a pass. Same-position ping, selection and star updates bind normally without
+flashing. Check-again reset preserves the visible order and resets existing
+indicators without a band. The all-finished event starts no presentation work.
 
-Probe property notifications coalesce into one dispatcher snapshot. During a
-pass, sorted source data continues updating; only the latest pending state is
-kept. The current row finishes, then the next waiting row reads its target from
-the latest source. At the end of a pass, earlier slots affected by newer results
-are revisited; unchanged slots skip animation. No queue of obsolete orderings
-is replayed, and old completion callbacks cannot overwrite a newer state.
-Clicking resolves the displayed identity against the CURRENT live
-group and health, so removed/failed servers cannot become a stale connection.
-Sorting, server pools, DNS, Core and TUN recovery behavior are unchanged.
+Constants in `ServerCometTimeline.cs` are `SORT_PASS_MS = 800`, `FLASH_MS = 400`,
+`BAND_WIDTH_DIP = 170`, and `SKEW_DEG = -18`. With clamped elapsed fraction t:
 
-Initial population and unrealized/offscreen additions update immediately.
-Existing slots reveal additions/removals; trailing removed slots are trimmed only
-after the pass. Offscreen/unrealized rows complete immediately, so scrolling does
-not add an artificial delay before the first visible row starts.
-Hidden/unloaded/minimized views flush pending data and finish immediately; restore
-starts with the latest data. Resizing completes the affected row rather than
-stretching a partly revealed snapshot.
+```
+eased = 0.5 - 0.5 * cos(pi * t)
+leadingEdgeX = eased * (W + 0.85 * B)
+bandLeftX = leadingEdgeX - 0.85 * B
+```
 
-## Accessibility and performance
+The frozen cyan/white horizontal gradient has stops at 0, .30, .68, .86, .90,
+.96 and 1, with the requested long tail and sharp bright edge. The static skew
+and rounded row/viewport clips are prepared before each pass. The existing
+card's actual corner radius is read from its template. No blur or shadow is
+added. Idle row artwork, text, spacing, RTL, palette and existing icons remain
+unchanged.
 
-The effect is enabled by default with no app setting or registry flag. Windows
-client-area animation disabled means immediate updates, respecting the OS motion
-preference independently of the existing probing/smart-card ornaments.
+Before each pass, existing content groups are measured through TransformToVisual
+into the physical LTR overlay. Inherited RTL transforms are included. The timeline
+sorts these measured centers and calculates crossing times using the inverse
+cosine easing. Each group retains its old snapshot until the leading edge
+crosses its center, then commits once. Dropped frames process every crossed
+group. Changed content fades from opacity .2 to 1 over 400 ms with a brief white
+brightness overlay; unchanged content gets no flash. Flash start times use the
+logical crossing time, so late frames do not extend the effect.
 
-Only native transform/opacity timelines run per frame; there is no application
-progress callback or per-frame geometry mutation. Fixed complementary clip
-rectangles translate with the band; no row positions or sizes animate.
-Content presenters use BitmapCache
-only during the transition and release the second content afterward. Clipped
-offscreen rows have no sweep clock. PNG flags decode with OnLoad and are frozen/
-cached before use; vector flags freeze where supported. Flag scaling is HighQuality.
-Frozen gradient brushes, rounded clips, skew transforms and band blur effects are
-reused during each sweep. Clip transforms remain mutable animation targets.
-Probe flag sheen and star glow pause inside the active row so they do not
-continually invalidate its cached bitmaps; they resume after final cleanup.
+Three changed visible positions require three sequential 800 ms passes (about
+2.4 seconds, plus normal dispatcher/frame scheduling). There is no stagger or
+waiting period between passes. A final group's 400 ms flash can finish after its
+band has left; there is still only one band.
+
+## Coalescing and lifecycle
+
+An active pass's target stays frozen. New notifications replace the latest
+pending order without restarting the clock. At every pass boundary preparation
+scans current slots from the first mismatch against that newest order. Matching
+positions cost no animation time. Before any destination group reveals an
+identity, its previous source is concealed. Vacancies keep the card's dimensions,
+background and disabled appearance, and cannot be refilled from stale snapshots.
+Partially committed rows are likewise protected from ordinary publications.
+
+A new explicit check cycle cancels presentation, applies the newest authoritative
+data and invalidates old callbacks before resetting checking states. The manual
+refresh and explicit disconnect/restart paths both use this boundary. Canceled
+old background checks retain their existing data cleanup but cannot request a
+new sorting effect. Search/navigation/loading uses instant presentation.
+
+Unrealized/offscreen rows drain synchronously in an iterative preparation loop.
+Recycling is checked before revealing or flashing a realized row. Empty/single
+lists and additions/removals use the same model. Scroll changes refresh cached
+clips/bounds without restarting time. Resize, hide, minimize, unload, close and
+shutdown apply final real data and remove presentation work. OS client-area
+animation disabled applies completed orders immediately; resetting a check still
+preserves visible order. There is no new app setting or persisted progress.
+
+Backend notifications only publish/coalesce snapshots. Preparation, measurement
+and replanning run on a separate dispatcher turn, outside Rendering. The frame
+callback reads only prepared presentation state and elapsed time, commits crossed
+groups and updates transforms/opacity. It never runs probes, reads tester state,
+sorts, decodes flags, accesses disk, waits for workers/locks or uses synchronous
+Dispatcher.Invoke. Rendering unsubscribes when no pass, flash or preparation is
+pending. Existing OnLoad/frozen flag caching and HighQuality scaling are retained.
+
+## Removed animation paths
+
+- Deleted `LightSweepRowTransition.cs` and `LightSweepAnimationPlan.cs`: old native
+  storyboards, dual presenters/complementary clips and 150 ms data crossfades.
+- Replaced the old `ServerRowTransition` and VM acknowledgment/promotion queue
+  with stable group snapshots and latest-order boundary replanning.
+- Removed probing-flag sheen markup, ProbeShine handlers and their perpetual clocks.
+- Removed the smart-card moving flag-mosaic sheen and animated dashed shine border,
+  including their geometry/size handlers and perpetual storyboard.
+- Removed the star's obsolete transition-surface guard. Its existing gold artwork
+  and safe Loaded/visibility glow lifecycle remain; no new badge was introduced.
+
+No lift/slide/scale, checking pass, pending pulse, ping-only reveal, stagger or
+whole-list completion pulse remains in the server-list sorting path.
 
 ## Validation
 
+Portable checks (C# 7.3, model/timeline with inert WPF value doubles):
+
 ```
 python3 tests/ServerListTransitionChecks/run.py /path/to/dotnet
+python3 tests/ServerListTransitionChecks/contracts.py
 python3 tests/ServerListTransitionChecks/bindings.py
-python3 tests/ServerRefreshChecks/net48_compile.py /path/to/dotnet
+python3 tests/ServerRefreshChecks/run.py /path/to/dotnet
+python3 tests/ServerRefreshChecks/manual_refresh.py /path/to/dotnet
+python3 tests/ServerRefreshChecks/api_refresh.py /path/to/dotnet
 python3 tests/LastSuccessfulServerChecks/run.py /path/to/dotnet
-python3 tests/ProbeShineChecks/run.py /path/to/dotnet
 python3 tests/ServerStarGlowChecks/run.py /path/to/dotnet
+python3 tests/ThemeChecks/run.py
+python3 tests/ServerRefreshChecks/net48_compile.py /path/to/dotnet
 ```
 
-The first check exercises the production VM with a manually advanced view clock:
-snapshot isolation, midpoint identity commit, selection retention, unchanged
-rows, failure/star updates, 200 rapid publications, last-update coalescing,
-stale callbacks, additions/removals and zero/single rows. It asserts a peak of
-one active clock, checks that midpoint reveal cannot release the next row, and
-drains 4095 synchronous offscreen acknowledgments without recursive stack growth.
-The net48 check compiles the actual picker, view model, transition control,
-existing motion and refresh controller against WPF reference assemblies. It
-does not execute Windows XAML or establish a VPN.
+The model/timeline checks cover incremental completion, reset order including
+reduced motion, group reveal timing, stable selection, one active pass, source
+vacating, 200 coalesced publications, rapid randomized reorderings, stale
+callbacks, additions/removals, empty/single lists, 4096 unrealized passes, exact
+geometry/easing and dropped frames. Contracts compare idle row artwork against
+1.4.20 and inspect removed effects, bindings and the backend-free frame path.
+The net48 check compiles actual picker/controller/refresh C# against real WPF
+reference assemblies with application/Core doubles. It does not build BAML or
+produce a Windows app executable.
 
-Windows acceptance still required (rendering/60 FPS cannot be measured on Linux):
-
-- Build the real WPF app, re-ping several numbered countries, and verify that
-  physical left-to-right reveals run one row at a time, with the next row starting
-  only after the previous band has fully disappeared.
-- Select a country before it moves; check the radio and click destination both
-  follow its identity. Repeat while a partial ping and a final result arrive.
-- Repeat refresh/sort during a wave; after settling, every slot must match the
-  newest order/ping. Star pinning must still mean the last successful connection.
-- Search while sweeping; add/remove countries through a refreshed API list;
-  include one country, an empty result and a failed/timeout ping (`—`, muted dot).
-  Earlier successful latency remains available in the failure tooltip/cache.
-- Minimize, hide the list, resize, logout, and restore during a pass. No old
-  animation/data should replay. Scroll to the middle before re-sorting.
-- Disable the Windows animation preference: updates must be instant.
-  Check both themes, RTL text, and 100/150/200% DPI against the idle design.
-- On a low-end Windows machine, profile a ten-row sequence with WPF Perforator;
-  verify frame pacing and transient bitmap memory before claiming a 60 FPS result.
-
-## Starred-row loading fix (1.4.16)
-
-The 2026-10-21 log from 1.4.15 records a UI crash at 15:18:42 while the first
-22-row list is being constructed: `XamlParseException: 'Effect' property does not
-point to a DependencyObject`. Its stack enters `StyleHelper` data-trigger actions
-and `Storyboard.VerifyPathIsAnimatable` during `LoadOptimizedTemplateContent`.
-The saved star's style can start its nested `UIElement.Effect` animation before
-the template has assigned the Path's local DropShadowEffect. Compile-only tests
-and a list without an already-starred country did not exercise this path.
-
-Star glow now starts from Loaded/visibility lifecycle handlers after the effect
-exists. It animates the actual effect's dependency properties directly, using
-independent mutable copies of frozen template effects. Early visibility events
-and missing effects are harmless; hide/unload/minimize removes both clocks.
-The star geometry, gold gradient, static glow and original four-second pulse
-values/timing are retained. The light sweep and app settings are unchanged.
-
-The portable star regression fails on the 1.4.15 XAML and passes on the fix.
-For real Windows validation, load an unobfuscated build's compiled BAML:
-
-```
-powershell.exe -NoProfile -STA -File tests/ServerStarGlowChecks/run-wpf.ps1 -AppPath <IRSpeedyVPN.exe>
-```
-
-This check constructs two already-starred row presenters inside a visible window,
-then exercises selection-marker changes, hide, minimize/restore and unload. It
-uses only UI resources and does not initialize VPN/probes. It must run on Windows;
-the Linux net48/reference-assembly check cannot execute WPF rendering or BAML.
-
-## Read-only snapshot binding fix (1.4.17)
-
-The next 2026-10-21 log confirms 1.4.16, then reports a different XAML error at
-15:34:51: `TwoWay or OneWayToSource binding cannot work on the read-only property
-'CountryName'` of `ServerItem`. WPF Run.Text uses TwoWay by default. The former
-mutable GroupItem country property accepted that default; the immutable sweep
-snapshot intentionally has no setter.
-
-All snapshot display bindings now explicitly declare OneWay: country Run and
-tooltip, flag/initials, latency/color, checking/selection/star triggers, displayed
-identity, automation and slot binding. Replacing a snapshot continues to refresh
-its view. The scrollbar's intentional TwoWay binding is retained. The model stays
-immutable, and the star lifecycle fix and light sweep are preserved.
-
-`bindings.py` fails on 1.4.16 and passes on this fix. The Windows companion also
-checks actual compiled Run binding mode, getter-only country loading and snapshot
-replacement without writing to the old model. Its existing already-starred row,
-hide/minimize/unload checks remain in place.
-
-## One row at a time (1.4.18)
-
-The earlier 75 ms stagger allowed several 520 ms sweeps to overlap. The scheduler
-now waits for `ServerDisplaySlot.Finish` before starting the next changed row.
-That completion notification removes the current view's clock/overlay first;
-the midpoint `Reveal` only swaps identity and never advances the queue. Short
-ping/star/selection fades use the same serial queue.
-
-Pending rows take the latest available target at their turn. A subsequent pass
-repairs only earlier rows that became outdated while the light moved downward.
-Cancellation invalidates the active callback and discards the pending sequence.
-Synchronous offscreen/unrealized completions drain in a guarded loop, avoiding
-recursive callback growth. The old stagger property/index and timers are removed.
-This scheduling applies to full-row transitions; the existing smart-card and
-probing-flag ornaments keep their separate behavior.
-
-## Presentation independent of probe callbacks (1.4.19)
-
-Backend publications only replace the latest sorted snapshots and post one
-presentation callback. The picker schedules presentation at DispatcherPriority.Render;
-starting the next row is likewise posted after the previous view releases its
-storyboard. No probe callback, network completion, sleep or timer is needed to
-advance a wave. Canceled presentation tickets cannot start old rows, and repeated
-publications coalesce while a presentation callback is pending.
-
-Partial background/manual ping notifications now use DispatcherPriority.Background,
-allowing rendering and input to run first. Cache writes remain before these UI
-notifications, and final results retain their existing priority and cancellation
-guards so late partials cannot replace a completed result. This does not move WPF
-objects to a worker thread; WPF still needs a responsive UI dispatcher.
-
-The portable transition suite also tests deferred presentation, 200 publications
-before the first presentation turn, completion with no further backend activity,
-queued-ticket cancellation and native coordinate/key-time alignment. On Windows,
-exercise the real native clocks and compiled template with an unobfuscated build:
+Windows-only compiled-template smoke test, using an unobfuscated app build:
 
 ```
 powershell.exe -NoProfile -STA -File tests/ServerListTransitionChecks/run-wpf.ps1 -AppPath <IRSpeedyVPN.exe>
+powershell.exe -NoProfile -STA -File tests/ServerStarGlowChecks/run-wpf.ps1 -AppPath <IRSpeedyVPN.exe>
 ```
 
-This checks direct storyboard targets, complementary native clip transforms,
-asymmetric easing/midpoint identity, full completion cleanup, short opacity fades
-and hiding an active row. It does not start any network tests or VPN service.
-It cannot run on Linux; frame pacing still requires the Windows acceptance above.
-
-## Correct timeline targets and idle-row notifications (1.4.20)
-
-The 1.4.19 native animation builder stored TranslateTransform objects directly in
-Storyboard.Target. These objects are Freezables. Clock creation snapshots the
-animation timelines, copying the target transforms instead of retaining the
-ones attached to the visible row. The identity/opacity paths targeted actual
-FrameworkElements, so logical completion alone could not prove that the light
-and clips moved. The user reported a slower app with missing animations.
-
-The builder now accepts only FrameworkElement targets. Band movement resolves
-RenderTransform.Children[1].X from the band Rectangle; complementary cuts resolve
-Clip.Transform.X from their content presenters. Both paths are constructed only
-after the owned mutable graphs have been assigned. Before the first timing tick,
-the base transform values already put the light outside the row. The single
-native storyboard, easing/key-time alignment and independent serial presentation
-queue remain. No per-frame application callback is restored.
-
-For related WPF targeting semantics, see Microsoft's [Storyboards Overview](https://learn.microsoft.com/en-us/dotnet/desktop/wpf/graphics-multimedia/storyboards-overview)
-and [Storyboard clock target resolution](https://source.dot.net/PresentationFramework/System/Windows/Media/Animation/Storyboard.cs.html).
-
-Unchanged slot snapshots no longer raise Transition/DisplayedServer changes that
-cause every idle presenter to rebind on each publication. New source snapshots
-and service references are still retained; a replacement service reference
-notifies its bindings, and canceling any active transition always notifies clock
-cleanup. Repeated midpoint/completion Reveal calls bind the target only once.
-The portable suite rejects the old behavior on 200 identical publications and
-checks rank-only changes, API object replacement and equal-looking cancellation.
-
-The Windows companion now checks the actual attached transforms' expected
-positions at two different clock times, their animation clocks, and reference
-identity of the FrameworkElement targets after timeline snapshotting. It is
-still a Windows-only test and has not been executed in the Linux environment.
-Portable VM/binding/effect checks and net48/WPF API compilation cannot replace
-this rendering check or establish a measured improvement in frame rate.
+The comet smoke test exercises the production picker, existing country aggregation
+on fixture URL data, actual overlay coordinates, measured group commits, active
+pass freezing, reset, selection and minimize/close cleanup. Fixture service
+constructors and VPN/probes are not run. Native WPF tests have not been run in
+the Linux implementation environment. Rendering correctness, input/scrolling,
+DPI/RTL appearance and frame pacing still require Windows acceptance. Test both
+themes at 100/150/200% DPI, rapid rechecks, search, added/removed rows, minimized
+windows and the OS reduced-motion preference. Profile a low-end Windows device
+before making a 60 FPS claim.

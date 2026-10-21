@@ -21,7 +21,10 @@ assert country_runs[0].get('FlowDirection') == 'RightToLeft'
 print('PASS Persian country Run explicitly reads its immutable snapshot with OneWay binding')
 
 items = next(e for e in xml.iter(w + 'ItemsControl') if e.get(x + 'Name') == 'icCountries')
-controls = [e for e in xml.iter() if e.tag.endswith('}LightSweepRowTransition')]
+controls = []
+assert not any(e.tag.endswith('}LightSweepRowTransition') for e in xml.iter())
+parts = [e for e in row.iter() if any(k.endswith('ServerCometPart.Part') for k in e.attrib)]
+assert len(parts) == 5 and all(one_way.search(e.get('DataContext', '')) for e in parts)
 count = 0
 for fragment in [row, items] + controls:
     for element in fragment.iter():

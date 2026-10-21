@@ -340,10 +340,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         public ServerCountryPicker()
         {
-            _serverList = new ServerListViewModel(action =>
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Render, action));
+            _serverList = new ServerListViewModel();
             InitializeComponent();
-            AddHandler(LightSweepRowTransition.ActivityChangedEvent, new RoutedEventHandler(RowTransitionActivityChanged));
+            _sweepAnimator = new ServerListSweepAnimator(_serverList, icCountries, ServerScroller, CometOverlay);
             icCountries.ItemsSource = _serverList.Slots;
             _serverList.Slots.CollectionChanged += (s, e) => UpdateEmptyResultVisibility();
         }
@@ -388,6 +387,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (_selectedService == null && _urlTest)
             {
                 Apply(null, null, SelectionKind.Smart);
+                RefreshDisplayedRows(instant: !_checkCycleSetup);
                 return;
             }
 
@@ -406,6 +406,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             }
             else
                 Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
+            RefreshDisplayedRows(instant: !_checkCycleSetup);
         }
 
         /// <summary>Free-text filter over the country rows (used by the search field).</summary>
@@ -414,6 +415,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _filter = text ?? "";
             ApplyFilter();
             ServerScroller.ScrollToTop();
+            RefreshDisplayedRows(instant: true);
         }
 
         private void ApplyFilter()
@@ -457,7 +459,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
 
         /// <summary>Refresh the numbered row that owns this service after URL testing.</summary>
-        public void RefreshGroup(IVPNService service)
+        public void RefreshGroup(IVPNService service, bool allowSortAnimation = true)
         {
             var group = _allGroups.FirstOrDefault(g => ReferenceEquals(g.Service, service));
             if (group == null)
@@ -465,6 +467,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
             group.RefreshSignals();
             ResortGroups();
+            RefreshDisplayedRows(allowReorder: allowSortAnimation && !_checkCycleSetup);
         }
 
         /// <summary>
@@ -477,6 +480,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             foreach (var group in _allGroups)
                 group.IsLastSuccessfulConnection = LastSuccessfulServer.Key(group.Service) == key;
             ResortGroups();
+            RefreshDisplayedRows(allowReorder: true);
             ServerScroller.ScrollToTop();
         }
 

@@ -1,15 +1,8 @@
-"""Exercise the production transition VM with a manually advanced view clock.
-
-WPF primitives are inert doubles on Linux; rendering needs the Windows smoke test
-in docs/server-list-transitions.md. No production scheduling logic is duplicated.
-"""
+"""Production slot planner/timeline; WPF value types are inert Linux doubles."""
 from pathlib import Path
-import subprocess
-import sys
-import tempfile
-
-root = Path(__file__).resolve().parents[2]
-fixture = r'''
+import subprocess,sys,tempfile
+root=Path(__file__).resolve().parents[2]
+fixture=r'''
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,160 +26,70 @@ namespace IRSpeedyVPN.Components.ServerListControl {
  }
 }
 class Service:IVPNService { public int ID {get;set;} }
-class Clock {
- public readonly Dictionary<ServerDisplaySlot,ServerRowTransition> Active=new Dictionary<ServerDisplaySlot,ServerRowTransition>();
- public readonly List<ServerRowTransition> Started=new List<ServerRowTransition>();
- readonly HashSet<ServerDisplaySlot> Attached=new HashSet<ServerDisplaySlot>();
- public int PeakActive;
- public void Attach(ServerListViewModel vm,int firstRealized=0) {
-  foreach(var slot in vm.Slots.Skip(firstRealized))if(Attached.Add(slot))slot.TransitionRequested+=Start;
- }
- void Start(ServerDisplaySlot slot,ServerRowTransition t){
-  Active.Add(slot,t);Started.Add(t);PeakActive=Math.Max(PeakActive,Active.Count);
-  if(Active.Count!=1)throw new Exception("a second row started before the first finished");
- }
- public void FinishRow() {
-  var row=Active.Single();Active.Clear();row.Key.Finish(row.Value);
- }
- public void Drain(ServerListViewModel vm){
-  int limit=Math.Max(20,vm.Slots.Count*3);
-  while(vm.IsTransitioning&&limit-->0)FinishRow();
-  Check(!vm.IsTransitioning,"sequential queue drains without a stale completion/deadlock");
- }
- public static void Check(bool value,string name){if(!value)throw new Exception(name);Console.WriteLine("PASS "+name);}
-}
 class Program {
- static GroupItem Group(int id,bool selected=false)=>new GroupItem{Service=new Service{ID=id},CountryName="کشور "+id,Initials="ک",SignalText=id+" ms",SortKey=id,IsSelectedCountry=selected};
- static ServerItem Snap(GroupItem g)=>new ServerItem(g);
- static void Check(bool value,string name)=>Clock.Check(value,name);
- static void QueuedPresentation(){
-  var pending=new Queue<Action>();var vm=new ServerListViewModel(action=>pending.Enqueue(action));
-  var a=Group(1,true);var b=Group(2);var c=Group(3);
-  vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true);var clock=new Clock();clock.Attach(vm);
-  a.SortKey=3;b.SortKey=2;c.SortKey=1;
-  for(int i=0;i<200;i++){c.SignalText=i+" ms";vm.Publish(new[]{Snap(c),Snap(b),Snap(a)},true);}
-  Check(clock.Started.Count==0&&pending.Count==1&&vm.Servers[0].SignalText=="199 ms","backend bursts update truth and enqueue just one independent presentation callback");
-  pending.Dequeue()();
-  Check(clock.Active.Count==1&&clock.Active.Values.Single().To.SignalText=="199 ms","presentation starts with the latest snapshot after the backend callback returns");
-  clock.FinishRow();
-  Check(clock.Active.Count==0&&pending.Count==1,"completion releases its clock before posting the next presentation turn");
-  int ticks=0;
-  while(vm.IsTransitioning&&ticks++<10){pending.Dequeue()();if(clock.Active.Count>0)clock.FinishRow();}
-  Check(!vm.IsTransitioning&&clock.PeakActive==1&&vm.Slots.Select(x=>x.DisplayedServer.Identity).SequenceEqual(vm.Servers.Select(x=>x.Identity)),"the entire serial wave finishes without any additional backend result");
-
-  a.SortKey=0;vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true);
-  vm.CompleteImmediately(); // e.g. minimize before the queued render callback
-  c.SortKey=-1;vm.Publish(new[]{Snap(c),Snap(b),Snap(a)},true);
-  Check(pending.Count==2,"a canceled render callback can coexist with the new presentation ticket");
-  pending.Dequeue()();Check(clock.Active.Count==0,"the canceled presentation ticket never starts a stale row");
-  pending.Dequeue()();var stale=clock.Active.Single();
-  vm.Publish(new[]{Snap(a)},false);clock.Active.Clear();stale.Key.Reveal(stale.Value);stale.Key.Finish(stale.Value);
-  Check(!vm.IsTransitioning&&pending.Count==0&&vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==1,"canceling an active queued wave flushes latest data and invalidates old completion");
+ static GroupItem G(int id,bool selected=false)=>new GroupItem{Service=new Service{ID=id},CountryName="کشور "+id,Initials="ک",SignalText=id+" ms",SortKey=id,IsSelectedCountry=selected};
+ static ServerItem S(GroupItem g)=>new ServerItem(g);
+ static void Check(bool ok,string name){if(!ok)throw new Exception(name);Console.WriteLine("PASS "+name);}
+ static void Unique(ServerListViewModel vm){
+  var owners=new Dictionary<string,int>();
+  for(int i=0;i<vm.Slots.Count;i++)for(int p=0;p<5;p++){
+   var item=vm.Slots[i].GetPart((ServerRowPart)p);if(item==null)continue;
+   if(owners.TryGetValue(item.Identity,out var owner)&&owner!=i)throw new Exception("duplicate identity in different displayed slots");owners[item.Identity]=i;
+  }
  }
- static void NoOpPublication(){
-  var g=Group(1,true);var vm=new ServerListViewModel(action=>action());
-  vm.Publish(new[]{Snap(g)},true);var slot=vm.Slots[0];var clock=new Clock();clock.Attach(vm);
-  int displays=0,transitions=0;
-  slot.PropertyChanged+=(sender,e)=>{if(e.PropertyName=="DisplayedServer")displays++;if(e.PropertyName=="Transition")transitions++;};
-  for(int i=0;i<200;i++)vm.Publish(new[]{Snap(g)},true);
-  g.SortKey=-99;vm.Publish(new[]{Snap(g)},true);
-  Check(displays==0&&transitions==0&&clock.Started.Count==0&&slot.DisplayedServer.SortKey==-99,"200 unchanged backend publications and rank-only updates cause no presenter rebind or clock restart");
-  g.Service=new Service{ID=1};vm.Publish(new[]{Snap(g)},true);
-  Check(displays==1&&ReferenceEquals(slot.DisplayedServer.Service,g.Service)&&clock.Started.Count==0,"API replacement retains the new service reference without an unnecessary sweep");
-  g.SignalText="75 ms";vm.Publish(new[]{Snap(g)},true);var fade=slot.Transition;
-  slot.Reveal(fade);slot.Reveal(fade);clock.FinishRow();
-  Check(displays==2&&transitions==1&&slot.DisplayedServer.SignalText=="75 ms","midpoint and completion bind new content only once while still notifying clock cleanup");
-  displays=0;transitions=0;slot.Begin(Snap(g),()=>{throw new Exception("canceled callback ran");});var stale=slot.Transition;
-  vm.CompleteImmediately();clock.Active.Clear();slot.Finish(stale);
-  Check(displays==0&&transitions==1&&!vm.IsTransitioning,"canceling an equal-looking transition still removes its clock without rebinding identical content");
- }
- static void NativePlan(){
-  Func<double,double> cubic=t=>t<.5?4*t*t*t:1-Math.Pow(-2*t+2,3)/2;
-  foreach(double width in new[]{80d,360d,720d})foreach(double band in new[]{80d,100d,120d})
-   foreach(var ease in new Func<double,double>[]{cubic,t=>t*t}){
-    var duration=TimeSpan.FromMilliseconds(520);var plan=new LightSweepAnimationPlan(width,band,13,duration,ease);
-    for(int i=0;i<=20;i++){
-     double p=ease(i/20d);double center=plan.BandFrom+(plan.BandTo-plan.BandFrom)*p+band/2;
-     double cut=plan.CutFrom+(plan.CutTo-plan.CutFrom)*p+13;
-     if(Math.Abs(center-cut)>1e-8)throw new Exception("native clip edge and brightest band center diverged");
-    }
-    if(Math.Abs(ease(plan.RevealTime.Ticks/(double)duration.Ticks)-.5)>1e-6)throw new Exception("discrete reveal marker does not match eased midpoint");
-    if(plan.BandFrom+band>0||plan.BandTo<width||plan.CutFrom>=0||plan.CutTo<width-13)throw new Exception("transition endpoints do not fully cover the row");
-   }
-  Check(true,"native transforms keep old/new clips under the brightest band, including asymmetric easing and narrow rows");
+ static int Drain(ServerListViewModel vm){
+  int n=0;ServerSortPass pass;
+  while((pass=vm.TryBeginPass())!=null){if(n++>vm.Servers.Count*4+20)throw new Exception("queue failed to converge");for(int i=0;i<5;i++){vm.Reveal(pass,(ServerRowPart)i);Unique(vm);}vm.Finish(pass);Unique(vm);}
+  if(!vm.Slots.Select(s=>s.DisplayedServer?.Identity).SequenceEqual(vm.Servers.Select(s=>s.Identity)))throw new Exception("lost/stale identity after drain");return n;
  }
  static void Main(){
-  QueuedPresentation();NativePlan();NoOpPublication();
-  var a=Group(1,true);var b=Group(2);var c=Group(3);var vm=new ServerListViewModel(action=>action());
-  vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true);var clock=new Clock();clock.Attach(vm);
-  Check(!vm.IsTransitioning&&vm.Slots.Count==3,"initial population is immediate");
-  b.SortKey=0;vm.Publish(new[]{Snap(b),Snap(a),Snap(c)},true);
-  Check(vm.Servers[0].Service.ID==2&&vm.Slots[0].DisplayedServer.Service.ID==1,"sorted truth changes before displayed slots");
-  Check(clock.Started.Count==1&&clock.Active.ContainsKey(vm.Slots[0])&&vm.Slots[1].Transition==null,"only the first changed row starts; the next row has no clock");
-  var old=vm.Slots[0].DisplayedServer;a.CountryName="changed live";a.SignalText="999 ms";a.IsSelectedCountry=false;
-  Check(old.CountryName=="کشور 1"&&old.SignalText=="1 ms"&&old.IsSelectedCountry,"old country, ping and selection are immutable during a sweep");
-  var first=clock.Active[vm.Slots[0]];vm.Slots[0].Reveal(first);
-  Check(vm.Slots[0].DisplayedServer.Service.ID==2&&!vm.Slots[0].DisplayedServer.IsSelectedCountry,"logical identity swaps only on reveal");
-  Check(clock.Started.Count==1&&vm.Slots[1].DisplayedServer.Service.ID==2,"midpoint reveal does not start the next row");
-  clock.FinishRow();
-  Check(clock.Started.Count==2&&clock.Active.ContainsKey(vm.Slots[1])&&vm.Slots[0].Transition==null,"next row starts only after full completion and old-overlay cleanup");
-  clock.FinishRow();
-  Check(vm.Slots[1].DisplayedServer.Service.ID==1&&vm.Slots[1].DisplayedServer.IsSelectedCountry,"selection follows server identity into its new slot");
-  clock.Started.Clear();vm.Publish(vm.Servers.ToArray(),true);
-  Check(!vm.IsTransitioning&&clock.Started.Count==0,"identical publication skips animation");
-
-  b.SignalText="—";b.IsSelectable=false;b.IsLastSuccessfulConnection=true;
-  vm.Publish(new[]{Snap(b),vm.Servers[1],Snap(c)},true);
-  Check(clock.Active.Count==1&&!clock.Active.Values.Single().ChangesIdentity,"ping/failure/star updates share the same single-row queue");
-  clock.Drain(vm);
-  Check(vm.Slots[0].DisplayedServer.SignalText=="—"&&!vm.Slots[0].DisplayedServer.IsSelectable&&vm.Slots[0].DisplayedServer.IsLastSuccessfulConnection,"failed ping and star reach the displayed snapshot");
-
-  b.IsLastSuccessfulConnection=false;c.SortKey=0;b.SortKey=1;a.SortKey=2;
-  clock.Started.Clear();vm.Publish(new[]{Snap(c),Snap(b),Snap(a)},true);
-  a.SortKey=0;c.SortKey=1;b.SortKey=2;
-  for(int i=0;i<200;i++){b.SignalText=i+" ms";vm.Publish(new[]{Snap(b),Snap(c),Snap(a)},true);}
-  Check(vm.Servers[2].SignalText=="199 ms"&&clock.Started.Count==1,"200 rapid updates refresh the truth while only one row is active");
-  clock.FinishRow();
-  Check(clock.Started.Count==2&&clock.Active.Values.Single().To.Service.ID==3,"waiting row reads the latest order when its turn starts");
-  clock.FinishRow();
-  Check(clock.Active.Values.Single().To.SignalText=="199 ms","a waiting row reveals the newest ping instead of a queued stale result");
-  clock.Drain(vm);
-  Check(clock.Started.Count==4&&vm.Slots[0].DisplayedServer.Service.ID==1&&vm.Slots[2].DisplayedServer.SignalText=="199 ms","earlier outdated slots are revisited without replaying obsolete snapshots");
-
-  b.SortKey=0;a.SortKey=1;c.SortKey=2;vm.Publish(new[]{Snap(b),Snap(a),Snap(c)},true);
-  var stale=clock.Active.ToArray();vm.Publish(new[]{Snap(c)},true);vm.CompleteImmediately();clock.Active.Clear();
-  foreach(var pair in stale){pair.Key.Reveal(pair.Value);pair.Key.Finish(pair.Value);}
-  Check(vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==3&&!vm.IsTransitioning&&clock.Active.Count==0,"minimize/cancel flushes latest data and never starts a queued row");
-  a.SortKey=0;b.SortKey=1;clock.Started.Clear();vm.Publish(new[]{Snap(a),Snap(b)},true);clock.Drain(vm);
-  Check(vm.Slots.Count==2&&vm.Slots[1].DisplayedServer.Service.ID==2,"new unrealized slots populate without waiting for a missing view");
-  clock.Attach(vm);vm.Publish(new[]{Snap(b)},true);clock.Drain(vm);
-  Check(vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==2,"removed rows reveal sequentially before trailing slots are trimmed");
-  vm.Publish(new ServerItem[0],false);
-  Check(vm.Slots.Count==0&&vm.Servers.Count==0,"empty list and instant-update path complete immediately");
-  vm.Publish(new[]{Snap(a)},true);
-  Check(vm.Slots.Count==1&&!vm.IsTransitioning,"single unrealized row never waits for an animation");
-  clock.Attach(vm);vm.Publish(new[]{Snap(c)},true);
-  Check(vm.IsTransitioning&&clock.Active.Values.Single().ChangesIdentity,"single realized row supports a complete identity reveal");
-  vm.Publish(new[]{Snap(b)},false);clock.FinishRow();
-  Check(!vm.IsTransitioning&&vm.Slots[0].DisplayedServer.Service.ID==2,"instant completion during a sweep commits the latest snapshot");
-  Check(clock.PeakActive==1,"no overlap across sorting, data fades, rapid updates and cancellation");
-
-  var many=Enumerable.Range(1,4096).Select(id=>Group(id)).ToArray();var large=new ServerListViewModel(action=>action());
-  large.Publish(many.Select(Snap),true);var largeClock=new Clock();largeClock.Attach(large,4095);
-  foreach(var g in many)g.SortKey=-g.Service.ID;
-  large.Publish(many.Select(Snap),true);
-  Check(largeClock.Started.Count==1&&largeClock.Active.ContainsKey(large.Slots[4095]),"4095 offscreen acknowledgments drain iteratively before the first visible row");
-  Check(large.Slots[0].DisplayedServer.Service.ID==4096,"offscreen rows commit immediately without delaying the visible light");
-  largeClock.Drain(large);
-  Check(large.Slots[4095].DisplayedServer.Service.ID==1&&largeClock.PeakActive==1,"large lists retain one active row without recursive callback growth");
+  var a=G(1,true);var b=G(2);var c=G(3);var vm=new ServerListViewModel();int work=0;vm.WorkAvailable+=()=>work++;
+  vm.Publish(new[]{S(a),S(b),S(c)},true);var stable=vm.Slots.ToArray();
+  Check(!vm.IsTransitioning,"initial load has no light");var before=vm.Slots.Select(s=>s.DisplayedServer.Identity).ToArray();vm.CompleteImmediately();work=0;
+  a.IsChecking=b.IsChecking=true;a.SignalText=b.SignalText="—";vm.Publish(new[]{S(c),S(b),S(a)},true,false);
+  Check(work==0&&!vm.IsTransitioning&&vm.Slots.Select(s=>s.DisplayedServer.Identity).SequenceEqual(before),"check again/reset preserves visible order with no light");
+  vm.Publish(new[]{S(c),S(b),S(a)},false,false);
+  Check(vm.Slots.Select(s=>s.DisplayedServer.Identity).SequenceEqual(before),"reduced-motion reset also preserves visible order");
+  Check(vm.Slots[0].DisplayedServer.IsChecking&&vm.Slots[0].SignalServer.SignalText=="—","pending indicators/data update normally");
+  b.IsChecking=false;b.SignalText="80 ms";vm.Publish(new[]{S(b),S(a),S(c)},true);var pass=vm.TryBeginPass();var frozen=pass.Target;
+  Check(pass.Index==0&&pass.Target.Service.ID==2&&a.IsChecking,"one country completion sorts immediately while another is checking");
+  Check(vm.Servers[0].Service.ID==2&&vm.Slots[0].NameServer.Service.ID==1,"sorted truth is immediate but displayed country remains old until reveal");
+  Check(vm.TryBeginPass()==null,"only one pass can run");vm.Reveal(pass,ServerRowPart.Signal);Unique(vm);
+  Check(vm.Slots[1].IsVacant&&vm.Slots[0].NameServer.Service.ID==1&&vm.Slots[0].SignalServer.Service.ID==2,"first destination group conceals its source without prematurely changing the name");
+  vm.Publish(new[]{S(c),S(b),S(a)},true,false);Check(vm.Slots[1].IsVacant,"progress cannot restore a stale identity in a vacated source");
+  for(int i=0;i<200;i++){b.SignalText=i+" ms";vm.Publish(new[]{S(c),S(b),S(a)},true);}
+  Check(ReferenceEquals(pass.Target,frozen)&&vm.Slots[0].SignalServer.SignalText=="80 ms","200 completions coalesce while active target stays frozen");vm.Finish(pass);Unique(vm);
+  var next=vm.TryBeginPass();Check(next.Index==0&&next.Target.Service.ID==3,"next boundary replans first current mismatch against newest order");vm.Finish(next);Unique(vm);Drain(vm);
+  Check(vm.Slots[1].SignalServer.SignalText=="199 ms"&&vm.Slots[2].SelectionServer.IsSelectedCountry&&a.IsSelectedCountry,"latest ping and selection follow stable identity");
+  Check(vm.Slots.SequenceEqual(stable),"visual slots are never reordered/replaced");
+  vm.Publish(vm.Servers.ToArray(),true);Check(vm.TryBeginPass()==null,"unchanged positions consume no pass time");
+  a.SignalText="—";a.IsSelectable=false;vm.Publish(new[]{S(c),S(b),S(a)},true,false);
+  Check(!vm.IsTransitioning&&vm.Slots[2].SignalServer.SignalText=="—"&&!vm.Slots[2].IsSelectable,"ping-only/failed data updates without any reveal pass");
+  var cycle=new ServerListViewModel();var all=new[]{S(G(1)),S(G(2)),S(G(3))};cycle.Publish(all,true);cycle.Publish(new[]{all[1],all[2],all[0]},true);
+  int n=Drain(cycle);Check(n==3&&n*ServerCometTiming.SORT_PASS_MS==2400,"three changed positions require three sequential 800ms passes");
+  cycle.Publish(all,true);var old=cycle.TryBeginPass();cycle.Reveal(old,ServerRowPart.Signal);cycle.CompleteImmediately();var baseline=cycle.Slots.Select(s=>s.DisplayedServer.Identity).ToArray();
+  cycle.Publish(all.Reverse(),true,false);cycle.Reveal(old,ServerRowPart.Name);cycle.Finish(old);
+  Check(!cycle.IsTransitioning&&cycle.Slots.Select(s=>s.DisplayedServer.Identity).SequenceEqual(baseline),"new cycle cancels partial presentation and stale callbacks without light");Unique(cycle);
+  cycle.Publish(new[]{all[2],S(G(4))},true);Drain(cycle);Check(cycle.Slots.Count==2&&cycle.Slots[1].DisplayedServer.Service.ID==4,"added/removed countries reconcile without duplicates or loss");
+  cycle.Publish(new ServerItem[0],true);Check(cycle.Slots.Count==0&&!cycle.IsTransitioning,"empty source cancels immediately");
+  cycle.Publish(new[]{S(G(9))},true);Drain(cycle);cycle.Publish(new[]{S(G(10))},false);Check(!cycle.IsTransitioning&&cycle.Slots[0].DisplayedServer.Service.ID==10,"single row and reduced-motion fallback apply latest state");
+  var random=new Random(17);var churn=new ServerListViewModel();var many=Enumerable.Range(1,37).Select(id=>S(G(id,id==17))).ToArray();churn.Publish(many,true);
+  for(int i=0;i<150;i++){churn.Publish(many.OrderBy(x=>random.Next()).ToArray(),true);var active=churn.TryBeginPass();if(active!=null){churn.Reveal(active,ServerRowPart.Signal);Unique(churn);for(int j=0;j<3;j++)churn.Publish(many.OrderBy(x=>random.Next()).ToArray(),true);churn.Finish(active);Unique(churn);}}
+  Drain(churn);Check(churn.Slots.Select(s=>s.DisplayedServer.Service.ID).OrderBy(x=>x).SequenceEqual(Enumerable.Range(1,37)),"rapid replanning preserves every country with no duplicate visible owner");
+  var large=new ServerListViewModel();var lots=Enumerable.Range(1,4096).Select(id=>S(G(id))).ToArray();large.Publish(lots,true);large.Publish(lots.Reverse(),true);int instant=0;ServerSortPass offscreen;while((offscreen=large.TryBeginPass())!=null){large.Finish(offscreen);instant++;}
+  Check(instant==4096&&!large.IsTransitioning,"4096 unrealized passes drain iteratively without recursion");
+  Check(ServerCometTiming.SORT_PASS_MS==800&&ServerCometTiming.FLASH_MS==400&&ServerCometTiming.BAND_WIDTH_DIP==170&&ServerCometTiming.SKEW_DEG==-18,"exact named timing and geometry constants");
+  Check(Math.Abs(ServerCometTiming.Ease(.5)-.5)<1e-10&&ServerCometTiming.Ease(-1)==0&&ServerCometTiming.Ease(2)==1,"clamped accelerate-decelerate cosine easing");
+  var timeline=new ServerCometTimeline(360,new[]{350d,160d,300d,40d,200d});var reveals=new List<int>();timeline.Advance(0,(i,t)=>reveals.Add(i));timeline.Advance(800,(i,t)=>reveals.Add(i));timeline.Advance(1200,(i,t)=>reveals.Add(i));
+  Check(reveals.SequenceEqual(new[]{3,1,4,2,0}),"dropped frames reveal groups once in measured physical order, including RTL coordinates");
+  Check(Math.Abs(ServerCometTiming.BandLeft(400,360)-(.5*(360+.85*170)-.85*170))<1e-8,"exact band/leading-edge coordinate formula");
  }
 }
 '''
-with tempfile.TemporaryDirectory(prefix='server-list-transition-') as directory:
-    path = Path(directory)
-    (path / 'Program.cs').write_text(fixture)
-    (path / 'ServerListViewModel.cs').write_text((root / 'IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs').read_text())
-    (path / 'LightSweepAnimationPlan.cs').write_text((root / 'IRSpeedyVPN/Components/ServerListControl/LightSweepAnimationPlan.cs').read_text())
-    (path / 'ServerListRanking.cs').write_text((root / 'IRSpeedyVPN/Components/ServerListControl/ServerListRanking.cs').read_text())
-    (path / 'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')
-    subprocess.run([sys.argv[1] if len(sys.argv) > 1 else 'dotnet', 'run', '--project', directory, '-v:q'], check=True)
+with tempfile.TemporaryDirectory(prefix='server-comet-') as directory:
+    path=Path(directory)
+    (path/'Program.cs').write_text(fixture)
+    for name in ['ServerListViewModel.cs','ServerCometTimeline.cs']:
+        (path/name).write_text((root/'IRSpeedyVPN/Components/ServerListControl'/name).read_text())
+    (path/'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')
+    subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',directory,'-v:q'],check=True)

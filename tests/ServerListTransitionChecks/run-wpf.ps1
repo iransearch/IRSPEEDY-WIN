@@ -1,5 +1,6 @@
-# Real native WPF clocks and compiled production template. No probes or VPN.
+# Windows-only: real compiled BAML, production picker, timeline and overlay.
 # powershell.exe -NoProfile -STA -File tests/ServerListTransitionChecks/run-wpf.ps1 -AppPath <IRSpeedyVPN.exe>
+# Use an unobfuscated build. No VPN/probe constructors, network calls or registry writes.
 param([Parameter(Mandatory=$true)][string]$AppPath)
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
@@ -8,92 +9,113 @@ $assembly = [Reflection.Assembly]::LoadFrom((Resolve-Path $AppPath).Path)
 $app = [Activator]::CreateInstance($assembly.GetType('IRSpeedyVPN.App', $true))
 $app.ShutdownMode = [System.Windows.ShutdownMode]::OnExplicitShutdown
 $app.InitializeComponent()
-$themeType = $assembly.GetType('IRSpeedyVPN.Common.ThemeManager', $true)
-$themeType.GetProperty('Instance').GetValue($null, $null).Initialize()
-$flags = [Reflection.BindingFlags]'Instance,NonPublic'
+$assembly.GetType('IRSpeedyVPN.Common.ThemeManager', $true).GetProperty('Instance').GetValue($null, $null).Initialize()
+$flags = [Reflection.BindingFlags]'Instance,NonPublic,Public'
 $prefix = 'IRSpeedyVPN.Components.ServerListControl.'
-$rowType = $assembly.GetType($prefix + 'LightSweepRowTransition', $true)
-$slotType = $assembly.GetType($prefix + 'ServerDisplaySlot', $true)
 $groupType = $assembly.GetType($prefix + 'GroupItem', $true)
 $itemType = $assembly.GetType($prefix + 'ServerItem', $true)
+$urlType = $assembly.GetType('IRSpeedyVPN.Models.NewService.Url', $true)
+$serverType = $assembly.GetType('IRSpeedyVPN.Models.NewService.ServerEx', $true)
+$serviceType = $assembly.GetType('IRSpeedyVPN.Services.TunnelPlusService', $true)
 function Check($ok, [string]$name) { if (!$ok) { throw $name }; Write-Output "PASS $name" }
 function Field($instance, [string]$name) { return $instance.GetType().GetField($name,$flags).GetValue($instance) }
-function Pump {
+function Call($instance, [string]$name, [object[]]$arguments) { return $instance.GetType().GetMethod($name,$flags).Invoke($instance,$arguments) }
+function Pump([int]$milliseconds = 20) {
     $frame = New-Object System.Windows.Threading.DispatcherFrame
     $timer = New-Object System.Windows.Threading.DispatcherTimer
-    $timer.Interval = [TimeSpan]::FromMilliseconds(100)
+    $timer.Interval = [TimeSpan]::FromMilliseconds($milliseconds)
     $timer.Add_Tick({ $frame.Continue = $false }.GetNewClosure())
     $timer.Start()
     try { [System.Windows.Threading.Dispatcher]::PushFrame($frame) } finally { $timer.Stop() }
 }
-$picker = [Activator]::CreateInstance($assembly.GetType($prefix + 'ServerCountryPicker', $true))
-$picker.Height = 90
-$layout = New-Object System.Windows.Controls.StackPanel
-$layout.Children.Add($picker) | Out-Null
-$window = New-Object System.Windows.Window
-$window.Width = 420; $window.Height = 260
-$window.ShowInTaskbar = $false; $window.ShowActivated = $false
-$window.Content = $layout
-try {
-    $window.Show(); Pump
-    $group = [Activator]::CreateInstance($groupType, $true)
-    $group.CountryName = 'country'
-    # Service=null is deliberate: constructing the immutable visual snapshot
-    # needs no actual VPN service. Addition from null still changes identity.
-    $ctor = $itemType.GetConstructor($flags, $null, [Type[]]@($groupType), $null)
-    $item = $ctor.Invoke([object[]]@($group))
-    $slot = [Activator]::CreateInstance($slotType)
-    $row = [Activator]::CreateInstance($rowType)
-    $row.Style = $picker.FindResource($rowType)
-    $row.RowTemplate = $picker.FindResource('ServerRowContent')
-    $row.Height = 56; $row.Padding = [System.Windows.Thickness]::new(13,0,13,0)
-    $row.Duration = [TimeSpan]::FromSeconds(10)
-    $ease = New-Object System.Windows.Media.Animation.QuadraticEase
-    $ease.EasingMode = [System.Windows.Media.Animation.EasingMode]::EaseIn
-    $row.Easing = $ease; $row.Slot = $slot
-    $layout.Children.Add($row) | Out-Null
-    $layout.UpdateLayout(); Pump
-    $begin = $slotType.GetMethod('Begin',$flags)
-    $begin.Invoke($slot,[object[]]@($item,$null)) | Out-Null
-    if (![System.Windows.SystemParameters]::ClientAreaAnimation) {
-        Check (!$row.IsAnimatingSurface -and $slot.DisplayedServer -eq $item) 'OS motion preference completes immediately'
-    } else {
-        $clock = Field $row '_storyboard'
-        Check ($null -ne $clock -and $row.IsAnimatingSurface) 'production native storyboard starts without property-path exceptions'
-        # Clock construction copies/freeze-snapshots its timeline. A direct
-        # Freezable Target is copied too, unlike its owning FrameworkElement.
-        $frozen = $clock.GetCurrentValueAsFrozen()
-        for ($i=0; $i -lt $clock.Children.Count; $i++) {
-            $target = [System.Windows.Media.Animation.Storyboard]::GetTarget($clock.Children[$i])
-            $copiedTarget = [System.Windows.Media.Animation.Storyboard]::GetTarget($frozen.Children[$i])
-            Check ($target -is [System.Windows.FrameworkElement] -and [object]::ReferenceEquals($target,$copiedTarget)) 'clock snapshot retains its real row element instead of cloning a detached transform'
+function Wait-For([scriptblock]$condition, [int]$timeout = 6000) {
+    $watch = [Diagnostics.Stopwatch]::StartNew()
+    while (!( & $condition )) { if ($watch.ElapsedMilliseconds -gt $timeout) { throw 'UI condition timed out' }; Pump }
+}
+function Order($slots) { return (@($slots | ForEach-Object { $_.DisplayedServer.Service.ID }) -join ',') }
+function Unique($slots) {
+    $owners = @{}
+    for ($i=0; $i -lt $slots.Count; $i++) {
+        foreach ($part in @('SignalServer','BadgeServer','NameServer','FlagServer','SelectionServer')) {
+            $value = $slots[$i].$part
+            if ($null -eq $value) { continue }
+            if ($owners.ContainsKey($value.Identity) -and $owners[$value.Identity] -ne $i) { throw 'Duplicate visible identity' }
+            $owners[$value.Identity] = $i
         }
-        $clock.Pause($row)
-        $clock.SeekAlignedToLastTick($row,[TimeSpan]::FromSeconds(6),[System.Windows.Media.Animation.TimeSeekOrigin]::BeginTime)
-        $band = Field $row '_band'
-        $old = Field $row '_old'; $next = Field $row '_next'
-        $x = $band.RenderTransform.Children[1].X
-        $edge = $old.Clip.Transform.X + $row.Padding.Left
-        $expectedX = -$row.BandWidth + ($row.ActualWidth + $row.BandWidth) * .36
-        Check ($band.RenderTransform.Children[1].HasAnimatedProperties -and $old.Clip.Transform.HasAnimatedProperties -and $next.Clip.Transform.HasAnimatedProperties -and [Math]::Abs($x - $expectedX) -lt .01) 'real visible transforms move to the expected position, rather than merely sharing an unchanged coordinate'
-        Check ([Math]::Abs($edge - ($x + $row.BandWidth/2)) -lt .01 -and [Math]::Abs($edge - ($next.Clip.Transform.X + $row.Padding.Left)) -lt .01) 'native band and complementary clip transforms share the eased clock'
-        Check ($null -eq $slot.DisplayedServer -and $row.IsAnimatingSurface) 'asymmetric easing keeps old identity before the light reaches midpoint'
-        $clock.SeekAlignedToLastTick($row,[TimeSpan]::FromSeconds(8),[System.Windows.Media.Animation.TimeSeekOrigin]::BeginTime)
-        $expectedLater = -$row.BandWidth + ($row.ActualWidth + $row.BandWidth) * .64
-        Check ([Math]::Abs($band.RenderTransform.Children[1].X - $expectedLater) -lt .01 -and $band.RenderTransform.Children[1].X -gt $x) 'light actually advances physically left to right between separate clock times'
-        Check ($slot.DisplayedServer -eq $item -and $row.IsAnimatingSurface) 'discrete marker reveals identity under the native eased light before completion'
-        $clock.Resume($row); $clock.SkipToFill($row); Pump
-        Check ($null -eq $slot.Transition -and !$row.IsAnimatingSurface -and $band.Visibility -eq [System.Windows.Visibility]::Collapsed -and $null -eq $old.Clip -and $null -eq $old.CacheMode -and $null -eq $next.Content) 'completion releases native clocks, clips, cached surfaces and second presenter'
-
-        # Same identity takes the native 150ms opacity path, not a light band.
-        $begin.Invoke($slot,[object[]]@($item,$null)) | Out-Null
-        Check ($band.Visibility -eq [System.Windows.Visibility]::Collapsed) 'data-only fade adds no second light band'
-        Pump; Pump
-        Check (!$row.IsAnimatingSurface -and $null -eq $slot.Transition) 'native short opacity fade completes independently'
-        $begin.Invoke($slot,[object[]]@($null,$null)) | Out-Null
-        $row.Visibility = [System.Windows.Visibility]::Collapsed
-        Pump
-        Check (!$row.IsAnimatingSurface -and $null -eq $slot.DisplayedServer -and $null -eq (Field $row '_storyboard')) 'hiding an active removal flushes identity and removes its storyboard'
     }
+}
+function Group([int]$id, [string]$name, [string]$code, [long]$ping) {
+    $url = [Activator]::CreateInstance($urlType); $url.latency = $ping; $url.latencychkTime = [DateTime]::Now
+    $urls = [Activator]::CreateInstance([Collections.Generic.List[object]].GetGenericTypeDefinition().MakeGenericType($urlType)); $urls.Add($url)
+    $server = [Activator]::CreateInstance($serverType); $server.ID = $id; $server.urls = $urls; $server.Protocol = 'vless'
+    # Only ID and GetServerUrls are read. Never initialize Core or create a connection.
+    $service = [Runtime.Serialization.FormatterServices]::GetUninitializedObject($serviceType)
+    $serviceType.GetField('server',$flags).SetValue($service,$server)
+    $group = [Activator]::CreateInstance($groupType,$true)
+    $group.Service = $service; $group.CountryName = $name; $group.CountryCode = $code
+    $group.ResolveFlag(); $group.RefreshSignals()
+    return $group
+}
+$picker = [Activator]::CreateInstance($assembly.GetType($prefix + 'ServerCountryPicker',$true))
+$picker.Height = 430
+$window = New-Object System.Windows.Window
+$window.Width = 420; $window.Height = 500; $window.ShowInTaskbar = $false; $window.ShowActivated = $false
+$window.Content = $picker
+try {
+    $window.Show(); Pump 100
+    $a = Group 1 'A' 'FR' 300; $b = Group 2 'B' 'DE' 500; $c = Group 3 'C' 'NL' 700
+    $a.IsChecking = $true; $a.IsSelectedCountry = $true
+    $groups = [Activator]::CreateInstance([Collections.Generic.List[object]].GetGenericTypeDefinition().MakeGenericType($groupType))
+    $groups.Add($a); $groups.Add($b); $groups.Add($c)
+    $picker.GetType().GetField('_allGroups',$flags).SetValue($picker,$groups)
+    $picker.GetType().GetField('_groups',$flags).SetValue($picker,$groups)
+    $items = [Array]::CreateInstance($itemType,3)
+    $ctor = $itemType.GetConstructor($flags,$null,[Type[]]@($groupType),$null)
+    for ($i=0; $i -lt 3; $i++) { $items[$i] = $ctor.Invoke([object[]]@($groups[$i])) }
+    $model = Field $picker '_serverList'; $animator = Field $picker '_sweepAnimator'; $overlay = Field $picker 'CometOverlay'
+    Call $model 'Publish' ([object[]]@($items,$true,$false)) | Out-Null
+    Pump 100
+    Check ((Order $model.Slots) -eq '1,2,3' -and !(Field $overlay 'ShowBand')) 'initial population has no light'
+    $b.Service.GetServerUrls()[0].latency = 80
+    $picker.RefreshGroup($b.Service)
+    Check ($model.Servers[0].Service.ID -eq 2 -and $a.IsChecking) 'completed country sorts while another remains checking'
+    if (![System.Windows.SystemParameters]::ClientAreaAnimation) {
+        Check ((Order $model.Slots) -eq '2,1,3' -and !$model.IsTransitioning) 'OS reduced motion applies final order immediately'
+    } else {
+        Wait-For { Field $overlay 'ShowBand' }
+        $pass = Field $animator '_pass'; $started = Field $animator '_started'
+        $c.Service.GetServerUrls()[0].latency = 200
+        $picker.RefreshGroup($c.Service)
+        Check ([object]::ReferenceEquals($pass,(Field $animator '_pass')) -and $started -eq (Field $animator '_started')) 'new completion coalesces without restarting current pass'
+        $shift = Field $overlay 'BandShift'; $left = $shift.X
+        Pump 150
+        Check ($shift.X -gt $left -and $overlay.FlowDirection -eq [Windows.FlowDirection]::LeftToRight) 'physical light travels left to right'
+        Unique $model.Slots
+        # Check the actual measured physical centers against the current leading edge.
+        $bounds = Field $animator '_bounds'; $edge = $shift.X - (Field $animator '_rowLeft') + .85*170
+        for ($i=0; $i -lt 5; $i++) {
+            $center = $bounds[$i].Left + $bounds[$i].Width/2 - (Field $animator '_rowLeft')
+            $part = [Enum]::ToObject($assembly.GetType($prefix+'ServerRowPart',$true),$i)
+            $shown = Call $pass.Slot 'GetPart' ([object[]]@($part))
+            if ($edge -gt $center+1) { Check ([object]::ReferenceEquals($shown,$pass.Target)) 'crossed physical group has new snapshot' }
+            if ($edge -lt $center-1) { Check ([object]::ReferenceEquals($shown,$pass.From)) 'uncrossed physical group retains old snapshot' }
+        }
+        Wait-For { Unique $model.Slots; !$model.IsTransitioning -and (Field $overlay 'Flashes').Count -eq 0 -and !(Field $animator '_subscribed') }
+        Check ((Order $model.Slots) -eq '2,3,1' -and $model.Slots[2].SelectionServer.IsSelectedCountry) 'latest order settles with selection on its stable identity'
+        $b.Service.GetServerUrls()[0].latency = 70; $picker.RefreshGroup($b.Service); Pump 100
+        Check (!$model.IsTransitioning -and !(Field $overlay 'ShowBand') -and (Field $overlay 'Flashes').Count -eq 0) 'same-position result has no band or flash'
+    }
+    $before = Order $model.Slots
+    $picker.BeginCheckCycle()
+    foreach ($g in @($a,$b,$c)) { $g.Service.GetServerUrls()[0].latency = 0 }
+    $picker.ResetTestResults(); $picker.EndCheckCycleSetup(); Pump 900
+    Check ((Order $model.Slots) -eq $before -and !$model.IsTransitioning -and !(Field $overlay 'ShowBand')) 'check-again reset preserves order without light'
+    $c.Service.GetServerUrls()[0].latency = 50; $picker.RefreshGroup($c.Service); Pump 40
+    $window.WindowState = [Windows.WindowState]::Minimized; Pump 100
+    Check ((Order $model.Slots) -eq (Order ($model.Servers | ForEach-Object { [pscustomobject]@{DisplayedServer=$_} }))) 'minimize applies newest authoritative order'
+    Check (!(Field $overlay 'ShowBand') -and !(Field $animator '_subscribed') -and (Field $overlay 'Flashes').Count -eq 0) 'minimize releases timeline and all overlays'
+    $window.WindowState = [Windows.WindowState]::Normal; Pump 100
+    Check (!(Field $overlay 'ShowBand')) 'restore never replays obsolete work'
 } finally { $window.Close() }
-Write-Output 'PASS compiled row template and native WPF transition lifecycle; no backend required'
+Check (!(Field $animator '_subscribed')) 'close/unload unsubscribes rendering'
+Write-Output 'PASS native compiled picker comet lifecycle; no networking or VPN started'

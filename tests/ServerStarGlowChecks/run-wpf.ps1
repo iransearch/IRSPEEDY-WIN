@@ -25,6 +25,12 @@ public sealed class StarRowProbe : INotifyPropertyChanged {
         get { return star; }
         set { star=value;var h=PropertyChanged;if(h!=null)h(this,new PropertyChangedEventArgs("IsLastSuccessfulConnection")); }
     }
+    public object FlagServer { get { return this; } }
+    public object NameServer { get { return this; } }
+    public object SignalServer { get { return this; } }
+    public object SelectionServer { get { return this; } }
+    public object BadgeServer { get { return this; } }
+    public bool IsVacant { get { return false; } }
     public string CountryName { get { return country; } }
     public string SignalText { get { return "142 ms"; } }
     public string SignalToolTip { get { return "test"; } }

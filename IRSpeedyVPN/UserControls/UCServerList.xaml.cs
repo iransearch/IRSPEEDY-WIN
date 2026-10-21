@@ -284,6 +284,7 @@ namespace IRSpeedyVPN.UserControls
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(() => ResumeServerChecksAfterCleanup(restartRound)); return; }
             if (restartRound)
             {
+                countryPicker.BeginCheckCycle();
                 probesRequireDisconnect = false;
                 probeRestartRequested = true;
             }
@@ -310,6 +311,7 @@ namespace IRSpeedyVPN.UserControls
                 // old worker drains; later results do not reorder the active queue.
                 cache.RestartFromFirstCountry();
                 probeRestartRequested = false;
+                countryPicker.EndCheckCycleSetup();
             }
             var service = cache.NextService;
             if (service == null || !services.Contains(service)) return;
@@ -396,7 +398,7 @@ namespace IRSpeedyVPN.UserControls
             // (or restored cache on cancellation) before advancing/draining the worker.
             // Cancellation must not discard this refresh as it did in the queued path.
             if (ReferenceEquals(services, _currentServices))
-                countryPicker.RefreshGroup(service);
+                countryPicker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);
             if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
             await Task.Run(() =>
             {

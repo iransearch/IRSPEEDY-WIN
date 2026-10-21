@@ -10,6 +10,18 @@ namespace IRSpeedyVPN.Components.ServerListControl
     public partial class ServerCountryPicker
     {
         private readonly ServerListViewModel _serverList;
+        private readonly ServerListSweepAnimator _sweepAnimator;
+        private bool _checkCycleSetup;
+        public void BeginCheckCycle()
+        {
+            CompleteRowTransitions();
+            _checkCycleSetup = true;
+        }
+        public void EndCheckCycleSetup()
+        {
+            _checkCycleSetup = false;
+            RefreshDisplayedRows();
+        }
         private readonly List<GroupItem> _observedGroups = new List<GroupItem>();
         private DispatcherOperation _rowsUpdate;
 
@@ -33,17 +45,17 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             if (_rowsUpdate != null && _rowsUpdate.Status == DispatcherOperationStatus.Pending) return;
             // A probe changes several properties together; take just one coherent snapshot.
-            _rowsUpdate = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(RefreshDisplayedRows));
+            _rowsUpdate = Dispatcher.BeginInvoke(DispatcherPriority.Background, new Action(() => RefreshDisplayedRows()));
         }
 
-        private void RefreshDisplayedRows()
+        private void RefreshDisplayedRows(bool allowReorder = false, bool instant = false)
         {
             if (ServerScroller == null || icCountries == null) return;
             if (_rowsUpdate != null && _rowsUpdate.Status == DispatcherOperationStatus.Pending) _rowsUpdate.Abort();
             _rowsUpdate = null;
-            bool animate = SystemParameters.ClientAreaAnimation && IsLoaded && IsVisible
+            bool animate = !instant && SystemParameters.ClientAreaAnimation && IsLoaded && IsVisible
                 && Window.GetWindow(this)?.WindowState != WindowState.Minimized;
-            _serverList.Publish(_groups.Select(group => new ServerItem(group)), animate);
+            _serverList.Publish(_groups.Select(group => new ServerItem(group)), animate, allowReorder || instant);
         }
 
         private void CompleteRowTransitions()

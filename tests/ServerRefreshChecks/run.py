@@ -48,8 +48,9 @@ class Picker {
  public void SetGroupChecking(IVPNService s,bool checking){CheckThread();Checking=checking;}
  public Action<IVPNService> OnRefresh;
  void CheckThread(){if(Thread.CurrentThread.ManagedThreadId!=thread)throw new Exception("picker updated off UI thread");}
- public void RefreshGroup(IVPNService s){CheckThread();Updates++;Displayed=s.GetServerUrls()[0].latency;OnRefresh?.Invoke(s);}
+ public void RefreshGroup(IVPNService s,bool allowSortAnimation=true){CheckThread();Updates++;Displayed=s.GetServerUrls()[0].latency;OnRefresh?.Invoke(s);}
  public void ShowGroupProgress(IVPNService s,long latency){CheckThread();Progresses++;Displayed=latency;}
+ public void BeginCheckCycle(){}public void EndCheckCycleSetup(){}
  public void ResetTestResults(){CheckThread();Displayed=0;}
  public void RestoreTestProgress(IVPNService s){CheckThread();Displayed=s.GetServerUrls()[0].latency;}
 }

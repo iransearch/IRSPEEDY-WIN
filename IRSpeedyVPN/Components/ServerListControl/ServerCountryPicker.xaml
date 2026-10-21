@@ -140,8 +140,10 @@
     <!-- Immutable snapshots are display-only. Run.Text otherwise defaults to TwoWay. -->
     <DataTemplate x:Key="ServerRowContent">
               <Grid FlowDirection="LeftToRight">
+                <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Visible"/><Style.Triggers><DataTrigger Binding="{Binding IsVacant, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Hidden"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
-                <Grid Grid.Column="3" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <Grid local:ServerCometPart.Part="Selection" DataContext="{Binding SelectionServer, Mode=OneWay}" Grid.Column="3" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center">
+                  <Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding Mode=OneWay}" Value="{x:Null}"><Setter Property="Visibility" Value="Hidden"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                   <Ellipse Stroke="{DynamicResource Theme.SelectionRingBrush}" StrokeThickness="1.5"/>
                   <Grid Margin="-4">
                     <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsSelectedCountry, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
@@ -149,7 +151,8 @@
                     <Ellipse Width="18" Height="18" Fill="{DynamicResource AccentBrush}"/>
                   </Grid>
                 </Grid>
-                <Grid Grid.Column="2" Width="30" Height="30" FlowDirection="LeftToRight" RenderOptions.BitmapScalingMode="HighQuality">
+                <Grid local:ServerCometPart.Part="Flag" DataContext="{Binding FlagServer, Mode=OneWay}" Grid.Column="2" Width="30" Height="30" FlowDirection="LeftToRight" RenderOptions.BitmapScalingMode="HighQuality">
+                  <Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding Mode=OneWay}" Value="{x:Null}"><Setter Property="Visibility" Value="Hidden"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                   <Ellipse Fill="{DynamicResource RowHoverBrush}" Stroke="{DynamicResource Theme.ThinBorderBrush}" StrokeThickness="1"/>
                   <Ellipse>
                     <Ellipse.Fill><ImageBrush ImageSource="{Binding FlagSource, Mode=OneWay}" Stretch="UniformToFill"/></Ellipse.Fill>
@@ -158,24 +161,10 @@
                   <TextBlock Text="{Binding Initials, Mode=OneWay}" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="13" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
                     <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible"/><Style.Triggers><DataTrigger Binding="{Binding HasFlag, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                   </TextBlock>
-                  <!-- Same diagonal white sheen as the smart flag, only while this row is probing. -->
-                  <Grid IsHitTestVisible="False">
-                    <Grid.Clip><EllipseGeometry Center="15,15" RadiusX="15" RadiusY="15"/></Grid.Clip>
-                    <Rectangle Width="12" Margin="0,-10" HorizontalAlignment="Left" Loaded="ProbeShine_Changed" Unloaded="ProbeShine_Unloaded" IsVisibleChanged="ProbeShine_VisibilityChanged">
-                      <Rectangle.Style><Style TargetType="Rectangle">
-                        <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers><DataTrigger Binding="{Binding IsChecking, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
-                      </Style></Rectangle.Style>
-                      <Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                        <GradientStop Color="#00FFFFFF" Offset="0"/><GradientStop Color="#8CFFFFFF" Offset="0.5"/><GradientStop Color="#00FFFFFF" Offset="1"/>
-                      </LinearGradientBrush></Rectangle.Fill>
-                      <Rectangle.RenderTransform><TransformGroup><SkewTransform AngleX="-14" CenterY="25"/><TranslateTransform X="-20"/></TransformGroup></Rectangle.RenderTransform>
-                    </Rectangle>
-                  </Grid>
                 </Grid>
                 <Grid Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <Grid Width="18" Height="18" Margin="0,0,7,0" ToolTip="آخرین اتصال موفق" AutomationProperties.Name="آخرین اتصال موفق">
+                  <Grid local:ServerCometPart.Part="Badge" DataContext="{Binding BadgeServer, Mode=OneWay}" Width="18" Height="18" Margin="0,0,7,0" ToolTip="آخرین اتصال موفق" AutomationProperties.Name="آخرین اتصال موفق">
                     <Grid.Style><Style TargetType="Grid">
                       <Setter Property="Visibility" Value="Collapsed"/>
                       <Style.Triggers><DataTrigger Binding="{Binding IsLastSuccessfulConnection, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
@@ -187,9 +176,9 @@
                       <Path.Effect><DropShadowEffect Color="#FFFFCC55" BlurRadius="6" ShadowDepth="0" Opacity="0.65"/></Path.Effect>
                     </Path>
                   </Grid>
-                  <TextBlock Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
+                  <TextBlock local:ServerCometPart.Part="Name" DataContext="{Binding NameServer, Mode=OneWay}" Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
                 </Grid>
-                <StackPanel Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
+                <StackPanel local:ServerCometPart.Part="Signal" DataContext="{Binding SignalServer, Mode=OneWay}" Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
                   <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush, Mode=OneWay}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                   <StackPanel ToolTip="{Binding SignalToolTip, Mode=OneWay}">
                     <TextBlock Text="{Binding SignalText, Mode=OneWay}" FontWeight="Bold" FontSize="12.5" Foreground="{Binding SignalBrush, Mode=OneWay}"/>
@@ -197,26 +186,6 @@
                 </StackPanel>
               </Grid>
     </DataTemplate>
-    <Style TargetType="{x:Type local:LightSweepRowTransition}">
-      <Setter Property="FlowDirection" Value="LeftToRight"/>
-      <Setter Property="Focusable" Value="False"/>
-      <Setter Property="Template">
-        <Setter.Value>
-          <ControlTemplate TargetType="{x:Type local:LightSweepRowTransition}">
-            <Grid x:Name="PART_Surface" FlowDirection="LeftToRight" IsHitTestVisible="False">
-              <ContentPresenter x:Name="PART_Old" Margin="{TemplateBinding Padding}" ContentTemplate="{TemplateBinding RowTemplate}" VerticalAlignment="Center"/>
-              <ContentPresenter x:Name="PART_New" Margin="{TemplateBinding Padding}" ContentTemplate="{TemplateBinding RowTemplate}" VerticalAlignment="Center" Visibility="Collapsed"/>
-              <!-- RenderTransform only. The control supplies a frozen cyan/white brush. -->
-              <Canvas IsHitTestVisible="False">
-                <Rectangle x:Name="PART_Band" Canvas.Top="-16" Width="100" Visibility="Collapsed" IsHitTestVisible="False">
-                  <Rectangle.Effect><BlurEffect Radius="3"/></Rectangle.Effect>
-                </Rectangle>
-              </Canvas>
-            </Grid>
-          </ControlTemplate>
-        </Setter.Value>
-      </Setter>
-    </Style>
     <!-- The whole card supports mouse, keyboard and assistive technology. -->
     <Style x:Key="ServerCardButton" TargetType="Button">
       <Setter Property="FontFamily" Value="{StaticResource AppFontFamily}"/>
@@ -235,7 +204,7 @@
                 <Border.Effect><DropShadowEffect Color="#172340" Opacity="0.10" BlurRadius="10" ShadowDepth="3" Direction="270"/></Border.Effect>
               </Border>
               <Border BorderBrush="Transparent" BorderThickness="{TemplateBinding BorderThickness}">
-                <local:LightSweepRowTransition Slot="{Binding Mode=OneWay}" RowTemplate="{StaticResource ServerRowContent}" Padding="{TemplateBinding Padding}" Duration="0:0:0.520" BandWidth="100"/>
+                <ContentPresenter Content="{Binding Mode=OneWay}" ContentTemplate="{StaticResource ServerRowContent}" Margin="{TemplateBinding Padding}" FlowDirection="LeftToRight" VerticalAlignment="Center"/>
               </Border>
             </Grid>
             <ControlTemplate.Triggers>
@@ -250,7 +219,7 @@
   <Grid x:Name="root" FlowDirection="LeftToRight">
     <Grid.RowDefinitions><RowDefinition Height="Auto"/><RowDefinition Height="*"/></Grid.RowDefinitions>
     <Grid x:Name="SmartCardHost" Margin="0,0,0,12" IsVisibleChanged="Picker_IsVisibleChanged">
-      <Button x:Name="smartCard" FontFamily="{StaticResource AppFontFamily}" Height="82" FlowDirection="RightToLeft" Cursor="Hand" Click="SmartCard_Click" SizeChanged="SmartCard_SizeChanged" AutomationProperties.Name="انتخاب هوشمند">
+      <Button x:Name="smartCard" FontFamily="{StaticResource AppFontFamily}" Height="82" FlowDirection="RightToLeft" Cursor="Hand" Click="SmartCard_Click" AutomationProperties.Name="انتخاب هوشمند">
         <Button.Template>
           <ControlTemplate TargetType="Button">
             <Border BorderBrush="{DynamicResource ServerCardBorderBrush}" BorderThickness="1" CornerRadius="14">
@@ -303,48 +272,29 @@
                     </Border.Effect>
                   </Border>
 
-                  <!-- flags + sheen, clipped to the rounded rectangle -->
+                  <!-- existing flag mosaic, clipped to the rounded rectangle -->
                   <Grid>
                     <Grid.Clip>
                       <RectangleGeometry Rect="0,0,140,58" RadiusX="12" RadiusY="12" />
                     </Grid.Clip>
                     <Image Source="{StaticResource Mosaic.SmartSelection}" Stretch="Fill" />
 
-                    <!-- diagonal sheen: skew -14°, sweeps left → right in the first 55% of every 3.2s -->
-                    <Rectangle Width="34" Margin="0,-10" HorizontalAlignment="Left" IsHitTestVisible="False">
-                      <Rectangle.Fill>
-                        <LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
-                          <GradientStop Color="#00FFFFFF" Offset="0" />
-                          <GradientStop Color="#8CFFFFFF" Offset="0.5" />
-                          <GradientStop Color="#00FFFFFF" Offset="1" />
-                        </LinearGradientBrush>
-                      </Rectangle.Fill>
-                      <Rectangle.RenderTransform>
-                        <TransformGroup>
-                          <SkewTransform AngleX="-14" CenterY="39" />
-                          <TranslateTransform x:Name="SmartMosaicShift" X="-60" />
-                        </TransformGroup>
-                      </Rectangle.RenderTransform>
-
-                    </Rectangle>
                   </Grid>
                 </Grid>
               </Grid>
       </Button>
-      <Path x:Name="SmartCardShine" FlowDirection="LeftToRight" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeDashCap="Round" IsHitTestVisible="False">
-        <Path.Stroke><LinearGradientBrush StartPoint="0,0" EndPoint="1,0"><GradientStop Color="#0060A5FA" Offset="0"/><GradientStop Color="White" Offset="0.5"/><GradientStop Color="#002563EB" Offset="1"/></LinearGradientBrush></Path.Stroke>
-      </Path>
     </Grid>
     <!-- The 6-DIP rail sits outside the cards, with a fixed left gutter. -->
     <ScrollViewer x:Name="ServerScroller" Grid.Row="1" Margin="-4,0,0,0" Style="{StaticResource ServerScrollViewer}" Padding="0" Focusable="False">
       <ItemsControl x:Name="icCountries" Focusable="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Button Style="{StaticResource ServerCardButton}" Height="52" Margin="0,0,0,8" IsEnabled="{Binding DisplayedServer.IsSelectable, Mode=OneWay}" Cursor="{Binding DisplayedServer.RowCursor, Mode=OneWay}" Click="Row_Click" Tag="{Binding DisplayedServer.Identity, Mode=OneWay}" AutomationProperties.Name="{Binding DisplayedServer.CountryName, Mode=OneWay}" AutomationProperties.HelpText="{Binding DisplayedServer.SignalText, Mode=OneWay}"/>
+            <Button Style="{StaticResource ServerCardButton}" Height="52" Margin="0,0,0,8" IsEnabled="{Binding IsSelectable, Mode=OneWay}" Cursor="{Binding RowCursor, Mode=OneWay}" Click="Row_Click" Tag="{Binding DisplayedServer.Identity, Mode=OneWay}" AutomationProperties.Name="{Binding DisplayedServer.CountryName, Mode=OneWay}" AutomationProperties.HelpText="{Binding DisplayedServer.SignalText, Mode=OneWay}"/>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </ScrollViewer>
     <TextBlock x:Name="EmptyResults" Grid.Row="1" Text="سروری پیدا نشد" FontSize="13" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"/>
+    <local:ServerListCometOverlay x:Name="CometOverlay" Grid.RowSpan="2" FlowDirection="LeftToRight" IsHitTestVisible="False" Focusable="False"/>
   </Grid>
 </UserControl>

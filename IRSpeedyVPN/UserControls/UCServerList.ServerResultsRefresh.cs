@@ -24,6 +24,7 @@ namespace IRSpeedyVPN.UserControls
         {
             if (!IsLoaded || !IsVisible || manualRefreshBusy || globalInfo?.CurrentService != null
                 || _currentServices == null || probeCache == null || !_isUrlTestSupported) return;
+            countryPicker.BeginCheckCycle();
             manualRefreshBusy = true;
             manualRefreshExternalPause = false;
             // A deliberate refresh grants a new scan even after a failed connect
@@ -76,6 +77,7 @@ namespace IRSpeedyVPN.UserControls
                     foreach (var service in services.OfType<TunnelPlusService>()) service.ResetListTestResult();
                     countryPicker.ResetTestResults();
                 }
+                countryPicker.EndCheckCycleSetup();
                 var plan = new ServerRefreshPlan(services);
                 var finishedRows = new ConcurrentDictionary<IVPNService, bool>();
                 var bestByRow = new ConcurrentDictionary<IVPNService, long>();
@@ -168,6 +170,7 @@ namespace IRSpeedyVPN.UserControls
                     probesPaused = false;
                 if (manualRefreshCancellation == cancellation) manualRefreshCancellation = null;
                 cancellation.Dispose();
+                countryPicker.EndCheckCycleSetup();
                 manualRefreshBusy = false;
                 UpdateHeaderIcons();
                 if (!ReferenceEquals(services, _currentServices) && !probesPaused) RunBackgroundUrlTests(_currentServices);
