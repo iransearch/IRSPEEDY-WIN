@@ -26,6 +26,11 @@ linked = [
  'UserControls/UCServerList.ServerResultsRefresh.cs',
  'Models/HeaderIconRegistration.cs', 'Common/HeaderRefreshMotion.cs',
  'Components/ServerListControl/ServerCountryPicker.xaml.cs',
+ 'Components/ServerListControl/ServerCountryPicker.Transitions.cs',
+ 'Components/ServerListControl/ServerCountryPicker.Motion.cs',
+ 'Components/ServerListControl/ServerListViewModel.cs',
+ 'Components/ServerListControl/ServerListRanking.cs',
+ 'Components/ServerListControl/LightSweepRowTransition.cs',
 ]
 stubs = r'''using System;using System.Linq;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
 using System.Windows;using System.Windows.Controls;using System.Windows.Media;
@@ -55,6 +60,7 @@ stubs += r'''namespace IRSpeedyVPN.Components.ServerListControl {
  public partial class ServerCountryPicker {
   Grid SmartCardHost=new Grid(),EmptyResults=new Grid(),smartCheck=new Grid();
   ScrollViewer ServerScroller=new ScrollViewer();ItemsControl icCountries=new ItemsControl();void InitializeComponent(){}
+  Button smartCard=new Button();System.Windows.Shapes.Path SmartCardShine=new System.Windows.Shapes.Path();TranslateTransform SmartMosaicShift=new TranslateTransform();
  }
 }
 namespace IRSpeedyVPN {

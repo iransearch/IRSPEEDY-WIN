@@ -91,7 +91,11 @@ namespace IRSpeedyVPN.Components.ServerListControl
             try
             {
                 var uri = new Uri($"pack://application:,,,/Resources/Irspeedy/Flags/{file}.png", UriKind.Absolute);
-                var img = new BitmapImage(uri);
+                var img = new BitmapImage();
+                img.BeginInit();
+                img.CacheOption = BitmapCacheOption.OnLoad;
+                img.UriSource = uri;
+                img.EndInit();
                 img.Freeze();
                 Cache[file] = img;
                 return img;
@@ -106,8 +110,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             var code = (countryCode ?? "").Trim().ToUpperInvariant();
             if (code == "UK") code = "GB";
-            return Application.Current?.TryFindResource("ServerListFlag_" + code) as ImageSource
-                ?? TryGet(countryCode);
+            var flag = Application.Current?.TryFindResource("ServerListFlag_" + code) as ImageSource;
+            if (flag != null && flag.CanFreeze && !flag.IsFrozen) flag.Freeze();
+            return flag ?? TryGet(countryCode);
         }
 
         public static string Initials(string countryName)
@@ -269,11 +274,11 @@ namespace IRSpeedyVPN.Components.ServerListControl
             // selectable success just because an earlier test had a positive ping.
             var previous = urls.Where(u => u.LastSuccessfulLatency > 0)
                 .OrderBy(u => u.LastSuccessfulLatency).FirstOrDefault();
-            SignalText = previous != null
-                ? previous.LastSuccessfulLatency.ToString(CultureInfo.InvariantCulture) + " ms"
-                : allFresh ? "ناموفق" : "—";
+            SignalText = "—";
+            if (previous == null && allFresh) SignalToolTip = "تست ناموفق؛ مسیر سالمی تأیید نشد.";
             if (previous != null)
-                SignalToolTip = "آخرین تست موفق: " + previous.LastSuccessfulCheckTime.ToString("yyyy/MM/dd HH:mm")
+                SignalToolTip = "آخرین تست موفق: " + previous.LastSuccessfulLatency.ToString(CultureInfo.InvariantCulture)
+                    + " ms، " + previous.LastSuccessfulCheckTime.ToString("yyyy/MM/dd HH:mm")
                     + "؛ نتیجهٔ فعلی ناموفق است.";
             SetSignalColor(0);
         }
@@ -336,6 +341,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public ServerCountryPicker()
         {
             InitializeComponent();
+            icCountries.ItemsSource = _serverList.Slots;
+            _serverList.Slots.CollectionChanged += (s, e) => UpdateEmptyResultVisibility();
         }
 
         public void Load(IEnumerable<IVPNService> services, bool urlTestSupported)
@@ -364,6 +371,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
                     return group;
                 })
                 .ToList();
+
+            ObserveGroups();
 
             _smart = _urlTest ? new SmartItem() : null;
             SmartCardHost.Visibility = _urlTest ? Visibility.Visible : Visibility.Collapsed;
@@ -411,8 +420,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 : _allGroups.Where(g => g.CountryName != null &&
                     g.CountryName.IndexOf(_filter.Trim(), StringComparison.CurrentCultureIgnoreCase) >= 0).ToList();
 
-            icCountries.ItemsSource = _groups;
-            EmptyResults.Visibility = _groups.Count == 0 ? Visibility.Visible : Visibility.Collapsed;
+            QueueRowsUpdate();
+            UpdateEmptyResultVisibility();
         }
 
         public void SetGroupChecking(IVPNService service, bool checking)
@@ -470,12 +479,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         private void ResortGroups()
         {
-            var ordered = _allGroups
-                .OrderByDescending(g => g.IsLastSuccessfulConnection)
-                .ThenBy(g => g.SortKey)
-                .ThenBy(g => g.CountryName, StringComparer.CurrentCulture)
-                .ThenBy(g => g.Service?.ID ?? int.MaxValue)
-                .ToList();
+            var ordered = ServerListRanking.Order(_allGroups, g => g.IsLastSuccessfulConnection,
+                g => g.SortKey, g => g.CountryName, g => g.Service?.ID ?? int.MaxValue).ToList();
 
             if (ordered.SequenceEqual(_allGroups))
                 return;
@@ -545,8 +550,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         private void Row_Click(object sender, RoutedEventArgs e)
         {
-            if (!(sender is FrameworkElement fe) || !(fe.DataContext is GroupItem group))
+            if (!(sender is FrameworkElement fe) || !(fe.DataContext is ServerDisplaySlot slot))
                 return;
+
+            // Click the revealed identity, then recheck the CURRENT health/pool.
+            var identity = slot.DisplayedServer?.Identity;
+            var group = _allGroups.FirstOrDefault(g => LastSuccessfulServer.Key(g.Service) == identity);
+            if (group == null) { e.Handled = true; return; }
 
             if (!group.IsSelectable)
             {

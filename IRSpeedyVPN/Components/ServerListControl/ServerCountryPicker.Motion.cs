@@ -59,6 +59,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         private void Picker_Loaded(object sender, RoutedEventArgs e)
         {
+            CompleteRowTransitions();
             DetachMotionWindow();
             _motionWindow = Window.GetWindow(this);
             if (_motionWindow != null) _motionWindow.StateChanged += MotionWindow_StateChanged;
@@ -67,6 +68,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         private void Picker_Unloaded(object sender, RoutedEventArgs e)
         {
+            CompleteRowTransitions();
             StopSmartShine();
             DetachMotionWindow();
         }
@@ -77,8 +79,16 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _motionWindow = null;
         }
 
-        private void MotionWindow_StateChanged(object sender, EventArgs e) => UpdateSmartShine();
-        private void Picker_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e) => UpdateSmartShine();
+        private void MotionWindow_StateChanged(object sender, EventArgs e)
+        {
+            if (_motionWindow?.WindowState == WindowState.Minimized) CompleteRowTransitions();
+            UpdateSmartShine();
+        }
+        private void Picker_IsVisibleChanged(object sender, DependencyPropertyChangedEventArgs e)
+        {
+            if (!IsVisible) CompleteRowTransitions();
+            UpdateSmartShine();
+        }
         private void SmartCard_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateSmartShine();
 
         private void StopSmartShine()

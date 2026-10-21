@@ -9,6 +9,7 @@ methods=source[a:b]
 harness=r'''
 using System;using System.Linq;using System.Collections.Generic;
 using IRSpeedyVPN.Common;using IRSpeedyVPN.Interfaces;
+using IRSpeedyVPN.Components.ServerListControl;
 namespace IRSpeedyVPN.Interfaces {
  public interface IVPNService { int ID {get;} object SelectedServerUrl {get;} }
  public interface ISmartFastConnection { bool IsSmartFast {get;} }
@@ -74,5 +75,6 @@ class Program {
 with tempfile.TemporaryDirectory(prefix='last-successful-server-') as directory:
  p=Path(directory);(p/'Program.cs').write_text(harness+methods+checks)
  (p/'LastSuccessfulServer.cs').write_text((root/'IRSpeedyVPN/Common/LastSuccessfulServer.cs').read_text())
+ (p/'ServerListRanking.cs').write_text((root/'IRSpeedyVPN/Components/ServerListControl/ServerListRanking.cs').read_text())
  (p/'checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')
  subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',directory,'-v:q'],check=True)
