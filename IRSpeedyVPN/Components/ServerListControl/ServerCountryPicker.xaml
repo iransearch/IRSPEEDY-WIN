@@ -137,14 +137,14 @@
         </Setter.Value>
       </Setter>
     </Style>
-    <!-- Immutable old/new snapshots use the exact same idle row artwork. -->
+    <!-- Immutable snapshots are display-only. Run.Text otherwise defaults to TwoWay. -->
     <DataTemplate x:Key="ServerRowContent">
               <Grid FlowDirection="LeftToRight">
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
                 <Grid Grid.Column="3" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center">
                   <Ellipse Stroke="{DynamicResource Theme.SelectionRingBrush}" StrokeThickness="1.5"/>
                   <Grid Margin="-4">
-                    <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsSelectedCountry}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
+                    <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsSelectedCountry, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                     <Ellipse Fill="{DynamicResource Theme.SurfaceBrush}" Stroke="{DynamicResource ServerCardBorderBrush}" StrokeThickness="1"/>
                     <Ellipse Width="18" Height="18" Fill="{DynamicResource AccentBrush}"/>
                   </Grid>
@@ -152,11 +152,11 @@
                 <Grid Grid.Column="2" Width="30" Height="30" FlowDirection="LeftToRight" RenderOptions.BitmapScalingMode="HighQuality">
                   <Ellipse Fill="{DynamicResource RowHoverBrush}" Stroke="{DynamicResource Theme.ThinBorderBrush}" StrokeThickness="1"/>
                   <Ellipse>
-                    <Ellipse.Fill><ImageBrush ImageSource="{Binding FlagSource}" Stretch="UniformToFill"/></Ellipse.Fill>
-                    <Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding HasFlag}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Ellipse.Style>
+                    <Ellipse.Fill><ImageBrush ImageSource="{Binding FlagSource, Mode=OneWay}" Stretch="UniformToFill"/></Ellipse.Fill>
+                    <Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding HasFlag, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Ellipse.Style>
                   </Ellipse>
-                  <TextBlock Text="{Binding Initials}" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="13" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible"/><Style.Triggers><DataTrigger Binding="{Binding HasFlag}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
+                  <TextBlock Text="{Binding Initials, Mode=OneWay}" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="13" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Visible"/><Style.Triggers><DataTrigger Binding="{Binding HasFlag, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Collapsed"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
                   </TextBlock>
                   <!-- Same diagonal white sheen as the smart flag, only while this row is probing. -->
                   <Grid IsHitTestVisible="False">
@@ -164,7 +164,7 @@
                     <Rectangle Width="12" Margin="0,-10" HorizontalAlignment="Left" Loaded="ProbeShine_Changed" Unloaded="ProbeShine_Unloaded" IsVisibleChanged="ProbeShine_VisibilityChanged">
                       <Rectangle.Style><Style TargetType="Rectangle">
                         <Setter Property="Visibility" Value="Collapsed"/>
-                        <Style.Triggers><DataTrigger Binding="{Binding IsChecking}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                        <Style.Triggers><DataTrigger Binding="{Binding IsChecking, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
                       </Style></Rectangle.Style>
                       <Rectangle.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,0">
                         <GradientStop Color="#00FFFFFF" Offset="0"/><GradientStop Color="#8CFFFFFF" Offset="0.5"/><GradientStop Color="#00FFFFFF" Offset="1"/>
@@ -178,7 +178,7 @@
                   <Grid Width="18" Height="18" Margin="0,0,7,0" ToolTip="آخرین اتصال موفق" AutomationProperties.Name="آخرین اتصال موفق">
                     <Grid.Style><Style TargetType="Grid">
                       <Setter Property="Visibility" Value="Collapsed"/>
-                      <Style.Triggers><DataTrigger Binding="{Binding IsLastSuccessfulConnection}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
+                      <Style.Triggers><DataTrigger Binding="{Binding IsLastSuccessfulConnection, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
                     </Style></Grid.Style>
                     <Path Data="M9,0 L11.6,5.7 L18,6.5 L13.3,10.8 L14.5,17 L9,13.9 L3.5,17 L4.7,10.8 L0,6.5 L6.4,5.7 Z" Stretch="Uniform" Stroke="#FFE6AD32" StrokeThickness="0.6" Loaded="StarGlow_Loaded" Unloaded="StarGlow_Unloaded" IsVisibleChanged="StarGlow_VisibilityChanged">
                       <Path.Fill><LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
@@ -187,12 +187,12 @@
                       <Path.Effect><DropShadowEffect Color="#FFFFCC55" BlurRadius="6" ShadowDepth="0" Opacity="0.65"/></Path.Effect>
                     </Path>
                   </Grid>
-                  <TextBlock Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName}"/></TextBlock>
+                  <TextBlock Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
                 </Grid>
                 <StackPanel Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
-                  <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush}" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                  <StackPanel ToolTip="{Binding SignalToolTip}">
-                    <TextBlock Text="{Binding SignalText}" FontWeight="Bold" FontSize="12.5" Foreground="{Binding SignalBrush}"/>
+                  <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush, Mode=OneWay}" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                  <StackPanel ToolTip="{Binding SignalToolTip, Mode=OneWay}">
+                    <TextBlock Text="{Binding SignalText, Mode=OneWay}" FontWeight="Bold" FontSize="12.5" Foreground="{Binding SignalBrush, Mode=OneWay}"/>
                   </StackPanel>
                 </StackPanel>
               </Grid>
@@ -235,7 +235,7 @@
                 <Border.Effect><DropShadowEffect Color="#172340" Opacity="0.10" BlurRadius="10" ShadowDepth="3" Direction="270"/></Border.Effect>
               </Border>
               <Border BorderBrush="Transparent" BorderThickness="{TemplateBinding BorderThickness}">
-                <local:LightSweepRowTransition Slot="{Binding}" RowTemplate="{StaticResource ServerRowContent}" Padding="{TemplateBinding Padding}" Duration="0:0:0.520" StaggerDelay="0:0:0.075" BandWidth="100"/>
+                <local:LightSweepRowTransition Slot="{Binding Mode=OneWay}" RowTemplate="{StaticResource ServerRowContent}" Padding="{TemplateBinding Padding}" Duration="0:0:0.520" StaggerDelay="0:0:0.075" BandWidth="100"/>
               </Border>
             </Grid>
             <ControlTemplate.Triggers>
@@ -340,7 +340,7 @@
       <ItemsControl x:Name="icCountries" Focusable="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Button Style="{StaticResource ServerCardButton}" Height="52" Margin="0,0,0,8" IsEnabled="{Binding DisplayedServer.IsSelectable}" Cursor="{Binding DisplayedServer.RowCursor}" Click="Row_Click" Tag="{Binding DisplayedServer.Identity}" AutomationProperties.Name="{Binding DisplayedServer.CountryName}" AutomationProperties.HelpText="{Binding DisplayedServer.SignalText}"/>
+            <Button Style="{StaticResource ServerCardButton}" Height="52" Margin="0,0,0,8" IsEnabled="{Binding DisplayedServer.IsSelectable, Mode=OneWay}" Cursor="{Binding DisplayedServer.RowCursor, Mode=OneWay}" Click="Row_Click" Tag="{Binding DisplayedServer.Identity, Mode=OneWay}" AutomationProperties.Name="{Binding DisplayedServer.CountryName, Mode=OneWay}" AutomationProperties.HelpText="{Binding DisplayedServer.SignalText, Mode=OneWay}"/>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

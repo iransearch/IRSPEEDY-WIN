@@ -62,6 +62,7 @@ reused during each sweep. Render clips and translation remain mutable by design.
 
 ```
 python3 tests/ServerListTransitionChecks/run.py /path/to/dotnet
+python3 tests/ServerListTransitionChecks/bindings.py
 python3 tests/ServerRefreshChecks/net48_compile.py /path/to/dotnet
 python3 tests/LastSuccessfulServerChecks/run.py /path/to/dotnet
 python3 tests/ProbeShineChecks/run.py /path/to/dotnet
@@ -122,3 +123,22 @@ This check constructs two already-starred row presenters inside a visible window
 then exercises selection-marker changes, hide, minimize/restore and unload. It
 uses only UI resources and does not initialize VPN/probes. It must run on Windows;
 the Linux net48/reference-assembly check cannot execute WPF rendering or BAML.
+
+## Read-only snapshot binding fix (1.4.17)
+
+The next 2026-10-21 log confirms 1.4.16, then reports a different XAML error at
+15:34:51: `TwoWay or OneWayToSource binding cannot work on the read-only property
+'CountryName'` of `ServerItem`. WPF Run.Text uses TwoWay by default. The former
+mutable GroupItem country property accepted that default; the immutable sweep
+snapshot intentionally has no setter.
+
+All snapshot display bindings now explicitly declare OneWay: country Run and
+tooltip, flag/initials, latency/color, checking/selection/star triggers, displayed
+identity, automation and slot binding. Replacing a snapshot continues to refresh
+its view. The scrollbar's intentional TwoWay binding is retained. The model stays
+immutable, and the star lifecycle fix and light sweep are preserved.
+
+`bindings.py` fails on 1.4.16 and passes on this fix. The Windows companion also
+checks actual compiled Run binding mode, getter-only country loading and snapshot
+replacement without writing to the old model. Its existing already-starred row,
+hide/minimize/unload checks remain in place.

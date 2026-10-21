@@ -17,12 +17,15 @@ using System.ComponentModel;
 using System.Windows.Media;
 public sealed class StarRowProbe : INotifyPropertyChanged {
     private bool star = true;
+    private readonly string country;
+    public StarRowProbe() : this("country") { }
+    public StarRowProbe(string name) { country = name; }
     public event PropertyChangedEventHandler PropertyChanged;
     public bool IsLastSuccessfulConnection {
         get { return star; }
         set { star=value;var h=PropertyChanged;if(h!=null)h(this,new PropertyChangedEventArgs("IsLastSuccessfulConnection")); }
     }
-    public string CountryName { get { return "country"; } }
+    public string CountryName { get { return country; } }
     public string SignalText { get { return "142 ms"; } }
     public string SignalToolTip { get { return "test"; } }
     public string Initials { get { return "F"; } }
@@ -45,6 +48,21 @@ function Find-Star($node) {
     if ($node -is [System.Windows.Shapes.Path] -and $node.Effect -is [System.Windows.Media.Effects.DropShadowEffect]) { return $node }
     for ($i=0; $i -lt [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($node); $i++) {
         $found = Find-Star ([System.Windows.Media.VisualTreeHelper]::GetChild($node,$i))
+        if ($null -ne $found) { return $found }
+    }
+    return $null
+}
+function Find-CountryRun($node) {
+    if ($node -is [System.Windows.Controls.TextBlock]) {
+        foreach ($inline in $node.Inlines) {
+            if ($inline -is [System.Windows.Documents.Run]) {
+                $binding = [System.Windows.Data.BindingOperations]::GetBinding($inline, [System.Windows.Documents.Run]::TextProperty)
+                if ($null -ne $binding -and $binding.Path.Path -eq 'CountryName') { return $inline }
+            }
+        }
+    }
+    for ($i=0; $i -lt [System.Windows.Media.VisualTreeHelper]::GetChildrenCount($node); $i++) {
+        $found = Find-CountryRun ([System.Windows.Media.VisualTreeHelper]::GetChild($node,$i))
         if ($null -ne $found) { return $found }
     }
     return $null
@@ -72,6 +90,16 @@ try {
     # This is the 1.4.15 failure that compile-only and empty-list tests missed.
     $layout.Children.Add($a) | Out-Null; $layout.Children.Add($b) | Out-Null
     $layout.UpdateLayout(); Drain-Layout
+    $countryRun = Find-CountryRun $a
+    Check ($null -ne $countryRun -and $countryRun.Text -eq 'country') 'getter-only country name loads into the compiled Persian Run'
+    $countryBinding = [System.Windows.Data.BindingOperations]::GetBinding($countryRun, [System.Windows.Documents.Run]::TextProperty)
+    Check ($countryBinding.Mode -eq [System.Windows.Data.BindingMode]::OneWay) 'country Run overrides the WPF TwoWay default'
+    Check ([System.ComponentModel.TypeDescriptor]::GetProperties($dataA)['CountryName'].IsReadOnly) 'the country source is actually read-only'
+    $replacement = New-Object StarRowProbe -ArgumentList 'replacement'
+    $a.Content = $replacement; $layout.UpdateLayout(); Drain-Layout
+    Check ((Find-CountryRun $a).Text -eq 'replacement') 'replacing a sweep snapshot refreshes its OneWay country text'
+    Check ($dataA.CountryName -eq 'country') 'reveal never writes the new country into the old snapshot'
+    $a.Content = $dataA; $layout.UpdateLayout(); Drain-Layout
     $starA = Find-Star $a; $starB = Find-Star $b
     Check ($null -ne $starA -and $null -ne $starB) 'cold already-starred row templates load without XamlParseException'
     $animate = [System.Windows.SystemParameters]::ClientAreaAnimation
