@@ -29,21 +29,19 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 dc.PushClip(BandClip); dc.PushTransform(BandShift); dc.PushTransform(BandSkew);
                 dc.DrawRectangle(BandBrush, null, BandRect); dc.Pop(); dc.Pop(); dc.Pop();
             }
-            foreach (var flash in Flashes)
-            {
-                dc.PushClip(flash.Clip); dc.PushOpacity(flash.Brightness);
-                dc.DrawRoundedRectangle(Brushes.White, null, flash.Bounds, 2, 2); dc.Pop(); dc.Pop();
-            }
+            // Content fades on its own element. Painting its layout bounds here
+            // produces a solid horizontal bar behind stretched country labels.
         }
         private static Brush CreateBandBrush()
         {
             var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
             brush.GradientStops.Add(new GradientStop(Colors.Transparent, 0));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(15, 110, 210, 255), .30));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(77, 110, 210, 255), .68));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(191, 190, 240, 255), .86));
-            brush.GradientStops.Add(new GradientStop(Color.FromArgb(242, 255, 255, 255), .90));
-            brush.GradientStops.Add(new GradientStop(Colors.Transparent, .96));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(10, 110, 210, 255), .30));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(46, 110, 210, 255), .68));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(102, 190, 240, 255), .86));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(140, 255, 255, 255), .90));
+            brush.GradientStops.Add(new GradientStop(Color.FromArgb(38, 190, 240, 255), .95));
+            brush.GradientStops.Add(new GradientStop(Colors.Transparent, .99));
             brush.GradientStops.Add(new GradientStop(Colors.Transparent, 1));
             brush.Freeze(); return brush;
         }
@@ -55,8 +53,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         internal ServerDisplaySlot Slot;
         internal ServerRowPart Part;
         internal ServerItem Snapshot;
-        internal double Started, Brightness;
-        internal Rect Bounds;
-        internal Geometry Clip;
+        internal double Started;
     }
 }

@@ -116,7 +116,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
                     || current?.Identity != flash.Snapshot.Identity || PartChanged(flash.Snapshot, current, flash.Part))
                 { flash.Element.Opacity = 1; _overlay.Flashes.RemoveAt(i); continue; }
                 flash.Element.Opacity = .2 + .8 * t;
-                flash.Brightness = .18 * (1 - t) * (1 - t);
             }
             _overlay.InvalidateVisual(); StopIfIdle();
         }
@@ -130,7 +129,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             for (int i = _overlay.Flashes.Count - 1; i >= 0; i--)
                 if (ReferenceEquals(_overlay.Flashes[i].Element, element)) _overlay.Flashes.RemoveAt(i);
             _overlay.Flashes.Add(new ServerCometFlash { Element = element, OwnerRow = _row, Slot = _pass.Slot, Part = part,
-                Snapshot = _pass.Target, Started = _started + crossing, Bounds = _bounds[index], Clip = _rowClip });
+                Snapshot = _pass.Target, Started = _started + crossing });
         }
         private void FinishPass()
         {
@@ -156,13 +155,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
             {
                 var rect = Bounds(_row); _rowLeft = rect.Left;
                 _rowClip = MakeClip(_row, rect); _overlay.BandClip = _rowClip; _overlay.BandShift.Y = rect.Top;
-            }
-            foreach (var flash in _overlay.Flashes)
-            {
-                if (!flash.Element.IsLoaded) continue;
-                flash.Bounds = Bounds(flash.Element);
-                var row = FindParentRow(flash.Element);
-                if (row != null) flash.Clip = MakeClip(row, Bounds(row));
             }
             _overlay.InvalidateVisual();
         }
@@ -193,12 +185,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (root is Button row && ReferenceEquals(row.DataContext, slot)) return row;
             for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
             { var found = FindRow(VisualTreeHelper.GetChild(root, i), slot); if (found != null) return found; }
-            return null;
-        }
-        private static Button FindParentRow(DependencyObject element)
-        {
-            for (var parent = VisualTreeHelper.GetParent(element); parent != null; parent = VisualTreeHelper.GetParent(parent))
-                if (parent is Button row) return row;
             return null;
         }
         private static void FindGroups(DependencyObject root, FrameworkElement[] groups)

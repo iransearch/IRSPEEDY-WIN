@@ -1,4 +1,4 @@
-# Server list comet (1.4.21)
+# Server list comet (1.4.22)
 
 The existing .NET Framework 4.8 WPF picker consumes the application's existing
 country order immediately after each completed country check. Its aggregation,
@@ -32,7 +32,8 @@ bandLeftX = leadingEdgeX - 0.85 * B
 ```
 
 The frozen cyan/white horizontal gradient has stops at 0, .30, .68, .86, .90,
-.96 and 1, with the requested long tail and sharp bright edge. The static skew
+.95, .99 and 1. The white peak is approximately 55% opaque, with a softer leading
+falloff and a low-opacity cyan tail. The static skew
 and rounded row/viewport clips are prepared before each pass. The existing
 card's actual corner radius is read from its template. No blur or shadow is
 added. Idle row artwork, text, spacing, RTL, palette and existing icons remain
@@ -43,8 +44,10 @@ into the physical LTR overlay. Inherited RTL transforms are included. The timeli
 sorts these measured centers and calculates crossing times using the inverse
 cosine easing. Each group retains its old snapshot until the leading edge
 crosses its center, then commits once. Dropped frames process every crossed
-group. Changed content fades from opacity .2 to 1 over 400 ms with a brief white
-brightness overlay; unchanged content gets no flash. Flash start times use the
+group. Changed content fades from opacity .2 to 1 over 400 ms on the existing
+content element itself; unchanged content gets no flash. No brightness rectangle
+is drawn over the element's layout bounds: stretched country labels otherwise
+produce a conspicuous horizontal gray bar behind the text. Flash start times use the
 logical crossing time, so late frames do not extend the effect.
 
 Three changed visible positions require three sequential 800 ms passes (about
