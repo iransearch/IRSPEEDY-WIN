@@ -57,6 +57,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             StopStarGlow(element);
             if (!element.IsLoaded || !element.IsVisible || !IsVisible || !SystemParameters.ClientAreaAnimation
+                || LightSweepRowTransition.IsTransitionSurface(element)
                 || _motionWindow == null || _motionWindow.WindowState == WindowState.Minimized) return;
 
             // Loaded guarantees that the local XAML Effect has been assigned.

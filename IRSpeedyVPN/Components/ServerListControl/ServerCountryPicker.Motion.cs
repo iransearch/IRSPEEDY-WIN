@@ -9,6 +9,17 @@ namespace IRSpeedyVPN.Components.ServerListControl
     public partial class ServerCountryPicker
     {
         private readonly HashSet<FrameworkElement> _probeShines = new HashSet<FrameworkElement>();
+        private void RowTransitionActivityChanged(object sender, RoutedEventArgs e)
+        {
+            var row = e.OriginalSource as LightSweepRowTransition;
+            if (row == null) return;
+            // Keep cached content static while it is being revealed. Resume the
+            // existing ornaments after the second presenter has been released.
+            foreach (var element in _probeShines)
+                if (row.IsAncestorOf(element)) UpdateProbeShine(element);
+            foreach (var element in _starGlows)
+                if (row.IsAncestorOf(element)) UpdateStarGlow(element);
+        }
         private void ProbeShine_Changed(object sender, RoutedEventArgs e)
         {
             var element = (FrameworkElement)sender;
@@ -45,7 +56,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             var shift = ProbeShift(element);
             if (shift == null) return;
             shift.BeginAnimation(TranslateTransform.XProperty, null);
-            if (!element.IsLoaded || !element.IsVisible || !IsVisible ||
+            if (!element.IsLoaded || !element.IsVisible || !IsVisible || LightSweepRowTransition.IsTransitionSurface(element) ||
                 _motionWindow == null || _motionWindow.WindowState == WindowState.Minimized) return;
             var sheen = new DoubleAnimationUsingKeyFrames { Duration = TimeSpan.FromSeconds(3.2), RepeatBehavior = RepeatBehavior.Forever };
             sheen.KeyFrames.Add(new DiscreteDoubleKeyFrame(-20, KeyTime.FromTimeSpan(TimeSpan.Zero)));

@@ -25,8 +25,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
             typeof(LightSweepRowTransition), new PropertyMetadata(Color.FromArgb(95, 192, 243, 255)));
         public static readonly DependencyProperty EasingProperty = DependencyProperty.Register(nameof(Easing), typeof(IEasingFunction),
             typeof(LightSweepRowTransition), new PropertyMetadata(null));
-        private static readonly DependencyProperty ProgressProperty = DependencyProperty.Register("Progress", typeof(double),
-            typeof(LightSweepRowTransition), new PropertyMetadata(0d, ProgressChanged));
+        private static readonly DependencyProperty RevealMarkerProperty = DependencyProperty.Register("RevealMarker", typeof(bool),
+            typeof(LightSweepRowTransition), new PropertyMetadata(false, RevealMarkerChanged));
+        public static readonly RoutedEvent ActivityChangedEvent = EventManager.RegisterRoutedEvent("ActivityChanged",
+            RoutingStrategy.Bubble, typeof(RoutedEventHandler), typeof(LightSweepRowTransition));
 
         public ServerDisplaySlot Slot { get => (ServerDisplaySlot)GetValue(SlotProperty); set => SetValue(SlotProperty, value); }
         public DataTemplate RowTemplate { get => (DataTemplate)GetValue(RowTemplateProperty); set => SetValue(RowTemplateProperty, value); }
@@ -41,10 +43,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private TranslateTransform _shift;
         private readonly RectangleGeometry _oldClip = new RectangleGeometry();
         private readonly RectangleGeometry _nextClip = new RectangleGeometry();
+        private readonly TranslateTransform _oldCut = new TranslateTransform();
+        private readonly TranslateTransform _nextCut = new TranslateTransform();
+        private Storyboard _storyboard;
         private ServerDisplaySlot _attachedSlot;
         private ServerRowTransition _active;
         private ServerDisplaySlot _activeSlot;
-        private bool _revealed;
+        public bool IsAnimatingSurface { get; private set; }
 
         public LightSweepRowTransition()
         {
@@ -126,7 +131,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             StopClock();
             _active = transition;
             _activeSlot = slot;
-            _revealed = false;
+            SetMotionActive(true);
             _old.Content = transition.From;
             _old.Visibility = transition.From == null ? Visibility.Hidden : Visibility.Visible;
             _next.Content = transition.To;
@@ -134,8 +139,18 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _next.Visibility = transition.To == null ? Visibility.Hidden : Visibility.Visible;
             _old.CacheMode = new BitmapCache();
             _next.CacheMode = new BitmapCache();
+            var duration = transition.ChangesIdentity ? Duration : TimeSpan.FromMilliseconds(150);
+            var easing = Easing ?? new CubicEase { EasingMode = EasingMode.EaseInOut };
+            var plan = new LightSweepAnimationPlan(ActualWidth, BandWidth, Padding.Left, duration, easing.Ease);
+            var storyboard = new Storyboard { Duration = duration, FillBehavior = FillBehavior.HoldEnd };
             if (transition.ChangesIdentity)
             {
+                // Fixed rectangles with animated transforms: no managed per-frame
+                // callback, rectangle allocation or layout work as pings arrive.
+                _oldClip.Rect = new Rect(0, 0, plan.Travel, ActualHeight);
+                _nextClip.Rect = new Rect(-plan.Travel, 0, plan.Travel, ActualHeight);
+                _oldClip.Transform = _oldCut;
+                _nextClip.Transform = _nextCut;
                 _old.Clip = _oldClip;
                 _next.Clip = _nextClip;
                 _band.Width = BandWidth;
@@ -155,52 +170,60 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 transforms.Children.Add(skew);
                 transforms.Children.Add(_shift);
                 _band.RenderTransform = transforms;
+                _band.CacheMode = new BitmapCache();
                 _band.Visibility = Visibility.Visible;
-            }
-            UpdateFrame(0);
-            var easing = Easing ?? new CubicEase { EasingMode = EasingMode.EaseInOut };
-            var animation = new DoubleAnimation(0, 1, transition.ChangesIdentity ? Duration : TimeSpan.FromMilliseconds(150))
-            {
-                BeginTime = TimeSpan.Zero,
-                EasingFunction = easing,
-                FillBehavior = FillBehavior.HoldEnd
-            };
-            animation.Completed += (s, e) =>
-            {
-                if (ReferenceEquals(_active, transition)) slot.Finish(transition);
-            };
-            BeginAnimation(ProgressProperty, animation, HandoffBehavior.SnapshotAndReplace);
-        }
-
-        private static void ProgressChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
-            => ((LightSweepRowTransition)d).UpdateFrame((double)e.NewValue);
-
-        private void UpdateFrame(double progress)
-        {
-            var transition = _active;
-            if (transition == null) return;
-            if (transition.ChangesIdentity)
-            {
-                double center = -BandWidth / 2 + (ActualWidth + BandWidth) * progress;
-                _shift.X = center - BandWidth / 2;
-                double width = Math.Max(0, _old.ActualWidth);
-                double cut = Math.Max(0, Math.Min(width, center - Padding.Left));
-                double height = Math.Max(_old.ActualHeight, _next.ActualHeight);
-                _nextClip.Rect = new Rect(0, 0, cut, height);
-                _oldClip.Rect = new Rect(cut, 0, width - cut, height);
+                AddMotion(storyboard, _shift, TranslateTransform.XProperty, plan.BandFrom, plan.BandTo, duration, easing);
+                AddMotion(storyboard, _oldCut, TranslateTransform.XProperty, plan.CutFrom, plan.CutTo, duration, easing);
+                AddMotion(storyboard, _nextCut, TranslateTransform.XProperty, plan.CutFrom, plan.CutTo, duration, easing);
             }
             else
             {
-                _old.Opacity = 1 - progress;
-                _next.Opacity = progress;
+                AddMotion(storyboard, _old, OpacityProperty, 1, 0, duration, easing);
+                AddMotion(storyboard, _next, OpacityProperty, 0, 1, duration, easing);
             }
-            // Same eased clock drives the light, clipping and logical identity.
-            // At 0.5 the band center is exactly at the physical row midpoint.
-            if (!_revealed && progress >= .5)
+            // This marker and the native visual timelines share one clock. Invert
+            // the easing once to commit identity exactly at the physical midpoint.
+            var marker = new ObjectAnimationUsingKeyFrames { Duration = duration };
+            marker.KeyFrames.Add(new DiscreteObjectKeyFrame(false, KeyTime.FromTimeSpan(TimeSpan.Zero)));
+            marker.KeyFrames.Add(new DiscreteObjectKeyFrame(true, KeyTime.FromTimeSpan(plan.RevealTime)));
+            Storyboard.SetTarget(marker, this);
+            Storyboard.SetTargetProperty(marker, new PropertyPath(RevealMarkerProperty));
+            storyboard.Children.Add(marker);
+            storyboard.Completed += (s, e) =>
             {
-                _revealed = true;
-                _activeSlot?.Reveal(transition);
-            }
+                if (ReferenceEquals(_active, transition)) slot.Finish(transition);
+            };
+            _storyboard = storyboard;
+            storyboard.Begin(this, true);
+        }
+
+        private static void AddMotion(Storyboard storyboard, DependencyObject target, DependencyProperty property,
+            double from, double to, TimeSpan duration, IEasingFunction easing)
+        {
+            var animation = new DoubleAnimation(from, to, duration) { EasingFunction = easing };
+            Storyboard.SetTarget(animation, target);
+            Storyboard.SetTargetProperty(animation, new PropertyPath(property));
+            storyboard.Children.Add(animation);
+        }
+
+        private static void RevealMarkerChanged(DependencyObject d, DependencyPropertyChangedEventArgs e)
+        {
+            var row = (LightSweepRowTransition)d;
+            if ((bool)e.NewValue && row._active != null) row._activeSlot?.Reveal(row._active);
+        }
+
+        private void SetMotionActive(bool active)
+        {
+            if (IsAnimatingSurface == active) return;
+            IsAnimatingSurface = active;
+            RaiseEvent(new RoutedEventArgs(ActivityChangedEvent, this));
+        }
+
+        internal static bool IsTransitionSurface(DependencyObject element)
+        {
+            for (var ancestor = VisualTreeHelper.GetParent(element); ancestor != null; ancestor = VisualTreeHelper.GetParent(ancestor))
+                if (ancestor is LightSweepRowTransition row) return row.IsAnimatingSurface;
+            return false;
         }
 
         private void FinishActive()
@@ -216,7 +239,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             _active = null;
             _activeSlot = null;
-            BeginAnimation(ProgressProperty, null);
+            _storyboard?.Remove(this);
+            _storyboard = null;
+            SetValue(RevealMarkerProperty, false);
         }
 
         private void ShowFinal()
@@ -235,7 +260,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 _next.CacheMode = null;
                 _next.Visibility = Visibility.Collapsed;
             }
-            if (_band != null) _band.Visibility = Visibility.Collapsed;
+            if (_band != null)
+            {
+                _band.Visibility = Visibility.Collapsed;
+                _band.CacheMode = null;
+            }
+            SetMotionActive(false);
         }
 
         private void SetRoundedClip()

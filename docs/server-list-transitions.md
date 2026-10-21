@@ -1,4 +1,4 @@
-# Server list light sweep (1.4.18)
+# Server list light sweep (1.4.19)
 
 `ServerCountryPicker.xaml` keeps the existing row artwork in `ServerRowContent`.
 Its `ServerCardButton` template hosts `LightSweepRowTransition`; the overlay is
@@ -19,15 +19,17 @@ The reusable control exposes `Slot`, `RowTemplate`, `Duration` (520 ms),
 `BandWidth` (100 DIP), `BandColor` and `Easing`. Exactly one row transition can run
 at a time. The next row starts after the previous row's full completion and
 overlay cleanup, with no index-based stagger timer and no overlap.
-A single WPF `DoubleAnimation` with CubicEase/EaseInOut drives normalized progress
-`p`. In physical left-to-right coordinates its light center is
+A WPF `Storyboard` runs native transform animations with CubicEase/EaseInOut.
+Their eased normalized progress is `p`. In physical left-to-right coordinates its light center is
 `-BandWidth/2 + (rowWidth + BandWidth) * p`. Two content presenters have complementary
 render clips meeting at this center: new content appears on the left of the
 light and old content remains on its right. This reveals ping, name, flag and
 radio at their own positions instead of swapping the entire row ahead of the
-light. `DisplayedServer`/button identity commits when `p >= 0.5`, exactly when
-the light center crosses the row midpoint; completion commits it again safely.
-There is no independent timer that can drift relative to the animation.
+light. A discrete keyframe on the same storyboard commits `DisplayedServer`/button
+identity exactly when the light center crosses the row midpoint; completion
+commits it again safely. The easing is inverted once to find this key time, which
+also supports asymmetric monotonic easing. There is no independent timer that
+can drift relative to the animation.
 Rows retaining the same identity use a 150 ms cross-fade for changed ping/star/
 selection data; identical snapshots do not animate.
 
@@ -55,13 +57,16 @@ The effect is enabled by default with no app setting or registry flag. Windows
 client-area animation disabled means immediate updates, respecting the OS motion
 preference independently of the existing probing/smart-card ornaments.
 
-Only normalized animation progress, clips, opacity and RenderTransform change per
-frame; no row positions or sizes animate. Content presenters use BitmapCache
+Only native transform/opacity timelines run per frame; there is no application
+progress callback or per-frame geometry mutation. Fixed complementary clip
+rectangles translate with the band; no row positions or sizes animate. Content presenters use BitmapCache
 only during the transition and release the second content afterward. Clipped
 offscreen rows have no sweep clock. PNG flags decode with OnLoad and are frozen/
 cached before use; vector flags freeze where supported. Flag scaling is HighQuality.
 Frozen gradient brushes, rounded clips, skew transforms and band blur effects are
-reused during each sweep. Render clips and translation remain mutable by design.
+reused during each sweep. Clip transforms remain mutable animation targets.
+Probe flag sheen and star glow pause inside the active row so they do not
+continually invalidate its cached bitmaps; they resume after final cleanup.
 
 ## Validation
 
@@ -166,3 +171,32 @@ Synchronous offscreen/unrealized completions drain in a guarded loop, avoiding
 recursive callback growth. The old stagger property/index and timers are removed.
 This scheduling applies to full-row transitions; the existing smart-card and
 probing-flag ornaments keep their separate behavior.
+
+## Presentation independent of probe callbacks (1.4.19)
+
+Backend publications only replace the latest sorted snapshots and post one
+presentation callback. The picker schedules presentation at DispatcherPriority.Render;
+starting the next row is likewise posted after the previous view releases its
+storyboard. No probe callback, network completion, sleep or timer is needed to
+advance a wave. Canceled presentation tickets cannot start old rows, and repeated
+publications coalesce while a presentation callback is pending.
+
+Partial background/manual ping notifications now use DispatcherPriority.Background,
+allowing rendering and input to run first. Cache writes remain before these UI
+notifications, and final results retain their existing priority and cancellation
+guards so late partials cannot replace a completed result. This does not move WPF
+objects to a worker thread; WPF still needs a responsive UI dispatcher.
+
+The portable transition suite also tests deferred presentation, 200 publications
+before the first presentation turn, completion with no further backend activity,
+queued-ticket cancellation and native coordinate/key-time alignment. On Windows,
+exercise the real native clocks and compiled template with an unobfuscated build:
+
+```
+powershell.exe -NoProfile -STA -File tests/ServerListTransitionChecks/run-wpf.ps1 -AppPath <IRSpeedyVPN.exe>
+```
+
+This checks direct storyboard targets, complementary native clip transforms,
+asymmetric easing/midpoint identity, full completion cleanup, short opacity fades
+and hiding an active row. It does not start any network tests or VPN service.
+It cannot run on Linux; frame pacing still requires the Windows acceptance above.

@@ -340,7 +340,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         public ServerCountryPicker()
         {
+            _serverList = new ServerListViewModel(action =>
+                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Render, action));
             InitializeComponent();
+            AddHandler(LightSweepRowTransition.ActivityChangedEvent, new RoutedEventHandler(RowTransitionActivityChanged));
             icCountries.ItemsSource = _serverList.Slots;
             _serverList.Slots.CollectionChanged += (s, e) => UpdateEmptyResultVisibility();
         }

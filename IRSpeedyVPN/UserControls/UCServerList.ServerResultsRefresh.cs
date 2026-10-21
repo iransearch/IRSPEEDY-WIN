@@ -111,7 +111,7 @@ namespace IRSpeedyVPN.UserControls
                                     long best;
                                     if (current() && !finishedRows.ContainsKey(owner) && bestByRow.TryGetValue(owner, out best))
                                         countryPicker.ShowGroupProgress(owner, best);
-                                }));
+                                }), System.Windows.Threading.DispatcherPriority.Background);
                             }
                         };
                         Action<Url, long> complete = (url, latency) =>

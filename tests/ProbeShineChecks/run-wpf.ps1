@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $source = Get-Content (Join-Path $repoRoot 'IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Motion.cs') -Raw
-$start = $source.IndexOf('        private readonly HashSet<FrameworkElement> _probeShines')
+$start = $source.IndexOf('        private void ProbeShine_Changed')
 $end = $source.IndexOf('        private Window _motionWindow;')
 $methods = $source.Substring($start, $end - $start)
 $code = @"
@@ -13,7 +13,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+public class LightSweepRowTransition {
+    public static bool IsTransitionSurface(DependencyObject element) { return false; }
+}
 public class ProbeShineHarness : UserControl {
+    private readonly HashSet<FrameworkElement> _probeShines = new HashSet<FrameworkElement>();
     private Window _motionWindow;
 $methods
     public void Refresh(FrameworkElement e) { UpdateProbeShine(e); }

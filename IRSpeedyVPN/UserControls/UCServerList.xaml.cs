@@ -362,7 +362,7 @@ namespace IRSpeedyVPN.UserControls
                                         && ReferenceEquals(services, _currentServices)
                                         && globalInfo?.CurrentService == null)
                                         countryPicker.ShowGroupProgress(service, latency);
-                                }));
+                                }), System.Windows.Threading.DispatcherPriority.Background);
                             }) : null, () => token.IsCancellationRequested, token,
                                 prioritizeFailed: cache.PrioritizeFailedServers,
                                 memberProgress: (url, latency) =>

@@ -8,6 +8,7 @@ assert 'probeTimer' not in source and 'ServerProbeSchedule' not in source
 stubs = r'''
 using System; using System.Linq; using System.Collections.Generic; using System.Collections.Concurrent; using System.Threading; using System.Threading.Tasks; using System.IO;
 using IRSpeedyVPN.Services; using IRSpeedyVPN.Interfaces; using IRSpeedyVPN.Models.NewService;
+namespace System.Windows.Threading { public enum DispatcherPriority { Background=4 } }
 namespace IRSpeedyVPN.Models { public enum VPNType { NORMAL,VOD,CHAIN } }
 namespace IRSpeedyVPN.Interfaces { interface IVPNService { int ID {get;} string Name {get;} bool IsUrlTestSupported {get;} string CountryCode {get;} string Country {get;} List<Url> GetServerUrls(); void UrlTest(); } }
 class TunnelPlusService : IVPNService {
@@ -33,6 +34,7 @@ class FakeDispatcher {
  public bool CheckAccess()=>Thread.CurrentThread.ManagedThreadId==thread;
  public void Invoke(Action a){if(!CheckAccess())throw new Exception("unexpected synchronous dispatcher call");a();}
  public void BeginInvoke(Action a){if(HoldPosted)held.Enqueue(a);else context.Post(_=>a(),null);}
+ public void BeginInvoke(Action a,object priority){if(priority.ToString()!="Background")throw new Exception("partial result must yield to rendering");BeginInvoke(a);}
  public void ReleasePosted(){HoldPosted=false;while(held.TryDequeue(out var a))context.Post(_=>a(),null);}
 }
 class UiContext : SynchronizationContext {

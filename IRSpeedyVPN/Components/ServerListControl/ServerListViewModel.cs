@@ -121,9 +121,15 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public ObservableCollection<ServerItem> Servers { get; } = new ObservableCollection<ServerItem>();
         public ObservableCollection<ServerDisplaySlot> Slots { get; } = new ObservableCollection<ServerDisplaySlot>();
         public bool IsTransitioning { get; private set; }
-        private bool _initialized, _pending, _advancing;
-        private int _generation, _nextIndex;
+        private bool _initialized, _pending, _advancing, _advanceScheduled;
+        private int _generation, _nextIndex, _scheduleTicket;
         private ServerDisplaySlot _activeSlot;
+        private readonly Action<Action> _schedulePresentation;
+
+        public ServerListViewModel(Action<Action> schedulePresentation)
+        {
+            _schedulePresentation = schedulePresentation ?? throw new ArgumentNullException(nameof(schedulePresentation));
+        }
 
         public void Publish(IEnumerable<ServerItem> servers, bool animate)
         {
@@ -143,7 +149,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 _nextIndex = 0;
                 _pending = false;
                 IsTransitioning = true;
-                AdvanceRows();
+                ScheduleAdvance();
             }
             _initialized = true;
         }
@@ -151,6 +157,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public void CompleteImmediately()
         {
             ++_generation; // invalidates callbacks from clocks that were canceled
+            ++_scheduleTicket;
+            _advanceScheduled = false;
             IsTransitioning = false;
             _pending = false;
             _activeSlot = null;
@@ -163,6 +171,19 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             while (Slots.Count < count) Slots.Add(new ServerDisplaySlot());
             while (Slots.Count > count) Slots.RemoveAt(Slots.Count - 1);
+        }
+
+        private void ScheduleAdvance()
+        {
+            if (_advancing || _advanceScheduled || !IsTransitioning || _activeSlot != null) return;
+            _advanceScheduled = true;
+            int ticket = ++_scheduleTicket;
+            _schedulePresentation(() =>
+            {
+                if (ticket != _scheduleTicket) return;
+                _advanceScheduled = false;
+                AdvanceRows();
+            });
         }
 
         private void AdvanceRows()
@@ -210,7 +231,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                         _activeSlot = null;
                         // Finish() has already removed the old row's clock/overlay.
                         // Only now can the next row start its own reveal.
-                        AdvanceRows();
+                        ScheduleAdvance();
                     });
                 }
             }

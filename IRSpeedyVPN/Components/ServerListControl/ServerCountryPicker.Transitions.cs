@@ -9,7 +9,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 {
     public partial class ServerCountryPicker
     {
-        private readonly ServerListViewModel _serverList = new ServerListViewModel();
+        private readonly ServerListViewModel _serverList;
         private readonly List<GroupItem> _observedGroups = new List<GroupItem>();
         private DispatcherOperation _rowsUpdate;
 

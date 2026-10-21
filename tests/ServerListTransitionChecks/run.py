@@ -59,8 +59,48 @@ class Program {
  static GroupItem Group(int id,bool selected=false)=>new GroupItem{Service=new Service{ID=id},CountryName="کشور "+id,Initials="ک",SignalText=id+" ms",SortKey=id,IsSelectedCountry=selected};
  static ServerItem Snap(GroupItem g)=>new ServerItem(g);
  static void Check(bool value,string name)=>Clock.Check(value,name);
+ static void QueuedPresentation(){
+  var pending=new Queue<Action>();var vm=new ServerListViewModel(action=>pending.Enqueue(action));
+  var a=Group(1,true);var b=Group(2);var c=Group(3);
+  vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true);var clock=new Clock();clock.Attach(vm);
+  a.SortKey=3;b.SortKey=2;c.SortKey=1;
+  for(int i=0;i<200;i++){c.SignalText=i+" ms";vm.Publish(new[]{Snap(c),Snap(b),Snap(a)},true);}
+  Check(clock.Started.Count==0&&pending.Count==1&&vm.Servers[0].SignalText=="199 ms","backend bursts update truth and enqueue just one independent presentation callback");
+  pending.Dequeue()();
+  Check(clock.Active.Count==1&&clock.Active.Values.Single().To.SignalText=="199 ms","presentation starts with the latest snapshot after the backend callback returns");
+  clock.FinishRow();
+  Check(clock.Active.Count==0&&pending.Count==1,"completion releases its clock before posting the next presentation turn");
+  int ticks=0;
+  while(vm.IsTransitioning&&ticks++<10){pending.Dequeue()();if(clock.Active.Count>0)clock.FinishRow();}
+  Check(!vm.IsTransitioning&&clock.PeakActive==1&&vm.Slots.Select(x=>x.DisplayedServer.Identity).SequenceEqual(vm.Servers.Select(x=>x.Identity)),"the entire serial wave finishes without any additional backend result");
+
+  a.SortKey=0;vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true);
+  vm.CompleteImmediately(); // e.g. minimize before the queued render callback
+  c.SortKey=-1;vm.Publish(new[]{Snap(c),Snap(b),Snap(a)},true);
+  Check(pending.Count==2,"a canceled render callback can coexist with the new presentation ticket");
+  pending.Dequeue()();Check(clock.Active.Count==0,"the canceled presentation ticket never starts a stale row");
+  pending.Dequeue()();var stale=clock.Active.Single();
+  vm.Publish(new[]{Snap(a)},false);clock.Active.Clear();stale.Key.Reveal(stale.Value);stale.Key.Finish(stale.Value);
+  Check(!vm.IsTransitioning&&pending.Count==0&&vm.Slots.Count==1&&vm.Slots[0].DisplayedServer.Service.ID==1,"canceling an active queued wave flushes latest data and invalidates old completion");
+ }
+ static void NativePlan(){
+  Func<double,double> cubic=t=>t<.5?4*t*t*t:1-Math.Pow(-2*t+2,3)/2;
+  foreach(double width in new[]{80d,360d,720d})foreach(double band in new[]{80d,100d,120d})
+   foreach(var ease in new Func<double,double>[]{cubic,t=>t*t}){
+    var duration=TimeSpan.FromMilliseconds(520);var plan=new LightSweepAnimationPlan(width,band,13,duration,ease);
+    for(int i=0;i<=20;i++){
+     double p=ease(i/20d);double center=plan.BandFrom+(plan.BandTo-plan.BandFrom)*p+band/2;
+     double cut=plan.CutFrom+(plan.CutTo-plan.CutFrom)*p+13;
+     if(Math.Abs(center-cut)>1e-8)throw new Exception("native clip edge and brightest band center diverged");
+    }
+    if(Math.Abs(ease(plan.RevealTime.Ticks/(double)duration.Ticks)-.5)>1e-6)throw new Exception("discrete reveal marker does not match eased midpoint");
+    if(plan.BandFrom+band>0||plan.BandTo<width||plan.CutFrom>=0||plan.CutTo<width-13)throw new Exception("transition endpoints do not fully cover the row");
+   }
+  Check(true,"native transforms keep old/new clips under the brightest band, including asymmetric easing and narrow rows");
+ }
  static void Main(){
-  var a=Group(1,true);var b=Group(2);var c=Group(3);var vm=new ServerListViewModel();
+  QueuedPresentation();NativePlan();
+  var a=Group(1,true);var b=Group(2);var c=Group(3);var vm=new ServerListViewModel(action=>action());
   vm.Publish(new[]{Snap(a),Snap(b),Snap(c)},true);var clock=new Clock();clock.Attach(vm);
   Check(!vm.IsTransitioning&&vm.Slots.Count==3,"initial population is immediate");
   b.SortKey=0;vm.Publish(new[]{Snap(b),Snap(a),Snap(c)},true);
@@ -114,7 +154,7 @@ class Program {
   Check(!vm.IsTransitioning&&vm.Slots[0].DisplayedServer.Service.ID==2,"instant completion during a sweep commits the latest snapshot");
   Check(clock.PeakActive==1,"no overlap across sorting, data fades, rapid updates and cancellation");
 
-  var many=Enumerable.Range(1,4096).Select(id=>Group(id)).ToArray();var large=new ServerListViewModel();
+  var many=Enumerable.Range(1,4096).Select(id=>Group(id)).ToArray();var large=new ServerListViewModel(action=>action());
   large.Publish(many.Select(Snap),true);var largeClock=new Clock();largeClock.Attach(large,4095);
   foreach(var g in many)g.SortKey=-g.Service.ID;
   large.Publish(many.Select(Snap),true);
@@ -129,6 +169,7 @@ with tempfile.TemporaryDirectory(prefix='server-list-transition-') as directory:
     path = Path(directory)
     (path / 'Program.cs').write_text(fixture)
     (path / 'ServerListViewModel.cs').write_text((root / 'IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs').read_text())
+    (path / 'LightSweepAnimationPlan.cs').write_text((root / 'IRSpeedyVPN/Components/ServerListControl/LightSweepAnimationPlan.cs').read_text())
     (path / 'ServerListRanking.cs').write_text((root / 'IRSpeedyVPN/Components/ServerListControl/ServerListRanking.cs').read_text())
     (path / 'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')
     subprocess.run([sys.argv[1] if len(sys.argv) > 1 else 'dotnet', 'run', '--project', directory, '-v:q'], check=True)

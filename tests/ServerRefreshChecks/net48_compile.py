@@ -32,6 +32,7 @@ linked = [
  'Components/ServerListControl/ServerListViewModel.cs',
  'Components/ServerListControl/ServerListRanking.cs',
  'Components/ServerListControl/LightSweepRowTransition.cs',
+ 'Components/ServerListControl/LightSweepAnimationPlan.cs',
 ]
 stubs = r'''using System;using System.Linq;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
 using System.Windows;using System.Windows.Controls;using System.Windows.Media;
