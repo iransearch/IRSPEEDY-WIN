@@ -8,7 +8,7 @@ using System.Windows.Media;
 using System.Windows.Threading;
 namespace IRSpeedyVPN.Components.ServerListControl
 {
-    // One UI-owned timeline commits a permutation cycle, with a band on each visible row.
+    // One UI-owned timeline exchanges one pair, with a band on each visible row.
     internal sealed class ServerListSweepAnimator
     {
         private readonly ServerListViewModel _model;

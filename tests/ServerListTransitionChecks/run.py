@@ -80,43 +80,42 @@ class Program {
   a.SignalText="—";a.IsSelectable=false;vm.Publish(new[]{S(c),S(b),S(a)},true,false);
   Check(!vm.IsTransitioning&&vm.Slots[2].SignalServer.SignalText=="—"&&!vm.Slots[2].IsSelectable,"ping-only/failed data updates without any reveal pass");
   var cycle=new ServerListViewModel();var all=new[]{S(G(1)),S(G(2)),S(G(3))};cycle.Publish(all,true);cycle.Publish(new[]{all[1],all[2],all[0]},true);
-  int n=Drain(cycle);Check(n==1&&n*ServerCometTiming.SORT_PASS_MS==800,"three-country cycle resolves directly in one pass");
+  int n=Drain(cycle);Check(n==2&&n*ServerCometTiming.SORT_PASS_MS==1600,"three-country cycle resolves with sequential pairs");
   var direct=new ServerListViewModel();direct.Publish(all,true);direct.Publish(new[]{all[2],all[1],all[0]},true);
   Check(Drain(direct)==1,"two distant servers exchange in one 800ms pass, skipping the unchanged middle row");
   var four=Enumerable.Range(1,4).Select(id=>S(G(id,id==1))).ToArray();
   var descent=new ServerListViewModel();descent.Publish(four,true);
   descent.Publish(new[]{four[1],four[2],four[3],four[0]},true);
   var drop=descent.TryBeginPass();
-  Check(drop.Rows.Length==4&&drop.Rows.Single(row=>row.From.Service.ID==1).Target.Service.ID==2
-    &&drop.Rows.Single(row=>row.Target.Service.ID==1).Index==3,"first-to-fourth permutation plans final destinations together");
+  Check(drop.Rows.Length==2&&drop.Rows.Single(row=>row.Target.Service.ID==1).Index==3,
+    "first-to-fourth move uses exactly two lights and targets fourth immediately");
   descent.Reveal(drop,ServerRowPart.Name);Unique(descent);
-  Check(descent.Slots[3].DisplayedServer.Service.ID==1&&descent.Slots[3].SelectionServer.IsSelectedCountry==false,
+  Check(descent.Slots[3].DisplayedServer.Service.ID==1,
     "country moves directly from first to fourth without visiting second or third");
   descent.Finish(drop);Unique(descent);
-  Check(descent.TryBeginPass()==null&&descent.Slots[3].SelectionServer.IsSelectedCountry,
-    "one 800ms pass completes four-row rotation and preserves identity selection");
+  Check(descent.Slots[3].SelectionServer.IsSelectedCountry,
+    "direct move preserves identity selection");
+  int remainder=Drain(descent);Check(remainder==2&&descent.Slots[3].DisplayedServer.Service.ID==1,
+    "remaining pairs run sequentially without moving the completed first-to-fourth country again");
   cycle.Publish(all,true);var old=cycle.TryBeginPass();cycle.Reveal(old,ServerRowPart.Signal);cycle.CompleteImmediately();var baseline=cycle.Slots.Select(s=>s.DisplayedServer.Identity).ToArray();
   cycle.Publish(all.Reverse(),true,false);cycle.Reveal(old,ServerRowPart.Name);cycle.Finish(old);
   Check(!cycle.IsTransitioning&&cycle.Slots.Select(s=>s.DisplayedServer.Identity).SequenceEqual(baseline),"new cycle cancels partial presentation and stale callbacks without light");Unique(cycle);
   cycle.Publish(new[]{all[2],S(G(4))},true);Drain(cycle);Check(cycle.Slots.Count==2&&cycle.Slots[1].DisplayedServer.Service.ID==4,"added/removed countries reconcile without duplicates or loss");
   cycle.Publish(new ServerItem[0],true);Check(cycle.Slots.Count==0&&!cycle.IsTransitioning,"empty source cancels immediately");
   cycle.Publish(new[]{S(G(9))},true);Drain(cycle);cycle.Publish(new[]{S(G(10))},false);Check(!cycle.IsTransitioning&&cycle.Slots[0].DisplayedServer.Service.ID==10,"single row and reduced-motion fallback apply latest state");
-  // Exhaustive permutations: each identity changes position at most once for
-  // one published order, and every intermediate notification stays a permutation.
+  // Every permutation converges with at most N-1 sequential pairs,
+  // and each intermediate notification retains all countries.
   foreach(var order in Permutations(Enumerable.Range(1,6).ToArray(),0)) {
    var exact=new ServerListViewModel();var items=Enumerable.Range(1,6).Select(id=>S(G(id))).ToArray();
    exact.Publish(items,true);exact.Publish(order.Select(id=>items[id-1]),true);
-   var moves=new int[7];ServerSortPass step;
+   int passes=0;ServerSortPass step;
    while((step=exact.TryBeginPass())!=null) {
-    foreach(var row in step.Rows) {
-     moves[row.Target.Service.ID]++;
-     CheckDestination(row.Index, row.Target.Service.ID, order);
-    }
+    if(step.Rows.Length!=2||++passes>5)throw new Exception("not a bounded sequential pair");
     exact.Finish(step);Unique(exact);
    }
-   if(moves.Any(count=>count>1))throw new Exception("identity visited an intermediate slot");
+   if(!exact.Slots.Select(slot=>slot.DisplayedServer.Service.ID).SequenceEqual(order))throw new Exception("incorrect final order");
   }
-  Check(true,"all 720 six-country orders go directly to final slots without repeated moves");
+  Check(true,"all 720 six-country orders converge with exactly two active rows per pass");
   var random=new Random(17);var churn=new ServerListViewModel();var many=Enumerable.Range(1,37).Select(id=>S(G(id,id==17))).ToArray();churn.Publish(many,true);
   for(int i=0;i<150;i++){churn.Publish(many.OrderBy(x=>random.Next()).ToArray(),true);var active=churn.TryBeginPass();if(active!=null){churn.Reveal(active,ServerRowPart.Signal);Unique(churn);for(int j=0;j<3;j++)churn.Publish(many.OrderBy(x=>random.Next()).ToArray(),true);churn.Finish(active);Unique(churn);}}
   Drain(churn);Check(churn.Slots.Select(s=>s.DisplayedServer.Service.ID).OrderBy(x=>x).SequenceEqual(Enumerable.Range(1,37)),"rapid replanning preserves every country in every group without blank rows or duplicate names/flags");

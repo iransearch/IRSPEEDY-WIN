@@ -176,33 +176,34 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public ServerSortPass TryBeginPass()
         {
             if (_active != null || !_workRequested) return null;
+            var targets = Servers.Select((item, index) => new { item, index })
+                .ToDictionary(entry => entry.item.Identity, entry => entry.index);
+            int source = -1, destination = -1, distance = 0;
             for (int i = 0; i < Slots.Count; i++)
             {
-                var target = Servers[i];
-                if (Slots[i].DisplayedServer.Identity == target.Identity)
-                { Slots[i].SetInstant(target); continue; }
-                // Follow the permutation cycle. A sequence of pair swaps would
-                // carry displaced identities through intermediate positions.
-                // Every member of this cycle goes directly to its current target.
-                var positions = Slots.Select((slot, index) => new { slot, index })
-                    .ToDictionary(entry => entry.slot.DisplayedServer.Identity, entry => entry.index);
-                var rows = new List<ServerSortRow>();
-                int destination = i;
-                do
-                {
-                    rows.Add(new ServerSortRow(destination, Slots[destination], Servers[destination]));
-                    if (!positions.TryGetValue(Servers[destination].Identity, out destination))
-                    { CompleteImmediately(); return null; }
-                } while (destination != i);
-                return _active = new ServerSortPass(_generation, rows.ToArray());
+                int targetIndex;
+                if (!targets.TryGetValue(Slots[i].DisplayedServer.Identity, out targetIndex))
+                { CompleteImmediately(); return null; }
+                int displacement = Math.Abs(targetIndex - i);
+                if (displacement == 0) Slots[i].SetInstant(Servers[i]);
+                // Move the furthest displaced country straight to its destination
+                // first, rather than pushing it down through successive top slots.
+                if (displacement > distance)
+                { source = i; destination = targetIndex; distance = displacement; }
             }
-            _workRequested = false; return null;
+            if (source < 0) { _workRequested = false; return null; }
+            var displaced = Servers[targets[Slots[destination].DisplayedServer.Identity]];
+            return _active = new ServerSortPass(_generation, new[] {
+                new ServerSortRow(destination, Slots[destination], Servers[destination]),
+                new ServerSortRow(source, Slots[source], displaced)
+            }.OrderBy(row => row.Index).ToArray());
         }
+
         public void Reveal(ServerSortPass pass, ServerRowPart part)
         {
             if (pass == null || !ReferenceEquals(_active, pass) || pass.Generation != _generation || (pass.RevealedMask & (1 << (int)part)) != 0) return;
             pass.RevealedMask |= 1 << (int)part;
-            // Commit the same group across the cycle before notifying any binding.
+            // Commit the same group on both rows before notifying any binding.
             // No blank source and no duplicate name/flag/selection at a frame boundary.
             foreach (var row in pass.Rows) row.Slot.AssignPart(part, row.Target);
             foreach (var row in pass.Rows) row.Slot.NotifyPart(part);
