@@ -132,8 +132,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _activeSlot = slot;
             _revealed = false;
             _old.Content = transition.From;
+            _old.Visibility = transition.From == null ? Visibility.Hidden : Visibility.Visible;
             _next.Content = transition.To;
-            _next.Visibility = Visibility.Visible;
+            // A null item must not instantiate the row template's empty flag/radio artwork.
+            _next.Visibility = transition.To == null ? Visibility.Hidden : Visibility.Visible;
             _old.CacheMode = new BitmapCache();
             _next.CacheMode = new BitmapCache();
             if (transition.ChangesIdentity)
@@ -225,6 +227,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             if (_old == null) return;
             _old.Content = Slot?.DisplayedServer;
+            _old.Visibility = Slot?.DisplayedServer == null ? Visibility.Hidden : Visibility.Visible;
             _old.Clip = null;
             _old.Opacity = 1;
             _old.CacheMode = null;
