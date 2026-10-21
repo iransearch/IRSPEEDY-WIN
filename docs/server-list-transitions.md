@@ -65,6 +65,7 @@ python3 tests/ServerListTransitionChecks/run.py /path/to/dotnet
 python3 tests/ServerRefreshChecks/net48_compile.py /path/to/dotnet
 python3 tests/LastSuccessfulServerChecks/run.py /path/to/dotnet
 python3 tests/ProbeShineChecks/run.py /path/to/dotnet
+python3 tests/ServerStarGlowChecks/run.py /path/to/dotnet
 ```
 
 The first check exercises the production VM with a manually advanced view clock:
@@ -92,3 +93,32 @@ Windows acceptance still required (rendering/60 FPS cannot be measured on Linux)
   Check both themes, RTL text, and 100/150/200% DPI against the idle design.
 - On a low-end Windows machine, profile a ten-row cascade with WPF Perforator;
   verify frame pacing and transient bitmap memory before claiming a 60 FPS result.
+
+## Starred-row loading fix (1.4.16)
+
+The 2026-10-21 log from 1.4.15 records a UI crash at 15:18:42 while the first
+22-row list is being constructed: `XamlParseException: 'Effect' property does not
+point to a DependencyObject`. Its stack enters `StyleHelper` data-trigger actions
+and `Storyboard.VerifyPathIsAnimatable` during `LoadOptimizedTemplateContent`.
+The saved star's style can start its nested `UIElement.Effect` animation before
+the template has assigned the Path's local DropShadowEffect. Compile-only tests
+and a list without an already-starred country did not exercise this path.
+
+Star glow now starts from Loaded/visibility lifecycle handlers after the effect
+exists. It animates the actual effect's dependency properties directly, using
+independent mutable copies of frozen template effects. Early visibility events
+and missing effects are harmless; hide/unload/minimize removes both clocks.
+The star geometry, gold gradient, static glow and original four-second pulse
+values/timing are retained. The light sweep and app settings are unchanged.
+
+The portable star regression fails on the 1.4.15 XAML and passes on the fix.
+For real Windows validation, load an unobfuscated build's compiled BAML:
+
+```
+powershell.exe -NoProfile -STA -File tests/ServerStarGlowChecks/run-wpf.ps1 -AppPath <IRSpeedyVPN.exe>
+```
+
+This check constructs two already-starred row presenters inside a visible window,
+then exercises selection-marker changes, hide, minimize/restore and unload. It
+uses only UI resources and does not initialize VPN/probes. It must run on Windows;
+the Linux net48/reference-assembly check cannot execute WPF rendering or BAML.

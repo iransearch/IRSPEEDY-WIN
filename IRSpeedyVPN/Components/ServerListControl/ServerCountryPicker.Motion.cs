@@ -69,6 +69,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private void Picker_Unloaded(object sender, RoutedEventArgs e)
         {
             CompleteRowTransitions();
+            foreach (var element in _starGlows) StopStarGlow(element);
             StopSmartShine();
             DetachMotionWindow();
         }
@@ -101,6 +102,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             StopSmartShine();
             foreach (var element in _probeShines) UpdateProbeShine(element);
+            foreach (var element in _starGlows) UpdateStarGlow(element);
             if (!IsLoaded || !IsVisible || SmartCardHost == null || !SmartCardHost.IsVisible ||
                 _motionWindow == null || _motionWindow.WindowState == WindowState.Minimized) return;
 
