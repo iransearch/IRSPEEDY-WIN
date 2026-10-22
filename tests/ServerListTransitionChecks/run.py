@@ -62,6 +62,27 @@ class Program {
   }
  }
  static void Main(){
+  // BAML defers enum conversion until the country-row template is loaded.
+  // Reproduce SmartAssembly field renaming and exercise the same converter
+  // against the actual XAML values, independently of WPF/desktop availability.
+  var tokens=System.Xml.Linq.XElement.Load(@"__PICKER_XAML__").DescendantsAndSelf().SelectMany(rowElement=>rowElement.Attributes())
+   .Where(rowAttribute=>rowAttribute.Name.LocalName=="ServerCometPart.Part").Select(rowAttribute=>rowAttribute.Value).ToArray();
+  var renamedAssembly=System.Reflection.Emit.AssemblyBuilder.DefineDynamicAssembly(
+   new System.Reflection.AssemblyName("RenamedRowParts"),System.Reflection.Emit.AssemblyBuilderAccess.Run);
+  var renamedEnum=renamedAssembly.DefineDynamicModule("Parts").DefineEnum("HiddenRowPart",System.Reflection.TypeAttributes.Public,typeof(int));
+  foreach(ServerRowPart part in Enum.GetValues(typeof(ServerRowPart)))renamedEnum.DefineLiteral("renamed_"+((int)part+1),(int)part);
+  var converter=new System.ComponentModel.EnumConverter(renamedEnum.CreateTypeInfo().AsType());
+  bool originalNameFailed=false;
+  try{converter.ConvertFromInvariantString("Selection");}catch(FormatException){originalNameFailed=true;}
+  Check(originalNameFailed,"reproduced Selection EnumConverter failure after enum member renaming");
+  var converted=new List<int>();
+  foreach(var token in tokens){
+   try{converted.Add(Convert.ToInt32(converter.ConvertFromInvariantString(token)));}
+   catch(FormatException ex){throw new Exception("Country row XAML still depends on renamed enum member: "+token,ex);}
+  }
+  Check(converted.OrderBy(p=>p).SequenceEqual(Enumerable.Range(0,5)),"all five actual XAML row-part values survive enum type/member renaming");
+  Check((int)ServerRowPart.None==-1&&(int)ServerRowPart.Signal==0&&(int)ServerRowPart.Badge==1
+   &&(int)ServerRowPart.Name==2&&(int)ServerRowPart.Flag==3&&(int)ServerRowPart.Selection==4,"stable row-part IDs match the slot array and XAML contract");
   // Exercise the production displayed-slot planner, including in-flight work.
   var pa=G(71,true);var pb=G(72);var pc=G(73);var pinned=new ServerListViewModel();
   pinned.Publish(new[]{S(pa),S(pb),S(pc)},true);pinned.BeginCheckCycle();
@@ -241,7 +262,7 @@ class Program {
 '''
 with tempfile.TemporaryDirectory(prefix='server-comet-') as directory:
     path=Path(directory)
-    (path/'Program.cs').write_text(fixture)
+    (path/'Program.cs').write_text(fixture.replace('__PICKER_XAML__',(root/'IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml').as_posix()))
     for name in ['ServerListViewModel.cs','ServerCometTimeline.cs']:
         (path/name).write_text((root/'IRSpeedyVPN/Components/ServerListControl'/name).read_text())
     (path/'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')

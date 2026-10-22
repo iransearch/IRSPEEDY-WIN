@@ -142,7 +142,8 @@
               <Grid FlowDirection="LeftToRight">
                 <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Visible"/><Style.Triggers><DataTrigger Binding="{Binding IsVacant, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Hidden"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                 <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/><ColumnDefinition Width="30"/><ColumnDefinition Width="28"/></Grid.ColumnDefinitions>
-                <Grid local:ServerCometPart.Part="Selection" DataContext="{Binding SelectionServer, Mode=OneWay}" Grid.Column="3" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center">
+                <!-- Stable ServerRowPart IDs avoid enum-name conversion after release obfuscation. -->
+                <Grid local:ServerCometPart.Part="4" DataContext="{Binding SelectionServer, Mode=OneWay}" Grid.Column="3" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center">
                   <Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding Mode=OneWay}" Value="{x:Null}"><Setter Property="Visibility" Value="Hidden"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                   <Ellipse Stroke="{DynamicResource Theme.SelectionRingBrush}" StrokeThickness="1.5"/>
                   <Grid Margin="-4">
@@ -151,7 +152,7 @@
                     <Ellipse Width="18" Height="18" Fill="{DynamicResource AccentBrush}"/>
                   </Grid>
                 </Grid>
-                <Grid local:ServerCometPart.Part="Flag" DataContext="{Binding FlagServer, Mode=OneWay}" Grid.Column="2" Width="30" Height="30" FlowDirection="LeftToRight" RenderOptions.BitmapScalingMode="HighQuality">
+                <Grid local:ServerCometPart.Part="3" DataContext="{Binding FlagServer, Mode=OneWay}" Grid.Column="2" Width="30" Height="30" FlowDirection="LeftToRight" RenderOptions.BitmapScalingMode="HighQuality">
                   <Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding Mode=OneWay}" Value="{x:Null}"><Setter Property="Visibility" Value="Hidden"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                   <Ellipse Fill="{DynamicResource RowHoverBrush}" Stroke="{DynamicResource Theme.ThinBorderBrush}" StrokeThickness="1"/>
                   <Ellipse>
@@ -178,7 +179,7 @@
                 </Grid>
                 <Grid Grid.Column="1" Margin="10,0" VerticalAlignment="Center">
                   <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                  <Grid local:ServerCometPart.Part="Badge" DataContext="{Binding BadgeServer, Mode=OneWay}" Width="18" Height="18" Margin="0,0,7,0" ToolTip="آخرین اتصال موفق" AutomationProperties.Name="آخرین اتصال موفق">
+                  <Grid local:ServerCometPart.Part="1" DataContext="{Binding BadgeServer, Mode=OneWay}" Width="18" Height="18" Margin="0,0,7,0" ToolTip="آخرین اتصال موفق" AutomationProperties.Name="آخرین اتصال موفق">
                     <Grid.Style><Style TargetType="Grid">
                       <Setter Property="Visibility" Value="Collapsed"/>
                       <Style.Triggers><DataTrigger Binding="{Binding IsLastSuccessfulConnection, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers>
@@ -190,9 +191,9 @@
                       <Path.Effect><DropShadowEffect Color="#FFFFCC55" BlurRadius="6" ShadowDepth="0" Opacity="0.65"/></Path.Effect>
                     </Path>
                   </Grid>
-                  <TextBlock local:ServerCometPart.Part="Name" DataContext="{Binding NameServer, Mode=OneWay}" Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
+                  <TextBlock local:ServerCometPart.Part="2" DataContext="{Binding NameServer, Mode=OneWay}" Grid.Column="1" FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
                 </Grid>
-                <StackPanel local:ServerCometPart.Part="Signal" DataContext="{Binding SignalServer, Mode=OneWay}" Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
+                <StackPanel local:ServerCometPart.Part="0" DataContext="{Binding SignalServer, Mode=OneWay}" Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
                   <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush, Mode=OneWay}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                   <StackPanel ToolTip="{Binding SignalToolTip, Mode=OneWay}">
                     <TextBlock Text="{Binding SignalText, Mode=OneWay}" FontWeight="Bold" FontSize="12.5" Foreground="{Binding SignalBrush, Mode=OneWay}"/>

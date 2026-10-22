@@ -59,7 +59,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
     }
 
-    public enum ServerRowPart { None = -1, Signal, Badge, Name, Flag, Selection }
+    // Numeric IDs are also used by the deferred XAML row template. Keep them
+    // stable: enum member names may change during release obfuscation.
+    public enum ServerRowPart { None = -1, Signal = 0, Badge = 1, Name = 2, Flag = 3, Selection = 4 }
     public sealed class ServerDisplaySlot : INotifyPropertyChanged
     {
         private readonly ServerItem[] _parts = new ServerItem[5];

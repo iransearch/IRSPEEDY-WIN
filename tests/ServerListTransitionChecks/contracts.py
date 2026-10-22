@@ -10,7 +10,7 @@ a=row(xml);b=row(old)
 for child in list(a[0]):
  if child.tag==w+'Grid.Style':a[0].remove(child)
 for element in a.iter():
- if element.get(l+'ServerCometPart.Part') in ['Selection','Flag']:
+ if element.get(l+'ServerCometPart.Part') in ['4','3']:
   style=element.find(w+'Grid.Style')
   assert style is not None and any(t.get('Value')=='{x:Null}' for t in style.iter(w+'DataTrigger'))
   assert any(t.get('Property')=='Visibility' and t.get('Value')=='Hidden' for t in style.iter(w+'Setter'))
@@ -25,7 +25,7 @@ assert all(name not in text for name in ['LightSweepRowTransition','SmartMosaicS
 assert not (folder/'LightSweepRowTransition.cs').exists() and not (folder/'LightSweepAnimationPlan.cs').exists()
 print('PASS one multi-band overlay host; old reorder/crossfade and smart-card light paths remain removed')
 parts=[e.get(l+'ServerCometPart.Part') for e in row(ET.parse(folder/'ServerCountryPicker.xaml').getroot()).iter() if e.get(l+'ServerCometPart.Part')]
-assert sorted(parts)==sorted(['Name','Flag','Signal','Selection','Badge'])
+assert sorted(parts)==['0','1','2','3','4'],'deferred XAML must use stable row-part IDs, not enum names that SmartAssembly can rename'
 c=(folder/'ServerListSweepAnimator.cs').read_text();frame=c[c.index('        private void Rendering('):c.index('        private void Reveal(')]
 assert all(v not in frame for v in ['OrderBy','Sort(','Task.','await ','Invoke(','File.','UrlTest','GetServerUrls','BitmapImage','Thread.','lock ('])
 assert c.count('CompositionTarget.Rendering +=')==1 and 'CompositionTarget.Rendering -=' in c and 'Stopwatch' in c
