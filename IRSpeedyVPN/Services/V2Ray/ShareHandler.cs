@@ -909,8 +909,10 @@ namespace v2rayN.Handler
                     item.requestHost = Utils.UrlDecode(query["host"] ?? "");
                     item.path = Utils.UrlDecode(query["path"] ?? "/");
                     item.headerType = Utils.UrlDecode(query["mode"] ?? "auto");
+                    // ParseQueryString already URL-decodes each value. Decoding
+                    // JSON again changes literal '+' and percent escapes in headers.
                     if (!Utils.IsNullOrEmpty(query["extra"]))
-                        item.transportExtra = Utils.UrlDecode(query["extra"]);
+                        item.transportExtra = query["extra"];
                     break;
                 case "httpupgrade":
                     item.requestHost = Utils.UrlDecode(query["host"] ?? "");
