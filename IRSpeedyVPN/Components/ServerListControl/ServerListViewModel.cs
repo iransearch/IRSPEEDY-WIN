@@ -156,13 +156,15 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (completedIdentity != null) _completedChecks.Add(completedIdentity);
             var latest = source.ToArray();
             var byId = latest.ToDictionary(item => item.Identity);
+            bool pinChanged = Servers.FirstOrDefault(item => item.IsLastSuccessfulConnection)?.Identity
+                != latest.FirstOrDefault(item => item.IsLastSuccessfulConnection)?.Identity;
             bool membershipChanged = latest.Length != Servers.Count || Servers.Any(item => !byId.ContainsKey(item.Identity));
             for (int i = 0; i < latest.Length; i++)
                 if (i < Servers.Count) Servers[i] = latest[i]; else Servers.Add(latest[i]);
             while (Servers.Count > latest.Length) Servers.RemoveAt(Servers.Count - 1);
-            // Adding/removing identities is structural, not an exchange. Reconcile
-            // immediately rather than keeping an empty source card in the list.
-            if (!_initialized || membershipChanged || latest.Length == 0 || (!animate && allowReorder))
+            // Membership and connection-pin changes are authoritative. Reconcile
+            // immediately and cancel frozen targets for the previous pinned ID.
+            if (!_initialized || membershipChanged || pinChanged || latest.Length == 0 || (!animate && allowReorder))
             { CompleteImmediately(); _initialized = true; return; }
             foreach (var slot in Slots)
             {
@@ -190,13 +192,17 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (Slots.Count != latest.Length) return latest;
             var byId = latest.ToDictionary(item => item.Identity);
             if (Slots.Any(slot => slot.DisplayedServer == null || !byId.ContainsKey(slot.DisplayedServer.Identity))) return latest;
-            var ordered = latest.Where(CanMove).ToArray();
+            // Connection pinning precedes test eligibility. Move the star to
+            // the front, keeping the relative order of all other identities.
+            var current = Slots.Select(slot => byId[slot.DisplayedServer.Identity]).ToArray();
+            var pinned = latest.FirstOrDefault(item => item.IsLastSuccessfulConnection);
+            if (pinned != null)
+                current = new[] { pinned }.Concat(current.Where(item => item.Identity != pinned.Identity)).ToArray();
+            var ordered = latest.Where(item => item.Identity != pinned?.Identity && CanMove(item)).ToArray();
             int next = 0;
-            return Slots.Select(slot => {
-                var item = byId[slot.DisplayedServer.Identity];
-                return CanMove(item) ? ordered[next++] : item;
-            }).ToArray();
+            return current.Select(item => item.Identity != pinned?.Identity && CanMove(item) ? ordered[next++] : item).ToArray();
         }
+
         public ServerSortPass TryBeginPass()
         {
             if (_active != null || !_workRequested) return null;

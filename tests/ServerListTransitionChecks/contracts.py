@@ -64,4 +64,6 @@ assert 'rows.Add(new ServerSortRow(i, Slots[i], target[i]))' in vm
 assert 'var displaced' not in vm
 assert 'foreach (var assignment in _pass.Rows)' in c and 'new ServerCometBand' in c
 assert '_overlay.Bands.Add(band)' in c
-print('PASS explicit completion gates every moved slot; direct destinations and one band per changed row')
+assert 'var pinned = latest.FirstOrDefault(item => item.IsLastSuccessfulConnection)' in vm
+assert 'membershipChanged || pinChanged' in vm
+print('PASS ordinary sort requires completion; pin priority bypasses eligibility and cancels stale targets')

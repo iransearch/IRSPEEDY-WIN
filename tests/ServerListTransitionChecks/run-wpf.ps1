@@ -143,6 +143,14 @@ try {
         Check ((Order $model.Slots) -eq '1,2,3') 'three-way reorder needs no follow-up pair passes'
 
     }
+    $picker.BeginCheckCycle(); $picker.EndCheckCycleSetup()
+    $c.IsLastSuccessfulConnection = $true; $c.IsChecking = $true
+    Call $picker 'ResortGroups' ([object[]]@()) | Out-Null
+    Call $picker 'RefreshDisplayedRows' ([object[]]@($true,$false,$null)) | Out-Null
+    Pump 40
+    Check ($model.Slots[0].DisplayedServer.Service.ID -eq 3 -and $model.Slots[0].BadgeServer.IsLastSuccessfulConnection) 'checking star pins first before any current-cycle completion'
+    Check (!$model.IsTransitioning -and !(Field $overlay 'ShowBand')) 'pin change applies immediately without a stale sweep'
+    Unique $model.Slots
     $before = Order $model.Slots
     $picker.BeginCheckCycle()
     foreach ($g in @($a,$b,$c)) { $g.Service.GetServerUrls()[0].latency = 0 }

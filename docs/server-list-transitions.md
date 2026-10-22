@@ -1,4 +1,4 @@
-# Server list comet (1.4.27)
+# Server list comet (1.4.28)
 
 The WPF/.NET Framework 4.8 picker consumes the existing application ranking as
 each country completes its check. It does not wait for every country to finish.
@@ -11,12 +11,17 @@ retries and timeouts are unchanged.
 A partial ping, cached result or IsChecking=false alone does not grant eligibility.
 Starting another check revokes that country's eligibility; beginning a new cycle
 or loading a list clears all eligibility. Countries not completed in the current
-cycle stay in their existing slots and retain the checking sheen inside the flag.
+cycle keep their order during ordinary latency sorting and retain the checking
+sheen inside the flag. Connection pinning is an independent priority.
 
 `ServerListViewModel.Servers` holds the authoritative immutable snapshots in the
-application's current sorted order. `PresentationOrder()` projects completed
-countries, in that same order, into the slots they currently occupy. Pending slots
-remain fixed. When only one country has finished there is no eligible position
+application's current sorted order. `PresentationOrder()` first extracts the
+starred identity to the front, preserving relative order of all other countries.
+It then projects completed ordinary countries into their slots below the pin.
+The starred country remains first even when pending or actively checking. Pin
+changes apply immediately and invalidate active animation targets for the old
+pin, so stale callbacks cannot demote the new star. Pending rows may shift down
+when a new country is pinned; ordinary latency sorting otherwise leaves them fixed. When only one country has finished there is no eligible position
 exchange yet. Any relative-order change among completed countries is presented
 without waiting for the rest of the list.
 
@@ -89,3 +94,12 @@ UI/old-animation and binding contracts passed. The Windows-only WPF script now
 includes a real three-band scenario; that script and a full net48 application
 build were NOT run here. Native rendering, smoothness and frame rate still need
 Windows verification.
+
+## Pin-priority regression validation for 1.4.28
+
+The new production-slot regression failed on 1.4.27 before the fix. It now covers
+pinning before any current-cycle completion, a checking star, ordinary sorting
+below the pin, pin transfer during partial reveal, stale callback cancellation,
+selection/atomic uniqueness, reduced-motion/lifecycle cleanup, recovery of an
+already-misordered display, and removal of the pinned country. The native WPF
+fixture includes the pending-star case; native Windows execution remains unrun.

@@ -62,6 +62,48 @@ class Program {
   }
  }
  static void Main(){
+  // Exercise the production displayed-slot planner, including in-flight work.
+  var pa=G(71,true);var pb=G(72);var pc=G(73);var pinned=new ServerListViewModel();
+  pinned.Publish(new[]{S(pa),S(pb),S(pc)},true);pinned.BeginCheckCycle();
+  int pinNotices=0;foreach(var slot in pinned.Slots)slot.PropertyChanged+=(sender,e)=>{Unique(pinned);pinNotices++;};
+  pb.IsLastSuccessfulConnection=true;
+  pinned.Publish(new[]{S(pb),S(pa),S(pc)},true);
+  Check(pinned.Slots[0].DisplayedServer.Service.ID==72&&pinned.Slots[0].BadgeServer.IsLastSuccessfulConnection,
+    "star pins immediately above unfinished countries without completion eligibility");
+  Check(pinNotices>0&&pinned.Slots[1].SelectionServer.IsSelectedCountry,
+    "pin promotion is atomic and preserves selected identity");
+  pb.IsChecking=true;pinned.MarkChecking(S(pb).Identity);pinned.BeginCheckCycle();
+  pinned.Publish(new[]{S(pb),S(pc),S(pa)},true,false);
+  Check(pinned.Slots[0].DisplayedServer.Service.ID==72&&pinned.TryBeginPass()==null,
+    "cycle reset and an in-progress star keep first place without a sweep");
+  pinned.Publish(new[]{S(pb),S(pc),S(pa)},true,true,S(pa).Identity);
+  pinned.Publish(new[]{S(pb),S(pc),S(pa)},true,true,S(pc).Identity);
+  var belowPin=pinned.TryBeginPass();
+  Check(belowPin!=null&&belowPin.Rows.All(row=>row.Index>0),
+    "completed ordinary countries can reorder without displacing a checking star");
+  pinned.Reveal(belowPin,ServerRowPart.Signal);Unique(pinned);
+  pb.IsLastSuccessfulConnection=false;pa.IsLastSuccessfulConnection=true;
+  pinned.Publish(new[]{S(pa),S(pc),S(pb)},true);
+  Check(pinned.Slots[0].DisplayedServer.Service.ID==71&&pinned.Slots[0].SelectionServer.IsSelectedCountry,
+    "changing the pin during a partial reveal immediately puts the new star first");
+  pinned.Finish(belowPin);pinned.Reveal(belowPin,ServerRowPart.Name);Unique(pinned);
+  Check(pinned.Slots[0].DisplayedServer.Service.ID==71&&!pinned.IsTransitioning,
+    "canceled old animation cannot restore the previous pinned country");
+  pa.IsChecking=true;pinned.MarkChecking(S(pa).Identity);
+  pinned.Publish(new[]{S(pa),S(pc),S(pb)},false);pinned.CompleteImmediately();
+  Check(pinned.Slots[0].DisplayedServer.Service.ID==71,
+    "reduced motion and lifecycle cleanup retain the star independently of testing");
+  var repair=new ServerListViewModel();repair.Publish(new[]{S(pa),S(pc),S(pb)},true);
+  repair.Slots[0].SetInstant(S(pc));repair.Slots[1].SetInstant(S(pa));
+  repair.Publish(new[]{S(pa),S(pc),S(pb)},true);var fixPin=repair.TryBeginPass();
+  Check(fixPin!=null&&fixPin.Rows[0].Target.Service.ID==71,
+    "already-misordered displayed slots repair even when the pinned identity has not changed");
+  repair.Finish(fixPin);Unique(repair);
+  Check(repair.Slots[0].DisplayedServer.IsLastSuccessfulConnection,
+    "repaired star is first even while checking and every other country is pending");
+  repair.Publish(new[]{S(pc),S(pb)},true);Unique(repair);
+  Check(repair.Slots.Count==2&&repair.Slots.All(slot=>!slot.BadgeServer.IsLastSuccessfulConnection),
+    "removing the pinned country leaves no phantom star or missing identity");
   var strict=new ServerListViewModel();var sg=Enumerable.Range(1,4).Select(id=>G(id,id==1)).ToArray();
   var original=sg.Select(S).ToArray();strict.Publish(original,true);strict.BeginCheckCycle();
   var reversed=original.Reverse().ToArray();strict.Publish(reversed,true);
