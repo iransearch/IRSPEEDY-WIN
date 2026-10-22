@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Services.SingBox;
+using IRSpeedyVPN.Services.SingBox;
 using System;
 using System.Collections.Generic;
 using System.Collections.Specialized;
@@ -913,6 +913,23 @@ namespace v2rayN.Handler
                     // JSON again changes literal '+' and percent escapes in headers.
                     if (!Utils.IsNullOrEmpty(query["extra"]))
                         item.transportExtra = query["extra"];
+                    if (!Utils.IsNullOrEmpty(query["headers"]))
+                    {
+                        // Throne links can carry name|value pairs separately.
+                        // An explicit list replaces extra.headers, retaining all
+                        // other extra options. ParseQueryString decoded it once.
+                        var pairs = query["headers"].Split('|');
+                        if (pairs.Length % 2 != 0)
+                            throw new FormatException("Invalid XHTTP header pairs");
+                        var extra = Utils.IsNullOrEmpty(item.transportExtra)
+                            ? new Newtonsoft.Json.Linq.JObject()
+                            : Newtonsoft.Json.Linq.JObject.Parse(item.transportExtra);
+                        var headers = new Newtonsoft.Json.Linq.JObject();
+                        for (int i = 0; i < pairs.Length; i += 2)
+                            headers[pairs[i]] = pairs[i + 1];
+                        extra["headers"] = headers;
+                        item.transportExtra = extra.ToString(Newtonsoft.Json.Formatting.None);
+                    }
                     break;
                 case "httpupgrade":
                     item.requestHost = Utils.UrlDecode(query["host"] ?? "");

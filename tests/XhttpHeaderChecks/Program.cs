@@ -14,33 +14,43 @@ class Program
         Console.WriteLine("PASS " + label);
     }
 
-    static void RoundTrip(string label, JObject extra)
+    static void RoundTrip(string label, JObject extra, string queryHeaders = null, JObject expectedExtra = null)
     {
-        var original = extra.ToString(Newtonsoft.Json.Formatting.None);
+        var original = extra == null ? null : extra.ToString(Newtonsoft.Json.Formatting.None);
+        expectedExtra = expectedExtra ?? extra;
         var link = "vless://00000000-0000-0000-0000-000000000001@192.0.2.1:443"
             + "?encryption=none&security=tls&sni=tls.example&fp=chrome&alpn=h2%2Chttp%2F1.1"
-            + "&allowInsecure=0&type=xhttp&host=cdn.example&path=%2F&mode=auto&extra="
-            + HttpUtility.UrlEncode(original) + "#fixture";
+            + "&allowInsecure=0&type=xhttp&host=cdn.example&path=%2F&mode=auto"
+            + (extra == null ? "" : "&extra=" + HttpUtility.UrlEncode(original))
+            + (queryHeaders == null ? "" : "&headers=" + HttpUtility.UrlEncode(queryHeaders)) + "#fixture";
         var node = ParsedTransport.Parse(link);
-        Check(node.transportExtra == original, label + ": parsed extra matches exactly after one URL decode");
+        if (string.IsNullOrEmpty(queryHeaders))
+            Check(node.transportExtra == original, label + ": parsed extra matches exactly after one URL decode");
+        else
+            Check(node.transportExtra != null && JToken.DeepEquals(expectedExtra, JObject.Parse(node.transportExtra)), label + ": query header pairs imported without a second decode");
         Check(node.requestHost == "cdn.example" && node.path == "/" && node.headerType == "auto"
             && node.alpn.SequenceEqual(new[] { "h2", "http/1.1" }), label + ": ordinary XHTTP fields unchanged");
         ShareHandler.Nodes["fixture"] = node;
         var single = JObject.Parse(ConfigGenerator.GetConfig("fixture", 19001));
         var singleExtra = single["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"];
-        Check(JToken.DeepEquals(extra, singleExtra), label + ": single-server JSON preserves header names/values and extra options");
+        Check(JToken.DeepEquals(expectedExtra, singleExtra), label + ": single-server JSON preserves header names/values and extra options");
         var probe = JObject.Parse(ConfigGenerator.GetUrlTestXrayConfig(new List<ConfigGenerator.XraySocksInfo> {
             new ConfigGenerator.XraySocksInfo { Link = "fixture", Tag = "probe", Port = 19002, User = "u", Pass = "p" }
         }));
-        Check(JToken.DeepEquals(extra, probe["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"]),
+        Check(JToken.DeepEquals(expectedExtra, probe["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"]),
             label + ": URL-test JSON preserves headers");
+        var isolatedProbe = JObject.Parse(ConfigGenerator.GetUrlTestXrayConfig(new List<ConfigGenerator.XraySocksInfo> {
+            new ConfigGenerator.XraySocksInfo { Link = "fixture", Tag = "probe", Port = 19002, User = "u", Pass = "p" }
+        }, useCoreDns: true));
+        Check(JToken.DeepEquals(expectedExtra, isolatedProbe["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"]),
+            label + ": production probe DNS adaptation preserves headers");
         int port = 19100;
         using (var plan = AutoSelectorPoolPlan.Create(new[] { "fixture" }, new string[0], false, () => port++, p => { }))
         {
             Check(plan != null && plan.MainMembers == 1, label + ": one-member Pool accepts the link");
             var pool = JObject.Parse(plan.XrayConfig);
             var member = ((JArray)pool["outbounds"]).OfType<JObject>().Single(o => (string)o["tag"] == "smart-proxy-0");
-            Check(JToken.DeepEquals(extra, member["streamSettings"]["xhttpSettings"]["extra"]),
+            Check(JToken.DeepEquals(expectedExtra, member["streamSettings"]["xhttpSettings"]["extra"]),
                 label + ": final SOCKS-bridge Pool member preserves exact headers");
         }
     }
@@ -72,7 +82,26 @@ class Program
                 }}
             }
         });
-        var plain = ParsedTransport.Parse("vless://00000000-0000-0000-0000-000000000001@192.0.2.1:443?type=xhttp&path=%2F&mode=auto");
+        var queryValue = "Example/1.0 C++ + %25 %2F & = \"quoted\" فارسی";
+        RoundTrip("standalone query headers", null, "User-Agent|" + queryValue + "|X-Empty|", new JObject {
+            ["headers"] = new JObject { ["User-Agent"] = queryValue, ["X-Empty"] = "" }
+        });
+        RoundTrip("query headers override extra headers", new JObject {
+            ["headers"] = new JObject { ["Old-Header"] = "old" },
+            ["xPaddingBytes"] = "100-1000", ["custom"] = new JObject { ["literal"] = "keep+%2F" }
+        }, "User-Agent|query+%2F", new JObject {
+            ["headers"] = new JObject { ["User-Agent"] = "query+%2F" },
+            ["xPaddingBytes"] = "100-1000", ["custom"] = new JObject { ["literal"] = "keep+%2F" }
+        });
+        RoundTrip("empty query headers retain extra", new JObject {
+            ["headers"] = new JObject { ["User-Agent"] = "keep" }
+        }, "");
+        const string plainLink = "vless://00000000-0000-0000-0000-000000000001@192.0.2.1:443?type=xhttp&path=%2F&mode=auto";
+        bool refused = false;
+        try { ParsedTransport.Parse(plainLink + "&headers=User-Agent%7Cvalue%7Cmissing-value"); }
+        catch (FormatException) { refused = true; }
+        Check(refused, "incomplete query header pair rejected rather than silently dropped");
+        var plain = ParsedTransport.Parse(plainLink);
         Check(plain.transportExtra == null && plain.path == "/" && plain.headerType == "auto", "XHTTP without extra remains unchanged");
     }
 }

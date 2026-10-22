@@ -36,6 +36,9 @@ namespace IRSpeedyVPN.Common
         {
             if (string.IsNullOrEmpty(text)) return "none";
             string value = text.Substring(0, Math.Min(text.Length, 4096)).ToLowerInvariant();
+            if (value.Contains("invalid http header") || value.Contains("invalid header field")
+                || value.Contains("invalid header name") || value.Contains("invalid header value")
+                || value.Contains("invalid xhttp header pairs")) return "invalid-http-header";
             if (value.Contains("forbidden by its access permissions") || value.Contains("permission denied")
                 || value.Contains("access is denied")) return "socket-access-denied";
             if (value.Contains("requested address is not valid") || value.Contains("cannot assign requested address")) return "address-unavailable";

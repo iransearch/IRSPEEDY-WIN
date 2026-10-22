@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Resources;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
@@ -59,6 +59,6 @@ using System.Windows;
 // by using the '*' as shown below:
 // [assembly: AssemblyVersion("1.0.*")]
 // Public releases use Major.Minor.Patch; the CLR normalizes the revision to zero.
-[assembly: AssemblyVersion("1.4.29")]
-[assembly: AssemblyFileVersion("1.4.29")]
-[assembly: AssemblyInformationalVersion("1.4.29")]
+[assembly: AssemblyVersion("1.4.30")]
+[assembly: AssemblyFileVersion("1.4.30")]
+[assembly: AssemblyInformationalVersion("1.4.30")]

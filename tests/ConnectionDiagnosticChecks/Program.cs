@@ -40,6 +40,13 @@ internal static class Program
         Require(output.Contains("connection refused") && output.Contains("context deadline exceeded"), "Useful error causes were lost.");
         string scrubbed = ConnectionDiagnostics.SafeCoreText("error password=PRIVATE_VALUE token=abcdef12345 https://user:pass@private.example/path 203.0.113.8 uuid=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee connection refused context deadline exceeded");
         Require(!scrubbed.Contains("PRIVATE_VALUE") && !scrubbed.Contains("abcdef") && !scrubbed.Contains("203.0.113") && !scrubbed.Contains("aaaa"), "Sensitive tokens leaked.");
+        const string invalidHeader = "failed to GET https://private.example/: net/http: invalid header field value for \"X-Private\" PRIVATE_VALUE";
+        var headerText = ConnectionDiagnostics.SafeCoreText(invalidHeader);
+        Require(headerText.Contains("invalid header field value for") && !headerText.Contains("X-Private")
+            && !headerText.Contains("PRIVATE_VALUE") && !headerText.Contains("private.example"), "HTTP header diagnosis lost or private data leaked.");
+        Require(NetworkFailureDiagnostic.CoreReason(invalidHeader) == "invalid-http-header"
+            && NetworkFailureDiagnostic.CoreReason("http2: invalid HTTP header name PRIVATE_VALUE") == "invalid-http-header",
+            "Invalid HTTP header must have a fixed failure reason.");
         Require(ConnectionDiagnostics.IsLoopbackProxy("http://127.0.0.1:10808") && !ConnectionDiagnostics.IsLoopbackProxy("http://127.0.0.1:10808@private.example"), "Proxy classification must anchor whole value.");
         Require(ConnectionDiagnostics.Fingerprint("one") == ConnectionDiagnostics.Fingerprint("one"), "Session fingerprints must be stable.");
         Require(ConnectionDiagnostics.Fingerprint("one") != ConnectionDiagnostics.Fingerprint("two"), "Different members need distinct fingerprints.");

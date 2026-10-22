@@ -281,6 +281,8 @@ namespace IRSpeedyVPN.Common
         // Unknown tokens are removed, rather than trusting a blacklist to catch every credential format.
         // Keep diagnostic vocabulary and error signatures; never write raw configs/URLs/destinations.
         private static readonly HashSet<string> CoreWords = new HashSet<string>(("error warn warning info debug panic fatal runtime goroutine unexpected EOF timeout timed out context deadline exceeded canceled cancelled connection connect connecting network changed reset closed closing close refused aborted broken pipe no recent activity handshake failed failure tls certificate verify verification invalid unknown authority x509 quic hysteria hysteria2 vless vmess trojan shadowsocks xray sing-box tcp udp dns lookup read write dial accept listen bind socket address already in use cannot assign requested not available interface route tun inbound outbound proxy direct server client transport remote host forcibly was an existing by the is a to of on for from and or with without i/o operation shutdown exit signal access denied permission unreachable unreachable-host no such device resource temporarily unavailable too many open files all outbound failed no available server empty balancer leastload no qualified outbound wsarecv wsasend connectex windows system call returned success started stopped start stop network is down network is unreachable invalid argument connection refused connection reset by peer broken pipe the semaphore timeout period has expired network name is no longer available").Split(' '), StringComparer.OrdinalIgnoreCase);
+        private static readonly HashSet<string> HttpWords = new HashSet<string>(
+            "http http2 net/http net/http2 header headers field value name malformed status code response".Split(' '), StringComparer.OrdinalIgnoreCase);
         internal static string SafeCoreText(string text)
         {
             if (string.IsNullOrEmpty(text)) return "empty";
@@ -288,7 +290,7 @@ namespace IRSpeedyVPN.Common
             text = Regex.Replace(text, @"[a-zA-Z][a-zA-Z0-9+.-]*://\S+|[\w.+-]+@[\w.-]+|[\w.-]+\.[a-zA-Z]{2,}[^\s]*", " REDACTED ");
             text = Regex.Replace(text, @"(?i)(password|token|authorization|uuid|secret|user|username|id|key)\s*[:=]\s*[^\s,;]+", " REDACTED ");
             var tokens = Regex.Matches(text, @"[a-zA-Z][a-zA-Z0-9_/-]*|[^\sA-Za-z]+").Cast<Match>()
-                .Select(m => CoreWords.Contains(m.Value) || RoutingWords.Contains(m.Value) ? m.Value : "[redacted]");
+                .Select(m => CoreWords.Contains(m.Value) || RoutingWords.Contains(m.Value) || HttpWords.Contains(m.Value) ? m.Value : "[redacted]");
             return Regex.Replace(string.Join(" ", tokens), @"(?:\[redacted\] ?){2,}", "[redacted] ").Trim();
         }
         private static readonly HashSet<string> RoutingWords = new HashSet<string>(

@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Events;
 using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
@@ -1324,7 +1324,7 @@ namespace IRSpeedyVPN.Services
 
         private string ProbeContext(string testId, string link)
         {
-            string protocol = "unknown", security = "unknown";
+            string protocol = "unknown", security = "unknown", transport = "unknown";
             try
             {
                 string message;
@@ -1333,13 +1333,15 @@ namespace IRSpeedyVPN.Services
                 {
                     protocol = item.configType.ToString();
                     security = string.IsNullOrEmpty(item.streamSecurity) ? "none" : item.streamSecurity;
+                    transport = item.GetNetwork() ?? "unknown";
                 }
             }
             catch { }
             return " testId=" + testId + " countryId=" + ID + " countryIndex=" + CountryIndex
                 + " country=\"" + SafeProbeText(Country) + "\""
                 + " member=" + (server.urls.FindIndex(u => u != null && u.url == link) + 1)
-                + " protocol=" + SafeProbeText(protocol) + " security=" + SafeProbeText(security);
+                + " protocol=" + SafeProbeText(protocol) + " security=" + SafeProbeText(security)
+                + " transport=" + SafeProbeText(transport);
         }
 
         private void LogProbeAttempt(string testId, string requestId, string phase, TestReq request, TestResp response,
