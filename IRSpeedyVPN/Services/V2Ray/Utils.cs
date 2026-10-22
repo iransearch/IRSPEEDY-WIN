@@ -87,22 +87,15 @@ namespace v2rayN
         }
         static string FormatJson(string json)
         {
-            string INDENT_STRING = "    ";
-            int indentation = 0;
-            int quoteCount = 0;
-            var result =
-                from ch in json
-                let quotes = ch == '"' ? quoteCount++ : quoteCount
-                let lineBreak = ch == ',' && quotes % 2 == 0 ? ch + Environment.NewLine + String.Concat(Enumerable.Repeat(INDENT_STRING, indentation)) : null
-                let openChar = ch == '{' || ch == '[' ? ch + Environment.NewLine + String.Concat(Enumerable.Repeat(INDENT_STRING, ++indentation)) : ch.ToString()
-                let closeChar = ch == '}' || ch == ']' ? Environment.NewLine + String.Concat(Enumerable.Repeat(INDENT_STRING, --indentation)) + ch : ch.ToString()
-                select lineBreak == null
-                            ? openChar.Length > 1
-                                ? openChar
-                                : closeChar
-                            : lineBreak;
-
-            return String.Concat(result);
+            // Quotes can be escaped and JSON punctuation can occur inside a
+            // string. The old character counter inserted CR/LF into XHTTP
+            // header values such as User-Agent=\"...KHTML,+like+Gecko...\".
+            // Keep the serializer/null policy; format parsed JSON tokens only.
+            using (var reader = new Newtonsoft.Json.JsonTextReader(new StringReader(json)))
+            {
+                reader.DateParseHandling = Newtonsoft.Json.DateParseHandling.None;
+                return Newtonsoft.Json.Linq.JToken.ReadFrom(reader).ToString(Newtonsoft.Json.Formatting.Indented);
+            }
         }
         /// <summary>
         /// 保存成json文件

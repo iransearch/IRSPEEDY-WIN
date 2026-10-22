@@ -33,6 +33,9 @@ class Program
         ShareHandler.Nodes["fixture"] = node;
         var single = JObject.Parse(ConfigGenerator.GetConfig("fixture", 19001));
         var singleExtra = single["outbounds"][0]["streamSettings"]["xhttpSettings"]["extra"];
+        Check(!singleExtra.SelectTokens("$..headers").OfType<JObject>().SelectMany(o => o.Properties())
+            .Where(p => p.Value.Type == JTokenType.String).Any(p => p.Value.ToString().IndexOfAny(new[] { '\r', '\n' }) >= 0),
+            label + ": production formatter inserts no CR/LF into HTTP header values");
         Check(JToken.DeepEquals(expectedExtra, singleExtra), label + ": single-server JSON preserves header names/values and extra options");
         var probe = JObject.Parse(ConfigGenerator.GetUrlTestXrayConfig(new List<ConfigGenerator.XraySocksInfo> {
             new ConfigGenerator.XraySocksInfo { Link = "fixture", Tag = "probe", Port = 19002, User = "u", Pass = "p" }
@@ -74,6 +77,13 @@ class Program
             ["custom"] = new JObject { ["token"] = "literal+%2B%26" }
         });
         RoundTrip("ordinary extra without headers", new JObject { ["xPaddingBytes"] = "100-1000", ["xPaddingObfsMode"] = true });
+        RoundTrip("quoted JSON punctuation in headers", new JObject {
+            ["headers"] = new JObject {
+                ["User-Agent"] = "Example/1.0 \"quoted,comma\" {literal} [text] \\\"quoted\\\"",
+                ["X-Unmatched-Punctuation"] = "} ] { ["
+            },
+            ["longLiteral"] = long.MaxValue
+        });
         RoundTrip("download connection header", new JObject {
             ["downloadSettings"] = new JObject {
                 ["address"] = "download.example", ["port"] = 443, ["network"] = "xhttp",
@@ -103,5 +113,15 @@ class Program
         Check(refused, "incomplete query header pair rejected rather than silently dropped");
         var plain = ParsedTransport.Parse(plainLink);
         Check(plain.transportExtra == null && plain.path == "/" && plain.headerType == "auto", "XHTTP without extra remains unchanged");
+        var literals = new JObject {
+            ["dateLiteral"] = "2026-10-22T18:00:00Z", ["longLiteral"] = long.MaxValue,
+            ["decimalLiteral"] = 123.5, ["boolLiteral"] = true,
+            ["strings"] = new JArray("quoted\"comma,", "} ] { [", "trailing\\", "line\r\nline", "فارسی")
+        };
+        using (var reader = new Newtonsoft.Json.JsonTextReader(new System.IO.StringReader(v2rayN.Utils.ToJson(literals))))
+        {
+            reader.DateParseHandling = Newtonsoft.Json.DateParseHandling.None;
+            Check(JToken.DeepEquals(literals, JToken.ReadFrom(reader)), "production formatter preserves string/numeric/boolean literals and existing escaped controls");
+        }
     }
 }

@@ -1,11 +1,15 @@
-# XHTTP header import and preservation (1.4.30)
+# XHTTP header import and serialization (1.4.31)
 
 Run `python tests/XhttpHeaderChecks/run.py [dotnet]` with the .NET 8 SDK.
+Add `--generators` to run the complete HysteriaXrayChecks suite with the production
+formatter wired into its configuration serialization as well.
 
-The production VLESS and transport parser methods are copied verbatim into the
-harness. The tests run the production Xray config generator and final
+The production VLESS/transport parser and Utils.FormatJson methods are copied
+verbatim into the harness. The tests run the production Xray config generator and final
 AutoSelectorPoolPlan SOCKS-bridge generator. Unrelated importers, WPF, registry
-and JSON helper dependencies use the existing HysteriaXrayChecks fixtures.
+and JSON serialization dependencies use the existing HysteriaXrayChecks fixtures.
+The framework JavaScriptSerializer is represented by Newtonsoft in this .NET 8
+harness; its JSON output then passes through the real production FormatJson.
 
 Cases cover the reported nested `headers.headers` Safari value (with synthetic
 authentication/address), a regular User-Agent map, plus signs, percent escapes,
@@ -16,8 +20,9 @@ path) and final one-member Pool configurations.
 Header names are not rewritten or flattened. The original report's nested header
 map is preserved literally; this fix does not reinterpret it as User-Agent.
 
-The reported-header regression failed before removing the second decode and
-passed afterwards. In the Linux validation environment these checks and the
+The original decode regression failed before removing the second decode and
+passed afterwards. Those earlier checks bypassed the production formatter and
+did not detect its independent mutation of header values. In the Linux validation environment these checks and the
 existing HysteriaXrayChecks were compiled with Roslyn C# 7.3, .NET 8 reference
 assemblies and the SDK's available Newtonsoft.Json assembly. This is config-level
 validation, not a native Windows/net48 application build or a live VPN connection.
@@ -40,5 +45,17 @@ Other query values, TLS verification, fingerprint, ALPN, routing, Pool policies
 and probe scheduling are not changed. Previously double-encoded extra JSON is not
 heuristically decoded again: standard links encode the JSON once.
 
-These tests verify configuration and diagnostics. They do not establish that the
-original `extra.headers.headers` link connects or identify its runtime failure.
+The 1.4.30 Windows log reports `http2: invalid HTTP header value for header
+"Headers"` during the failed XHTTP tests. Replaying the production formatter with
+the reported Safari string reproduces inserted CR/LF inside the value: escaped
+quotes incorrectly toggle its quote counter and a literal comma is treated as
+JSON punctuation. Braces/brackets inside strings were also treated as structure.
+The corrected formatter formats parsed JSON tokens with date parsing disabled,
+retaining the existing JavaScriptSerializer and NullPropertiesConverter policy.
+It does not flatten/reinterpret headers or remove user-supplied control characters.
+
+The regression fails against the old formatter and passes after the fix. Cases
+also cover escaped quotes/backslashes, literal punctuation, strings resembling
+dates, numeric/boolean literals, nested download headers, and both probe DNS
+paths. These are configuration/diagnostic tests; a native Windows/net48 build and
+live VPN connection still require validation on Windows.
