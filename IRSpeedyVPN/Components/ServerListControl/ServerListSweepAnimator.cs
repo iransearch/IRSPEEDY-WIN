@@ -218,7 +218,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private static void FindGroups(DependencyObject root, FrameworkElement[] groups)
         {
             var part = ServerCometPart.GetPart(root);
-            if (part != ServerRowPart.None && root is FrameworkElement element) groups[(int)part] = element;
+            if (part >= 0 && part < groups.Length && root is FrameworkElement element) groups[part] = element;
             for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++) FindGroups(VisualTreeHelper.GetChild(root, i), groups);
         }
         private static bool PartChanged(ServerItem old, ServerItem next, ServerRowPart part)

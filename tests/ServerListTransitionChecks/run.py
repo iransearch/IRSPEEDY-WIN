@@ -11,7 +11,32 @@ using IRSpeedyVPN.Interfaces;
 namespace System.Windows.Input {
  public class Cursor {} public static class Cursors { public static Cursor Hand=new Cursor(),Arrow=new Cursor(); }
 }
-namespace System.Windows.Media { public class ImageSource {} public class Brush {} }
+namespace System.Windows.Media {
+ public class ImageSource {} public class Brush {}
+ public static class VisualTreeHelper {
+  public static int GetChildrenCount(System.Windows.DependencyObject element)=>element.Children.Count;
+  public static System.Windows.DependencyObject GetChild(System.Windows.DependencyObject element,int index)=>element.Children[index];
+ }
+}
+namespace System.Windows {
+ public class PropertyMetadata { public object DefaultValue; public PropertyMetadata(object value){DefaultValue=value;} }
+ public class DependencyProperty {
+  public Type PropertyType; public PropertyMetadata DefaultMetadata;
+  public static DependencyProperty RegisterAttached(string name,Type type,Type owner,PropertyMetadata metadata){
+   if(!type.IsInstanceOfType(metadata.DefaultValue))throw new Exception("Wrong metadata type");
+   return new DependencyProperty{PropertyType=type,DefaultMetadata=metadata};
+  }
+ }
+ public class DependencyObject {
+  public readonly List<DependencyObject> Children=new List<DependencyObject>();
+  readonly Dictionary<DependencyProperty,object> values=new Dictionary<DependencyProperty,object>();
+  public object GetValue(DependencyProperty property){object value;return values.TryGetValue(property,out value)?value:property.DefaultMetadata.DefaultValue;}
+  public void SetValue(DependencyProperty property,object value){
+   if(!property.PropertyType.IsInstanceOfType(value))throw new Exception("Wrong attached value type");values[property]=value;
+  }
+ }
+ public class FrameworkElement:DependencyObject {}
+}
 namespace IRSpeedyVPN.Interfaces { public interface IVPNService { int ID {get;} } }
 namespace IRSpeedyVPN.Common {
  static class LastSuccessfulServer { internal static string Key(IVPNService s)=>s==null?"":s.GetType().FullName+":"+s.ID; }
@@ -75,12 +100,27 @@ class Program {
   bool originalNameFailed=false;
   try{converter.ConvertFromInvariantString("Selection");}catch(FormatException){originalNameFailed=true;}
   Check(originalNameFailed,"reproduced Selection EnumConverter failure after enum member renaming");
+  Check(ServerCometPart.PartProperty.PropertyType==typeof(int),"XAML numeric row-part values target an integer DP; numeric enum markup would fail MC3032");
+  Check(typeof(ServerCometPart).GetMethod("SetPart").GetParameters()[1].ParameterType==typeof(int)
+   &&typeof(ServerCometPart).GetMethod("GetPart").ReturnType==typeof(int),"attached setter/getter and DP metadata consistently expose int to the markup compiler");
+  var partConverter=System.ComponentModel.TypeDescriptor.GetConverter(ServerCometPart.PartProperty.PropertyType);
+  Check(!(partConverter is System.ComponentModel.EnumConverter),"row XAML uses integer conversion without enum name lookup");
+  var dependency=new System.Windows.DependencyObject();
+  Check(Convert.ToInt32(ServerCometPart.GetPart(dependency))==-1,"unmarked visual elements retain the no-part default");
   var converted=new List<int>();
   foreach(var token in tokens){
-   try{converted.Add(Convert.ToInt32(converter.ConvertFromInvariantString(token)));}
-   catch(FormatException ex){throw new Exception("Country row XAML still depends on renamed enum member: "+token,ex);}
+   var value=partConverter.ConvertFromInvariantString(token);
+   typeof(ServerCometPart).GetMethod("SetPart").Invoke(null,new object[]{dependency,value});
+   Check(Convert.ToInt32(ServerCometPart.GetPart(dependency))==Convert.ToInt32(value),"actual attached property round-trips XAML part ID "+token);
+   converted.Add(Convert.ToInt32(value));
   }
-  Check(converted.OrderBy(p=>p).SequenceEqual(Enumerable.Range(0,5)),"all five actual XAML row-part values survive enum type/member renaming");
+  Check(converted.OrderBy(p=>p).SequenceEqual(Enumerable.Range(0,5)),"all five actual XAML part values use stable integer IDs independent of enum names");
+  var visualRoot=new System.Windows.DependencyObject();
+  foreach(var id in converted){var visual=new System.Windows.FrameworkElement();ServerCometPart.SetPart(visual,id);visualRoot.Children.Add(visual);}
+  var invalidVisual=new System.Windows.FrameworkElement();ServerCometPart.SetPart(invalidVisual,99);visualRoot.Children.Add(invalidVisual);
+  var foundGroups=ParsedGroupFinder.Find(visualRoot);
+  Check(converted.Select((id,index)=>ReferenceEquals(foundGroups[id],visualRoot.Children[index])).All(valid=>valid),
+   "production FindGroups discovers all five integer-marked groups and skips unmarked/out-of-range nodes");
   Check((int)ServerRowPart.None==-1&&(int)ServerRowPart.Signal==0&&(int)ServerRowPart.Badge==1
    &&(int)ServerRowPart.Name==2&&(int)ServerRowPart.Flag==3&&(int)ServerRowPart.Selection==4,"stable row-part IDs match the slot array and XAML contract");
   // Exercise the production displayed-slot planner, including in-flight work.
@@ -265,5 +305,12 @@ with tempfile.TemporaryDirectory(prefix='server-comet-') as directory:
     (path/'Program.cs').write_text(fixture.replace('__PICKER_XAML__',(root/'IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml').as_posix()))
     for name in ['ServerListViewModel.cs','ServerCometTimeline.cs']:
         (path/name).write_text((root/'IRSpeedyVPN/Components/ServerListControl'/name).read_text())
+    overlay=(root/'IRSpeedyVPN/Components/ServerListControl/ServerListCometOverlay.cs').read_text()
+    attached=overlay[overlay.index('    public static class ServerCometPart'):overlay.index('    public sealed class ServerListCometOverlay')]
+    (path/'ServerCometPart.cs').write_text('using System.Windows;namespace IRSpeedyVPN.Components.ServerListControl{\n'+attached+'\n}')
+    animator=(root/'IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs').read_text()
+    find_groups=animator[animator.index('        private static void FindGroups('):animator.index('        private static bool PartChanged(')]
+    (path/'ParsedGroupFinder.cs').write_text('using System.Windows;using System.Windows.Media;using IRSpeedyVPN.Components.ServerListControl;class ParsedGroupFinder{\n'
+        +'public static FrameworkElement[] Find(DependencyObject root){var groups=new FrameworkElement[5];FindGroups(root,groups);return groups;}\n'+find_groups+'\n}')
     (path/'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')
     subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',directory,'-v:q'],check=True)

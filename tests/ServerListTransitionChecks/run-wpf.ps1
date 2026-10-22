@@ -18,6 +18,10 @@ $urlType = $assembly.GetType('IRSpeedyVPN.Models.NewService.Url', $true)
 $serverType = $assembly.GetType('IRSpeedyVPN.Models.NewService.ServerEx', $true)
 $serviceType = $assembly.GetType('IRSpeedyVPN.Services.TunnelPlusService', $true)
 function Check($ok, [string]$name) { if (!$ok) { throw $name }; Write-Output "PASS $name" }
+$partOwner = $assembly.GetType($prefix + 'ServerCometPart', $true)
+$partProperty = $partOwner.GetField('PartProperty').GetValue($null)
+Check ($partProperty.PropertyType -eq [int]) 'compiled attached Part DP uses int for numeric BAML values'
+Check ($partOwner.GetMethod('GetPart').ReturnType -eq [int] -and $partOwner.GetMethod('SetPart').GetParameters()[1].ParameterType -eq [int]) 'compiled attached accessors match integer DP metadata'
 function Field($instance, [string]$name) { return $instance.GetType().GetField($name,$flags).GetValue($instance) }
 function Call($instance, [string]$name, [object[]]$arguments) { return $instance.GetType().GetMethod($name,$flags).Invoke($instance,$arguments) }
 function Pump([int]$milliseconds = 20) {

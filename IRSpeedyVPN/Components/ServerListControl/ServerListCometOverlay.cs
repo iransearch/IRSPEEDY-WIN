@@ -7,9 +7,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
     // Mark EXISTING groups; this adds no visual/layout node.
     public static class ServerCometPart
     {
-        public static readonly DependencyProperty PartProperty = DependencyProperty.RegisterAttached("Part", typeof(ServerRowPart), typeof(ServerCometPart), new PropertyMetadata(ServerRowPart.None));
-        public static void SetPart(DependencyObject element, ServerRowPart value) => element.SetValue(PartProperty, value);
-        public static ServerRowPart GetPart(DependencyObject element) => (ServerRowPart)element.GetValue(PartProperty);
+        // XAML rejects numeric literals for enum-typed properties (MC3032).
+        // Expose the stable part IDs as int so neither compilation nor BAML
+        // loading depends on enum member names after release obfuscation.
+        public static readonly DependencyProperty PartProperty = DependencyProperty.RegisterAttached("Part", typeof(int), typeof(ServerCometPart), new PropertyMetadata(-1));
+        public static void SetPart(DependencyObject element, int value) => element.SetValue(PartProperty, value);
+        public static int GetPart(DependencyObject element) => (int)element.GetValue(PartProperty);
     }
     public sealed class ServerListCometOverlay : FrameworkElement
     {
