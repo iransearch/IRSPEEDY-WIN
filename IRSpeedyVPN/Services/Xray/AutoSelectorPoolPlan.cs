@@ -10,6 +10,7 @@ namespace IRSpeedyVPN.Services.Xray
     internal sealed class AutoSelectorPoolPlan : IDisposable
     {
         internal const int CloselyCheckedMemberLimit = 35;
+        internal const int AiActiveMemberLimit = 8;
         private readonly List<int> ports = new List<int>();
         private readonly Action<int> releasePort;
         private readonly List<JObject> main = new List<JObject>();
@@ -99,8 +100,8 @@ namespace IRSpeedyVPN.Services.Xray
                 ["outbounds"] = new JArray(members.Select(b => (string)b["tag"])),
                 ["url"] = "https://connectivitycheck.gstatic.com/generate_204",
                 ["interval"] = "900s", ["bench_interval"] = "900s", ["watch_interval"] = "300s",
-                ["active_size"] = Math.Min(CloselyCheckedMemberLimit, members.Length), ["expected"] = Math.Min(3, members.Length),
-                ["sampling"] = 10, ["tolerance"] = 300,
+                ["active_size"] = Math.Min(tag == "proxy" ? CloselyCheckedMemberLimit : AiActiveMemberLimit, members.Length), ["expected"] = Math.Min(3, members.Length),
+                ["sampling"] = 3, ["tolerance"] = 300,
                 ["fail_tolerance"] = 0.2,
                 ["timeout"] = "5s", ["concurrency"] = 4, ["dial_retries"] = 2,
                 ["balance"] = true, ["balance_mode"] = tag == "proxy" ? "round-robin" : "connection",
@@ -120,7 +121,7 @@ namespace IRSpeedyVPN.Services.Xray
             var rules = root["route"]?["rules"] as JArray;
             if (primary == null || rules == null)
                 throw new InvalidOperationException("Missing primary outbound or routing rules.");
-            // Existing inbounds, DNS, Shield, VOD, geo rules and chain outbounds stay
+            // Existing inbounds, DNS, Shield, geo rules and chain outbounds stay
             // in the base config. Preserve any front-chain detour on every bridge.
             var detour = primary["detour"];
             foreach (var bridge in main.Concat(ai))
@@ -157,7 +158,7 @@ namespace IRSpeedyVPN.Services.Xray
                 };
                 if (ai.Count > 0) aiRule["outbound"] = "ai-proxy";
                 // Shield and protocol handling used to run before reaching Xray's
-                // AI rules. Retain that ordering, with AI ahead of geo/VOD/default.
+                // AI rules. Retain that ordering, with AI ahead of geo/default.
                 var beforeAi = rules.OfType<JObject>().Where(r =>
                     (string)r["action"] == "sniff" || (string)r["action"] == "hijack-dns"
                     || (string)r["action"] == "reject" || (string)r["outbound"] == "block"

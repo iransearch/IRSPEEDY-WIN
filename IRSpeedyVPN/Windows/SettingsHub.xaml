@@ -144,7 +144,7 @@
                   <ColumnDefinition Width="*"/>
                   <ColumnDefinition Width="42"/>
                 </Grid.ColumnDefinitions>
-                <controls:ServiceToggle x:Name="VodService" AutomationProperties.Name="VodService" Grid.Column="0" FlowDirection="LeftToRight"/>
+                <controls:ServiceToggle x:Name="AiService" AutomationProperties.Name="AiService" Grid.Column="0" FlowDirection="LeftToRight"/>
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="10,0">
                   <TextBlock FontSize="14.5" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" FlowDirection="LeftToRight" FontWeight="Bold">
                     <Run Text="هوش مصنوعی" FlowDirection="RightToLeft"/>

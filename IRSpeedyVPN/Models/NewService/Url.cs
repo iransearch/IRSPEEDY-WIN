@@ -25,8 +25,6 @@ namespace IRSpeedyVPN.Models.NewService
 
         public int is_subscription { get; set; }
 
-        public int irancell { get; set; }
-
         public int chainproxy { get; set; }
         public long latency { get; set; }
         public DateTime latencychkTime { get; set; }
@@ -38,7 +36,7 @@ namespace IRSpeedyVPN.Models.NewService
         public DateTime LastSuccessfulCheckTime { get; set; }
 
         public VPNType VPNType =>
-            (this.chainproxy != 1) ? ((this.irancell != 1) ? VPNType.NORMAL : VPNType.VOD) : VPNType.CHAIN;
+            this.chainproxy == 1 ? VPNType.CHAIN : VPNType.NORMAL;
     }
 
 }

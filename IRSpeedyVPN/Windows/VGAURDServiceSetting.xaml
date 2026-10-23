@@ -50,6 +50,6 @@
  <TextBlock x:Name="SplitTunnelStatus" Grid.Column="4" Style="{StaticResource Text.RowStatus}"/>
  <Control Grid.Column="6" Template="{StaticResource Icon.ChevronBack}" Foreground="{DynamicResource Theme.ChevronBrush}" Width="14" Height="14" VerticalAlignment="Center"/>
  </Grid></Border></Button></StackPanel>
- <StackPanel Visibility="Collapsed"><ctl:SettingsToggleSwitch x:Name="TelegramRouteProxy" Checked="TelegramRouteProxy_Checked"/><ctl:SettingsToggleSwitch x:Name="VodService"/><ctl:SettingsToggleSwitch x:Name="GameMode" Checked="GameMode_Checked" Unchecked="GameMode_Unchecked"/></StackPanel>
+ <StackPanel Visibility="Collapsed"><ctl:SettingsToggleSwitch x:Name="TelegramRouteProxy" Checked="TelegramRouteProxy_Checked"/><ctl:SettingsToggleSwitch x:Name="AiService"/><ctl:SettingsToggleSwitch x:Name="GameMode" Checked="GameMode_Checked" Unchecked="GameMode_Unchecked"/></StackPanel>
  <Button Grid.Row="2" Margin="14,0,14,16" Height="44" Style="{StaticResource PrimaryButtonStyle}" Content="تایید و ذخیره" Click="btnOK_Click"/>
  </Grid></Border></Window>

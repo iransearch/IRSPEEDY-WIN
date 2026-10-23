@@ -23,7 +23,7 @@ namespace IRSpeedyVPN.Windows
             ShareButton.IsEnabled = connected && IsConnectionBusy?.Invoke() != true;
             MethodsButton.IsEnabled = ShieldButton.IsEnabled = PasswordButton.IsEnabled = !locked;
             GameMode.IsEnabled = !locked && Environment.Is64BitOperatingSystem;
-            VodService.IsEnabled = SaveButton.IsEnabled = !locked;
+            AiService.IsEnabled = SaveButton.IsEnabled = !locked;
             GameRow.Opacity = AiRow.Opacity = locked ? 0.45 : 1;
             foreach (var control in new System.Windows.UIElement[] { ShareButton, MethodsButton, ShieldButton, PasswordButton, SaveButton })
                 control.Opacity = control.IsEnabled ? 1 : 0.45;
@@ -35,7 +35,7 @@ namespace IRSpeedyVPN.Windows
         {
             InitializeComponent();
             GameMode.IsOn = RegHelper.GetSettingValue("VGAURDGameMode") == "1";
-            VodService.IsOn = Services.Xray.SmartIpRouting.IsEnabled();
+            AiService.IsOn = Services.Xray.SmartIpRouting.IsEnabled();
             Loaded += (s, e) => { RefreshAccess(); stateTimer.Start(); };
             stateTimer.Tick += (s, e) => RefreshAccess();
             Closed += (s, e) => stateTimer.Stop();
@@ -55,7 +55,7 @@ namespace IRSpeedyVPN.Windows
                 }
                 catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); return false; }
             }
-            Services.Xray.SmartIpRouting.SetEnabled(VodService.IsOn);
+            Services.Xray.SmartIpRouting.SetEnabled(AiService.IsOn);
             RegHelper.SetSettingValue("VGAURDGameMode", GameMode.IsOn ? "1" : "0");
             if (GameMode.IsOn)
             {
@@ -79,7 +79,7 @@ namespace IRSpeedyVPN.Windows
             // A child can enable split tunneling and disable game mode. Do not
             // overwrite that decision with the hub's older toggle values.
             GameMode.IsOn = RegHelper.GetSettingValue("VGAURDGameMode") == "1";
-            VodService.IsOn = Services.Xray.SmartIpRouting.IsEnabled();
+            AiService.IsOn = Services.Xray.SmartIpRouting.IsEnabled();
         }
         private void Shield_Click(object sender, RoutedEventArgs e)
         { if (!PreferencesLocked) new SpeedyShieldSetting { Owner = this }.ShowDialog(); }

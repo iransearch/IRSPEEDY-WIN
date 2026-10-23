@@ -12,16 +12,8 @@ using v2rayN.Handler;
 namespace IRSpeedyVPN.Services.Xray
 {
     /// <summary>
-    /// SMART IP: a dedicated leastLoad balancer for AI traffic inside the smart
-    /// connection config, gated by the shared VOD/AI toggle. The AI links come from
-    /// the API, the same as VOD. VOD is not built here: the API serves plain VLESS on
-    /// a public IP, which the core refuses as an Xray outbound, so VOD is handled by
-    /// its own sing-box outbound instead.
-    ///
-    /// Two details differ from the Android client because the core will not accept
-    /// them: it takes a single burstObservatory rather than multiObservatory, and its
-    /// leastLoad strategy has no observerTag field. AI therefore shares the pool's
-    /// health probe while keeping its own balancer, selector prefix and maxRTT.
+    /// SMART IP keeps API-provided AI members independent from the main pool.
+    /// The user's AI preference controls routing; health checks run in the core.
     /// </summary>
     public static class SmartIpRouting
     {
@@ -37,10 +29,11 @@ namespace IRSpeedyVPN.Services.Xray
         public const string AiBalancerTag = "ai-balancer";
         public const string AiRuleTag = "ai-routing";
 
+        // Keep the existing registry name so saved AI preferences survive updates.
         private const string SettingKey = "VGAURDVodService";
 
         // The smart balancer keeps the 3s ceiling from the config template;
-        // VOD and AI tolerate more latency.
+        // AI tolerates more latency.
         private const string ServiceMaxRtt = "5s";
 
         public static readonly string[] AiDomains =
@@ -85,7 +78,7 @@ namespace IRSpeedyVPN.Services.Xray
             "support.google.com"
         };
 
-        /// <summary>Reads the shared VOD/AI toggle. Both services follow it.</summary>
+        /// <summary>Reads the user's AI routing preference.</summary>
         public static bool IsEnabled()
         {
             try

@@ -15,7 +15,7 @@ lookup = source[source.index('        private string GetChainLink('):source.inde
 stubs = r'''
 using System;using System.Collections.Generic;using System.Linq;using System.Threading;using System.Diagnostics;using System.IO;
 using IRSpeedyVPN.Models;using IRSpeedyVPN.Models.NewService;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Services.Libcore;using IRSpeedyVPN.Common;using IRSpeedyVPN.Services.Hysteria;
-namespace IRSpeedyVPN.Models { public enum VPNType{NORMAL,VOD,CHAIN} class GlobalInfo{public Settings settings=new Settings();}class Settings{public Setting setting=new Setting();}class Setting{public string url_test="https://example.invalid/probe";} }
+namespace IRSpeedyVPN.Models { public enum VPNType{NORMAL,CHAIN} class GlobalInfo{public Settings settings=new Settings();}class Settings{public Setting setting=new Setting();}class Setting{public string url_test="https://example.invalid/probe";} }
 namespace IRSpeedyVPN.Common {
  static class LogHelper{public static void WriteExLog(string s){}public static void WriteLog(Exception e){throw e;}}
  static class ConnectionDiagnostics{public static long EventSequence;public static string Fingerprint(string s)=>"hash";}

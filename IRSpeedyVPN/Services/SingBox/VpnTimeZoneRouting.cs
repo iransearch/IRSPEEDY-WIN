@@ -18,7 +18,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 || outbounds == null || !outbounds.OfType<JObject>().Any(o => (string)o["tag"] == "proxy"))
                 throw new InvalidOperationException("VPN IP lookup requires the primary proxy and an HTTP listener.");
             // IP display and time-zone HTTPS lookups on the explicit user listener bypass AI,
-            // VOD, Game Mode and process exclusions. Core/DNS traffic is unaffected.
+            // Game Mode and process exclusions. Core/DNS traffic is unaffected.
             rules.Insert(0, new JObject
             {
                 ["inbound"] = new JArray(inbounds),

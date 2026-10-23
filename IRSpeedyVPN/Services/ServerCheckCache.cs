@@ -72,7 +72,7 @@ namespace IRSpeedyVPN.Services
         {
             // ID identifies the row, the complete config fingerprint invalidates changed links.
             return Hash(JsonConvert.SerializeObject(new object[] { service.ID, service.Name, CountryKey(service),
-                url.url, url.extra_field_1, url.extra_field_2, url.chainproxy, url.irancell, url.is_subscription }));
+                url.url, url.extra_field_1, url.extra_field_2, url.chainproxy, url.is_subscription }));
         }
 
         internal void Bind(IEnumerable<IVPNService> services)

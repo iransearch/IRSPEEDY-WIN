@@ -32,12 +32,12 @@ namespace IRSpeedyVPN.Services
                 {
                     if (url == null || string.IsNullOrWhiteSpace(url.url)) continue;
                     string key = JsonConvert.SerializeObject(new object[] { url.url, url.extra_field_1, url.extra_field_2,
-                        url.chainproxy, url.irancell, url.is_subscription });
+                        url.chainproxy, url.is_subscription });
                     Candidate candidate;
                     if (!candidates.TryGetValue(key, out candidate))
                     {
                         candidate = new Candidate { Probe = new Url { url = url.url, extra_field_1 = url.extra_field_1,
-                            extra_field_2 = url.extra_field_2, chainproxy = url.chainproxy, irancell = url.irancell,
+                            extra_field_2 = url.extra_field_2, chainproxy = url.chainproxy,
                             is_subscription = url.is_subscription } };
                         candidates.Add(key, candidate);
                     }

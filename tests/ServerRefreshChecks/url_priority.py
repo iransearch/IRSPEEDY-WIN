@@ -16,7 +16,7 @@ assert 'MaxConcurrency = 15,' in source
 prefix = r'''
 using System; using System.Collections.Generic; using System.Linq;
 using IRSpeedyVPN.Models.NewService;
-namespace IRSpeedyVPN.Models.NewService { public enum VPNType { NORMAL,VOD,CHAIN } }
+namespace IRSpeedyVPN.Models.NewService { public enum VPNType { NORMAL,CHAIN } }
 static class Shuffle {
  public static int Calls;
  public static IEnumerable<T> Randomize<T>(this IEnumerable<T> input){Calls++;return input.Reverse();}

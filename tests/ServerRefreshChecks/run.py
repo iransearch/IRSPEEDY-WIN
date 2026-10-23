@@ -9,7 +9,7 @@ stubs = r'''
 using System; using System.Linq; using System.Collections.Generic; using System.Collections.Concurrent; using System.Threading; using System.Threading.Tasks; using System.IO;
 using IRSpeedyVPN.Services; using IRSpeedyVPN.Interfaces; using IRSpeedyVPN.Models.NewService;
 namespace System.Windows.Threading { public enum DispatcherPriority { Background=4 } }
-namespace IRSpeedyVPN.Models { public enum VPNType { NORMAL,VOD,CHAIN } }
+namespace IRSpeedyVPN.Models { public enum VPNType { NORMAL,CHAIN } }
 namespace IRSpeedyVPN.Interfaces { interface IVPNService { int ID {get;} string Name {get;} bool IsUrlTestSupported {get;} string CountryCode {get;} string Country {get;} List<Url> GetServerUrls(); void UrlTest(); } }
 class TunnelPlusService : IVPNService {
  public int ID {get;set;} public string Name=>"xfast"; public string CountryCode {get;set;} public string Country=>CountryCode; public bool IsUrlTestSupported=>true;

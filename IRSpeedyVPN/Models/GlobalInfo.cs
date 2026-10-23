@@ -24,7 +24,6 @@ namespace IRSpeedyVPN.Models
         public TimeSpan ConnectionElapsed => connectionClock?.Elapsed ?? TimeSpan.Zero;
         public IVPNService CurrentService;
         public string ServerResponse { get; set; }
-        public List<Url> Vods { get; set; }
         public List<Url> Ais { get; set; }
 
         public void Import(AccountInfoEx acc, string password,String tempPath)
@@ -39,7 +38,6 @@ namespace IRSpeedyVPN.Models
             Password = password;
             TempPath = tempPath;
             settings = acc.Settings;
-            Vods = acc.vods;
             Ais = acc.ais;
         }
         /*

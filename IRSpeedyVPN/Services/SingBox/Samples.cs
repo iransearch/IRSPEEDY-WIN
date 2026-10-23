@@ -443,30 +443,6 @@ namespace IRSpeedyVPN.Services.SingBox
 			".cloudflare-ech"
 		};
 
-		public static string[] sg_vodDomains = new[]
-		{
-			"filimo.com",
-			"namava.ir",
-			"namava.tv",
-			"tamashakhoneh.ir",
-			"tmk.ir",
-			"gapfilm.ir",
-			"digitoon.tv",
-			"filmnet.ir",
-			"ipmyp.ir"
-		};
 
-		public static string[] sg_vodDomainSuffix = new[]
-		{
-			".filimo.com",
-			".namava.ir",
-			".namava.tv",
-			".tamashakhoneh.ir",
-			".tmk.ir",
-			".gapfilm.ir",
-			".digitoon.tv",
-			".filmnet.ir",
-			".ipmyp.ir"
-		};
 	}
 }

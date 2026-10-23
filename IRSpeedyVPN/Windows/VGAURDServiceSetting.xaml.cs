@@ -43,8 +43,8 @@ namespace IRSpeedyVPN.Windows
             RegHelper.SetSettingValue(KEY_SYSTEM_PROXY, IsOn(SystemProxy) ? "1" : "0");
             RegHelper.SetSettingValue(KEY_TELEGRAM_PROXY, IsOn(TelegramRouteProxy) ? "1" : "0");
 
-            // VOD/AI is independent
-            Services.Xray.SmartIpRouting.SetEnabled(IsOn(VodService));
+            // AI is independent
+            Services.Xray.SmartIpRouting.SetEnabled(IsOn(AiService));
 
             // Game Mode is independent, but forces VPN mode (persisted above as VPN=1).
             RegHelper.SetSettingValue(KEY_GAME, IsOn(GameMode) ? "1" : "0");
@@ -84,7 +84,7 @@ namespace IRSpeedyVPN.Windows
                 SetChecked(GlobalProxy, RegHelper.GetSettingValue(KEY_GLOBAL_PROXY) == "1");
                 SetChecked(SystemProxy, RegHelper.GetSettingValue(KEY_SYSTEM_PROXY) == "1");
                 SetChecked(TelegramRouteProxy, RegHelper.GetSettingValue(KEY_TELEGRAM_PROXY) == "1");
-                SetChecked(VodService, Services.Xray.SmartIpRouting.IsEnabled());
+                SetChecked(AiService, Services.Xray.SmartIpRouting.IsEnabled());
                 SetChecked(GameMode, RegHelper.GetSettingValue(KEY_GAME) == "1");
             }
             finally
@@ -134,7 +134,7 @@ namespace IRSpeedyVPN.Windows
         }
 
         // --------------------------
-        // Mutual exclusivity (except VOD/AI)
+        // Mutual exclusivity (except AI)
         // --------------------------
         private void NormalizeExclusiveGroup()
         {
@@ -168,7 +168,7 @@ namespace IRSpeedyVPN.Windows
             try
             {
                 TurnOffOthers(keepOn);
-                // VOD/AI intentionally untouched
+                // AI intentionally untouched
             }
             finally
             {
@@ -204,9 +204,9 @@ namespace IRSpeedyVPN.Windows
         private void SystemProxy_Unchecked(object sender, RoutedEventArgs e) { }
         private void TelegramRouteProxy_Unchecked(object sender, RoutedEventArgs e) { }
 
-        // VOD/AI independent
-        private void VodService_Checked(object sender, RoutedEventArgs e) { }
-        private void VodService_Unchecked(object sender, RoutedEventArgs e) { }
+        // AI independent
+        private void AiService_Checked(object sender, RoutedEventArgs e) { }
+        private void AiService_Unchecked(object sender, RoutedEventArgs e) { }
 
         // Game Mode: on -> force VPN and lock the mode switches; off -> unlock them.
         private void GameMode_Checked(object sender, RoutedEventArgs e)

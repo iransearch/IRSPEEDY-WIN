@@ -331,7 +331,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 // reloads: the connection service is fresh there, so IsSmartFast is
                 // still false and a guarded rebuild would leave the row with no pool.
                 // Without a pool the connection skips the smart balancer config, and
-                // the VOD and AI balancers that live in it never reach the core.
+                // the AI balancer that live in it never reach the core.
                 PrepareCountryPool(group, value);
 
                 Apply(value, group, SelectionKind.Country);

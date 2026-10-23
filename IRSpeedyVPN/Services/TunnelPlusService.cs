@@ -113,7 +113,6 @@ namespace IRSpeedyVPN.Services
         string corePath;
         string sniCorePath;
         string lastLink;
-        string lastVodLink;
         int lastListenPort = 10808;
         bool lastVpnMode;
         DateTime lastCoreStartUtc;
@@ -196,8 +195,8 @@ namespace IRSpeedyVPN.Services
             }
             try
             {
-                bool isVodEnabled = Xray.SmartIpRouting.IsEnabled();
-                Diagnostic("ai-setting-read", "enabled=" + isVodEnabled + " inputMembers=" + GetAiLinks().Count);
+                bool isAiEnabled = Xray.SmartIpRouting.IsEnabled();
+                Diagnostic("ai-setting-read", "enabled=" + isAiEnabled + " inputMembers=" + GetAiLinks().Count);
                 if (serviceController.CheckUserPermission(gInfo.Username, gInfo.Password))
                 // if (ServiceHelper.CheckAvailabilty(gInfo.Username,gInfo.Password))
                 {
@@ -211,13 +210,8 @@ namespace IRSpeedyVPN.Services
                     {
                         KillAll();
 
-                        // Start each fresh connect with no VOD link. VodUrlTest below
-                        // repopulates it only while VOD is enabled; otherwise it stays
-                        // null so a link left over from an earlier VOD-on connection
-                        // does not keep the irancell outbound alive after VOD is off.
-                        lastVodLink = null;
-
-                        // smart fast already ran the url test and collected the success urls
+                        // Pool members are tested in the background by Core; only a
+                        // fixed-link connection needs this pre-connect selection test.
                         if (_smartFastUrls == null || _smartFastUrls.Length == 0)
                         {
                             UrlTest(SelectedServerUrl != null ? new[] { SelectedServerUrl } : null, true);
@@ -231,18 +225,6 @@ namespace IRSpeedyVPN.Services
                                 return;
 
                             }
-                            else if (isVodEnabled)
-                            {
-                                VodUrlTest();
-                            }
-                            //LogHelper.WriteExLog($"ss\t{selectedUrl}\n");
-                        }
-                        else if (isVodEnabled)
-                        {
-                            // A smart or country pool runs its own url test, so the
-                            // branch above is skipped and VOD would keep a stale link
-                            // from an earlier connection, or none at all.
-                            VodUrlTest();
                         }
 
                     }                    
@@ -254,7 +236,7 @@ namespace IRSpeedyVPN.Services
                     //vprocess.StandardInput.Write(configData);
                     //vprocess.StandardInput.Close();
                     bool vpnmode =  (RegHelper.GetSettingValue("VGAURDVPNMode") != "0");
-                    // Game Mode routes only DNS/VOD/AI through the tunnel and everything else
+                    // Game Mode routes only DNS/AI through the tunnel and everything else
                     // direct. It only makes sense over TUN, so it forces VPN mode on.
                     bool gameMode = RegHelper.GetSettingValue("VGAURDGameMode") == "1";
                     if (gameMode)
@@ -308,7 +290,7 @@ namespace IRSpeedyVPN.Services
                         ReleaseAutoSelectorPlan();
                         needXray = true;
                         autoSelectorPlan = Xray.AutoSelectorPoolPlan.Create(smartUrls, GetAiLinks(),
-                            isVodEnabled, FreePortManager.Dequeue, FreePortManager.Enqueue);
+                            isAiEnabled, FreePortManager.Dequeue, FreePortManager.Enqueue);
                         if (autoSelectorPlan == null)
                         {
                             TryStopCore();
@@ -360,7 +342,7 @@ namespace IRSpeedyVPN.Services
                         _singboxLinkOverride = singboxLink;
                     }
                     */
-                    // Generate the existing inbound/DNS/Shield/VOD shell, then
+                    // Generate the existing inbound/DNS/Shield shell, then
                     // replace its primary outbound with the independent groups.
                     if (string.IsNullOrWhiteSpace(configData))
                     {
@@ -372,7 +354,6 @@ namespace IRSpeedyVPN.Services
                             shieldFiles,
                             chainLink,
                             new string[] { defaultChainLink, selectedChain },
-                            lastVodLink,
                             !string.IsNullOrEmpty(defaultChainLink),
                             sniRuntime?.ListenHost,
                             sniRuntime?.ListenPort,
@@ -462,7 +443,7 @@ namespace IRSpeedyVPN.Services
                 var chainLink = GetChainLink(lastLink ?? SelectedUrl);
                 var defaultChainLink = GetDefaultChainLink();
                 var effectiveLink = _singboxLinkOverride ?? lastLink ?? SelectedUrl;
-                var configData = SingBox.ConfigGenerator.GetConfig(effectiveLink, lastListenPort, lastVpnMode, IsShareActive, shieldFiles, chainLink, new string[] { defaultChainLink, selectedChain  }, lastVodLink, !string.IsNullOrEmpty(defaultChainLink), sniRuntime?.ListenHost, sniRuntime?.ListenPort);
+                var configData = SingBox.ConfigGenerator.GetConfig(effectiveLink, lastListenPort, lastVpnMode, IsShareActive, shieldFiles, chainLink, new string[] { defaultChainLink, selectedChain  }, !string.IsNullOrEmpty(defaultChainLink), sniRuntime?.ListenHost, sniRuntime?.ListenPort);
                 if (!TryStartCoreWithConfig(configData, out var startError))
                 {
                     onConnectDisconnect?.Invoke(this, false, 0, startError);
@@ -818,32 +799,41 @@ namespace IRSpeedyVPN.Services
 
         private void RecheckAiPoolAfterStart()
         {
-            // Native startup probes only the first active tier. Check remaining
-            // AI members once so a faster one beyond the active tier need not
-            // wait for the 15-minute periodic round. Small pools already get a
-            // complete native initial round; do not duplicate their probes.
+            // Match Android: the native eight-member round runs in the background.
+            // Start the one-time AI-only full sweep after that round has completed;
+            // requesting it earlier would cancel the native round inside the Core.
             var plan = autoSelectorPlan;
-            if (plan == null || plan.AiMembers <= Xray.AutoSelectorPoolPlan.CloselyCheckedMemberLimit) return;
+            if (plan == null || plan.AiMembers <= Xray.AutoSelectorPoolPlan.AiActiveMemberLimit) return;
             long generation = Interlocked.Read(ref connectionGeneration);
-            Task.Run(() =>
+            Task.Run(async () =>
             {
-                lock (connectionLifecycleGate)
+                try
                 {
-                    if (userCancelRequested || !IsConnected || !ReferenceEquals(plan, autoSelectorPlan)
-                        || generation != Interlocked.Read(ref connectionGeneration)) return;
-                    try
+                    while (true)
                     {
-                        var result = new LibcoreServiceClient("127.0.0.1", CorePort, 750)
-                            .RecheckAutoSelector("ai-proxy", 750);
-                        Diagnostic("ai-pool-initial-recheck", "success=" + (result != null && string.IsNullOrEmpty(result.Error))
-                            + " members=" + plan.AiMembers);
+                        lock (connectionLifecycleGate)
+                        {
+                            if (userCancelRequested || !IsConnected || !ReferenceEquals(plan, autoSelectorPlan)
+                                || generation != Interlocked.Read(ref connectionGeneration)) return;
+                            var client = new LibcoreServiceClient("127.0.0.1", CorePort, 750);
+                            var status = client.QueryAutoSelectors(750)?.Groups.FirstOrDefault(g => g.Tag == "ai-proxy");
+                            if (userCancelRequested || generation != Interlocked.Read(ref connectionGeneration)) return;
+                            if (status == null) return;
+                            if (status.RoundsCompleted > 0 && !status.Suspended)
+                            {
+                                var result = client.RecheckAutoSelector("ai-proxy", 750);
+                                Diagnostic("ai-pool-initial-recheck", "success=" + (result != null && string.IsNullOrEmpty(result.Error))
+                                    + " members=" + plan.AiMembers);
+                                return;
+                            }
+                        }
+                        await Task.Delay(500).ConfigureAwait(false);
                     }
-                    catch (Exception ex)
-                    {
-                        // Optional Core capability failure must not restart or
-                        // disconnect the established VPN. Normal checks continue.
-                        Diagnostic("ai-pool-initial-recheck-unavailable", "exception=" + ex.GetType().Name);
-                    }
+                }
+                catch (Exception ex)
+                {
+                    // This optional background sweep never changes connection state.
+                    Diagnostic("ai-pool-initial-recheck-unavailable", "exception=" + ex.GetType().Name);
                 }
             });
         }
@@ -1426,111 +1416,6 @@ namespace IRSpeedyVPN.Services
             {
                 LogHelper.WriteLog(ex);
                 return new List<string>();
-            }
-        }
-
-        private void VodUrlTest()
-        {
-            lastVodLink = null;
-            if (!IsSmartFast && urlTestSpeed <= 0)
-                return;
-
-            try
-            {
-                Dictionary<string, string[]> vodUrls = new Dictionary<string, string[]>();
-                gInfo.Vods
-                   .Select(u => u.url)
-                   .Distinct()
-                   .ToList()
-                   .ForEach(u => vodUrls.Add(u, new string[] { GetDefaultChainLink() }));
-                if (vodUrls.Count == 0)
-                    return;
-
-                // With a single VOD link the latency probe only re-confirms that one
-                // link, adding seconds to the connect for no selection benefit. Use it
-                // directly; ApplyVodOutbound still validates it when the config is
-                // built. The probe only earns its cost when it picks among several.
-                if (vodUrls.Count == 1)
-                {
-                    lastVodLink = vodUrls.Keys.First();
-                    return;
-                }
-
-                // Route Hysteria2 and Xray-required links through Xray in VOD tests
-                var vodXhttpInfos = new List<Xray.ConfigGenerator.XraySocksInfo>();
-                var vodSocksOverrides = new Dictionary<string, Tuple<int, string, string>>();
-
-                foreach (var kvp in vodUrls)
-                {
-                    if (Xray.ConfigGenerator.LinkNeedsXrayForUrlTest(kvp.Key))
-                    {
-                        var socksPort = FreePortManager.Dequeue();
-                        var authUser = Guid.NewGuid().ToString("N");
-                        var authPass = Guid.NewGuid().ToString("N");
-                        var tag = $"vod-xray-{vodXhttpInfos.Count}";
-                        vodXhttpInfos.Add(new Xray.ConfigGenerator.XraySocksInfo
-                        {
-                            Link = kvp.Key,
-                            Tag = tag,
-                            Port = socksPort,
-                            User = authUser,
-                            Pass = authPass
-                        });
-                        vodSocksOverrides[kvp.Key] = Tuple.Create(socksPort, authUser, authPass);
-                    }
-                }
-
-                int port = FreePortManager.Dequeue();
-                try
-                {
-                    EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
-                    var vodConfig = SingBox.ConfigGenerator.GetUrlTestConfig(vodUrls, port, out var vodTagToUrl, null, vodSocksOverrides);
-
-                    if (vodTagToUrl.Count == 0)
-                        return;
-
-                    bool needVodXray = vodXhttpInfos.Count > 0;
-                    string vodXrayConfig = needVodXray ? Xray.ConfigGenerator.GetUrlTestXrayConfig(vodXhttpInfos, useCoreDns: true) : "";
-
-                    var vodResp = ExecuteCoreCall(client => client.Test(new TestReq
-                    {
-                        Config = vodConfig ?? "",
-                        OutboundTags = vodTagToUrl.Keys.ToList(),
-                        Url = "https://www.filimo.com/",
-                        MaxConcurrency = 10,
-                        TestTimeoutMs = 3000,
-                        NeedXray = needVodXray,
-                        XrayConfig = vodXrayConfig,
-                        XrayOutboundDnsStrategy = needVodXray ? Xray.ConfigGenerator.UrlTestOutboundDnsStrategy : ""
-                    }));
-
-                    if (vodResp?.Results != null)
-                    {
-                        long best = -1;
-                        foreach (var result in vodResp.Results)
-                        {
-                            if (result == null || result.LatencyMs <= 0)
-                                continue;
-                            if (!vodTagToUrl.TryGetValue(result.OutboundTag, out var url))
-                                continue;
-                            if (best < 0 || result.LatencyMs < best)
-                            {
-                                best = result.LatencyMs;
-                                lastVodLink = url;
-                            }
-                        }
-                    }
-                }
-                finally
-                {
-                    FreePortManager.Enqueue(port);
-                    foreach (var info in vodXhttpInfos)
-                        FreePortManager.Enqueue(info.Port);
-                }
-            }
-            catch (Exception ex)
-            {
-                LogHelper.WriteLog(ex);
             }
         }
 

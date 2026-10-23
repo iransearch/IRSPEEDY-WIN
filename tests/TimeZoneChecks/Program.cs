@@ -204,7 +204,7 @@ internal static class Program
             'inbounds':[{'type':'mixed','tag':'mixed-in'},{'type':'http','tag':'sharing-http'},{'type':'tun','tag':'tun-in'}],
             'outbounds':[{'type':'auto-selector','tag':'proxy'},{'type':'auto-selector','tag':'ai-proxy'},{'type':'direct','tag':'direct'}],
             'route':{'final':'direct','rules':[{'action':'hijack-dns'},{'process_path':['IRSpeedyVPN.exe'],'outbound':'direct'},
-                {'domain_suffix':['openai.com'],'outbound':'ai-proxy'},{'domain_suffix':['youtube.com'],'outbound':'vod-proxy'}]}
+                {'domain_suffix':['openai.com'],'outbound':'ai-proxy'},{'domain_suffix':['example.com'],'outbound':'regional-proxy'}]}
         }");
         var result = JObject.Parse(VpnTimeZoneRouting.Apply(original.ToString()));
         var route = (JObject)result["route"]; var rules = (JArray)route["rules"]; var first = (JObject)rules[0];
@@ -214,7 +214,7 @@ internal static class Program
             "HTTPS public-IP/GeoIP requests through explicit listeners always select main pool");
         rules.RemoveAt(0);
         Check(JToken.DeepEquals(route, original["route"]) && JToken.DeepEquals(result["outbounds"], original["outbounds"]),
-            "AI/VOD/process exclusions, Game Mode final and existing pool membership are preserved");
+            "AI/regional/process exclusions, Game Mode final and existing pool membership are preserved");
         Throws<InvalidOperationException>(() => VpnTimeZoneRouting.Apply("{'inbounds':[],'route':{'rules':[]}}"));
     }
 }

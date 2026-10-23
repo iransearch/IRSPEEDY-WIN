@@ -480,11 +480,8 @@ namespace IRSpeedyVPN.Services.Xray
         }
 
         /// <summary>
-        /// Adds the AI leastLoad balancer next to the main smart balancer, as the
-        /// Android client does, using the AI links supplied by the API. Gated by the
-        /// VOD/AI toggle. VOD is not handled here: the API serves plain VLESS on a
-        /// public IP, which the core refuses to build as an Xray outbound, so VOD
-        /// stays on its sing-box outbound instead.
+        /// Adds an independent AI balancer using the API-provided members,
+        /// controlled by the user's AI routing preference.
         /// </summary>
         private static bool ApplySmartIpRouting(JObject root, JArray outbounds, IEnumerable<string> aiLinks, JsonSerializer serializer, bool enabled)
         {

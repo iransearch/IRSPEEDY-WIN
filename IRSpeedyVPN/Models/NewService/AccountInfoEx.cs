@@ -16,7 +16,6 @@ namespace IRSpeedyVPN.Models.NewService
         public string id { get; set; }
         public string datetime { get; set; }
         public SettingInfo Settings { get; set; }
-        public List<Url> vods { get; set; }
         public List<Url> ais { get; set; }
     }
 

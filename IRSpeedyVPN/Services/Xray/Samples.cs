@@ -8,8 +8,8 @@ namespace IRSpeedyVPN.Services.Xray
 {
     public  class Samples
     {
-        // SmartIpRouting appends the vod-proxy-/ai-proxy- prefixes to the
-        // burstObservatory selector when those services are active. The Throne
+        // SmartIpRouting appends the ai-proxy- prefix to the
+        // burstObservatory selector when AI is active. The Throne
         // core accepts only this one observatory, so the probe is shared.
         public static string BalancerConfig= @"{
 			""burstObservatory"": {

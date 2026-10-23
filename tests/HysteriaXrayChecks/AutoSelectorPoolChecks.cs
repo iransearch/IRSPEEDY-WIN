@@ -52,7 +52,7 @@ internal static class AutoSelectorPoolChecks
                     && main["fallbackTag"] == null && ai["fallbackTag"] == null,
                     "main and AI selection stay independent in " + (tun ? "TUN" : "proxy"));
                 Check((string)main["interval"] == "900s" && (string)main["bench_interval"] == "900s"
-                    && (string)main["watch_interval"] == "300s" && (int)main["sampling"] == 10
+                    && (string)main["watch_interval"] == "300s" && (int)main["sampling"] == 3 && (int)ai["sampling"] == 3
                     && (int)main["tolerance"] == 300 && (int)ai["tolerance"] == 300
                     && main["max_rtt"] == null && ai["max_rtt"] == null
                     && (int)main["expected"] == 2 && (int)main["active_size"] == 2
@@ -63,9 +63,9 @@ internal static class AutoSelectorPoolChecks
                 Check(JToken.DeepEquals(config["dns"], original["dns"])
                     && JToken.DeepEquals(config["inbounds"], original["inbounds"])
                     && (string)config["route"]["final"] == (tun ? "direct" : "proxy")
-                    && outbounds.Any(o => (string)o["tag"] == "irancell")
+                    && !outbounds.Any(o => (string)o["tag"] == "irancell")
                     && outbounds.Where(o => (string)o["type"] == "socks").All(o => (string)o["detour"] == "chain-default-1"),
-                    "DNS, sharing inbound, VOD, chain and Game Mode final preserved in " + (tun ? "TUN" : "proxy"));
+                    "DNS, sharing inbound, chain and Game Mode final preserved without a legacy service outbound in " + (tun ? "TUN" : "proxy"));
                 var rules = (JArray)config["route"]["rules"];
                 var aiRule = rules.OfType<JObject>().Single(r => (string)r["outbound"] == "ai-proxy");
                 Check(aiRule["domain_suffix"].Values<string>().Contains("showip.net")
@@ -110,7 +110,7 @@ internal static class AutoSelectorPoolChecks
         Check(AutoSelectorPoolPlan.Create(new[] { "missing://invalid" }, null, false,
             () => { throw new Exception("unexpected allocation"); }, released.Add) == null,
             "no accepted main member prevents configuration and allocates no ports");
-        foreach (int count in new[] { 9, 35, 36 })
+        foreach (int count in new[] { 8, 9, 35, 36 })
         {
             var largeLinks = Enumerable.Range(0, count).Select(i => "hy2://auto-" + i).ToArray();
             foreach (var link in largeLinks)
@@ -123,8 +123,8 @@ internal static class AutoSelectorPoolChecks
                 Check(group["outbounds"].Count() == count && aiGroup["outbounds"].Count() == count
                     && (int)group["expected"] == 3 && (int)aiGroup["expected"] == 3
                     && (int)group["active_size"] == Math.Min(35, count)
-                    && (int)aiGroup["active_size"] == Math.Min(35, count),
-                    "main/AI pools retain all " + count + " members with three ready and at most 35 closely checked");
+                    && (int)aiGroup["active_size"] == Math.Min(8, count),
+                    "main/AI pools retain all " + count + " members with independent main (35) and Android AI (8) active limits");
             }
         }
         Console.WriteLine(passed + " Auto Selector pool checks passed.");
@@ -141,7 +141,6 @@ internal static class AutoSelectorPoolChecks
         root["outbounds"][0]["type"] = "socks";
         root["outbounds"][0]["detour"] = "chain-default-1";
         ((JArray)root["outbounds"]).Add(new JObject { ["type"] = "direct", ["tag"] = "chain-default-1" });
-        ((JArray)root["outbounds"]).Add(new JObject { ["type"] = "socks", ["tag"] = "irancell", ["server_port"] = 29000, ["detour"] = "chain-default-1" });
         ((JArray)root["route"]["rules"]).Add(new JObject { ["domain"] = new JArray("ads.invalid"), ["outbound"] = "block" });
         if (tun) root["route"]["final"] = "direct";
         return root;

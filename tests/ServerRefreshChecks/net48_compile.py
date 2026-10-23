@@ -39,7 +39,7 @@ linked = [
 stubs = r'''using System;using System.Linq;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
 using System.Windows;using System.Windows.Controls;using System.Windows.Media;
 using IRSpeedyVPN.Common;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Models;using IRSpeedyVPN.Models.NewService;using IRSpeedyVPN.Services;
-namespace IRSpeedyVPN.Models { public enum VPNType { NORMAL,VOD,CHAIN } internal class GlobalInfo { public object CurrentService; } }
+namespace IRSpeedyVPN.Models { public enum VPNType { NORMAL,CHAIN } internal class GlobalInfo { public object CurrentService; } }
 namespace IRSpeedyVPN.Interfaces {
  public interface IVPNService { int ID{get;}string Name{get;}string CountryCode{get;}string Country{get;}bool IsUrlTestSupported{get;}Url SelectedServerUrl{get;set;}List<Url> GetServerUrls();void UrlTest(); }
  interface ISmartFastConnection { void SetSmartFastUrls(string[] urls); }

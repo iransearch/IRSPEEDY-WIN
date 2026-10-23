@@ -88,7 +88,7 @@ class Program
         SmartIpRouting.SetEnabled(false);
         ConfigGenerator.GetSmartBalancerConfig(links, 19002, "test-user", "test-pass",
             new[] { "hy2://fixture" }, out ai, out members, out hysteriaMembers, true);
-        Check(ai, "Startup did not use its AI/VOD preference snapshot");
+        Check(ai, "Startup did not use its AI preference snapshot");
         Check(IRSpeedyVPN.Common.ConnectionDiagnostics.Lines.Any(l => l.Contains("ai-setting-saved"))
             && IRSpeedyVPN.Common.ConnectionDiagnostics.Lines.Any(l => l.Contains("accepted=1")), "Toggle/member diagnosis missing");
         Console.WriteLine("PASS: repeated AI on/off, current members, ShowIP rule, shared startup snapshot and preserved probe policy.");
