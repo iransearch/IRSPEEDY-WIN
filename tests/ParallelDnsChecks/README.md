@@ -1,6 +1,6 @@
 # Android-style VPN DNS
 
-Windows 1.4.35 uses the app-owned native `vpn-dns-race` transport in the updated
+Windows 1.4.36 uses the app-owned native `vpn-dns-race` transport in the updated
 Throne-G Core. Reference Android commit:
 12f470f443f5f5217a4713f87f24469feacd44f9.
 
@@ -49,7 +49,7 @@ The transformation is idempotent, including already-native race profiles.
 Browser-owned DoH and applications that resolve before contacting the proxy
 are outside this destination-resolution policy.
 
-**Rebuild the updated Throne-G Core as well as Windows 1.4.35.** The old Core
+**Rebuild the updated Throne-G Core as well as Windows 1.4.36.** The old Core
 does not recognize the new transport. Use the existing branch
 `update/fc668b60-core-only-1.3.0-beta.1`. The local DNS engine is packaged in that
 repository; no dependency-pin or external builder override is required.
@@ -62,6 +62,11 @@ maps to Google/Cloudflare/Yandex/additional; 4 is TCP fallback, -1 no winner.
 raw stage or complete IP lookup latency. Complete cumulative provider/cache/error
 counters survive sampling (first 32 results, every 128th, final summary).
 No queried domains, returned addresses, endpoint tags or raw errors are logged.
+Windows 1.4.36 also preserves these events in the final `LogPolicy` filter;
+1.4.35 inadvertently retained only DNS errors and dropped healthy results and
+summaries. Upgrading 1.4.35 to 1.4.36 needs only the Windows app rebuild when Core
+aecfe86f4cbec5c7cab2b7d7f76bee324444a875 is already installed. DNS/Shield routing
+and resolver selection are unchanged by this logging fix.
 `dns.final` is a routing default, not the actual winner.
 
 Generate and verify Windows configuration fixtures:

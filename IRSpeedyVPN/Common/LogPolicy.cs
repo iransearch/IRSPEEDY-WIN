@@ -44,7 +44,11 @@ namespace IRSpeedyVPN.Common
             {
                 var coreEvent = Field(fields, "event");
                 return coreEvent == "default-interface" || coreEvent == "hy2-reset"
-                    || coreEvent == "pool-probes-ready";
+                    || coreEvent == "pool-probes-ready"
+                    // Core already bounds DNS result sampling. Preserve healthy
+                    // results and summaries too, or provider totals are biased.
+                    || coreEvent == "dns-race-created" || coreEvent == "dns-race-result"
+                    || coreEvent == "dns-race-summary";
             }
             if (stage == "core-output" || stage == "core-exit-tail")
             {
@@ -90,3 +94,4 @@ namespace IRSpeedyVPN.Common
         }
     }
 }
+

@@ -23,6 +23,14 @@ internal static class Program
         Require(CoreDiagnosticMetadata.TryParse("[CoreDiagnostic] schema=core-network-v2 event=dns-race-created pid=7 seq=4 box=2 dns=8 count=4 timeoutMs=8000 fallbackTimeoutMs=4000 current=true", out safe), "DNS race startup metadata missing.");
         Require(!CoreDiagnosticMetadata.TryParse(dns.Replace("ip-network", "private.example"), out safe)
             && !CoreDiagnosticMetadata.TryParse(dns + " domain=private.example", out safe), "DNS diagnostics disclosed browsing data.");
+        foreach (var dnsEvent in new[] { "dns-race-created", "dns-race-result", "dns-race-summary" })
+        {
+            string fields = "event=" + dnsEvent + " error=none failures=0 count=1 wins2=1";
+            Require(LogPolicy.UsefulDiagnostic("core-detail", fields)
+                && LogPolicy.ShouldWrite("[ConnectionDiagnostic] stage=core-detail " + fields),
+                "Successful DNS metadata must pass both report filters: " + dnsEvent);
+        }
+        Require(!LogPolicy.UsefulDiagnostic("core-detail", "event=probe-end error=none"), "Successful routine probes became noisy.");
         Require(CoreDiagnosticMetadata.Hash("proxy") == "1241936d4dd3aad6", "Go/C# correlation mismatch.");
         using (var process = System.Diagnostics.Process.GetCurrentProcess())
         {
@@ -34,6 +42,9 @@ internal static class Program
         TunnelPlusService.Exercise();
         ConnectionDiagnostics.Flush();
         var output = string.Join("\n", lines.ToArray());
+        Require(output.Contains("event=dns-race-created") && output.Contains("source=ip-network")
+            && output.Contains("source=ip-cache") && output.Contains("event=dns-race-summary")
+            && output.Contains("wins2=2"), "Healthy DNS winner and final totals were filtered out of the actual report pipeline.");
         Require(output.Contains("selectedMode=Proxy") && output.Contains("appliedMode=TUN"), "Selected/applied mode must be distinguished.");
         Require(output.Contains("appliedMode=Proxy"), "Established proxy mode must be explicit.");
         Require(output.Contains("appliedMode=not-connected"), "Do not label an idle service as connected.");

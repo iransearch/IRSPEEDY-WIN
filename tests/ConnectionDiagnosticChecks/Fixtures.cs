@@ -1,5 +1,5 @@
 using System; using System.Diagnostics;
-namespace IRSpeedyVPN.Common { public static class LogHelper { public static Action<string> Sink; public static void WriteLog(string s) { Sink?.Invoke(s); } } }
+namespace IRSpeedyVPN.Common { public static class LogHelper { public static Action<string> Sink; public static void WriteLog(string s) { if (LogPolicy.ShouldWrite(s)) Sink?.Invoke(s); } } }
 namespace IRSpeedyVPN.Resource { public static class RegHelper { public static string Mode="0", Game="0"; public static string GetSettingValue(string k) { return k=="VGAURDVPNMode"?Mode:Game; } } }
 namespace IRSpeedyVPN.Services
 {
@@ -34,6 +34,10 @@ namespace IRSpeedyVPN.Services
             for (int i = 0; i < 50; i++) reader.ObserveCoreOutput(null, "stderr", "route outbound proxy");
             reader.ObserveCoreOutput(null, "stderr", "[Info] [1234] app/dispatcher: taking detour [ai-proxy-2] for [tcp:showip.net:443]");
             reader.ObserveCoreOutput(null, "stderr", "error connection refused context deadline exceeded secret://private@example.com password=PRIVATE_VALUE");
+            reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-created pid=7 seq=10 box=2 dns=8 count=4 timeoutMs=8000 fallbackTimeoutMs=4000 current=true");
+            reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-result pid=7 seq=11 box=2 dns=8 count=1 wins0=0 wins1=0 wins2=1 wins3=0 wins4=0 cached=0 failures=0 index=2 source=ip-network elapsedMs=24 error=none");
+            reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-result pid=7 seq=12 box=2 dns=8 count=2 wins0=0 wins1=0 wins2=2 wins3=0 wins4=0 cached=1 failures=0 index=2 source=ip-cache elapsedMs=0 error=none");
+            reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-summary pid=7 seq=13 box=2 dns=8 count=2 wins0=0 wins1=0 wins2=2 wins3=0 wins4=0 cached=1 failures=0");
             s.EndConnection();
         }
     }
@@ -42,3 +46,4 @@ namespace IRSpeedyVPN.Services
 
 // SystemProxy uses this namespace only for commented-out message boxes.
 namespace System.Windows.Forms { }
+
