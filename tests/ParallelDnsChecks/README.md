@@ -2,16 +2,19 @@
 
 The active connection's final JSON is transformed after Split Tunnel rules and
 typed serialization. The app-owned remote profile races three verified DoH
-transports through `proxy`, in this order:
+transports and one ordinary UDP resolver through `proxy`, in this order:
 
-| Provider | Server | TLS name | Path |
-| --- | --- | --- | --- |
-| Google | 8.8.8.8 | dns.google | /dns-query |
-| Cloudflare | 1.1.1.1 | cloudflare-dns.com | /dns-query |
-| Yandex Basic | 77.88.8.8 | common.dot.dns.yandex.net | /dns-query |
+| Provider | Server | Transport | TLS name | Path |
+| --- | --- | --- | --- | --- |
+| Google | 8.8.8.8 | DoH | dns.google | /dns-query |
+| Cloudflare | 1.1.1.1 | DoH | cloudflare-dns.com | /dns-query |
+| Yandex Basic | 77.88.8.8 | DoH | common.dot.dns.yandex.net | /dns-query |
+| Additional resolver | 78.186.60.77 | UDP/53 | — | — |
 
 Yandex documents the Basic DoH IP and TLS name at <https://dns.yandex.com/>.
-Google is listed first; a faster valid Cloudflare or Yandex response still wins.
+Google is listed first; a faster valid response from any of the four resolvers wins.
+The additional resolver uses UDP port 53 with the same `proxy` detour; it does not
+change direct/bootstrap DNS or the server-test resolver.
 NOERROR (including NODATA) and NXDOMAIN are valid answers. SERVFAIL, REFUSED and
 transport errors do not win; if every provider fails the result is SERVFAIL,
 without retrying a provider or using direct/system DNS. Existing core TTL caches
@@ -43,6 +46,6 @@ python tests/ParallelDnsChecks/run-core.py /path/to/sing-box /absolute/path/to/f
 
 `GO` can select the Go executable. The runner temporarily adds a test to the
 external core checkout, runs `go test -race`, and removes the test in `finally`.
-Tests cover all three winners, scoped/direct DNS, Windows shared DNS, schema
+Tests cover all four winners, scoped/direct DNS, Windows shared DNS, schema
 validation, errors, negative answers, AAAA/NODATA and the existing TTL cache.
 Live Windows TUN/DoH verification still requires the packaged application.

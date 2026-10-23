@@ -9,8 +9,9 @@ namespace IRSpeedyVPN.Services.SingBox
         private const string Google = "dns-remote";
         private const string Cloudflare = "dns-remote-cloudflare";
         private const string Yandex = "dns-remote-yandex";
+        private const string Additional = "dns-remote-additional";
         private const string ResponsePrefix = "irspeedy-dns-race-";
-        private static readonly string[] RemoteTags = { Google, Cloudflare, Yandex };
+        private static readonly string[] RemoteTags = { Google, Cloudflare, Yandex, Additional };
         private static readonly string[] RouteOptions = { "action", "server", "strategy", "disable_cache",
             "disable_optimistic_cache", "rewrite_ttl", "timeout", "client_subnet", "remove_client_subnet" };
 
@@ -30,7 +31,8 @@ namespace IRSpeedyVPN.Services.SingBox
             var rules = dns["rules"] as JArray ?? new JArray();
             if (rules.OfType<JObject>().Any(r => (string)r["action"] == "evaluate"
                 && ((string)r["tag"] ?? "").StartsWith(ResponsePrefix, System.StringComparison.Ordinal))) return json;
-            if (servers.OfType<JObject>().Any(s => (string)s["tag"] == Cloudflare || (string)s["tag"] == Yandex)) return json;
+            if (servers.OfType<JObject>().Any(s => (string)s["tag"] == Cloudflare || (string)s["tag"] == Yandex
+                || (string)s["tag"] == Additional)) return json;
 
             // A legacy DNS rule strategy cannot coexist with evaluate/race. The
             // app's bootstrap dialer already gets prefer_ipv4 from this resolver;
@@ -63,6 +65,10 @@ namespace IRSpeedyVPN.Services.SingBox
                     ["path"] = "/dns-query", ["detour"] = "proxy",
                     ["tls"] = new JObject { ["enabled"] = true, ["server_name"] = endpoint[2] }
                 });
+            servers.Insert(insert, new JObject {
+                ["type"] = "udp", ["tag"] = Additional, ["server"] = "78.186.60.77",
+                ["server_port"] = 53, ["detour"] = "proxy"
+            });
             var ordered = new JArray();
             int group = 0;
             foreach (var rule in rules.OfType<JObject>())

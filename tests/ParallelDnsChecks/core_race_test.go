@@ -45,8 +45,10 @@ func irspeedyRules(t *testing.T, name string, transports ...*fakeDNSTransport) (
 	return router, rules
 }
 
+const irspeedyRemoteCount = 4
+
 func irspeedyTransports() []*fakeDNSTransport {
-	tags := []string{"dns-remote", "dns-remote-cloudflare", "dns-remote-yandex", "dns-direct", "split-dns-direct"}
+	tags := []string{"dns-remote", "dns-remote-cloudflare", "dns-remote-yandex", "dns-remote-additional", "dns-direct", "split-dns-direct"}
 	transports := make([]*fakeDNSTransport, len(tags))
 	for i, tag := range tags {
 		transports[i] = &fakeDNSTransport{tag: tag, delay: 400 * time.Millisecond,
@@ -73,7 +75,7 @@ func irspeedyExchange(router *Router, rules []adapter.DNSRule, domain, inbound, 
 
 func TestIRSpeedyParallelDNS(t *testing.T) {
 	for _, fixture := range []string{"proxy", "tun", "split-proxy", "split-tun", "scoped"} {
-		for _, winner := range []int{0, 1, 2} {
+		for _, winner := range []int{0, 1, 2, 3} {
 			t.Run(fixture+"/winner-"+string(rune('0'+winner)), func(t *testing.T) {
 				transports := irspeedyTransports()
 				transports[winner].delay = 25 * time.Millisecond
@@ -87,13 +89,13 @@ func TestIRSpeedyParallelDNS(t *testing.T) {
 				require.NoError(t, result.err)
 				require.Equal(t, transports[winner].address, responseAddress(t, result.response))
 				require.Less(t, time.Since(start), 250*time.Millisecond, "must not wait for a slower earlier resolver")
-				for _, transport := range transports[:3] {
+				for _, transport := range transports[:irspeedyRemoteCount] {
 					require.Equal(t, int32(1), transport.queryCount.Load())
 				}
-				for _, transport := range transports[3:] {
+				for _, transport := range transports[irspeedyRemoteCount:] {
 					require.Zero(t, transport.queryCount.Load(), "no direct DNS leak")
 				}
-				require.Less(t, transports[2].firstQueried.Sub(transports[0].firstQueried).Abs(), 100*time.Millisecond)
+				require.Less(t, transports[irspeedyRemoteCount-1].firstQueried.Sub(transports[0].firstQueried).Abs(), 100*time.Millisecond)
 			})
 		}
 	}
@@ -114,17 +116,17 @@ func TestIRSpeedyParallelDNS(t *testing.T) {
 	}
 	t.Run("all-fail", func(t *testing.T) {
 		transports := irspeedyTransports()
-		for _, transport := range transports[:3] {
+		for _, transport := range transports[:irspeedyRemoteCount] {
 			transport.delay, transport.rcode = time.Millisecond, mDNS.RcodeRefused
 		}
 		router, rules := irspeedyRules(t, "split-tun", transports...)
 		result := irspeedyExchange(router, rules, "race.example.org", "tun-in", "svchost.exe", mDNS.TypeA)
 		require.NoError(t, result.err)
 		require.Equal(t, mDNS.RcodeServerFailure, result.response.Rcode)
-		for _, transport := range transports[:3] {
+		for _, transport := range transports[:irspeedyRemoteCount] {
 			require.Equal(t, int32(1), transport.queryCount.Load(), "no sequential requery")
 		}
-		for _, transport := range transports[3:] {
+		for _, transport := range transports[irspeedyRemoteCount:] {
 			require.Zero(t, transport.queryCount.Load())
 		}
 	})
@@ -146,14 +148,25 @@ func TestIRSpeedyParallelDNS(t *testing.T) {
 			}
 		}
 	})
-	t.Run("timeouts-do-not-block-third-resolver", func(t *testing.T) {
+	t.Run("timeouts-do-not-block-additional-resolver", func(t *testing.T) {
 		transports := irspeedyTransports()
-		transports[0].exchangeErr, transports[1].exchangeErr = context.DeadlineExceeded, context.DeadlineExceeded
-		transports[2].delay = 25 * time.Millisecond
+		for _, transport := range transports[:irspeedyRemoteCount-1] {
+			transport.exchangeErr = context.DeadlineExceeded
+		}
+		transports[irspeedyRemoteCount-1].delay = 25 * time.Millisecond
 		router, rules := irspeedyRules(t, "tun", transports...)
 		result := irspeedyExchange(router, rules, "race.example.org", "tun-in", "browser.exe", mDNS.TypeA)
 		require.NoError(t, result.err)
-		require.Equal(t, transports[2].address, responseAddress(t, result.response))
+		require.Equal(t, transports[irspeedyRemoteCount-1].address, responseAddress(t, result.response))
+	})
+	t.Run("additional-error-does-not-block-doh", func(t *testing.T) {
+		transports := irspeedyTransports()
+		transports[3].delay, transports[3].rcode = time.Millisecond, mDNS.RcodeRefused
+		transports[1].delay = 25 * time.Millisecond
+		router, rules := irspeedyRules(t, "tun", transports...)
+		result := irspeedyExchange(router, rules, "race.example.org", "tun-in", "browser.exe", mDNS.TypeA)
+		require.NoError(t, result.err)
+		require.Equal(t, transports[1].address, responseAddress(t, result.response))
 	})
 	t.Run("cached-answer-retained", func(t *testing.T) {
 		transports := irspeedyTransports()
@@ -172,10 +185,10 @@ func TestIRSpeedyParallelDNS(t *testing.T) {
 		domain, inbound, process string
 		transport                int
 	}{
-		{"bootstrap.example.org", "mixed-in", "browser.exe", 3},
-		{"race.example.org", "tun-in", "other.exe", 4},
-		{"race.example.org", "tun-in", "svchost.exe", 2},
-		{"scoped.example.org", "mixed-in", "browser.exe", 2},
+		{"bootstrap.example.org", "mixed-in", "browser.exe", 4},
+		{"race.example.org", "tun-in", "other.exe", 5},
+		{"race.example.org", "tun-in", "svchost.exe", 3},
+		{"scoped.example.org", "mixed-in", "browser.exe", 3},
 	} {
 		t.Run(tc.domain+"/"+tc.process, func(t *testing.T) {
 			transports := irspeedyTransports()
@@ -188,8 +201,8 @@ func TestIRSpeedyParallelDNS(t *testing.T) {
 			result := irspeedyExchange(router, rules, tc.domain, tc.inbound, tc.process, mDNS.TypeA)
 			require.NoError(t, result.err)
 			require.Equal(t, transports[tc.transport].address, responseAddress(t, result.response))
-			if tc.transport >= 3 {
-				for _, transport := range transports[:3] {
+			if tc.transport >= irspeedyRemoteCount {
+				for _, transport := range transports[:irspeedyRemoteCount] {
 					require.Zero(t, transport.queryCount.Load(), "direct scope must not launch VPN queries")
 				}
 			}
