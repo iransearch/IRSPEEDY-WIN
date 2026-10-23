@@ -1,6 +1,6 @@
 # Android-style VPN DNS
 
-Windows 1.4.34 uses the app-owned native `vpn-dns-race` transport in the updated
+Windows 1.4.35 uses the app-owned native `vpn-dns-race` transport in the updated
 Throne-G Core. Reference Android commit:
 12f470f443f5f5217a4713f87f24469feacd44f9.
 
@@ -34,17 +34,34 @@ Parent cancellation prevents fallback.
 
 Remote DNS rules receive a 12-second outer budget. Explicit shorter timeouts,
 cache-bypass flags and scoped/direct rules remain effective. Direct/bootstrap
-DNS, server-test DNS, AI/Pool routing and Split Tunnel exclusions keep their
+DNS, server-test DNS, AI/Pool selection and Split Tunnel exclusions keep their
 existing policy. TUN shared Windows DNS routes to the same composite.
 
-**Rebuild the updated Throne-G Core as well as Windows 1.4.34.** The old Core
+In Proxy mode, HTTP/SOCKS destination domains now pass through `resolve` before
+the final main/AI VPN route. DNS routing is retained (no forced `server` bypass),
+so predefined/Shield, localhost, bootstrap and scoped direct rules still apply.
+The original domain remains available to AI/domain routing and payload/SNI is
+unchanged; outbound setup uses the resolved IP. Existing direct routes run first.
+Known blocked domains are rejected before resolution; preceding Shield blockers
+are checked again afterwards to catch returned IPs and rule-set IP entries.
+Only proxy inbound tags match these rules, never TUN or internal DNS/probes.
+The transformation is idempotent, including already-native race profiles.
+Browser-owned DoH and applications that resolve before contacting the proxy
+are outside this destination-resolution policy.
+
+**Rebuild the updated Throne-G Core as well as Windows 1.4.35.** The old Core
 does not recognize the new transport. Use the existing branch
 `update/fc668b60-core-only-1.3.0-beta.1`. The local DNS engine is packaged in that
 repository; no dependency-pin or external builder override is required.
-Core implementation commit: 71b93203ed46de66a86ce3294b67b197573db0bf.
+Core implementation commit: aecfe86f4cbec5c7cab2b7d7f76bee324444a875.
 
-Debug logs distinguish raw/network, IP/network and IP/cache winners. Provider
-tags map to primary-0/1/2/3 (Google/Cloudflare/Yandex/additional), or fallback.
+Structured Core diagnostics now reach the normal report without Debug logging:
+`dns-race-created`, `dns-race-result`, `dns-race-summary`. Result `index` 0/1/2/3
+maps to Google/Cloudflare/Yandex/additional; 4 is TCP fallback, -1 no winner.
+`source` is `raw-network`, `ip-network`, or `ip-cache`; `elapsedMs` is the winning
+raw stage or complete IP lookup latency. Complete cumulative provider/cache/error
+counters survive sampling (first 32 results, every 128th, final summary).
+No queried domains, returned addresses, endpoint tags or raw errors are logged.
 `dns.final` is a routing default, not the actual winner.
 
 Generate and verify Windows configuration fixtures:
@@ -58,4 +75,8 @@ The runner uses `go test -race` on the real local DNS engine, transport and
 CLI/Check parser. Native tests cover completion order, each provider, real local
 TLS/UDP/TCP detours, raw/IP cache separation, preflight including fallback,
 TTL=0, dual-family coordination, cache bypass/clear, negatives, stage deadlines
-and worker cancellation. Live Windows TUN/DoH validation requires the packaged app.
+and worker cancellation. Fixtures also run real HTTP CONNECT/SOCKS5 inbounds with
+loopback DNS/providers and captured outbounds: main and AI get IP destinations,
+direct/bootstrap routing stays scoped, and Shield domain/IP/inline rule-set/DNS
+blocks prevent outbound dials. OS interface monitoring is excluded from that
+loopback harness. Live Windows/DoH validation requires the packaged app.

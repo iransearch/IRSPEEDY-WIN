@@ -17,6 +17,12 @@ internal static class Program
         Require(!CoreDiagnosticMetadata.TryParse(core + " tag=private.example", out safe), "Raw tag accepted.");
         Require(!CoreDiagnosticMetadata.TryParse(core + " reason=power-event", out safe), "Duplicate field accepted.");
         Require(!CoreDiagnosticMetadata.TryParse(core + " index=1\n", out safe), "Control characters accepted in numeric metadata.");
+        const string dns = "[CoreDiagnostic] schema=core-network-v2 event=dns-race-result pid=7 seq=3 monoMs=41 box=2 dropped=0 dns=8 count=12 wins0=2 wins1=3 wins2=4 wins3=1 wins4=1 cached=2 failures=1 index=2 source=ip-network elapsedMs=24 error=none";
+        Require(CoreDiagnosticMetadata.TryParse(dns, out safe) && safe.Contains("index=2") && safe.Contains("wins2=4"), "DNS winners must survive the production report filter.");
+        Require(CoreDiagnosticMetadata.TryParse(dns.Replace("ip-network", "ip-cache"), out safe), "DNS cache winner metadata missing.");
+        Require(CoreDiagnosticMetadata.TryParse("[CoreDiagnostic] schema=core-network-v2 event=dns-race-created pid=7 seq=4 box=2 dns=8 count=4 timeoutMs=8000 fallbackTimeoutMs=4000 current=true", out safe), "DNS race startup metadata missing.");
+        Require(!CoreDiagnosticMetadata.TryParse(dns.Replace("ip-network", "private.example"), out safe)
+            && !CoreDiagnosticMetadata.TryParse(dns + " domain=private.example", out safe), "DNS diagnostics disclosed browsing data.");
         Require(CoreDiagnosticMetadata.Hash("proxy") == "1241936d4dd3aad6", "Go/C# correlation mismatch.");
         using (var process = System.Diagnostics.Process.GetCurrentProcess())
         {
@@ -85,3 +91,4 @@ internal static class Program
     }
     private static void Require(bool valid, string message) { if (!valid) throw new Exception(message); }
 }
+

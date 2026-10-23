@@ -14,7 +14,7 @@ core, fixtures = (Path(arg).resolve() for arg in sys.argv[1:])
 server = core / "core/server"
 assert (server / "internal/vpndns/transport.go").is_file(), "Updated Throne-G with vpn-dns-race is required"
 assert all((fixtures / (name + ".json")).is_file()
-           for name in ("proxy", "tun", "split-proxy", "split-tun", "scoped")), "Generate Windows fixtures first"
+           for name in ("proxy", "tun", "split-proxy", "split-tun", "scoped", "proxy-shield-ai", "proxy-behavior")), "Generate Windows fixtures first"
 subprocess.run([os.environ.get("GO", "go"), "test", "-race", "./internal/dnsengine", "./internal/vpndns", "./internal/boxmain",
-                "-count=1"], cwd=server,
+                "./internal/boxbox", "./internal/netdiag", "-count=1"], cwd=server,
                env={**os.environ, "IRSPEEDY_DNS_FIXTURES": str(fixtures)}, check=True)

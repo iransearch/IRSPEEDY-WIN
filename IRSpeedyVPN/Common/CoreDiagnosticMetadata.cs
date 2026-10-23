@@ -157,7 +157,9 @@ namespace IRSpeedyVPN.Common
                     case "schema": valid = value == "core-network-v2"; break;
                     case "event": valid = new[] { "hy2-created", "hy2-reset", "hy2-close", "box-created", "box-start", "box-close",
                         "default-interface", "rpc-start", "rpc-stop", "rpc-stoptest", "tests-cancel", "test-environment", "test-return",
-                        "test-begin", "test-end", "probe-begin", "probe-end", "pool-probes-ready" }.Contains(value); break;
+                        "test-begin", "test-end", "probe-begin", "probe-end", "pool-probes-ready",
+                        "dns-race-created", "dns-race-result", "dns-race-summary" }.Contains(value); break;
+                    case "source": valid = new[] { "raw-network", "ip-network", "ip-cache" }.Contains(value); break;
                     case "reason": valid = new[] { "interface-update", "power-event", "network-manager-reset", "other-caller", "outbound-close", "stop-test" }.Contains(value); break;
                     case "context": valid = new[] { "active", "canceled", "deadline" }.Contains(value); break;
                     case "error": valid = new[] { "none", "network-changed", "canceled", "timeout", "closed", "other", "no-result" }.Contains(value); break;
@@ -165,6 +167,8 @@ namespace IRSpeedyVPN.Common
                     case "tag": case "config": valid = Regex.IsMatch(value, @"\A[0-9a-f]{16}\z"); break;
                     case "pid": case "seq": case "monoMs": case "box": case "dropped": case "outbound": case "index":
                     case "flags": case "test": case "count": case "timeoutMs": case "elapsedMs":
+                    case "dns": case "fallbackTimeoutMs": case "wins0": case "wins1": case "wins2": case "wins3": case "wins4":
+                    case "cached": case "failures":
                         long number; valid = long.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out number);
                         if (valid) value = number.ToString(CultureInfo.InvariantCulture);
                         break;
@@ -179,3 +183,4 @@ namespace IRSpeedyVPN.Common
         }
     }
 }
+
