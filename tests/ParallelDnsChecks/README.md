@@ -1,51 +1,61 @@
-# Parallel VPN DNS
+# Android-style VPN DNS
 
-The active connection's final JSON is transformed after Split Tunnel rules and
-typed serialization. The app-owned remote profile races three verified DoH
-transports and one ordinary UDP resolver through `proxy`, in this order:
+Windows 1.4.34 uses the app-owned native `vpn-dns-race` transport in the updated
+Throne-G Core. Reference Android commit:
+12f470f443f5f5217a4713f87f24469feacd44f9.
 
-| Provider | Server | Transport | TLS name | Path |
-| --- | --- | --- | --- | --- |
-| Google | 8.8.8.8 | DoH | dns.google | /dns-query |
-| Cloudflare | 1.1.1.1 | DoH | cloudflare-dns.com | /dns-query |
-| Yandex Basic | 77.88.8.8 | DoH | common.dot.dns.yandex.net | /dns-query |
-| Additional resolver | 78.186.60.77 | UDP/53 | — | — |
+| Provider | Server | Transport | TLS name |
+| --- | --- | --- | --- |
+| Google | 8.8.8.8 | DoH /dns-query | dns.google |
+| Cloudflare | 1.1.1.1 | DoH /dns-query | cloudflare-dns.com |
+| Yandex Basic | 77.88.8.8 | DoH /dns-query | common.dot.dns.yandex.net |
+| Additional resolver | 78.186.60.77 | UDP/53 | — |
 
-Yandex documents the Basic DoH IP and TLS name at <https://dns.yandex.com/>.
-Google is listed first; a faster valid response from any of the four resolvers wins.
-The additional resolver uses UDP port 53 with the same `proxy` detour; it does not
-change direct/bootstrap DNS or the server-test resolver.
-NOERROR (including NODATA) and NXDOMAIN are valid answers. SERVFAIL, REFUSED and
-transport errors do not win; if every provider fails the result is SERVFAIL,
-without retrying a provider or using direct/system DNS. Existing core TTL caches
-remain enabled, and losing work is canceled by the core. Parallel queries can
-increase DNS traffic; this does not measure or guarantee website download speed.
+All primary requests run concurrently through `proxy`, with an 8-second stage
+deadline. Valid replies enter a buffered completion queue: a later-listed
+provider which finishes first keeps its place even if Google's reply is also
+ready when selection resumes. Losers are canceled without delaying the caller.
 
-The implementation uses native `evaluate` / tagged `respond` / `race` from the
-Throne core's pinned sing-box fork, commit
-`f154bec036c97fc998a7714bea9977bdc343780a`. No new core binary is required.
-The obsolete DNS-rule `strategy` on app bootstrap rules is redundant with
-`route.default_domain_resolver.strategy` and is removed for modern DNS mode.
-The direct transport, resolver strategy and bootstrap domain rules stay intact.
-Explicit Windows shared DNS rules race in TUN Split Tunnel mode; deliberate
-direct app DNS remains direct. Probe configurations and custom DNS policies are
-left alone.
+Raw forwarding bypasses IP caches, including repeated raw A/AAAA requests.
+Raw failures produce SERVFAIL. IP lookups maintain separate TTL cache entries per
+provider and family. Before any network work they scan all selected DoH/TCP
+caches, including the fallback; all requested families must be present, unexpired
+and nonzero TTL. Multiple valid cache hits use configured order, as on Android.
+UDP checks its cache inside its IP worker. Both address families share one
+logical provider race. Positive partial-family results can complete a provider;
+complete negative results can also win.
 
-Run configuration/precedence checks and emit fixtures:
+After primary failure/timeout, one `tcp://1.1.1.1:53` fallback stage gets 4 seconds
+through the same VPN. There are no TCP reuse probes or implicit UDP-to-TCP retries.
+When an IP provider has produced no usable record, its stage waits for its
+deadline as on Android. NOERROR (including NODATA) and NXDOMAIN are valid;
+malformed/truncated/mismatched replies and server errors cannot win.
+Parent cancellation prevents fallback.
+
+Remote DNS rules receive a 12-second outer budget. Explicit shorter timeouts,
+cache-bypass flags and scoped/direct rules remain effective. Direct/bootstrap
+DNS, server-test DNS, AI/Pool routing and Split Tunnel exclusions keep their
+existing policy. TUN shared Windows DNS routes to the same composite.
+
+**Rebuild the updated Throne-G Core as well as Windows 1.4.34.** The old Core
+does not recognize the new transport. Use the existing branch
+`update/fc668b60-core-only-1.3.0-beta.1`. The local DNS engine is packaged in that
+repository; no dependency-pin or external builder override is required.
+Core implementation commit: 71b93203ed46de66a86ce3294b67b197573db0bf.
+
+Debug logs distinguish raw/network, IP/network and IP/cache winners. Provider
+tags map to primary-0/1/2/3 (Google/Cloudflare/Yandex/additional), or fallback.
+`dns.final` is a routing default, not the actual winner.
+
+Generate and verify Windows configuration fixtures:
 
 ```sh
 IRSPEEDY_DNS_FIXTURES=/absolute/path/to/fixtures dotnet run --project tests/ParallelDnsChecks
+python tests/ParallelDnsChecks/run-core.py /path/to/Throne-G /absolute/path/to/fixtures
 ```
 
-To exercise the generated fixtures with the real pinned DNS parser, validator,
-router and client, check out that exact core commit and run:
-
-```sh
-python tests/ParallelDnsChecks/run-core.py /path/to/sing-box /absolute/path/to/fixtures
-```
-
-`GO` can select the Go executable. The runner temporarily adds a test to the
-external core checkout, runs `go test -race`, and removes the test in `finally`.
-Tests cover all four winners, scoped/direct DNS, Windows shared DNS, schema
-validation, errors, negative answers, AAAA/NODATA and the existing TTL cache.
-Live Windows TUN/DoH verification still requires the packaged application.
+The runner uses `go test -race` on the real local DNS engine, transport and
+CLI/Check parser. Native tests cover completion order, each provider, real local
+TLS/UDP/TCP detours, raw/IP cache separation, preflight including fallback,
+TTL=0, dual-family coordination, cache bypass/clear, negatives, stage deadlines
+and worker cancellation. Live Windows TUN/DoH validation requires the packaged app.

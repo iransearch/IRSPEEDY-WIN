@@ -1,23 +1,20 @@
-"""Check generated DNS fixtures with the exact sing-box source used by Throne.
+"""Run VPN DNS tests in the updated Throne-G checkout.
 
 Generate fixtures with IRSPEEDY_DNS_FIXTURES=/absolute/path dotnet run --project
-tests/ParallelDnsChecks, then run this script with the core checkout and fixture
-directory as arguments. The temporary test file is always removed.
+tests/ParallelDnsChecks, then pass the Throne-G root and fixture directory.
+The tests are maintained in Throne-G; the upstream rule-order race is no longer
+used by the Windows live profile.
 """
 from pathlib import Path
 import os
-import shutil
 import subprocess
 import sys
 
 core, fixtures = (Path(arg).resolve() for arg in sys.argv[1:])
-pin = "f154bec036c97fc998a7714bea9977bdc343780a"
-assert subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=core, text=True).strip() == pin
-target = core / "dns/irspeedy_parallel_dns_test.go"
-assert not target.exists(), "Refusing to overwrite an existing test"
-try:
-    shutil.copyfile(Path(__file__).with_name("core_race_test.go"), target)
-    subprocess.run([os.environ.get("GO", "go"), "test", "./dns", "-run", "TestIRSpeedyParallelDNS", "-count=1", "-race"],
-                   cwd=core, env={**os.environ, "IRSPEEDY_DNS_FIXTURES": str(fixtures)}, check=True)
-finally:
-    target.unlink(missing_ok=True)
+server = core / "core/server"
+assert (server / "internal/vpndns/transport.go").is_file(), "Updated Throne-G with vpn-dns-race is required"
+assert all((fixtures / (name + ".json")).is_file()
+           for name in ("proxy", "tun", "split-proxy", "split-tun", "scoped")), "Generate Windows fixtures first"
+subprocess.run([os.environ.get("GO", "go"), "test", "-race", "./internal/dnsengine", "./internal/vpndns", "./internal/boxmain",
+                "-count=1"], cwd=server,
+               env={**os.environ, "IRSPEEDY_DNS_FIXTURES": str(fixtures)}, check=True)
