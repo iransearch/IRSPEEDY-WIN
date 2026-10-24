@@ -10,8 +10,13 @@ namespace IRSpeedyVPN.Common
     internal sealed class CoreRuntimeIdentity
     {
         internal const string ErrorPrefix = "[CoreFailure]\n";
+        internal const string ConnectionFailureMessage = "خطا در اتصال به سرویس";
+
+        internal static string UserConnectionError(string error)
+            => string.IsNullOrWhiteSpace(error) || error == "سروری یافت نشد" || error == "سرور یافت نشد" || error == "Connection canceled."
+                ? string.Empty : ConnectionFailureMessage;
         internal string Version = "unknown", Xray = "unknown", Commit = "unknown", Modified = "unknown",
-            Architecture = "unknown", GoVersion = "unknown", Path = "unknown", Sha256 = "unknown";
+            Architecture = "unknown", GoVersion = "unknown", Path = "unknown", Sha256 = "unknown", Privileged = "unknown";
         internal int Pid = -1;
 
         internal static string Token(string value)
@@ -29,6 +34,7 @@ namespace IRSpeedyVPN.Common
                 result.Version = Token(info.SingBoxVersion); result.Xray = Token(info.XrayVersion);
                 result.Commit = Token(info.Commit); result.Modified = Token(info.Modified);
                 result.Architecture = Token(info.Architecture); result.GoVersion = Token(info.GoVersion);
+                result.Privileged = info.HasPrivilege ? "true" : "false";
             }
             result.Pid = info != null && info.ProcessId > 0 ? info.ProcessId : listenerPid;
             if (result.Pid <= 0) return result;
@@ -78,7 +84,7 @@ namespace IRSpeedyVPN.Common
         internal string Details => "App: " + typeof(CoreRuntimeIdentity).Assembly.GetName().Version.ToString(3)
             + "\nCore (sing-box): " + Version + "\nXray: " + Xray
             + "\nCore commit: " + Commit + "\nSource modified: " + Modified
-            + "\nArchitecture: " + Architecture + "\nGo: " + GoVersion
+            + "\nArchitecture: " + Architecture + "\nGo: " + GoVersion + "\nCore privileged: " + Privileged
             + "\nPID: " + Pid + "\nExecutable: " + Path + "\nSHA256: " + Sha256;
 
         internal string Failure(string error)
@@ -94,3 +100,4 @@ namespace IRSpeedyVPN.Common
         }
     }
 }
+

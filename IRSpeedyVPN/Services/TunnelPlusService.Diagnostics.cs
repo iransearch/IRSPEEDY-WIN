@@ -34,6 +34,15 @@ namespace IRSpeedyVPN.Services
         {
             try { return process?.Id ?? -1; } catch { return -1; }
         }
+        private void DiagnosticStartFailure(string stage, string error, string phase)
+        {
+            Diagnostic(stage, "startupPhase=" + phase
+                + " reason=" + NetworkFailureDiagnostic.CoreReason(error)
+                + " " + CoreStartFailureDiagnostic.Fields(error)
+                + " messageId=" + ConnectionDiagnostics.Fingerprint(error)
+                + " text=\"" + ConnectionDiagnostics.SafeCoreStartText(error) + "\"");
+            ConnectionDiagnostics.RequestSnapshot();
+        }
         private void Diagnostic(string stage, string details = "")
         {
             try
@@ -136,3 +145,4 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
+

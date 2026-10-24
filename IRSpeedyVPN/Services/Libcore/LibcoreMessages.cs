@@ -22,6 +22,7 @@ namespace IRSpeedyVPN.Services.Libcore
 
     internal sealed class CoreBuildInfo
     {
+        public bool HasPrivilege;
         public string SingBoxVersion, XrayVersion, Commit, Modified, Architecture, GoVersion;
         public int ProcessId;
     }
@@ -115,3 +116,4 @@ namespace IRSpeedyVPN.Services.Libcore
         public List<URLTestResp> Results { get; set; } = new List<URLTestResp>();
     }
 }
+

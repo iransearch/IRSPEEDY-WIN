@@ -45,6 +45,19 @@ internal static class Program
         Require(output.Contains("event=dns-race-created") && output.Contains("source=ip-network")
             && output.Contains("source=ip-cache") && output.Contains("event=dns-race-summary")
             && output.Contains("wins2=2"), "Healthy DNS winner and final totals were filtered out of the actual report pipeline.");
+        Require(output.Contains("stage=core-start-config-error") && output.Contains("startupPhase=start-response")
+            && output.Contains("component=inbound") && output.Contains("operation=bind")
+            && output.Contains("network=tcp") && output.Contains("localPort=10808")
+            && output.Contains("reason=socket-access-denied"), "Startup response details were lost by the production report filters.");
+        Require(!output.Contains("PRIVATE_TAG") && !output.Contains("private.example"), "Startup error context leaked private data.");
+        string startupText = ConnectionDiagnostics.SafeCoreStartText("initialize inbound/mixed[PRIVATE_TAG]: configure tun adapter: Access is denied. password=PRIVATE_VALUE https://private.example/ 203.0.113.8");
+        Require(startupText.Contains("initialize") && startupText.Contains("configure") && startupText.Contains("denied")
+            && !startupText.Contains("PRIVATE") && !startupText.Contains("private.example") && !startupText.Contains("203.0.113"),
+            "Startup context must preserve useful words without raw configuration or endpoints.");
+        string quotedSecrets = ConnectionDiagnostics.SafeCoreStartText("error password=\"configure listen\" token='bind open' {\"password\":\"wintun\"}");
+        Require(!quotedSecrets.Contains("configure") && !quotedSecrets.Contains("listen") && !quotedSecrets.Contains("bind")
+            && !quotedSecrets.Contains("open") && !quotedSecrets.Contains("wintun"), "Quoted credentials and config dumps must be removed before vocabulary filtering.");
+        Require(!ConnectionDiagnostics.SafeCoreStartText("error password=\"listen bind").Contains("listen"), "A truncated quoted credential must remain redacted.");
         Require(output.Contains("selectedMode=Proxy") && output.Contains("appliedMode=TUN"), "Selected/applied mode must be distinguished.");
         Require(output.Contains("appliedMode=Proxy"), "Established proxy mode must be explicit.");
         Require(output.Contains("appliedMode=not-connected"), "Do not label an idle service as connected.");
@@ -102,4 +115,5 @@ internal static class Program
     }
     private static void Require(bool valid, string message) { if (!valid) throw new Exception(message); }
 }
+
 

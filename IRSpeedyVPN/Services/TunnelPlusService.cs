@@ -461,11 +461,19 @@ namespace IRSpeedyVPN.Services
         {
             error = null;
             if (!PauseSharingBeforeCoreRestart())
-            { error = "Hotspot cleanup was not confirmed."; return false; }
+            {
+                error = "Hotspot cleanup was not confirmed.";
+                DiagnosticStartFailure("core-start-preflight-error", error, "hotspot-cleanup");
+                return false;
+            }
             var runtimeCorePath = !string.IsNullOrWhiteSpace(corePath) && File.Exists(corePath)
                 ? corePath : ResolveCorePath();
             if (string.IsNullOrWhiteSpace(runtimeCorePath))
-            { error = "Core executable not found in temp folder."; return false; }
+            {
+                error = "Core executable not found in temp folder.";
+                DiagnosticStartFailure("core-start-preflight-error", error, "locate-executable");
+                return false;
+            }
             var geoRouting = GeoRoutingFallback.Apply(configData, xrayConfig,
                 Path.GetDirectoryName(runtimeCorePath));
             configData = geoRouting.SingBoxConfig;
@@ -488,6 +496,7 @@ namespace IRSpeedyVPN.Services
             }
             catch (Exception ex) when (ex is Newtonsoft.Json.JsonException || ex is InvalidOperationException || ex is ArgumentException)
             {
+                DiagnosticStartFailure("core-config-build-error", ex.Message, "build-routing");
                 error = "تنظیمات مسیریابی یا DNS معتبر نیست؛ تنظیمات برنامه‌ها را بررسی کنید.";
                 return false;
             }
@@ -571,7 +580,9 @@ namespace IRSpeedyVPN.Services
             {
                 LogHelper.WriteLog(ex);
                 Diagnostic("core-start-rpc-timeout", "stage=" + startupStage
-                    + " elapsedMs=" + rpcClock.ElapsedMilliseconds + " deadlineMs=" + CoreStartDeadlineMs);
+                    + " elapsedMs=" + rpcClock.ElapsedMilliseconds + " deadlineMs=" + CoreStartDeadlineMs
+                    + " " + NetworkFailureDiagnostic.ExceptionFields(ex));
+                DiagnosticStartFailure("core-start-error-details", ex.Message, startupStage);
                 error = runtimeIdentity.Failure("startup-timeout");
                 RecoverCoreAfterFailedStart();
                 return false;
@@ -585,7 +596,9 @@ namespace IRSpeedyVPN.Services
             }
             catch (IOException ex)
             {
-                Diagnostic("core-start-rpc-failed", "exception=" + ex.GetType().Name + " stage=" + startupStage + " elapsedMs=" + rpcClock.ElapsedMilliseconds);
+                Diagnostic("core-start-rpc-failed", "stage=" + startupStage + " elapsedMs=" + rpcClock.ElapsedMilliseconds
+                    + " " + NetworkFailureDiagnostic.ExceptionFields(ex));
+                DiagnosticStartFailure("core-start-error-details", ex.Message, startupStage);
                 error = runtimeIdentity.Failure("rpc-transport-failure");
                 RecoverCoreAfterFailedStart();
                 return false;
@@ -604,7 +617,7 @@ namespace IRSpeedyVPN.Services
                 diagnosticXrayConfigId = needXray ? ConnectionDiagnostics.Fingerprint(xrayConfig) : "none";
             if (!string.IsNullOrEmpty(startResp.Error))
             {
-                Diagnostic("core-start-config-error", "reason=" + NetworkFailureDiagnostic.CoreReason(startResp.Error));
+                DiagnosticStartFailure("core-start-config-error", startResp.Error, "start-response");
                 error = runtimeIdentity.Failure(startResp.Error);
                 TryStopCore();
                 return false;
@@ -2263,3 +2276,4 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
+

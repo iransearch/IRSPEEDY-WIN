@@ -25,17 +25,20 @@ class Program
     static async Task Main()
     {
         var old = LibcoreProto.DecodeCoreBuildInfo(new byte[] { 8, 1 });
-        Check(old.ProcessId == 0 && old.Commit == null, "legacy response does not invent a commit");
+        Check(old.ProcessId == 0 && old.Commit == null && old.HasPrivilege, "legacy response retains privilege without inventing a commit");
         var info = LibcoreProto.DecodeCoreBuildInfo(Identity());
         Check(info.SingBoxVersion == "1.13.0" && info.XrayVersion == "26.10.1" && info.Commit == "abc123"
-            && info.Modified == "false" && info.Architecture == "windows/amd64" && info.ProcessId == 123 && info.GoVersion == "go1.26.7", "identity wire contract and future-field compatibility");
+            && info.Modified == "false" && info.Architecture == "windows/amd64" && info.ProcessId == 123 && info.GoVersion == "go1.26.7" && info.HasPrivilege, "identity wire contract and future-field compatibility");
         var mismatch = CoreRuntimeIdentity.Capture(info, 456);
         Check(mismatch.Pid == -1 && mismatch.Commit == "unknown", "different listener cannot receive RPC process identity");
+        Check(mismatch.Privileged == "unknown" && CoreRuntimeIdentity.Capture(info, 0).Privileged == "true"
+            && CoreRuntimeIdentity.Capture(LibcoreProto.DecodeCoreBuildInfo(new byte[0]), -1).Privileged == "false", "Core privilege uses the existing RPC field without guessing a different process");
         Check(CoreRuntimeIdentity.Token("abc\nforged=value") == "unknown", "untrusted metadata cannot inject report lines");
         var empty = new CoreRuntimeIdentity();
         var report = empty.Failure("config password=secret unknown outbound type: auto-selector-round-robin");
         Check(report.Contains("Pool") && report.Contains("Core commit: unknown") && !report.Contains("secret"), "actionable report keeps missing identity explicit and excludes config secrets");
         Check(empty.Failure("startup-timeout").Contains("مهلت"), "timeout retains its distinct reason");
+        StartupFailureChecks.Run(Check);
         await WireQuery(false, true);
         await WireQuery(false);
         await WireQuery(true);
@@ -72,3 +75,4 @@ class Program
         finally { listener.Stop(); }
     }
 }
+

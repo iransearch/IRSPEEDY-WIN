@@ -130,7 +130,7 @@
         <uc:UCLoginLoading x:Name="uCLoginLoading" Grid.Row="1" Visibility="Collapsed" Panel.ZIndex="11"/>
         <uc:UCConnecting x:Name="uCConnecting" Grid.Row="1" Visibility="Collapsed" Panel.ZIndex="9"/>
         <uc:UCLoading x:Name="uCLoading" Grid.Row="0" Grid.RowSpan="2" Visibility="Hidden" Panel.ZIndex="10"/>
-        <TextBlock Grid.Row="1" x:Name="lblErrorMessage" MouseLeftButtonUp="CoreFailureDetails_Click" Text="" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Visibility="Hidden" Foreground="{DynamicResource Theme.LegacyRedBrush}" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" VerticalAlignment="Top" Margin="0,8,0,0" Panel.ZIndex="5"/>
+        <TextBlock Grid.Row="1" x:Name="lblErrorMessage" IsHitTestVisible="False" Text="" FontSize="14" FontWeight="Bold" HorizontalAlignment="Center" Visibility="Hidden" Foreground="{DynamicResource Theme.LegacyRedBrush}" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="360" VerticalAlignment="Top" Margin="0,8,0,0" Panel.ZIndex="5"/>
         <Popup Grid.Row="1" x:Name="popHint" Placement="Bottom" StaysOpen="True" AllowsTransparency="True">
           <Border Background="{DynamicResource Theme.HintSurfaceBrush}" CornerRadius="12" Padding="10,6" Opacity="1">
             <TextBlock x:Name="txtHintMessage" Text="" Foreground="White" FontSize="13" FontWeight="Bold"/>
@@ -140,3 +140,4 @@
     </Border>
   </Viewbox>
 </Window>
+

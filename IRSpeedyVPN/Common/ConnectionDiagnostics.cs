@@ -284,13 +284,26 @@ namespace IRSpeedyVPN.Common
         private static readonly HashSet<string> HttpWords = new HashSet<string>(
             "http http2 net/http net/http2 header headers field value name malformed status code response".Split(' '), StringComparer.OrdinalIgnoreCase);
         internal static string SafeCoreText(string text)
+            => SafeCoreText(text, false);
+
+        internal static string SafeCoreStartText(string text)
+        {
+            string safe = SafeCoreText(CoreStartFailureDiagnostic.Context(text), true);
+            return safe.Substring(0, Math.Min(safe.Length, 1536));
+        }
+
+        private static readonly HashSet<string> StartupWords = new HashSet<string>(
+            "initialize initialization inbound mixed socks http tun wintun adapter device driver bind listen configure create open load file routing monitor denied forbidden permissions exclusive privilege administrator WSAEACCES WSAEADDRINUSE WSAEADDRNOTAVAIL".Split(' '), StringComparer.OrdinalIgnoreCase);
+
+        private static string SafeCoreText(string text, bool startup)
         {
             if (string.IsNullOrEmpty(text)) return "empty";
             if (text.Length > 4096) text = text.Substring(0, 4096);
             text = Regex.Replace(text, @"[a-zA-Z][a-zA-Z0-9+.-]*://\S+|[\w.+-]+@[\w.-]+|[\w.-]+\.[a-zA-Z]{2,}[^\s]*", " REDACTED ");
             text = Regex.Replace(text, @"(?i)(password|token|authorization|uuid|secret|user|username|id|key)\s*[:=]\s*[^\s,;]+", " REDACTED ");
             var tokens = Regex.Matches(text, @"[a-zA-Z][a-zA-Z0-9_/-]*|[^\sA-Za-z]+").Cast<Match>()
-                .Select(m => CoreWords.Contains(m.Value) || RoutingWords.Contains(m.Value) || HttpWords.Contains(m.Value) ? m.Value : "[redacted]");
+                .Select(m => CoreWords.Contains(m.Value) || RoutingWords.Contains(m.Value) || HttpWords.Contains(m.Value)
+                    || startup && StartupWords.Contains(m.Value) ? m.Value : "[redacted]");
             return Regex.Replace(string.Join(" ", tokens), @"(?:\[redacted\] ?){2,}", "[redacted] ").Trim();
         }
         private static readonly HashSet<string> RoutingWords = new HashSet<string>(
@@ -329,3 +342,4 @@ namespace IRSpeedyVPN.Common
         private static extern int GetIpForwardTable(IntPtr table, ref int size, [MarshalAs(UnmanagedType.Bool)] bool order);
     }
 }
+

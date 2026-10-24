@@ -110,7 +110,8 @@ namespace IRSpeedyVPN.Services.Libcore
             var r = new ProtoReader(data);
             while (r.TryReadField(out int field, out int wire))
             {
-                if (field == 7 && wire == WireVarint) result.ProcessId = checked((int)r.ReadVarint());
+                if (field == 1 && wire == WireVarint) result.HasPrivilege = r.ReadVarint() != 0;
+                else if (field == 7 && wire == WireVarint) result.ProcessId = checked((int)r.ReadVarint());
                 else if (wire == WireLengthDelimited && field >= 2 && field <= 8 && field != 7)
                 {
                     var value = r.ReadString();
@@ -351,3 +352,4 @@ namespace IRSpeedyVPN.Services.Libcore
         }
     }
 }
+

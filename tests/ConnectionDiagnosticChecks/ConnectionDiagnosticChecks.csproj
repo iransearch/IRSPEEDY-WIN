@@ -7,6 +7,7 @@
   <Compile Include="../../IRSpeedyVPN/Common/ConnectionDiagnostics.cs" Link="ConnectionDiagnostics.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/CoreRoutingSignal.cs" Link="CoreRoutingSignal.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/NetworkFailureDiagnostic.cs" Link="NetworkFailureDiagnostic.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Common/CoreStartFailureDiagnostic.cs" Link="CoreStartFailureDiagnostic.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/ConnectionStateDiagnostic.cs" Link="ConnectionStateDiagnostic.cs"/>
   <Compile Include="../../IRSpeedyVPN/Services/TunnelPlusService.Diagnostics.cs" Link="TunnelPlusService.Diagnostics.cs"/>
   <Compile Include="../../IRSpeedyVPN/Services/TunnelPlusService.ConnectionState.cs" Link="TunnelPlusService.ConnectionState.cs"/>
@@ -20,3 +21,4 @@
   <Compile Include="../../IRSpeedyVPN/Common/Win32.cs" Link="Win32.cs"/>
  </ItemGroup>
 </Project>
+
