@@ -349,7 +349,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         public void Load(IEnumerable<IVPNService> services, bool urlTestSupported)
         {
-            _serverList.BeginCheckCycle();
+            // Manual refresh already opened this cycle before fetching the API
+            // snapshot. Rebinding that snapshot must not start a second cycle.
+            if (!_checkCycleSetup) _serverList.BeginCheckCycle();
             _urlTest = urlTestSupported;
             var arr = services?.ToArray() ?? new IVPNService[0];
             var previousServiceId = _selectedGroup?.Service?.ID;

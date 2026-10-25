@@ -147,6 +147,26 @@ try {
         Check ((Order $model.Slots) -eq '1,2,3') 'three-way reorder needs no follow-up pair passes'
 
     }
+    # A single completion must promote across still-checking rows. Exercise
+    # the real picker/overlay and automatic handoff to a mid-pass completion.
+    $picker.BeginCheckCycle(); $picker.EndCheckCycleSetup()
+    foreach ($g in @($a,$b,$c)) { $picker.SetGroupChecking($g.Service, $true) }
+    $c.Service.GetServerUrls()[0].latency = 10
+    $picker.SetGroupChecking($c.Service, $false); $picker.RefreshGroup($c.Service)
+    if ([System.Windows.SystemParameters]::ClientAreaAnimation) {
+        Wait-For { Field $overlay 'ShowBand' }
+        $promotion = Field $animator '_pass'
+        Check ($promotion.Rows.Length -eq 3 -and @(Field $overlay 'Bands').Count -eq 3) 'one completion promotes across two checking rows with three independent bands'
+        Check ((($promotion.Rows | ForEach-Object { $_.Target.Service.ID }) -join ',') -eq '3,1,2') 'single completion targets its first position directly'
+        $b.Service.GetServerUrls()[0].latency = 5
+        $picker.SetGroupChecking($b.Service, $false); $picker.RefreshGroup($b.Service)
+        Check ([object]::ReferenceEquals($promotion,(Field $animator '_pass'))) 'second completion preserves the active promotion pass'
+        Wait-For { Unique $model.Slots; !$model.IsTransitioning -and (Field $overlay 'Flashes').Count -eq 0 -and !(Field $animator '_subscribed') }
+        Check ((Order $model.Slots) -eq '2,3,1' -and $a.IsChecking) 'automatic next pass promotes the queued completion while the unfinished row stays pending'
+    } else {
+        Check ((Order $model.Slots) -eq '3,2,1') 'reduced motion promotes a single completion and preserves the waiting order'
+    }
+    $picker.SetGroupChecking($a.Service, $false)
     $picker.BeginCheckCycle(); $picker.EndCheckCycleSetup()
     $c.IsLastSuccessfulConnection = $true; $c.IsChecking = $true
     Call $picker 'ResortGroups' ([object[]]@()) | Out-Null

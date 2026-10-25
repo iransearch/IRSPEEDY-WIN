@@ -153,11 +153,15 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
         public void MarkChecking(string identity) => _completedChecks.Remove(identity);
         private bool CanMove(ServerItem item) => !item.IsChecking && _completedChecks.Contains(item.Identity);
+        private static ServerItem[] UniqueServers(IEnumerable<ServerItem> source)
+            => source.GroupBy(item => item.Identity, StringComparer.Ordinal).Select(group => group.First()).ToArray();
         public void Publish(IEnumerable<ServerItem> source, bool animate, bool allowReorder = true, string completedIdentity = null)
         {
             if (completedIdentity != null) _completedChecks.Add(completedIdentity);
-            var latest = source.ToArray();
-            var byId = latest.ToDictionary(item => item.Identity);
+            // A repeated service key represents one displayed country. Preserve
+            // the first canonical occurrence before building slots or dictionaries.
+            var latest = UniqueServers(source);
+            var byId = latest.ToDictionary(item => item.Identity, StringComparer.Ordinal);
             bool pinChanged = Servers.FirstOrDefault(item => item.IsLastSuccessfulConnection)?.Identity
                 != latest.FirstOrDefault(item => item.IsLastSuccessfulConnection)?.Identity;
             bool membershipChanged = latest.Length != Servers.Count || Servers.Any(item => !byId.ContainsKey(item.Identity));
@@ -190,19 +194,20 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
         private ServerItem[] PresentationOrder()
         {
-            var latest = Servers.ToArray();
-            if (Slots.Count != latest.Length) return latest;
-            var byId = latest.ToDictionary(item => item.Identity);
-            if (Slots.Any(slot => slot.DisplayedServer == null || !byId.ContainsKey(slot.DisplayedServer.Identity))) return latest;
-            // Connection pinning precedes test eligibility. Move the star to
-            // the front, keeping the relative order of all other identities.
-            var current = Slots.Select(slot => byId[slot.DisplayedServer.Identity]).ToArray();
+            var latest = UniqueServers(Servers);
+            var byId = latest.ToDictionary(item => item.Identity, StringComparer.Ordinal);
+            var current = Slots.Count == latest.Length
+                && Slots.All(slot => slot.DisplayedServer != null && byId.ContainsKey(slot.DisplayedServer.Identity))
+                ? Slots.Select(slot => byId[slot.DisplayedServer.Identity]).ToArray() : latest;
+            // The connection star always wins. Completed successes follow the
+            // application's order; pending rows keep their relative order, and
+            // completed failures follow them. Progress alone is never completion.
             var pinned = latest.FirstOrDefault(item => item.IsLastSuccessfulConnection);
-            if (pinned != null)
-                current = new[] { pinned }.Concat(current.Where(item => item.Identity != pinned.Identity)).ToArray();
-            var ordered = latest.Where(item => item.Identity != pinned?.Identity && CanMove(item)).ToArray();
-            int next = 0;
-            return current.Select(item => item.Identity != pinned?.Identity && CanMove(item) ? ordered[next++] : item).ToArray();
+            var ordered = latest.Where(item => item.Identity != pinned?.Identity && CanMove(item) && item.IsSelectable);
+            var waiting = current.Where(item => item.Identity != pinned?.Identity && !CanMove(item));
+            var failed = latest.Where(item => item.Identity != pinned?.Identity && CanMove(item) && !item.IsSelectable);
+            return (pinned != null ? new[] { pinned } : Array.Empty<ServerItem>())
+                .Concat(ordered).Concat(waiting).Concat(failed).ToArray();
         }
 
         public ServerSortPass TryBeginPass()
@@ -236,6 +241,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (pass == null || !ReferenceEquals(_active, pass) || pass.Generation != _generation) return;
             for (int i = 0; i < 5; i++) Reveal(pass, (ServerRowPart)i);
             _active = null;
+            // Progress/selection publications may have skipped the frozen rows.
+            // Refresh by identity without starting a new sort or changing positions.
+            var byId = UniqueServers(Servers).ToDictionary(item => item.Identity, StringComparer.Ordinal);
+            var changed = new List<ServerDisplaySlot>();
+            foreach (var slot in Slots)
+                if (slot.SetInstant(byId[slot.DisplayedServer.Identity], notify: false)) changed.Add(slot);
+            foreach (var slot in changed) slot.NotifyAll();
         }
         private void Resize(int count)
         {

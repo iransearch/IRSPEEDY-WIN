@@ -165,52 +165,7 @@ class Program {
   repair.Publish(new[]{S(pc),S(pb)},true);Unique(repair);
   Check(repair.Slots.Count==2&&repair.Slots.All(slot=>!slot.BadgeServer.IsLastSuccessfulConnection),
     "removing the pinned country leaves no phantom star or missing identity");
-  var strict=new ServerListViewModel();var sg=Enumerable.Range(1,4).Select(id=>G(id,id==1)).ToArray();
-  var original=sg.Select(S).ToArray();strict.Publish(original,true);strict.BeginCheckCycle();
-  var reversed=original.Reverse().ToArray();strict.Publish(reversed,true);
-  Check(strict.TryBeginPass()==null,"zero completed countries cannot move even if canonical order changes");
-  strict.Publish(reversed,true,true,original[0].Identity);
-  Check(strict.TryBeginPass()==null,"one completed country cannot swap with a pending partner");
-  strict.CompleteImmediately();
-  Check(strict.Slots.Select(slot=>slot.DisplayedServer.Service.ID).SequenceEqual(new[]{1,2,3,4}),
-    "instant/reduced-motion cleanup also pins every unfinished country");
-  strict.Publish(reversed,true,true,original[3].Identity);var eligible=strict.TryBeginPass();
-  Check(eligible!=null&&eligible.Rows.Length==2&&eligible.Rows.All(row=>row.From.Service.ID==1||row.From.Service.ID==4),
-    "only two explicitly completed countries form the active pair");
-  for(int part=0;part<5;part++){strict.Reveal(eligible,(ServerRowPart)part);Unique(strict);
-   Check(strict.Slots[1].GetPart((ServerRowPart)part).Service.ID==2&&strict.Slots[2].GetPart((ServerRowPart)part).Service.ID==3,
-     "not-started countries stay fixed during paired reveal part "+part);}
-  strict.Finish(eligible);Check(strict.TryBeginPass()==null,"pending middle countries receive no follow-up swap");
-  strict.BeginCheckCycle();strict.Publish(original,true);
-  Check(strict.TryBeginPass()==null,"new cycle forgets all previous completion eligibility");
-  sg[0].IsChecking=true;strict.Publish(sg.Select(S).Reverse(),true,true,original[0].Identity);
-  strict.Publish(sg.Select(S).Reverse(),true,true,original[3].Identity);
-  Check(strict.TryBeginPass()==null,"a still-checking country cannot become a partner from completion metadata alone");
-  sg[0].IsChecking=false;strict.MarkChecking(original[0].Identity);
-  strict.Publish(sg.Select(S).Reverse(),true,false);
-  Check(strict.TryBeginPass()==null,"stopping/canceling checking cannot restore earlier completion eligibility");
-  var incremental=new ServerListViewModel();var six=Enumerable.Range(1,6).Select(id=>S(G(id))).ToArray();
-  incremental.Publish(six,true);incremental.BeginCheckCycle();
-  var subset=new[]{six[2],six[4],six[0],six[1],six[3],six[5]};
-  foreach(int id in new[]{1,3,5})incremental.Publish(subset,true,true,six[id-1].Identity);
-  var triple=incremental.TryBeginPass();
-  Check(triple.Rows.Length==3&&triple.Rows.Select(row=>row.Index).SequenceEqual(new[]{0,2,4}),
-    "three completed countries update immediately while three unfinished countries keep their slots");
-  var latest=new[]{six[5],six[2],six[4],six[0],six[1],six[3]};
-  incremental.Publish(latest,true,true,six[5].Identity);
-  Check(incremental.TryBeginPass()==null&&triple.Rows[0].Target.Service.ID==3,
-    "new completion cannot restart or overwrite the active multi-row target");
-  for(int part=0;part<5;part++){
-   incremental.Reveal(triple,(ServerRowPart)part);Unique(incremental);
-   Check(incremental.Slots[1].GetPart((ServerRowPart)part).Service.ID==2&&incremental.Slots[3].GetPart((ServerRowPart)part).Service.ID==4,
-    "unfinished slots remain unchanged during unlimited reveal part "+part);
-  }
-  incremental.Finish(triple);var newest=incremental.TryBeginPass();
-  Check(newest.Rows.Length==4&&newest.Rows.Select(row=>row.Target.Service.ID).SequenceEqual(new[]{6,3,5,1}),
-    "next boundary consumes newest completed order with four lights instead of pair swaps");
-  incremental.Finish(newest);Unique(incremental);
-  Check(incremental.TryBeginPass()==null&&incremental.Slots.Select(slot=>slot.DisplayedServer.Service.ID).SequenceEqual(new[]{6,2,3,4,5,1}),
-    "completed subset settles directly without waiting for pending countries");
+  IncrementalOrderChecks.Run();
   var a=G(1,true);var b=G(2);var c=G(3);var vm=new ServerListViewModel();int work=0;vm.WorkAvailable+=()=>work++;
   vm.PublishForTest(new[]{S(a),S(b),S(c)},true);var stable=vm.Slots.ToArray();
   Check(!vm.IsTransitioning,"initial load has no light");var before=vm.Slots.Select(s=>s.DisplayedServer.Identity).ToArray();vm.CompleteImmediately();work=0;
@@ -305,6 +260,7 @@ with tempfile.TemporaryDirectory(prefix='server-comet-') as directory:
     (path/'Program.cs').write_text(fixture.replace('__PICKER_XAML__',(root/'IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml').as_posix()))
     for name in ['ServerListViewModel.cs','ServerCometTimeline.cs']:
         (path/name).write_text((root/'IRSpeedyVPN/Components/ServerListControl'/name).read_text())
+    (path/'IncrementalOrderChecks.cs').write_text((root/'tests/ServerListTransitionChecks/IncrementalOrderChecks.cs').read_text())
     overlay=(root/'IRSpeedyVPN/Components/ServerListControl/ServerListCometOverlay.cs').read_text()
     attached=overlay[overlay.index('    public static class ServerCometPart'):overlay.index('    public sealed class ServerListCometOverlay')]
     (path/'ServerCometPart.cs').write_text('using System.Windows;namespace IRSpeedyVPN.Components.ServerListControl{\n'+attached+'\n}')
@@ -313,4 +269,12 @@ with tempfile.TemporaryDirectory(prefix='server-comet-') as directory:
     (path/'ParsedGroupFinder.cs').write_text('using System.Windows;using System.Windows.Media;using IRSpeedyVPN.Components.ServerListControl;class ParsedGroupFinder{\n'
         +'public static FrameworkElement[] Find(DependencyObject root){var groups=new FrameworkElement[5];FindGroups(root,groups);return groups;}\n'+find_groups+'\n}')
     (path/'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')
-    subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',directory,'-v:q'],check=True)
+    if len(sys.argv) == 4:
+        dotnet, compiler, refs = sys.argv[1:]
+        subprocess.run([dotnet, compiler, '-nologo', '-langversion:7.3', '-target:exe',
+            '-out:' + str(path/'checks.dll')] + ['-r:' + str(dll) for dll in Path(refs).glob('*.dll')]
+            + [str(source) for source in path.glob('*.cs')], check=True)
+        (path/'checks.runtimeconfig.json').write_text('{"runtimeOptions":{"tfm":"net8.0","framework":{"name":"Microsoft.NETCore.App","version":"8.0.0"}}}')
+        subprocess.run([dotnet, str(path/'checks.dll')], check=True)
+    else:
+        subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',directory,'-v:q'],check=True)

@@ -6,12 +6,39 @@ Run the platform-independent checks with .NET 8:
 python tests/ServerListTransitionChecks/run.py
 python tests/ServerListTransitionChecks/bindings.py
 python tests/ServerListTransitionChecks/contracts.py
+python tests/ServerListTransitionChecks/cycle_wiring.py
 ```
 
 The contract check also reads the 1.4.20 row artwork from git commit `823c842`.
 For native Windows BAML/layout/animation checks, use the existing
 `run-wpf.ps1 -AppPath <unobfuscated IRSpeedyVPN.exe>` in a Windows PowerShell STA
 session. The native check has not been run in the Linux environment.
+
+## 1.4.38 incremental completion order
+
+The production planner presents the connection star first, completed successful
+countries in the application's latest order next, pending countries in their
+current relative order, and completed failures last. A successful partial ping
+does not complete a country. `IsSelectable` is authoritative after `RefreshGroup`
+refreshes the completed result; its temporary value while checking does not
+affect eligibility. Duplicate service keys keep the first canonical occurrence.
+
+`IncrementalOrderChecks.cs` runs with the production planner through `run.py`.
+It covers D promoting from fourth to first while other countries are checking,
+atomic multi-row reveals, pending order, failures, checking/failed pinned rows,
+publications during a frozen pass, metadata refresh at Finish without a later
+Publish, next-pass completion handoff, cycle resets, canceled checks, and
+duplicate keys at initialization, planning and Finish. The existing 720
+permutations, 4096-row case, stale-generation, timeline and stable-XAML-ID checks
+remain. `cycle_wiring.py` checks picker, background and manual-refresh call
+sites and the existing animator's next-pass handoff.
+
+For hosts that can execute .NET but cannot run MSBuild, pass the .NET host,
+Roslyn compiler and .NET 8 reference directory directly:
+
+```text
+python tests/ServerListTransitionChecks/run.py <dotnet> <csc.dll> <net8.0-reference-directory>
+```
 
 ## 1.4.32 startup crash regression
 
