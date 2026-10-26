@@ -295,6 +295,11 @@ namespace IRSpeedyVPN.WebServices
                             missingPasswordResponse = result;
                         }
                         bool retryable = missingPasswordRoute || IsRetriableFailure(result);
+                        LogHelper.WriteExLog("[StartupAuth] stage=failover-decision requestId=" + requestId
+                            + " flow=" + flowName + " endpoint=" + endpoint
+                            + " reason=" + (missingPasswordRoute ? "missing-password-route" : result == null
+                                ? "null-or-invalid-response" : retryable ? "retryable-http-response" : "final-http-response")
+                            + " allowFailover=" + allowFailover + " retryable=" + retryable);
                         history.Add(diagnosticEndpoint + ":http=" + (result == null ? "none" : ((int)result.StatusCode).ToString())
                             + ":ms=" + attemptSw.ElapsedMilliseconds);
                         LogHelper.WriteExLog("[StartupAuth] stage=endpoint-end requestId=" + requestId
@@ -344,9 +349,14 @@ namespace IRSpeedyVPN.WebServices
                         // Cancellation and ambiguous/posted requests must not be
                         // replayed on the next API host either. HTTP responses keep
                         // their existing policy (including an explicit HTTP 500).
-                        if (ex is OperationCanceledException
+                        bool replayBlocked = ex is OperationCanceledException
                             || ex is LoginTransportTimeoutException
-                            || (ex is LoginTransportException sent && sent.MayHaveBeenSent)) throw;
+                            || (ex is LoginTransportException sent && sent.MayHaveBeenSent);
+                        LogHelper.WriteExLog("[StartupAuth] stage=failover-decision requestId=" + requestId
+                            + " flow=" + flowName + " endpoint=" + endpoint + " reason=transport-exception"
+                            + " exception=" + ex.GetType().Name + " replayBlocked=" + replayBlocked
+                            + " allowFailover=" + allowFailover);
+                        if (replayBlocked) throw;
 
                         if (!allowFailover)
                             throw;

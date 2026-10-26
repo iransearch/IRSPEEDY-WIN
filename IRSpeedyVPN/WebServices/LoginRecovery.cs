@@ -76,7 +76,12 @@ namespace IRSpeedyVPN.WebServices
         internal string Summary => "exit=" + ExitCode + " http=" + HttpCode
             + " metrics=" + MetricsKnown + " connect=" + ConnectSeconds.ToString("R", CultureInfo.InvariantCulture)
             + " tls=" + TlsSeconds.ToString("R", CultureInfo.InvariantCulture)
-            + " upload=" + UploadedBytes.ToString("R", CultureInfo.InvariantCulture);
+            + " upload=" + UploadedBytes.ToString("R", CultureInfo.InvariantCulture)
+            + " pretransfer=" + PretransferSeconds.ToString("R", CultureInfo.InvariantCulture)
+            + " redirects=" + Redirects + " unavailable=" + Unavailable
+            + " mayHaveBeenSent=" + MayHaveBeenSent + " canRecover=" + CanRecover
+            + " canResolveAlternatePeer=" + CanResolveAlternatePeer
+            + " remoteIpKnown=" + (RemoteIp != null);
     }
 
     internal sealed class LoginTransportException : Exception
@@ -179,7 +184,17 @@ namespace IRSpeedyVPN.WebServices
                     throw new LoginTransportException("Initial: curl-unavailable; managed login failed (" + ex.GetType().Name + ").", mayHaveBeenSent);
                 }
             }
-            if (first.HttpCode > 0) return first;
+            if (first.HttpCode > 0)
+            {
+                Log(context, target.Host, "stage=http-return reason=http-response doh=False nonzeroExit="
+                    + (first.ExitCode != 0) + " " + first.Summary);
+                return first;
+            }
+            Log(context, target.Host, "stage=recovery-decision https=" + (target.Scheme == Uri.UriSchemeHttps)
+                + " literalHost=" + IPAddress.TryParse(target.Host, out _)
+                + " recoveryAvailable=" + context.RecoveryAvailable(target.Host)
+                + " remainingMs=" + deadline.RemainingMs + " lookupBudgetMs=" + deadline.LookupBudgetMs
+                + " " + first.Summary);
             if ((!first.CanRecover && !first.CanResolveAlternatePeer)
                 || target.Scheme != Uri.UriSchemeHttps || IPAddress.TryParse(target.Host, out _))
             {
@@ -187,7 +202,11 @@ namespace IRSpeedyVPN.WebServices
                 throw Failure(first, null, target.Scheme == Uri.UriSchemeHttps);
             }
             deadline.Check();
-            if (!context.BeginRecovery(target.Host)) throw Failure(first, null);
+            if (!context.BeginRecovery(target.Host))
+            {
+                Log(context, target.Host, "stage=skip reason=recovery-already-used");
+                throw Failure(first, null);
+            }
             Log(context, target.Host, "stage=doh reason=pre-send-failure " + first.Summary);
 
             LoginCurlResult second = null;
@@ -200,6 +219,7 @@ namespace IRSpeedyVPN.WebServices
                 if (lookupMs <= 0) throw Failure(first, null);
                 bool wasPrefetched;
                 answer = prefetch.Take(out wasPrefetched);
+                Log(context, target.Host, "stage=lookup-start prefetched=" + wasPrefetched + " budgetMs=" + lookupMs);
                 if (!wasPrefetched) answer = resolver.Resolve(target.Host, lookupMs, context.Cancellation, false);
                 var failedPeers = new HashSet<string>(StringComparer.Ordinal);
                 if (first.RemoteIp != null) failedPeers.Add(first.RemoteIp);
@@ -208,6 +228,9 @@ namespace IRSpeedyVPN.WebServices
                 for (int pass = 0; pass < 2; pass++)
                 {
                     deadline.Check();
+                    Log(context, target.Host, "stage=lookup-result pass=" + pass
+                        + " addressCount=" + (answer == null ? 0 : answer.Values.Length)
+                        + " cached=" + (answer != null && answer.FromCache));
                     if (answer == null || answer.Values.Length == 0) throw Failure(first, second);
                     var addresses = answer.Values.Where(ip => !failedPeers.Contains(ip)).ToArray();
                     if (addresses.Length != 0)
@@ -299,6 +322,8 @@ namespace IRSpeedyVPN.WebServices
             using (var replies = new BlockingCollection<ProviderReply>())
             {
                 stop.CancelAfter(budget);
+                for (int index = 0; index < Providers.Length; index++)
+                    Write(log, host, index, "started", 0);
                 var workers = Providers.Select((provider, index) => Task.Factory.StartNew(() =>
                 {
                     var reply = new ProviderReply { Index = index, Outcome = "no-answer", Values = new string[0] };
@@ -312,6 +337,7 @@ namespace IRSpeedyVPN.WebServices
                     }
                     catch (OperationCanceledException) { reply.Outcome = "canceled"; }
                     catch (Exception ex) { reply.Outcome = ex is TimeoutException ? "timeout" : "failed"; }
+                    if (reply.Values.Length != 0) reply.Outcome = "valid-answer";
                     reply.ElapsedMs = clock.ElapsedMilliseconds;
                     replies.Add(reply);
                 }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
@@ -332,7 +358,13 @@ namespace IRSpeedyVPN.WebServices
                         Write(log, host, reply.Index, reply.Outcome, reply.ElapsedMs);
                     }
                 }
-                finally { stop.Cancel(); Task.WaitAll(workers); }
+                finally
+                {
+                    stop.Cancel(); Task.WaitAll(workers);
+                    ProviderReply pending;
+                    while (replies.TryTake(out pending))
+                        Write(log, host, pending.Index, "joined-" + pending.Outcome, pending.ElapsedMs);
+                }
                 cancellation.ThrowIfCancellationRequested();
                 return result;
             }

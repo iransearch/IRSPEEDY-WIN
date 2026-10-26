@@ -245,3 +245,15 @@ Framework 4.8 compilation checks; no normal loading/replay/DNS behavior changed.
 - Linux native curl tests and .NET 4.8 reference compilation do not execute the
   protected single-file Windows package, Windows certificate backend or WPF
   dispatcher. These Windows smoke checks remain outstanding.
+
+## 1.4.43 decision diagnostics
+
+Login result summaries now include pretransfer, redirect count, curl availability,
+MayHaveBeenSent, CanRecover, alternate-peer eligibility and whether a remote IP
+was observed. Recovery decisions include HTTPS/literal-host guards, per-login
+recovery availability and remaining lookup/endpoint budgets. Lookup events record
+prefetch use, cache use and answer count. HTTP-return events identify nonzero curl
+exits with an HTTP code; controller events distinguish invalid/null responses,
+HTTP policy and replay-blocking transport failures. No credentials, response
+bodies, raw curl output or headers are logged. This release only adds diagnostics;
+retry and response handling policies are unchanged.

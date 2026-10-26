@@ -226,6 +226,14 @@ class Program
                 ".NET is used only when curl cannot start");
             Check(logs.All(line => !line.Contains("secret-user") && !line.Contains("password")), "event logs contain no credentials");
             Check(logs.All(IRSpeedyVPN.Common.LogPolicy.ShouldWrite), "recovery event records survive the production log filter");
+            var hidden = Failure(6); hidden.PretransferSeconds = 0.001; hidden.Redirects = 1;
+            Check(hidden.Summary.Contains("pretransfer=0.001") && hidden.Summary.Contains("redirects=1")
+                && hidden.Summary.Contains("mayHaveBeenSent=True") && hidden.Summary.Contains("canRecover=False"),
+                "diagnostics expose hidden pretransfer/redirect replay guards");
+            Check(logs.Any(line => line.Contains("stage=recovery-decision") && line.Contains("lookupBudgetMs="))
+                && logs.Any(line => line.Contains("stage=lookup-result") && line.Contains("addressCount="))
+                && logs.Any(line => line.Contains("stage=http-return")),
+                "diagnostics record recovery guards, DNS results and HTTP bypass");
             ControllerChecks.Run();
             RegressionChecks.Run();
             PrefetchChecks.Run();
