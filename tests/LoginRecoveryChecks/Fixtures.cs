@@ -1,4 +1,8 @@
 using System;
+using System.Web.Script.Serialization;
+using System.Collections;
+using System.Globalization;
+using System.Linq;
 using System.Collections.Generic;
 using System.Text;
 using System.Threading;
@@ -74,6 +78,24 @@ namespace IRSpeedyVPN.WebServices
 {
     internal sealed partial class CurlHelper
     {
+        internal static string[] ParseLoginAddresses(string json)
+        {
+            var root = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
+            object status, answers;
+            if (root == null || !root.TryGetValue("Status", out status) || status == null || Convert.ToString(status, CultureInfo.InvariantCulture) != "0"
+                || !root.TryGetValue("Answer", out answers)) return new string[0];
+            var records = answers as IEnumerable;
+            var values = new List<string>();
+            if (records != null) foreach (var record in records)
+            {
+                var item = record as Dictionary<string, object>;
+                object type, data;
+                if (item != null && item.TryGetValue("type", out type) && Convert.ToString(type) == "1"
+                    && item.TryGetValue("data", out data) && data != null && LoginDnsCache.IsPublicIPv4(data.ToString().Trim()))
+                    values.Add(data.ToString().Trim());
+            }
+            return values.ToArray();
+        }
         internal static void SetAvailabilityForTest(bool unavailable) { _curlUnavailable = unavailable; }
         internal static void RememberPendingForTest(System.Diagnostics.Process process)
         { RememberPendingStop(process); ReleaseCurlProcess(process); }
@@ -96,5 +118,22 @@ namespace IRSpeedyVPN.WebServices
                 line => { progress?.Observe(line); responseHeaders.Observe(line); }, outputProgress, outputLog);
             return ParseLoginResult(result.Output, result.ExitCode, responseHeaders);
         }
+    }
+}
+
+namespace IRSpeedyVPN.WebServices
+{
+    // Historical DoH fixtures exercise the shared race without adding a second
+    // DNS transport or a runtime experiment switch to the production login.
+    internal static class FixtureDohProviders
+    {
+        internal const int LookupBudgetMs = LoginDnsRace.LookupBudgetMs;
+        internal static string[] Resolve(string host, int timeoutMs, CancellationToken cancellation,
+            Func<string, int, CancellationToken, string[]> query, Action<string> log)
+            => LoginDnsRace.Resolve(host, timeoutMs, cancellation,
+                (provider, ms, token) => (query(provider + Uri.EscapeDataString(host), ms, token) ?? new string[0])
+                    .Where(LoginDnsCache.IsPublicIPv4).ToArray(), log,
+                new[] { "https://8.8.8.8/resolve?type=A&name=", "https://1.1.1.1/dns-query?type=A&name=" },
+                new[] { "google", "cloudflare" });
     }
 }

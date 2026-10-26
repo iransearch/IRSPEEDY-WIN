@@ -7,7 +7,6 @@ using System.Net;
 using System.Net.Sockets;
 using System.Threading;
 using System.Threading.Tasks;
-using System.Collections.Concurrent;
 
 namespace IRSpeedyVPN.WebServices
 {
@@ -48,7 +47,7 @@ namespace IRSpeedyVPN.WebServices
         internal int RemainingMs => Math.Min(context.RemainingMs, (int)Math.Max(0, budgetMs - clock.ElapsedMilliseconds));
         internal void Check()
         { context.Check(); if (RemainingMs <= 0) throw new TimeoutException("Login endpoint deadline expired."); }
-        internal int LookupBudgetMs => Math.Min(LoginDohProviders.LookupBudgetMs, RemainingMs - RecoveryPostReserveMs);
+        internal int LookupBudgetMs => Math.Min(LoginDnsRace.LookupBudgetMs, RemainingMs - RecoveryPostReserveMs);
     }
 
     internal sealed class LoginCurlResult
@@ -148,17 +147,19 @@ namespace IRSpeedyVPN.WebServices
         void Invalidate(string host, LoginAddresses answer);
     }
 
+    internal enum LoginDnsOrder { SystemFirst, ResolverFirst }
+
     internal sealed class LoginRecovery
     {
         // Background account refresh and a foreground login may overlap. Only
-        // credential attempts take this gate; DNS GETs can race independently.
+        // credential attempts take this gate; DNS queries can race independently.
         private static readonly SemaphoreSlim CredentialGate = new SemaphoreSlim(1, 1);
         private readonly ILoginTransport transport;
         private readonly ILoginResolver resolver;
         private readonly Action<string> log;
-        private readonly bool dohFirst;
-        internal LoginRecovery(ILoginTransport transport, ILoginResolver resolver, Action<string> log, bool dohFirst = false)
-        { this.transport = transport; this.resolver = resolver; this.log = log; this.dohFirst = dohFirst; }
+        private readonly LoginDnsOrder order;
+        internal LoginRecovery(ILoginTransport transport, ILoginResolver resolver, Action<string> log, LoginDnsOrder order = LoginDnsOrder.SystemFirst)
+        { this.transport = transport; this.resolver = resolver; this.log = log; this.order = order; }
         private void Log(LoginNetworkContext context, string host, string detail)
         {
             try { log?.Invoke("[LoginRecovery] login=" + context.Id + " host=" + host + " " + detail); }
@@ -170,8 +171,8 @@ namespace IRSpeedyVPN.WebServices
             var target = new Uri(url);
             var deadline = context.Endpoint ?? new LoginDeadline(context, timeoutMs);
             deadline.Check();
-            if (dohFirst && target.Scheme == Uri.UriSchemeHttps && !IPAddress.TryParse(target.Host, out _))
-                return SendDohFirst(url, method, headers, body, context, target, deadline);
+            if (order == LoginDnsOrder.ResolverFirst && target.Scheme == Uri.UriSchemeHttps && !IPAddress.TryParse(target.Host, out _))
+                return SendResolverFirst(url, method, headers, body, context, target, deadline);
             var progress = new LoginConnectProgress();
             using (var prefetch = new LoginPrefetch(target.Scheme == Uri.UriSchemeHttps
                 && !IPAddress.TryParse(target.Host, out _) && transport is ILoginConnectTransport
@@ -179,13 +180,13 @@ namespace IRSpeedyVPN.WebServices
                 return SendCore(url, method, headers, body, context, target, deadline, progress, prefetch);
         }
 
-        private LoginCurlResult SendDohFirst(string url, string method, string headers, string body,
+        private LoginCurlResult SendResolverFirst(string url, string method, string headers, string body,
             LoginNetworkContext context, Uri target, LoginDeadline deadline)
         {
-            Log(context, target.Host, "stage=dns-order mode=" + (CurlHelper.LoginPlainDnsVerification ? "plain-dns-first-verification" : "doh-first-verification") + " remainingMs=" + deadline.RemainingMs);
+            Log(context, target.Host, "stage=dns-order mode=resolver-first remainingMs=" + deadline.RemainingMs);
             LoginCurlResult last = null;
             var answer = context.BeginRecovery(target.Host)
-                ? LookupDohFirst(context, target.Host, deadline, false) : null;
+                ? LookupResolverFirst(context, target.Host, deadline, false) : null;
             var failedPeers = new HashSet<string>(StringComparer.Ordinal);
             for (int pass = 0; answer != null && pass < 2; pass++)
             {
@@ -193,20 +194,20 @@ namespace IRSpeedyVPN.WebServices
                 var addresses = answer.Values.Where(ip => !failedPeers.Contains(ip)).ToArray();
                 if (addresses.Length != 0)
                 {
-                    Log(context, target.Host, "stage=doh-first-attempt resolve=True cached=" + answer.FromCache
+                    Log(context, target.Host, "stage=resolver-first-attempt resolve=True cached=" + answer.FromCache
                         + " addressCount=" + addresses.Length + " pass=" + pass + " remainingMs=" + deadline.RemainingMs);
                     try { last = Retry(target, url, method, headers, body, addresses, deadline, context); }
                     catch (OperationCanceledException) { throw; }
                     catch (TimeoutException ex)
-                    { throw new LoginTransportTimeoutException("DoH first: " + (last == null ? "no completed attempt" : last.Summary), ex); }
+                    { throw new LoginTransportTimeoutException("Resolver first: " + (last == null ? "no completed attempt" : last.Summary), ex); }
                     catch (Exception ex)
                     {
                         // A launched attempt with no result has no trustworthy trailer.
                         // Do not turn an unexpected transport error into a second POST.
-                        throw new LoginTransportException("DoH first: " + (last == null ? "no completed attempt" : last.Summary)
+                        throw new LoginTransportException("Resolver first: " + (last == null ? "no completed attempt" : last.Summary)
                             + "; transport failed (" + ex.GetType().Name + ").", true);
                     }
-                    Log(context, target.Host, "stage=doh-first-result resolve=True cached=" + answer.FromCache
+                    Log(context, target.Host, "stage=resolver-first-result resolve=True cached=" + answer.FromCache
                         + " effectiveMayHaveBeenSent=" + last.MayHaveBeenSentFor(true) + " " + last.Summary);
                     if (last.HttpCode > 0)
                     {
@@ -220,15 +221,15 @@ namespace IRSpeedyVPN.WebServices
                     if (last.RemoteIp != null) failedPeers.Add(last.RemoteIp);
                     if (!last.CanRecover && !last.CanResolveAlternatePeer) break;
                 }
-                else Log(context, target.Host, "stage=doh-first-skip reason=same-failed-peer");
+                else Log(context, target.Host, "stage=resolver-first-skip reason=same-failed-peer");
                 // Preserve one bounded refresh for a failing cached set. No fresh
-                // answer failure restarts lookup, and system DNS cannot restart DoH.
+                // answer failure restarts lookup, and system DNS cannot restart resolver lookup.
                 if (!answer.FromCache || pass != 0) break;
                 resolver.Invalidate(target.Host, answer);
-                answer = LookupDohFirst(context, target.Host, deadline, true);
+                answer = LookupResolverFirst(context, target.Host, deadline, true);
             }
-            Log(context, target.Host, "stage=system-fallback reason=" + (last == null ? "no-doh-answer"
-                : last.Unavailable ? "curl-unavailable" : "proven-unsent-doh-failure")
+            Log(context, target.Host, "stage=system-fallback reason=" + (last == null ? "no-resolver-answer"
+                : last.Unavailable ? "curl-unavailable" : "proven-unsent-resolver-failure")
                 + " remainingMs=" + deadline.RemainingMs + (last == null ? "" : " initial=" + last.Summary));
             deadline.Check();
             try
@@ -236,31 +237,31 @@ namespace IRSpeedyVPN.WebServices
                 // No speculative prefetch and no second DNS recovery in this mode.
                 var system = SendCore(url, method, headers, body, context, target, deadline,
                     new LoginConnectProgress(), null, allowRecovery: false);
-                Log(context, target.Host, "stage=verification-result source=system resolve=False " + system.Summary);
+                Log(context, target.Host, "stage=resolver-fallback-result source=system resolve=False " + system.Summary);
                 return system;
             }
             catch (LoginTransportException ex)
             {
-                throw new LoginTransportException("DoH first: " + (last == null ? "no-answer" : last.Summary)
+                throw new LoginTransportException("Resolver first: " + (last == null ? "no-answer" : last.Summary)
                     + "; system fallback: " + ex.Message, ex.MayHaveBeenSent, ex);
             }
             catch (LoginTransportTimeoutException ex)
             {
-                throw new LoginTransportTimeoutException("DoH first: " + (last == null ? "no-answer" : last.Summary), ex);
+                throw new LoginTransportTimeoutException("Resolver first: " + (last == null ? "no-answer" : last.Summary), ex);
             }
         }
 
-        private LoginAddresses LookupDohFirst(LoginNetworkContext context, string host, LoginDeadline deadline, bool refresh)
+        private LoginAddresses LookupResolverFirst(LoginNetworkContext context, string host, LoginDeadline deadline, bool refresh)
         {
             deadline.Check();
             int budget = deadline.LookupBudgetMs;
-            Log(context, host, "stage=doh-first-lookup refresh=" + refresh + " budgetMs=" + budget);
+            Log(context, host, "stage=resolver-first-lookup refresh=" + refresh + " budgetMs=" + budget);
             if (budget <= 100) return null;
             try
             {
                 var answer = resolver.Resolve(host, budget, context.Cancellation, refresh);
                 deadline.Check();
-                Log(context, host, "stage=doh-first-answer addressCount=" + (answer == null ? 0 : answer.Values.Length)
+                Log(context, host, "stage=resolver-first-answer addressCount=" + (answer == null ? 0 : answer.Values.Length)
                     + " cached=" + (answer != null && answer.FromCache));
                 return answer;
             }
@@ -268,7 +269,7 @@ namespace IRSpeedyVPN.WebServices
             catch (Exception ex)
             {
                 deadline.Check();
-                Log(context, host, "stage=doh-first-lookup-failed type=" + ex.GetType().Name);
+                Log(context, host, "stage=resolver-first-lookup-failed type=" + ex.GetType().Name);
                 return null; // DNS GETs contain no POST; system fallback is safe.
             }
         }
@@ -314,13 +315,13 @@ namespace IRSpeedyVPN.WebServices
             if (first.HttpCode > 0)
             {
                 if (!allowRecovery && first.ExitCode != 0) throw Failure(first, null, target.Scheme == Uri.UriSchemeHttps);
-                Log(context, target.Host, "stage=http-return reason=http-response doh=False nonzeroExit="
+                Log(context, target.Host, "stage=http-return reason=http-response dnsRecovery=False nonzeroExit="
                     + (first.ExitCode != 0) + " " + first.Summary);
                 return first;
             }
             if (!allowRecovery)
             {
-                Log(context, target.Host, "stage=skip reason=verification-system-only " + first.Summary);
+                Log(context, target.Host, "stage=skip reason=system-fallback-only " + first.Summary);
                 throw Failure(first, null, target.Scheme == Uri.UriSchemeHttps);
             }
             Log(context, target.Host, "stage=recovery-decision https=" + (target.Scheme == Uri.UriSchemeHttps)
@@ -341,7 +342,7 @@ namespace IRSpeedyVPN.WebServices
                 Log(context, target.Host, "stage=skip reason=recovery-already-used");
                 throw Failure(first, null);
             }
-            Log(context, target.Host, "stage=doh reason=pre-send-failure " + first.Summary);
+            Log(context, target.Host, "stage=dns-recovery reason=pre-send-failure " + first.Summary);
 
             LoginCurlResult second = null;
             LoginAddresses answer = null;
@@ -371,7 +372,7 @@ namespace IRSpeedyVPN.WebServices
                     {
                         if (wasPrefetched) prefetch.Accept(answer);
                         second = Retry(target, url, method, headers, body, addresses, deadline, context);
-                        Log(context, target.Host, "stage=" + (pass == 0 ? "doh-result" : "refresh-result")
+                        Log(context, target.Host, "stage=" + (pass == 0 ? "dns-recovery-result" : "refresh-result")
                             + " cached=" + answer.FromCache + " " + second.Summary);
                         if (second.HttpCode > 0) return second;
                         resolver.Invalidate(target.Host, answer);
@@ -433,278 +434,6 @@ namespace IRSpeedyVPN.WebServices
             => new LoginTransportException("Initial: " + first.Summary + "; recovery: "
                 + (second == null ? "not-performed-or-no-answer" : second.Summary),
                 second == null ? first.MayHaveBeenSentFor(https) : second.MayHaveBeenSentFor(https));
-    }
-
-    // DNS only: a completion-order race under one capped lookup clock. Every
-    // provider is canceled and joined before returning, including on cancellation.
-    internal static class LoginDohProviders
-    {
-        internal const int LookupBudgetMs = 5000;
-        internal static readonly string[] Providers =
-        {
-            "https://8.8.8.8/resolve?type=A&name=",
-            "https://1.1.1.1/dns-query?type=A&name="
-        };
-        internal static string[] Resolve(string host, int timeoutMs, CancellationToken cancellation,
-            Func<string, int, CancellationToken, string[]> query, Action<string> log,
-            string[] providers = null, string[] names = null, bool plain = false)
-        {
-            providers = providers ?? Providers;
-            int budget = Math.Min(LookupBudgetMs, timeoutMs);
-            var clock = Stopwatch.StartNew();
-            cancellation.ThrowIfCancellationRequested();
-            if (budget <= 100) return new string[0];
-            using (var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
-            using (var replies = new BlockingCollection<ProviderReply>())
-            {
-                stop.CancelAfter(budget);
-                for (int index = 0; index < providers.Length; index++)
-                    Write(log, host, index, "started", 0, names);
-                var workers = providers.Select((provider, index) => Task.Factory.StartNew(() =>
-                {
-                    var reply = new ProviderReply { Index = index, Outcome = "no-answer", Values = new string[0] };
-                    try
-                    {
-                        stop.Token.ThrowIfCancellationRequested();
-                        int remaining = budget - (int)Math.Min(int.MaxValue, clock.ElapsedMilliseconds);
-                        if (remaining > 100)
-                            reply.Values = (query(plain ? provider : provider + Uri.EscapeDataString(host), remaining, stop.Token) ?? new string[0])
-                                .Where(value => plain ? LoginDohCache.IsPublicAddress(value) : LoginDohCache.IsPublicIPv4(value)).Distinct().ToArray();
-                    }
-                    catch (OperationCanceledException) { reply.Outcome = "canceled"; }
-                    catch (Exception ex) { reply.Outcome = ex is TimeoutException ? "timeout" : "failed"; }
-                    if (reply.Values.Length != 0) reply.Outcome = "valid-answer";
-                    reply.ElapsedMs = clock.ElapsedMilliseconds;
-                    replies.Add(reply);
-                }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
-                string[] result = new string[0];
-                try
-                {
-                    for (int received = 0; received < workers.Length; received++)
-                    {
-                        cancellation.ThrowIfCancellationRequested();
-                        int remaining = budget - (int)Math.Min(int.MaxValue, clock.ElapsedMilliseconds);
-                        ProviderReply reply;
-                        if (remaining <= 0 || !replies.TryTake(out reply, remaining, cancellation)) break;
-                        if (reply.Values.Length != 0 && reply.ElapsedMs < budget)
-                        {
-                            Write(log, host, reply.Index, "winner", reply.ElapsedMs, names);
-                            result = reply.Values; break;
-                        }
-                        Write(log, host, reply.Index, reply.Outcome, reply.ElapsedMs, names);
-                    }
-                }
-                finally
-                {
-                    stop.Cancel(); Task.WaitAll(workers);
-                    ProviderReply pending;
-                    while (replies.TryTake(out pending))
-                        Write(log, host, pending.Index, "joined-" + pending.Outcome, pending.ElapsedMs, names);
-                }
-                cancellation.ThrowIfCancellationRequested();
-                return result;
-            }
-        }
-        private sealed class ProviderReply
-        { internal int Index; internal string Outcome; internal string[] Values; internal long ElapsedMs; }
-        private static void Write(Action<string> log, string host, int provider, string outcome, long elapsedMs, string[] names = null)
-        {
-            try { log?.Invoke("[LoginRecovery] host=" + host + " stage=provider provider="
-                + (names == null ? (provider == 0 ? "google" : "cloudflare") : names[provider]) + " outcome=" + outcome + " elapsedMs=" + elapsedMs); }
-            catch { }
-        }
-    }
-
-    // Cache only public IPv4 answer sets, never login retry state. Reference
-    // comparison prevents an old failing caller from evicting a newer answer.
-    internal sealed class LoginDohCache : ILoginPrefetchResolver
-    {
-        private sealed class Entry { internal string[] Values; internal DateTime Expires; }
-        private readonly Dictionary<string, Entry> cache = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
-        private readonly object gate = new object();
-        private readonly Func<string, int, CancellationToken, string[]> fetch;
-        internal LoginDohCache(Func<string, int, CancellationToken, string[]> fetch) { this.fetch = fetch; }
-        public LoginAddresses Resolve(string host, int timeoutMs, CancellationToken cancellation, bool refresh)
-            => ResolveCore(host, timeoutMs, cancellation, refresh, true);
-        public LoginAddresses Prefetch(string host, int timeoutMs, CancellationToken cancellation)
-            => ResolveCore(host, timeoutMs, cancellation, false, false);
-        private LoginAddresses ResolveCore(string host, int timeoutMs, CancellationToken cancellation, bool refresh, bool commit)
-        {
-            cancellation.ThrowIfCancellationRequested();
-            if (timeoutMs <= 0) return null;
-            lock (gate)
-            {
-                Entry entry;
-                if (!refresh && cache.TryGetValue(host, out entry) && entry.Expires > DateTime.UtcNow)
-                    return new LoginAddresses(entry.Values, true);
-            }
-            var values = (fetch(host, Math.Min(LoginDohProviders.LookupBudgetMs, timeoutMs), cancellation) ?? new string[0])
-                .Where(IsPublicAddress).Select(value => IPAddress.Parse(value).ToString()).Distinct().ToArray();
-            cancellation.ThrowIfCancellationRequested();
-            if (values.Length == 0) return null;
-            var answer = new LoginAddresses(values, false);
-            if (commit) Accept(host, answer);
-            return answer;
-        }
-        public void Accept(string host, LoginAddresses answer)
-        { if (!answer.FromCache) lock (gate) cache[host] = new Entry { Values = answer.Values, Expires = DateTime.UtcNow.AddMinutes(5) }; }
-        public void Invalidate(string host, LoginAddresses answer)
-        {
-            lock (gate)
-            {
-                Entry entry;
-                if (cache.TryGetValue(host, out entry) && ReferenceEquals(entry.Values, answer.Values)) cache.Remove(host);
-            }
-        }
-        internal static bool IsPublicAddress(string value)
-        {
-            IPAddress ip;
-            if (!IPAddress.TryParse(value, out ip)) return false;
-            if (ip.AddressFamily == AddressFamily.InterNetwork) return IsPublicIPv4(value);
-            if (ip.AddressFamily != AddressFamily.InterNetworkV6 || ip.ScopeId != 0) return false;
-            var b = ip.GetAddressBytes();
-            return (b[0] & 0xe0) == 0x20
-                && !(b[0] == 0x20 && b[1] == 1 && b[2] == 0x0d && b[3] == 0xb8);
-        }
-        internal static bool IsPublicIPv4(string value)
-        {
-            IPAddress ip;
-            if (!IPAddress.TryParse(value, out ip) || ip.AddressFamily != AddressFamily.InterNetwork) return false;
-            var b = ip.GetAddressBytes();
-            return b[0] != 0 && b[0] != 10 && b[0] != 127 && b[0] < 224
-                && !(b[0] == 169 && b[1] == 254) && !(b[0] == 172 && b[1] >= 16 && b[1] <= 31)
-                && !(b[0] == 192 && b[1] == 168) && !(b[0] == 100 && b[1] >= 64 && b[1] <= 127)
-                && !(b[0] == 198 && (b[1] == 18 || b[1] == 19));
-        }
-    }
-    // Experimental login-only classic DNS. Connected UDP validates the peer;
-    // transaction, echoed question, owner chain and public RDATA are checked.
-    internal static class LoginPlainDns
-    {
-        internal static readonly string[] Addresses = { "8.8.8.8", "77.88.8.8", "1.1.1.1", "94.140.14.14" };
-        private static readonly string[] Names = { "google", "yandex", "cloudflare", "adguard" };
-        internal static string[] Resolve(string host, int timeoutMs, CancellationToken cancellation, Action<string> log)
-        {
-            string name = new System.Globalization.IdnMapping().GetAscii(host.TrimEnd('.')).ToLowerInvariant();
-            var endpoints = Addresses.SelectMany(ip => new[] { ip + "/1", ip + "/28" }).ToArray();
-            var names = Names.SelectMany(n => new[] { n + "-A", n + "-AAAA" }).ToArray();
-            try { log?.Invoke("[LoginRecovery] host=" + name + " stage=resolver-mode mode=plain-dns-verification"); } catch { }
-            return LoginDohProviders.Resolve(name, timeoutMs, cancellation, (endpoint, ms, token) =>
-            {
-                var parts = endpoint.Split('/');
-                return Query(name, new IPEndPoint(IPAddress.Parse(parts[0]), 53), int.Parse(parts[1]), ms, token);
-            }, log, endpoints, names, true);
-        }
-        internal static byte[] BuildQuery(string host, int type, ushort id)
-        {
-            var bytes = new List<byte> { (byte)(id >> 8), (byte)id, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0 };
-            foreach (string label in host.Split('.'))
-            {
-                if (label.Length == 0 || label.Length > 63 || label.Any(c => c > 127)) throw new FormatException("Invalid DNS label.");
-                bytes.Add((byte)label.Length); bytes.AddRange(System.Text.Encoding.ASCII.GetBytes(label));
-            }
-            bytes.Add(0); bytes.Add((byte)(type >> 8)); bytes.Add((byte)type); bytes.Add(0); bytes.Add(1);
-            if (bytes.Count > 271) throw new FormatException("Invalid DNS name length.");
-            return bytes.ToArray();
-        }
-        internal static string[] Query(string host, IPEndPoint server, int type, int timeoutMs, CancellationToken token)
-        {
-            var clock = Stopwatch.StartNew();
-            ushort id = BitConverter.ToUInt16(Guid.NewGuid().ToByteArray(), 0);
-            byte[] query = BuildQuery(host, type, id);
-            using (var socket = new Socket(server.AddressFamily, SocketType.Dgram, ProtocolType.Udp))
-            using (token.Register(() => { try { socket.Close(); } catch { } }))
-            {
-                token.ThrowIfCancellationRequested(); socket.Connect(server);
-                socket.SendTimeout = socket.ReceiveTimeout = Math.Max(1, timeoutMs);
-                socket.Send(query);
-                int left = timeoutMs - (int)clock.ElapsedMilliseconds; if (left <= 0) throw new TimeoutException();
-                socket.ReceiveTimeout = left; var buffer = new byte[4096]; int count = socket.Receive(buffer);
-                var data = buffer.Take(count).ToArray();
-                ValidateQuestion(data, host, type, id);
-                if ((data[2] & 2) == 0) return Parse(data, host, type, id);
-            }
-            // A truncated UDP answer requires TCP; the original lookup clock remains.
-            int remaining = timeoutMs - (int)clock.ElapsedMilliseconds;
-            if (remaining <= 0) throw new TimeoutException();
-            using (var socket = new Socket(server.AddressFamily, SocketType.Stream, ProtocolType.Tcp))
-            using (token.Register(() => { try { socket.Close(); } catch { } }))
-            {
-                token.ThrowIfCancellationRequested();
-                var connect = socket.BeginConnect(server, null, null);
-                using (connect.AsyncWaitHandle)
-                    if (!connect.AsyncWaitHandle.WaitOne(remaining)) throw new TimeoutException();
-                socket.EndConnect(connect);
-                var frame = new byte[query.Length + 2]; frame[0] = (byte)(query.Length >> 8); frame[1] = (byte)query.Length;
-                Buffer.BlockCopy(query, 0, frame, 2, query.Length);
-                Transfer(socket, frame, true, clock, timeoutMs, token);
-                var length = new byte[2]; Transfer(socket, length, false, clock, timeoutMs, token);
-                int size = U16(length, 0); if (size < 12) throw new FormatException();
-                var data = new byte[size]; Transfer(socket, data, false, clock, timeoutMs, token);
-                return Parse(data, host, type, id);
-            }
-        }
-        private static void Transfer(Socket socket, byte[] bytes, bool send, Stopwatch clock, int budget, CancellationToken token)
-        {
-            for (int offset = 0; offset < bytes.Length;)
-            {
-                token.ThrowIfCancellationRequested(); int left = budget - (int)clock.ElapsedMilliseconds;
-                if (left <= 0) throw new TimeoutException();
-                socket.SendTimeout = socket.ReceiveTimeout = left;
-                int count = send ? socket.Send(bytes, offset, bytes.Length - offset, SocketFlags.None)
-                    : socket.Receive(bytes, offset, bytes.Length - offset, SocketFlags.None);
-                if (count <= 0) throw new FormatException("Incomplete DNS frame."); offset += count;
-            }
-        }
-        private static int U16(byte[] data, int offset)
-        { if (offset < 0 || offset + 2 > data.Length) throw new FormatException(); return (data[offset] << 8) | data[offset + 1]; }
-        private static string Name(byte[] data, ref int offset)
-        {
-            var labels = new List<string>(); int cursor = offset, end = -1, steps = 0, length = 0;
-            while (true)
-            {
-                if (++steps > 128 || cursor >= data.Length) throw new FormatException();
-                int size = data[cursor++];
-                if (size == 0) { offset = end < 0 ? cursor : end; return string.Join(".", labels).ToLowerInvariant(); }
-                if ((size & 0xc0) == 0xc0)
-                {
-                    if (cursor >= data.Length) throw new FormatException();
-                    if (end < 0) end = cursor + 1;
-                    cursor = ((size & 63) << 8) | data[cursor]; continue;
-                }
-                if (size > 63 || cursor + size > data.Length || (length += size + 1) > 254) throw new FormatException();
-                for (int i = 0; i < size; i++) if (data[cursor + i] > 127 || data[cursor + i] == 0) throw new FormatException();
-                labels.Add(System.Text.Encoding.ASCII.GetString(data, cursor, size)); cursor += size;
-            }
-        }
-        private static int ValidateQuestion(byte[] data, string host, int type, ushort id)
-        {
-            if (data.Length < 12 || U16(data, 0) != id || (data[2] & 0xf8) != 0x80
-                || (data[3] & 15) != 0 || U16(data, 4) != 1) throw new FormatException("Invalid DNS reply.");
-            int pos = 12; if (Name(data, ref pos) != host.TrimEnd('.').ToLowerInvariant()
-                || U16(data, pos) != type || U16(data, pos + 2) != 1) throw new FormatException("DNS question mismatch.");
-            return pos + 4;
-        }
-        internal static string[] Parse(byte[] data, string host, int type, ushort id)
-        {
-            int pos = ValidateQuestion(data, host, type, id);
-            if ((data[2] & 2) != 0) throw new FormatException("Truncated DNS reply.");
-            int count = U16(data, 6); if (count > 512) throw new FormatException();
-            var aliases = new List<Tuple<string, string>>(); var records = new List<Tuple<string, string>>();
-            for (int i = 0; i < count; i++)
-            {
-                string owner = Name(data, ref pos); int rrType = U16(data, pos), cls = U16(data, pos + 2), size = U16(data, pos + 8); pos += 10;
-                if (pos + size > data.Length) throw new FormatException();
-                if (cls == 1 && rrType == 5)
-                { int p = pos; string alias = Name(data, ref p); if (p != pos + size) throw new FormatException(); aliases.Add(Tuple.Create(owner, alias)); }
-                if (cls == 1 && rrType == type && (type == 1 && size == 4 || type == 28 && size == 16))
-                { var address = new IPAddress(data.Skip(pos).Take(size).ToArray()).ToString(); if (LoginDohCache.IsPublicAddress(address)) records.Add(Tuple.Create(owner, address)); }
-                pos += size;
-            }
-            var allowed = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { host.TrimEnd('.') };
-            for (int pass = 0; pass < aliases.Count; pass++) foreach (var alias in aliases) if (allowed.Contains(alias.Item1)) allowed.Add(alias.Item2);
-            return records.Where(r => allowed.Contains(r.Item1)).Select(r => r.Item2).Distinct().Take(64).ToArray();
-        }
     }
 
 }

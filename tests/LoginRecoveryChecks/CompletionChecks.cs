@@ -91,7 +91,7 @@ static class CompletionChecks
                 && control.MayHaveBeenSent && server.Posts == 1,
                 "real keep-alive close-delimited control times out after a complete JSON body and remains replay-blocking");
             var native = new NativeTransport(certificates.CaPath);
-            var success = new LoginRecovery(native, new LoginDohCache((host, ms, token) => new[] { "93.184.216.34" }), null, dohFirst: true)
+            var success = new LoginRecovery(native, new LoginDnsCache((host, ms, token) => new[] { "93.184.216.34" }), null, order: LoginDnsOrder.ResolverFirst)
                 .Send(url, "POST", "", "fixture", 8000, new LoginNetworkContext(CancellationToken.None));
             Check(success.ExitCode == 0 && success.HttpCode == 200 && server.LastConnection == "close"
                 && server.LastProtocol == "HTTP/1.1" && native.Resolves.Count == 1 && native.Resolves[0] != null
@@ -107,7 +107,7 @@ static class CompletionChecks
             LoginTransportException failure = null;
             try
             {
-                new LoginRecovery(native, new LoginDohCache((host, ms, token) => new[] { "93.184.216.34" }), null, dohFirst: true)
+                new LoginRecovery(native, new LoginDnsCache((host, ms, token) => new[] { "93.184.216.34" }), null, order: LoginDnsOrder.ResolverFirst)
                     .Send("https://login.test:" + server.Port + "/", "POST", "", "fixture", 8000, new LoginNetworkContext(CancellationToken.None));
             }
             catch (LoginTransportException ex) { failure = ex; }

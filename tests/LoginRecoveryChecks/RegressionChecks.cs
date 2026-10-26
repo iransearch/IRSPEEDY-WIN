@@ -14,7 +14,7 @@ static class RegressionChecks
     static void Check(bool condition, string name)
     { if (!condition) throw new Exception(name); Console.WriteLine("PASS " + name); }
     static LoginCurlResult Unsent(int code) => new LoginCurlResult { ExitCode = code, MetricsKnown = true, ConnectSeconds = .1 };
-    static readonly ILoginResolver EmptyDns = new LoginDohCache((host, timeout, cancellation) => throw new Exception("unexpected DoH"));
+    static readonly ILoginResolver EmptyDns = new LoginDnsCache((host, timeout, cancellation) => throw new Exception("unexpected DoH"));
     static LoginTransportException Fails(LoginRecovery recovery, string url)
     {
         try { recovery.Send(url, "POST", "", "credential", 8000, new LoginNetworkContext(CancellationToken.None)); }
@@ -115,7 +115,7 @@ static class RegressionChecks
         try
         {
             new LoginRecovery(new StubTransport { Handler = resolve => resolve == null ? Unsent(6) : throw new LoginTransportTimeoutException() },
-                new LoginDohCache((host, timeout, token) => new[] { "93.184.216.34" }), null)
+                new LoginDnsCache((host, timeout, token) => new[] { "93.184.216.34" }), null)
                 .Send("https://login.test/", "POST", "", "fixture", 8000, new LoginNetworkContext(CancellationToken.None));
             throw new Exception("unknown recovery timeout accepted");
         }
@@ -126,7 +126,7 @@ static class RegressionChecks
     {
         int active = 0, finished = 0;
         var logs = new List<string>();
-        var result = LoginDohProviders.Resolve("login.test", 2000, CancellationToken.None, (url, ms, token) =>
+        var result = FixtureDohProviders.Resolve("login.test", 2000, CancellationToken.None, (url, ms, token) =>
         {
             Interlocked.Increment(ref active);
             try
@@ -139,7 +139,7 @@ static class RegressionChecks
         Check(result.Length == 1 && active == 0 && finished == 2 && logs.Any(line => line.Contains("provider=cloudflare") && line.Contains("outcome=winner") && line.Contains("elapsedMs=")),
             "parallel backup beats a blocked provider, logs winner/time and joins the canceled loser");
         var extendedClock = Stopwatch.StartNew();
-        result = LoginDohProviders.Resolve("login.test", 8000, CancellationToken.None, (url, ms, token) =>
+        result = FixtureDohProviders.Resolve("login.test", 8000, CancellationToken.None, (url, ms, token) =>
         {
             Check(ms > 2000 && ms <= 5000, "provider receives the shared five-second cap rather than the caller's larger budget");
             if (url.Contains("8.8.8.8")) { token.WaitHandle.WaitOne(); token.ThrowIfCancellationRequested(); }
@@ -148,7 +148,7 @@ static class RegressionChecks
         }, null);
         Check(result.Length == 1 && extendedClock.ElapsedMilliseconds >= 2100 && extendedClock.ElapsedMilliseconds < 5000,
             "valid DoH response after two seconds succeeds within the new five-second race cap");
-        result = LoginDohProviders.Resolve("login.test", 2000, CancellationToken.None, (url, ms, token) =>
+        result = FixtureDohProviders.Resolve("login.test", 2000, CancellationToken.None, (url, ms, token) =>
         {
             if (url.Contains("8.8.8.8")) return new[] { "127.0.0.1", "192.168.1.1" };
             Thread.Sleep(30); return new[] { "93.184.216.34" };
@@ -157,7 +157,7 @@ static class RegressionChecks
         foreach (string json in new[] { "{\"Status\":3,\"Answer\":[{\"type\":1,\"data\":\"93.184.216.35\"}]}",
             "{\"Status\":null,\"Answer\":[{\"type\":1,\"data\":\"93.184.216.35\"}]}", "{\"Status\":0,\"Answer\":[]}" })
         {
-            result = LoginDohProviders.Resolve("login.test", 2000, CancellationToken.None, (url, ms, token) =>
+            result = FixtureDohProviders.Resolve("login.test", 2000, CancellationToken.None, (url, ms, token) =>
             {
                 if (url.Contains("8.8.8.8")) return CurlHelper.ParseLoginAddresses(json);
                 Thread.Sleep(30); return new[] { "93.184.216.34" };
@@ -165,7 +165,7 @@ static class RegressionChecks
             Check(result.SequenceEqual(new[] { "93.184.216.34" }), "invalid/empty DNS JSON cannot beat a later valid provider");
         }
         var clock = Stopwatch.StartNew(); active = 0;
-        result = LoginDohProviders.Resolve("login.test", 200, CancellationToken.None, (url, ms, token) =>
+        result = FixtureDohProviders.Resolve("login.test", 200, CancellationToken.None, (url, ms, token) =>
         {
             Interlocked.Increment(ref active);
             try { token.WaitHandle.WaitOne(); token.ThrowIfCancellationRequested(); return null; }
@@ -175,7 +175,7 @@ static class RegressionChecks
         using (var cancel = new CancellationTokenSource())
         {
             cancel.Cancel(); int calls = 0;
-            try { LoginDohProviders.Resolve("login.test", 2000, cancel.Token, (url, ms, token) => { calls++; return null; }, null); }
+            try { FixtureDohProviders.Resolve("login.test", 2000, cancel.Token, (url, ms, token) => { calls++; return null; }, null); }
             catch (OperationCanceledException) { }
             Check(calls == 0, "canceled lookup starts neither provider");
         }
@@ -202,7 +202,7 @@ static class RegressionChecks
                 && !timed.MayHaveBeenSent && !timed.CanRecover && timed.CanResolveAlternatePeer,
                 "real TLS handshake stall is unsent and requires a different peer for same-host recovery");
             Failover(Fails(new LoginRecovery(new StubTransport { Handler = resolve => timed },
-                new LoginDohCache((host, timeout, token) => new string[0]), null), "https://login.test/"), true);
+                new LoginDnsCache((host, timeout, token) => new string[0]), null), "https://login.test/"), true);
         }
     }
     sealed class ManagedFailureTransport : ILoginTransport

@@ -67,7 +67,7 @@ class ControllerChecks {
 }
 '''
 
-files = [source/name for name in ['LoginRecovery.cs','LoginPrefetch.cs','CurlHelper.Login.cs','CurlHelper.Process.cs','CurlHelper.cs','HttpFallback.cs','DohResolver.cs']]
+files = [source/name for name in ['LoginRecovery.cs','LoginDnsRace.cs','LoginDnsCache.cs','LoginPlainDns.cs','LoginPrefetch.cs','CurlHelper.Login.cs','CurlHelper.Process.cs','CurlHelper.cs','HttpFallback.cs','DohResolver.cs']]
 files.append(root/'IRSpeedyVPN/Common/LogPolicy.cs')
 with tempfile.TemporaryDirectory(prefix='login-recovery-') as directory:
     path = Path(directory)
@@ -82,7 +82,7 @@ with tempfile.TemporaryDirectory(prefix='login-recovery-') as directory:
     subprocess.run(command, check=True)
     (path/'checks.runtimeconfig.json').write_text('{"runtimeOptions":{"tfm":"net8.0","framework":{"name":"Microsoft.NETCore.App","version":"8.0.0"}}}')
     subprocess.run([dotnet, str(output)], check=True, env=test_env)
-    api = [source/name for name in ['NewServiceController.cs','LoginRecovery.cs','LoginPrefetch.cs','BaseHttpResponse.cs','DefaultEncryptedResponse.cs','DefaultPlainResponse.cs']]
+    api = [source/name for name in ['NewServiceController.cs','LoginRecovery.cs','LoginDnsRace.cs','LoginDnsCache.cs','LoginPlainDns.cs','LoginPrefetch.cs','BaseHttpResponse.cs','DefaultEncryptedResponse.cs','DefaultPlainResponse.cs']]
     api += [here/'Fixtures.cs', here/'Api/Fixtures.cs', here/'Api/Program.cs']
     # Only the test bridge in Fixtures needs CurlHelper. Use the same actual
     # production transport files as the integration executable above.

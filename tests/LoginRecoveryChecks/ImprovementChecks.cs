@@ -28,7 +28,7 @@ static class ImprovementChecks
             string url = "https://login.test:" + server.Port + "/";
             var transport = new ReserveTransport(certificates.CaPath);
             int lookupMs = 0;
-            var dns = new LoginDohCache((host, timeout, token) =>
+            var dns = new LoginDnsCache((host, timeout, token) =>
             {
                 lookupMs = timeout;
                 if (token.WaitHandle.WaitOne(Math.Max(0, timeout - 180))) token.ThrowIfCancellationRequested();
@@ -41,7 +41,7 @@ static class ImprovementChecks
                 "non-prefetch lookup yields its time to a three-second POST reserve");
         }
         int speculativeMs = 0;
-        var cache = new LoginDohCache((host, timeout, token) => { speculativeMs = timeout; return new[] { "93.184.216.34" }; });
+        var cache = new LoginDnsCache((host, timeout, token) => { speculativeMs = timeout; return new[] { "93.184.216.34" }; });
         var progress = new LoginConnectProgress();
         var context = new LoginNetworkContext(CancellationToken.None);
         using (var prefetch = new LoginPrefetch(cache, "login.test", new LoginDeadline(context, 8000), context, progress))
@@ -66,7 +66,7 @@ static class ImprovementChecks
         {
             int lookups = 0;
             var same = new StubTransport { Handler = resolve => Failed(exit) };
-            var dns = new LoginDohCache((host, ms, token) => { lookups++; return new[] { "93.184.216.34" }; });
+            var dns = new LoginDnsCache((host, ms, token) => { lookups++; return new[] { "93.184.216.34" }; });
             var failure = Fails(() => Send(same, dns));
             Check(!failure.MayHaveBeenSent && same.Calls == 1 && lookups == 1,
                 "exit " + exit + " with only the failed peer in DoH never retries that address");
@@ -76,7 +76,7 @@ static class ImprovementChecks
                 if (resolve == null) return Failed(exit);
                 actualResolve = resolve; return new LoginCurlResult { HttpCode = 200 };
             } };
-            dns = new LoginDohCache((host, ms, token) => new[] { "93.184.216.34", "93.184.216.35" });
+            dns = new LoginDnsCache((host, ms, token) => new[] { "93.184.216.34", "93.184.216.35" });
             Check(Send(changed, dns).HttpCode == 200 && changed.Calls == 2 && actualResolve == "login.test:443:93.184.216.35",
                 "exit " + exit + " retries only the different public address");
         }
@@ -87,16 +87,16 @@ static class ImprovementChecks
         {
             int lookups = 0;
             var t = new StubTransport { Handler = resolve => forbidden };
-            var dns = new LoginDohCache((host, ms, token) => { lookups++; return new[] { "93.184.216.35" }; });
+            var dns = new LoginDnsCache((host, ms, token) => { lookups++; return new[] { "93.184.216.35" }; });
             Check(Fails(() => Send(t, dns)).MayHaveBeenSent && t.Calls == 1 && lookups == 0,
                 "remote_ip cannot bypass TLS/upload/unknown-metric replay prohibition");
         }
         int httpLookups = 0;
-        var httpDns = new LoginDohCache((host, ms, token) => { httpLookups++; return new[] { "93.184.216.35" }; });
+        var httpDns = new LoginDnsCache((host, ms, token) => { httpLookups++; return new[] { "93.184.216.35" }; });
         Check(Fails(() => Send(new StubTransport { Handler = resolve => Failed(28) }, httpDns, "http://login.test/")).MayHaveBeenSent && httpLookups == 0,
             "known remote_ip does not relax conservative HTTP behavior");
         bool warm = true; int fetches = 0;
-        var refresh = new LoginDohCache((host, ms, token) => { fetches++; return new[] { warm ? "93.184.216.34" : "93.184.216.35" }; });
+        var refresh = new LoginDnsCache((host, ms, token) => { fetches++; return new[] { warm ? "93.184.216.34" : "93.184.216.35" }; });
         refresh.Resolve("login.test", 1000, CancellationToken.None, false); warm = false;
         var cached = new StubTransport { Handler = resolve => resolve == null ? Failed(60) : new LoginCurlResult { HttpCode = 200 } };
         Check(Send(cached, refresh).HttpCode == 200 && cached.Calls == 2 && fetches == 2,
@@ -112,7 +112,7 @@ static class ImprovementChecks
             Check(timed.ExitCode == 28 && timed.RemoteIp == "127.0.0.1" && !timed.MayHaveBeenSent
                 && (timed.CanRecover || timed.CanResolveAlternatePeer),
                 "native stall supplies validated pre-send peer evidence (curl may report zero time_connect)");
-            Check(Send(firstStalls, new LoginDohCache((host, ms, token) => new[] { "93.184.216.34" }), goodUrl).HttpCode == 200
+            Check(Send(firstStalls, new LoginDnsCache((host, ms, token) => new[] { "93.184.216.34" }), goodUrl).HttpCode == 200
                 && stall.Posts == 0 && good.Posts == 1,
                 "native TCP-accepted TLS stall recovers through a different DoH peer with exactly one verified HTTPS POST");
         }
@@ -147,7 +147,7 @@ static class ImprovementChecks
         {
             CurlHelper.RememberPendingForTest(pending);
             var t = new StubTransport { Handler = resolve => new LoginCurlResult { HttpCode = 200 } };
-            var dns = new LoginDohCache((host, ms, token) => new string[0]);
+            var dns = new LoginDnsCache((host, ms, token) => new string[0]);
             try
             {
                 try { Send(t, dns); throw new Exception("uncertain curl allowed a later POST"); }

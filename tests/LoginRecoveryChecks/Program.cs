@@ -75,7 +75,7 @@ class Program
             // the same loopback port using a dedicated transport routing override.
             var logs = new List<string>();
             var transport = new NativeTransport(certificates.CaPath);
-            var resolver = new LoginDohCache(fetch);
+            var resolver = new LoginDnsCache(fetch);
             var recovery = new LoginRecovery(transport, resolver, logs.Add);
             int posts = good.Posts;
             Check(Send(recovery, url).HttpCode == 200 && fetches == 0 && good.Posts == posts + 1,
@@ -110,7 +110,7 @@ class Program
             // Route only the FIRST native attempt to that loopback listener; the
             // production --resolve argument and hostname stay unchanged on retry.
             var redirected = new FirstWrongTransport(certificates.CaPath, wrong.Port);
-            var dns = new LoginDohCache(fetch);
+            var dns = new LoginDnsCache(fetch);
             var repaired = new LoginRecovery(redirected, dns, logs.Add);
             posts = good.Posts; int wrongPosts = wrong.Posts; int before = fetches;
             Check(Send(repaired, url).HttpCode == 200 && good.Posts == posts + 1 && wrong.Posts == wrongPosts && fetches == before + 1,
@@ -120,19 +120,19 @@ class Program
             Check(good.LastHost == "login.test:" + good.Port, "URL/Host and TLS hostname remain the original hostname");
 
             var invalid = new AlwaysWrongTransport(certificates.CaPath, wrong.Port);
-            var invalidDns = new LoginDohCache(fetch);
+            var invalidDns = new LoginDnsCache(fetch);
             before = fetches;
             var invalidError = Fails(() => Send(new LoginRecovery(invalid, invalidDns, logs.Add), url));
             Check(invalid.Results.Count == 2 && invalid.Results.All(r => r.ExitCode == 60) && fetches == before + 1
                 && invalidError.Message.Contains("Initial: exit=60") && invalidError.Message.Contains("recovery: exit=60"),
                 "wrong-domain certificate stays rejected after recovery; both failures are retained and no loop occurs");
 
-            var cached = new LoginDohCache((host, timeout, cancellation) => new[] { "93.184.216.36" });
+            var cached = new LoginDnsCache((host, timeout, cancellation) => new[] { "93.184.216.36" });
             cached.Resolve("login.test", 1000, CancellationToken.None, false);
             // Stale 127.0.0.2 mapping has no listener. Refresh returns the real local
             // fake-DoH response via an indirection, preserving production caching.
             bool stale = true;
-            var refreshing = new LoginDohCache((host, timeout, cancellation) => stale ? new[] { "93.184.216.36" } : fetch(host, timeout, cancellation));
+            var refreshing = new LoginDnsCache((host, timeout, cancellation) => stale ? new[] { "93.184.216.36" } : fetch(host, timeout, cancellation));
             refreshing.Resolve("login.test", 1000, CancellationToken.None, false); stale = false;
             var staleTransport = new FirstWrongTransport(certificates.CaPath, wrong.Port);
             before = fetches; posts = good.Posts;
@@ -141,10 +141,10 @@ class Program
                 "bad cached address is evicted and refreshed once inside the same recovery");
 
             foreach (string address in new[] { "0.0.0.0", "0.1.2.3", "10.0.0.1", "127.0.0.1", "169.254.1.2", "172.16.1.2", "172.31.255.255", "192.168.1.1", "224.0.0.1", "239.1.2.3", "255.255.255.255", "::1", "100.64.0.1" })
-                Check(!LoginDohCache.IsPublicIPv4(address), "reject nonpublic DoH answer " + address);
+                Check(!LoginDnsCache.IsPublicIPv4(address), "reject nonpublic DoH answer " + address);
             doh.Json = "{\"Status\":0,\"Answer\":[{\"type\":1,\"data\":\"127.0.0.1\"}]}";
             var privateTransport = new FirstWrongTransport(certificates.CaPath, wrong.Port);
-            Fails(() => Send(new LoginRecovery(privateTransport, new LoginDohCache(fetch), logs.Add), url));
+            Fails(() => Send(new LoginRecovery(privateTransport, new LoginDnsCache(fetch), logs.Add), url));
             Check(privateTransport.Resolves.Count == 1, "private fake DoH response cannot trigger a POST attempt");
 
             using (var cancel = new CancellationTokenSource())
@@ -152,7 +152,7 @@ class Program
                 good.DelayMs = 1000;
                 var slow = new NativeTransport(certificates.CaPath);
                 cancel.CancelAfter(100);
-                Canceled(() => Send(new LoginRecovery(slow, new LoginDohCache(fetch), logs.Add), url, Context(cancel.Token)));
+                Canceled(() => Send(new LoginRecovery(slow, new LoginDnsCache(fetch), logs.Add), url, Context(cancel.Token)));
                 Check(slow.Resolves.Count == 1, "cancellation stops the real curl process and never starts DoH/replay");
                 good.DelayMs = 0;
             }
@@ -161,13 +161,13 @@ class Program
                 doh.DelayMs = 1000;
                 var slowDoh = new FirstWrongTransport(certificates.CaPath, wrong.Port);
                 cancel.CancelAfter(150);
-                Canceled(() => Send(new LoginRecovery(slowDoh, new LoginDohCache(fetch), logs.Add), url, Context(cancel.Token)));
+                Canceled(() => Send(new LoginRecovery(slowDoh, new LoginDnsCache(fetch), logs.Add), url, Context(cancel.Token)));
                 Check(slowDoh.Resolves.Count == 1, "cancellation aborts an in-flight DoH request before the retry POST");
                 doh.DelayMs = 0;
             }
 
             int lookups = 0;
-            var counting = new LoginDohCache((host, timeout, cancellation) => { lookups++; return new[] { "93.184.216.34" }; });
+            var counting = new LoginDnsCache((host, timeout, cancellation) => { lookups++; return new[] { "93.184.216.34" }; });
             var failing = new StubTransport { Handler = resolve => Failure(7) };
             var bounded = new LoginRecovery(failing, counting, logs.Add);
             var context = Context(); Fails(() => Send(bounded, url, context)); Fails(() => Send(bounded, url, context));
@@ -180,7 +180,7 @@ class Program
             {
                 var eligible = new StubTransport { Handler = resolve => resolve == null ? Failure(code) : new LoginCurlResult { HttpCode = 200 } };
                 int queries = 0;
-                var answers = new LoginDohCache((host, timeout, cancellation) => { queries++; return new[] { "93.184.216.34" }; });
+                var answers = new LoginDnsCache((host, timeout, cancellation) => { queries++; return new[] { "93.184.216.34" }; });
                 Check(Send(new LoginRecovery(eligible, answers, logs.Add), url).HttpCode == 200
                     && eligible.Calls == 2 && queries == 1 && eligible.ManagedCalls == 0,
                     "eligible pre-send exit " + code + " recovers exactly once before failover");
@@ -236,7 +236,7 @@ class Program
                 "diagnostics record recovery guards, DNS results and HTTP bypass");
             ControllerChecks.Run();
             DnsFailureChecks.Run(certificates);
-            DohFirstChecks.Run(certificates);
+            ResolverFirstChecks.Run(certificates);
             TransferDiagnosticChecks.Run(certificates);
             PlainDnsChecks.Run();
             CompletionChecks.Run(certificates);

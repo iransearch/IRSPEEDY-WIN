@@ -6,7 +6,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using IRSpeedyVPN.WebServices;
 
-static class DohFirstChecks
+static class ResolverFirstChecks
 {
     static void Check(bool value, string name)
     { if (!value) throw new Exception(name); Console.WriteLine("PASS " + name); }
@@ -14,7 +14,7 @@ static class DohFirstChecks
     static LoginCurlResult Ok() => new LoginCurlResult { HttpCode = 200, UploadedBytes = 177, MetricsKnown = true };
     static LoginCurlResult Send(ILoginTransport transport, ILoginResolver resolver, List<string> logs = null,
         string url = "https://login.test/", LoginNetworkContext context = null)
-        => new LoginRecovery(transport, resolver, logs == null ? (Action<string>)null : logs.Add, dohFirst: true)
+        => new LoginRecovery(transport, resolver, logs == null ? (Action<string>)null : logs.Add, order: LoginDnsOrder.ResolverFirst)
             .Send(url, "POST", "", "credential-must-not-be-logged", 8000,
                 context ?? new LoginNetworkContext(CancellationToken.None));
     static LoginTransportException Fails(Action action)
@@ -23,7 +23,7 @@ static class DohFirstChecks
     { try { action(); } catch (OperationCanceledException) { return; } throw new Exception("expected cancellation"); }
     internal static void Run(Certificates certificates)
     {
-        Check(CurlHelper.LoginDohFirstVerification, "production login enables the temporary DoH-first verification switch");
+        Check(CurlHelper.LoginResolutionOrder == LoginDnsOrder.ResolverFirst, "production login uses the final resolver-first policy without experiment switches");
         Native(certificates);
         Policy();
         Deadlines();
@@ -37,7 +37,7 @@ static class DohFirstChecks
             string url = "https://login.test:" + server.Port + "/";
             google.Json = "{\"Status\":0,\"Answer\":[{\"type\":1,\"data\":\"127.0.0.1\"}]}";
             var logs = new List<string>();
-            var dns = new LoginDohCache((host, ms, token) => LoginDohProviders.Resolve(host, ms, token,
+            var dns = new LoginDnsCache((host, ms, token) => FixtureDohProviders.Resolve(host, ms, token,
                 (provider, budget, stop) =>
                 {
                     bool isGoogle = provider.Contains("8.8.8.8");
@@ -52,7 +52,7 @@ static class DohFirstChecks
                 && server.LastHost == "login.test:" + server.Port,
                 "DoH-first race reaches verified native HTTPS via --resolve with one POST and original Host/SNI");
             Check(logs.Any(line => line.Contains("provider=cloudflare outcome=winner"))
-                && logs.Any(line => line.Contains("stage=doh-first-result resolve=True"))
+                && logs.Any(line => line.Contains("stage=resolver-first-result resolve=True"))
                 && !logs.Any(line => line.Contains("stage=system-fallback")),
                 "DoH-first success records the valid provider winner and never starts system DNS");
             foreach (int status in new[] { 401, 406, 500 })
@@ -70,14 +70,14 @@ static class DohFirstChecks
             server.Drop = false;
 
             int queries = 0; native = new NativeTransport(certificates.CaPath); posted = server.Posts;
-            var wrong = new LoginDohCache((host, ms, token) => { queries++; return new[] { "93.184.216.36" }; });
+            var wrong = new LoginDnsCache((host, ms, token) => { queries++; return new[] { "93.184.216.36" }; });
             Check(Send(native, wrong, logs, url).HttpCode == 200 && server.Posts == posted + 1
                 && queries == 1 && native.Resolves.Count == 2 && native.Resolves[0] != null && native.Resolves[1] == null,
                 "failed DoH peer before sending falls back once to system DNS and sends exactly one real POST");
             foreach (bool freshWorks in new[] { true, false })
             {
                 queries = 0; native = new NativeTransport(certificates.CaPath); posted = server.Posts;
-                var cached = new LoginDohCache((host, ms, token) =>
+                var cached = new LoginDnsCache((host, ms, token) =>
                     new[] { ++queries > 1 && freshWorks ? "93.184.216.34" : "93.184.216.36" });
                 cached.Resolve("login.test", 1000, CancellationToken.None, false);
                 Check(Send(native, cached, logs, url).HttpCode == 200 && queries == 2 && server.Posts == posted + 1
@@ -91,10 +91,10 @@ static class DohFirstChecks
         using (var wrong = new LocalServer(certificates.Wrong))
         {
             var native = new NativeTransport(certificates.CaPath);
-            var error = Fails(() => Send(native, new LoginDohCache((host, ms, token) => new[] { "93.184.216.34" }),
+            var error = Fails(() => Send(native, new LoginDnsCache((host, ms, token) => new[] { "93.184.216.34" }),
                 url: "https://login.test:" + wrong.Port + "/"));
             Check(wrong.Posts == 0 && native.Resolves.Count == 2 && native.Resolves.Last() == null
-                && native.Results.All(result => result.ExitCode == 60) && error.Message.Contains("DoH first:"),
+                && native.Results.All(result => result.ExitCode == 60) && error.Message.Contains("Resolver first:"),
                 "wrong-domain certificates remain rejected in both DNS orders with zero POSTs and initial failure preserved");
         }
     }
@@ -104,7 +104,7 @@ static class DohFirstChecks
         {
             int lookups = 0;
             var transport = new RecordingTransport { Handler = (resolve, ms, token) => Unsent(6) };
-            var dns = new LoginDohCache((host, ms, token) =>
+            var dns = new LoginDnsCache((host, ms, token) =>
             { lookups++; if (lookupThrows) throw new Exception("credential-must-not-be-logged"); return new string[0]; });
             var logs = new List<string>();
             Check(!Fails(() => Send(transport, dns, logs)).MayHaveBeenSent && transport.Resolves.SequenceEqual(new string[] { null })
@@ -126,13 +126,13 @@ static class DohFirstChecks
         }
         var systemPartial = new RecordingTransport { Handler = (resolve, ms, token) =>
             new LoginCurlResult { ExitCode = 28, HttpCode = 200, UploadedBytes = 177, MetricsKnown = true } };
-        Check(Fails(() => Send(systemPartial, new LoginDohCache((host, ms, token) => new string[0]))).MayHaveBeenSent
+        Check(Fails(() => Send(systemPartial, new LoginDnsCache((host, ms, token) => new string[0]))).MayHaveBeenSent
             && systemPartial.Resolves.Count == 1, "partial system HTTP after empty DoH also stays replay-blocking");
         foreach (bool unavailable in new[] { false, true })
         {
             var transport = new RecordingTransport { Handler = (resolve, ms, token) =>
                 new LoginCurlResult { Unavailable = true } };
-            var dns = new LoginDohCache((host, ms, token) => unavailable ? new[] { "93.184.216.34" } : new string[0]);
+            var dns = new LoginDnsCache((host, ms, token) => unavailable ? new[] { "93.184.216.34" } : new string[0]);
             Check(Send(transport, dns).HttpCode == 200 && transport.ManagedCalls == 1,
                 "DoH-first permits one managed POST only when curl cannot launch (answer=" + unavailable + ")");
         }
@@ -156,7 +156,7 @@ static class DohFirstChecks
 
         endpoints = 0; int hostnameLookups = 0;
         var offline = new RecordingTransport { Handler = (resolve, ms, token) => endpoints == 1 ? Unsent(6) : Ok() };
-        var noAnswers = new LoginDohCache((host, ms, token) => { hostnameLookups++; return new string[0]; });
+        var noAnswers = new LoginDnsCache((host, ms, token) => { hostnameLookups++; return new string[0]; });
         var flow = new LoginNetworkContext(CancellationToken.None);
         var response = new ControllerHarness().Run((host, timeout) =>
         {
@@ -180,7 +180,7 @@ static class DohFirstChecks
     {
         int lookups = 0, budget = 0, postBudget = 0;
         var transport = new RecordingTransport { Handler = (resolve, ms, token) => { postBudget = ms; return Ok(); } };
-        Send(transport, new LoginDohCache((host, ms, token) => { lookups++; budget = ms; return new[] { "93.184.216.34" }; }));
+        Send(transport, new LoginDnsCache((host, ms, token) => { lookups++; budget = ms; return new[] { "93.184.216.34" }; }));
         Check(budget > 0 && budget <= 5000 && postBudget >= 3000 && postBudget <= 8000 && transport.ObservedCalls == 0,
             "DoH-first keeps the five-second lookup cap, three-second POST reserve and disables speculative prefetch");
         foreach (bool expired in new[] { false, true })
@@ -189,20 +189,20 @@ static class DohFirstChecks
             lookups = 0; transport = new RecordingTransport { Handler = (resolve, ms, token) => Ok() };
             if (!expired) cancel.Cancel();
             var context = new LoginNetworkContext(cancel.Token, expired ? 0 : 30000);
-            try { Send(transport, new LoginDohCache((host, ms, token) => { lookups++; return new string[0]; }), context: context); throw new Exception("deadline ignored"); }
+            try { Send(transport, new LoginDnsCache((host, ms, token) => { lookups++; return new string[0]; }), context: context); throw new Exception("deadline ignored"); }
             catch (OperationCanceledException) { Check(!expired && lookups == 0 && transport.Resolves.Count == 0, "canceled DoH-first login starts no lookup or POST"); }
             catch (TimeoutException) { Check(expired && lookups == 0 && transport.Resolves.Count == 0, "expired DoH-first login starts no lookup or POST"); }
         }
         using (var cancel = new CancellationTokenSource(50))
         {
             transport = new RecordingTransport { Handler = (resolve, ms, token) => Ok() };
-            Canceled(() => Send(transport, new LoginDohCache((host, ms, token) =>
+            Canceled(() => Send(transport, new LoginDnsCache((host, ms, token) =>
             { token.WaitHandle.WaitOne(1000); token.ThrowIfCancellationRequested(); return new string[0]; }),
                 context: new LoginNetworkContext(cancel.Token)));
             Check(transport.Resolves.Count == 0, "cancel during the initial DoH lookup never starts a system POST");
         }
     }
-    static LoginDohCache Answers() => new LoginDohCache((host, ms, token) => new[] { "93.184.216.34" });
+    static LoginDnsCache Answers() => new LoginDnsCache((host, ms, token) => new[] { "93.184.216.34" });
     sealed class RecordingTransport : ILoginConnectTransport
     {
         internal readonly List<string> Resolves = new List<string>();

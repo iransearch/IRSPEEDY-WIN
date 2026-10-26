@@ -15,7 +15,7 @@ cancellation and cache eviction. `Fixtures.cs` supplies framework/runtime
 boundaries and a .NET 8 JSON adapter. The runner also compiles the actual
 controller failover methods and the complete controller with `Api/` REST/model
 fixtures. With .NET 4.8 references, complete production controller, RestHelper,
-curl, DoH parser, managed HTTP and recovery files are compiled together.
+curl, classic DNS transport/parser, managed HTTP and recovery files are compiled together.
 
 `RegressionChecks.cs` covers HTTPS/HTTP replay evidence, managed phases, static
 curl availability, trailer/argument robustness and native exits 6/7; `dns_fail.c`
@@ -41,21 +41,27 @@ checks each contradictory indicator/unknown metrics and HTTPS-only scoping,
 executes a verified native HTTPS POST after recovery, and checks actual
 Failure()/controller failover with failed DoH and a DNS-failed recovery attempt.
 
-`DohFirstChecks.cs` exercises the temporary production DoH-first flag, native
+`ResolverFirstChecks.cs` exercises the explicit production resolver-first policy, native
 HTTPS via --resolve and sequential system fallback, cache refresh, strict TLS,
 post-send/partial HTTP replay rejection, cancellation and shared POST gating.
 The system-first checks explicitly retain the constructor's reference policy.
 
 `TransferDiagnosticChecks.cs` validates optional transfer trailer parsing and
 scalar log privacy, and reproduces HTTP 200 with stalled zero/one-byte bodies
-using real certificate-verified curl through the production DoH-first path.
+using real certificate-verified curl through the production resolver-first path.
 These diagnostics never change the existing replay-evidence fields.
 
-`CompletionChecks.cs` tests the HTTP/1.1 connection-close experiment using real
-verified HTTPS control/trial requests, rejects mismatched lengths and missing
+`CompletionChecks.cs` tests the HTTP/1.1 connection-close policy using real
+verified HTTPS control/production requests, rejects mismatched lengths and missing
 chunk terminators, and checks whitelisted header privacy/bounded body metadata.
 It also checks that a stalled one-line chunked JSON response reports periodic
 numeric receive progress and idle time without exposing response or credentials.
 
 `PlainDnsChecks.cs` checks classic DNS packet validation, A/AAAA public filtering,
-loopback UDP transport, canceled sockets and first-valid-answer racing.
+loopback UDP/TCP transport, IPv6 curl pinning, canceled-socket classification
+and first-valid-answer racing.
+
+Historical DoH JSON parsing and provider URLs live only in Fixtures.cs to keep
+legacy synthetic race/transport coverage. Production login uses LoginPlainDns,
+LoginDnsRace and LoginDnsCache with no experiment switches. The SDK WPF project
+includes these source files automatically; run.py lists them explicitly.

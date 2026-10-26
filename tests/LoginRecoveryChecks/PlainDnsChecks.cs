@@ -31,11 +31,11 @@ static class PlainDnsChecks
         Check(LoginPlainDns.Parse(Reply(q, "127.0.0.1"), "login.test", 1, 77).Length == 0, "classic DNS private-only answer cannot win");
         var q6 = LoginPlainDns.BuildQuery("login.test", 28, 90);
         Check(LoginPlainDns.Parse(Reply(q6, "2606:4700:4700::1111"), "login.test", 28, 90).Length == 1
-            && !LoginDohCache.IsPublicAddress("::1") && !LoginDohCache.IsPublicAddress("fd00::1")
-            && !LoginDohCache.IsPublicAddress("fe80::1") && !LoginDohCache.IsPublicAddress("2001:db8::1"), "classic DNS accepts public AAAA and rejects local/documentation IPv6");
+            && !LoginDnsCache.IsPublicAddress("::1") && !LoginDnsCache.IsPublicAddress("fd00::1")
+            && !LoginDnsCache.IsPublicAddress("fe80::1") && !LoginDnsCache.IsPublicAddress("2001:db8::1"), "classic DNS accepts public AAAA and rejects local/documentation IPv6");
         string pinned = null;
         var transport = new StubTransport { Handler = resolve => { pinned = resolve; return new LoginCurlResult { HttpCode = 200 }; } };
-        new LoginRecovery(transport, new LoginDohCache((h, ms, t) => new[] { "2606:4700:4700::1111" }), null, dohFirst: true)
+        new LoginRecovery(transport, new LoginDnsCache((h, ms, t) => new[] { "2606:4700:4700::1111" }), null, order: LoginDnsOrder.ResolverFirst)
             .Send("https://login.test/", "POST", "", "fixture", 20000, new LoginNetworkContext(CancellationToken.None));
         Check(pinned == "login.test:443:[2606:4700:4700::1111]" && transport.Calls == 1,
             "classic DNS IPv6 cache reaches one credential attempt with bracketed curl resolve address");
@@ -76,14 +76,16 @@ static class PlainDnsChecks
             try { LoginPlainDns.Query("login.test", (IPEndPoint)udp.Client.LocalEndPoint, 1, 5000, cancel.Token); } catch { }
             Check(watch.ElapsedMilliseconds < 1500, "cancel closes blocked classic DNS socket promptly");
         }
-        int live = 0; var logs = new List<string>();
-        var winner = LoginDohProviders.Resolve("login.test", 5000, CancellationToken.None, (p, ms, token) =>
+        int live = 0; var logs = new List<string>(); var raceClock = System.Diagnostics.Stopwatch.StartNew();
+        var winner = LoginDnsRace.Resolve("login.test", 5000, CancellationToken.None, (p, ms, token) =>
         {
             Interlocked.Increment(ref live);
             try { if (p == "bad") return new[] { "127.0.0.1" }; if (p == "good") { Thread.Sleep(30); return new[] { "93.184.216.34" }; }
-                token.WaitHandle.WaitOne(ms); token.ThrowIfCancellationRequested(); return new string[0]; }
+                token.WaitHandle.WaitOne(ms); throw new SocketException((int)SocketError.OperationAborted); }
             finally { Interlocked.Decrement(ref live); }
-        }, logs.Add, new[] { "bad", "slow", "good" }, new[] { "bad", "slow", "good" }, true);
-        Check(winner.Length == 1 && live == 0 && logs.Any(s => s.Contains("provider=good outcome=winner")), "first valid classic DNS answer wins and cancels/joins slow loser without waiting for its answer");
+        }, logs.Add, new[] { "bad", "slow", "good" }, new[] { "bad", "slow", "good" });
+        Check(winner.Length == 1 && live == 0 && raceClock.ElapsedMilliseconds < 1500
+            && logs.Any(s => s.Contains("provider=slow outcome=joined-canceled"))
+            && !logs.Any(s => s.Contains("joined-failed")) && logs.Any(s => s.Contains("provider=good outcome=winner")), "first valid classic DNS answer wins and cancels/joins slow loser without waiting for its answer");
     }
 }

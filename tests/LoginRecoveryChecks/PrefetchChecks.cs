@@ -10,18 +10,18 @@ static class PrefetchChecks
 {
     static void Check(bool value, string name) { if (!value) throw new Exception(name); Console.WriteLine("PASS " + name); }
     static LoginCurlResult Result(int exit) => new LoginCurlResult { ExitCode = exit, MetricsKnown = true, HttpCode = exit == 0 ? 200 : 0 };
-    static LoginCurlResult Send(ObservedTransport transport, LoginDohCache cache)
+    static LoginCurlResult Send(ObservedTransport transport, LoginDnsCache cache)
         => new LoginRecovery(transport, cache, null).Send("https://login.test/", "POST", "", "credential", 8000, new LoginNetworkContext(CancellationToken.None));
     internal static void Run()
     {
         int queries = 0;
-        var cache = new LoginDohCache((host, timeout, token) => { Interlocked.Increment(ref queries); return new[] { "93.184.216.34" }; });
+        var cache = new LoginDnsCache((host, timeout, token) => { Interlocked.Increment(ref queries); return new[] { "93.184.216.34" }; });
         var healthy = new ObservedTransport { DelayMs = 40, First = Result(0) };
         Send(healthy, cache);
         Check(queries == 0 && healthy.Posts == 1 && healthy.MaxActive == 1, "healthy login below one second has zero DoH requests including prefetch");
 
         queries = 0;
-        cache = new LoginDohCache((host, timeout, token) => { Interlocked.Increment(ref queries); return new[] { "93.184.216.34" }; });
+        cache = new LoginDnsCache((host, timeout, token) => { Interlocked.Increment(ref queries); return new[] { "93.184.216.34" }; });
         var lateSuccess = new ObservedTransport { DelayMs = 1400, First = Result(0) };
         Send(lateSuccess, cache);
         Check(queries == 1 && lateSuccess.Posts == 1 && lateSuccess.MaxActive == 1,
@@ -30,7 +30,7 @@ static class PrefetchChecks
         Check(queries == 2, "successful first attempt discards completed prefetch instead of storing it in the five-minute cache");
 
         int active = 0; queries = 0;
-        cache = new LoginDohCache((host, timeout, token) =>
+        cache = new LoginDnsCache((host, timeout, token) =>
         {
             Interlocked.Increment(ref queries); Interlocked.Increment(ref active);
             try { token.WaitHandle.WaitOne(); token.ThrowIfCancellationRequested(); return null; }
@@ -48,10 +48,10 @@ static class PrefetchChecks
         foreach (int exit in new[] { 6, 7 })
         {
             queries = 0;
-            cache = new LoginDohCache((host, timeout, token) =>
+            cache = new LoginDnsCache((host, timeout, token) =>
             {
                 Interlocked.Increment(ref queries);
-                return LoginDohProviders.Resolve(host, timeout, token, (url, ms, cancel) =>
+                return FixtureDohProviders.Resolve(host, timeout, token, (url, ms, cancel) =>
                 { if (url.Contains("1.1.1.1")) { cancel.WaitHandle.WaitOne(); cancel.ThrowIfCancellationRequested(); } return new[] { "93.184.216.34" }; }, null);
             });
             var failed = new ObservedTransport { DelayMs = 1400, First = Result(exit) };
@@ -61,17 +61,17 @@ static class PrefetchChecks
                 "late exit " + exit + " consumes prefetch once, commits valid cache and never overlaps credential curl attempts");
         }
         queries = 0;
-        cache = new LoginDohCache((host, timeout, token) =>
+        cache = new LoginDnsCache((host, timeout, token) =>
         {
             Interlocked.Increment(ref queries);
-            return LoginDohProviders.Resolve(host, timeout, token, (url, ms, cancel) => new string[0], null);
+            return FixtureDohProviders.Resolve(host, timeout, token, (url, ms, cancel) => new string[0], null);
         });
         var bothFail = new ObservedTransport { DelayMs = 1400, First = Result(6) };
         try { Send(bothFail, cache); throw new Exception("expected empty DNS failure"); } catch (LoginTransportException) { }
         Check(queries == 1 && bothFail.Calls == 1 && bothFail.Posts == 0, "both speculative providers failing cause no loop and no extra POST");
 
         queries = 0;
-        cache = new LoginDohCache((host, timeout, token) => { Interlocked.Increment(ref queries); return new[] { "93.184.216.34" }; });
+        cache = new LoginDnsCache((host, timeout, token) => { Interlocked.Increment(ref queries); return new[] { "93.184.216.34" }; });
         var connected = new ObservedTransport { DelayMs = 1400, First = Result(0), ConnectImmediately = true };
         Send(connected, cache);
         Check(queries == 0 && connected.Posts == 1, "slow response after a connected/TLS phase does not start prefetch");
@@ -83,7 +83,7 @@ static class PrefetchChecks
             Check(queries == 0, "HTTP and IP-literal targets do not start unusable speculative DoH");
         }
         queries = 0;
-        cache = new LoginDohCache((host, timeout, token) => { Interlocked.Increment(ref queries); return new[] { "93.184.216.34" }; });
+        cache = new LoginDnsCache((host, timeout, token) => { Interlocked.Increment(ref queries); return new[] { "93.184.216.34" }; });
         var ineligibleFailure = new ObservedTransport { DelayMs = 1400, First = Result(55) };
         try { Send(ineligibleFailure, cache); throw new Exception("expected non-CanRecover failure"); }
         catch (LoginTransportException ex) { Check(!ex.MayHaveBeenSent, "pre-TLS exit 55 remains eligible only for next-host failover"); }
@@ -114,7 +114,7 @@ static class PrefetchChecks
         {
             slow.DelayMs = 1500; int active = 0;
             var before = CurlIds();
-            var result = LoginDohProviders.Resolve("login.test", 2000, CancellationToken.None, (provider, timeout, token) =>
+            var result = FixtureDohProviders.Resolve("login.test", 2000, CancellationToken.None, (provider, timeout, token) =>
             {
                 Interlocked.Increment(ref active);
                 try

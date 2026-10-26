@@ -73,7 +73,7 @@ static class TransferDiagnosticChecks
                 LoginTransportException failure = null;
                 try
                 {
-                    new LoginRecovery(transport, new LoginDohCache((host, ms, token) => new[] { "93.184.216.34" }), logs.Add, dohFirst: true)
+                    new LoginRecovery(transport, new LoginDnsCache((host, ms, token) => new[] { "93.184.216.34" }), logs.Add, order: LoginDnsOrder.ResolverFirst)
                         .Send(url, "POST", "", "fixture", 8000, new LoginNetworkContext(CancellationToken.None));
                 }
                 catch (LoginTransportException ex) { failure = ex; }
@@ -83,7 +83,7 @@ static class TransferDiagnosticChecks
                     && timeout.FirstByteSeconds > 0 && timeout.FirstByteSeconds < timeout.TotalSeconds
                     && server.Posts == posts + 1 && transport.Calls == 1,
                     "native HTTP 200 timeout exposes " + bytes + " received body bytes without replaying the POST");
-                Check(logs.Any(line => line.Contains("stage=doh-first-result") && line.Contains("transferMetrics=True")
+                Check(logs.Any(line => line.Contains("stage=resolver-first-result") && line.Contains("transferMetrics=True")
                     && line.Contains("download=" + bytes) && line.Contains("httpVersion=1.1") && line.Contains("bodyChars=" + bytes))
                     && !logs.Any(line => line.Contains("stage=system-fallback")),
                     "production DoH result log distinguishes header-only/partial-body timeout (bytes=" + bytes + ")");

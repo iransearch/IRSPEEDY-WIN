@@ -43,7 +43,7 @@ static class DnsFailureChecks
             var result = Captured(); mutation.Value(result);
             int lookups = 0;
             var transport = new StubTransport { Handler = resolve => result };
-            var recovery = new LoginRecovery(transport, new LoginDohCache((host, ms, token) =>
+            var recovery = new LoginRecovery(transport, new LoginDnsCache((host, ms, token) =>
             { lookups++; return new[] { "93.184.216.34" }; }), null);
             if (result.HttpCode > 0) Send(recovery);
             else Check(Fails(() => Send(recovery)).MayHaveBeenSent, "failure stays conservative for " + mutation.Key);
@@ -65,7 +65,7 @@ static class DnsFailureChecks
         var logs = new List<string>();
         int dns = 0;
         var http = new StubTransport { Handler = resolve => Captured() };
-        var httpFailure = Fails(() => Send(new LoginRecovery(http, new LoginDohCache((host, ms, token) =>
+        var httpFailure = Fails(() => Send(new LoginRecovery(http, new LoginDnsCache((host, ms, token) =>
         { dns++; return new[] { "93.184.216.34" }; }), logs.Add), "http://login.test/"));
         Check(httpFailure.MayHaveBeenSent && http.Calls == 1 && dns == 0,
             "plain HTTP retains its previous positive-pretransfer policy and never invokes DoH");
@@ -76,7 +76,7 @@ static class DnsFailureChecks
             var transport = new StubTransport { Handler = resolve => resolve == null ? Captured()
                 : native.Curl("https://login.test:" + server.Port + "/", "POST", "", "fixture",
                     resolve, 4000, CancellationToken.None) };
-            var recovery = new LoginRecovery(transport, new LoginDohCache((host, ms, token) =>
+            var recovery = new LoginRecovery(transport, new LoginDnsCache((host, ms, token) =>
             { dns++; return new[] { "93.184.216.34" }; }), logs.Add);
             Check(Send(recovery, "https://login.test:" + server.Port + "/").HttpCode == 200
                 && server.Posts == 1 && transport.Calls == 2 && dns == 1,
@@ -90,7 +90,7 @@ static class DnsFailureChecks
             var context = new LoginNetworkContext(CancellationToken.None);
             var transport = new StubTransport { Handler = resolve =>
             { calls++; return endpoints == 1 ? Captured() : new LoginCurlResult { HttpCode = 200 }; } };
-            var resolver = new LoginDohCache((host, ms, token) =>
+            var resolver = new LoginDnsCache((host, ms, token) =>
             { lookups++; return retryCurl ? new[] { "93.184.216.34" } : new string[0]; });
             var recovery = new LoginRecovery(transport, resolver, logs.Add);
             var response = new ControllerHarness().Run((host, timeout) =>
@@ -108,7 +108,7 @@ static class DnsFailureChecks
             if (resolve != null) { result.ExitCode = 28; result.TlsSeconds = .1; result.UploadedBytes = 177; }
             return result;
         } };
-        Check(Fails(() => Send(new LoginRecovery(posted, new LoginDohCache((host, ms, token) =>
+        Check(Fails(() => Send(new LoginRecovery(posted, new LoginDnsCache((host, ms, token) =>
             new[] { "93.184.216.34" }), logs.Add))).MayHaveBeenSent && attempts == 2,
             "an unsent initial DNS failure never overrides evidence of a sent recovery POST");
         Check(logs.Any(line => line.Contains("mayHaveBeenSent=True definitelyNotSent=True"))

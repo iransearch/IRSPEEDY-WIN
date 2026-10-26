@@ -12,15 +12,14 @@ namespace IRSpeedyVPN.WebServices
 {
     internal sealed partial class CurlHelper
     {
-        private static readonly LoginDohCache LoginDns = new LoginDohCache(FetchLoginAddresses);
-        // Temporary verification build: resolve via DoH before using system DNS.
-        internal const bool LoginDohFirstVerification = true;
-        internal const bool LoginPlainDnsVerification = true;
+        private static readonly LoginDnsCache LoginDns = new LoginDnsCache(FetchLoginAddresses);
+        // Credential POSTs use the first valid public answer from the classic DNS race.
+        internal const LoginDnsOrder LoginResolutionOrder = LoginDnsOrder.ResolverFirst;
         internal CurlResponse SendLogin(string url, string method, string headers, string body,
             int timeoutMs, LoginNetworkContext context)
         {
             var recovery = new LoginRecovery(new LoginTransport(this), LoginDns, LogHelper.WriteExLog,
-                dohFirst: LoginDohFirstVerification);
+                order: LoginResolutionOrder);
             var result = recovery.Send(url, method, headers, body, timeoutMs, context);
             return new CurlResponse(result.Body, result.HttpCode);
         }
@@ -105,8 +104,8 @@ namespace IRSpeedyVPN.WebServices
             // and explicit --resolve. Login must not silently follow redirects:
             // metrics from a later connection cannot prove the first POST was unsent.
             string args = BuildArgs(url, method, headers, body, null, null, resolve, followRedirects: false);
-            // Temporary completion trial for credential POSTs only. DoH GETs and
-            // ordinary curl callers retain their previous protocol/connection policy.
+            // Login credential POST completion policy. Other curl callers retain
+            // their existing protocol, buffering and connection behavior.
             if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase))
                 args += " --http1.1 -H \"Connection: close\" --verbose --no-buffer";
             string seconds = (timeoutMs / 1000d).ToString("0.###", CultureInfo.InvariantCulture);
@@ -153,47 +152,8 @@ namespace IRSpeedyVPN.WebServices
         private static double? OptionalMetric(string output, string marker)
             => Metric(output, marker, out var value) ? (double?)value : null;
         private static string[] FetchLoginAddresses(string host, int timeoutMs, CancellationToken cancellation)
-            => LoginPlainDnsVerification
-                ? LoginPlainDns.Resolve(host, timeoutMs, cancellation, LogHelper.WriteExLog)
-                : LoginDohProviders.Resolve(host, timeoutMs, cancellation, FetchLoginProvider, LogHelper.WriteExLog);
+            => LoginPlainDns.Resolve(host, timeoutMs, cancellation, LogHelper.WriteExLog);
 
-        private static string[] FetchLoginProvider(string url, int timeoutMs, CancellationToken cancellation)
-        {
-            var elapsed = Stopwatch.StartNew();
-            var response = new CurlHelper().SendLoginAttempt(
-                url,
-                "GET", "Accept: application/dns-json\r\n", null, null, timeoutMs, cancellation);
-            // This GET contains no credentials. Managed fallback is still restricted
-            // to curl launch failures, with the same caller-supplied deadline.
-            if (response.Unavailable)
-            {
-                int remainingMs = timeoutMs - (int)Math.Min(int.MaxValue, elapsed.ElapsedMilliseconds);
-                if (remainingMs <= 0) throw new TimeoutException("DoH provider deadline expired.");
-                var fallback = HttpFallback.Send(url,
-                    "GET", "Accept: application/dns-json\r\n", null, null, remainingMs, cancellation);
-                response.HttpCode = fallback.HttpCode; response.Body = fallback.Body;
-            }
-            if (response.HttpCode != 200) return new string[0];
-            return ParseLoginAddresses(response.Body);
-        }
-        internal static string[] ParseLoginAddresses(string json)
-        {
-            var root = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
-            object status, answers;
-            if (root == null || !root.TryGetValue("Status", out status) || status == null || Convert.ToString(status, CultureInfo.InvariantCulture) != "0"
-                || !root.TryGetValue("Answer", out answers)) return new string[0];
-            var records = answers as IEnumerable;
-            var values = new List<string>();
-            if (records != null) foreach (var record in records)
-            {
-                var item = record as Dictionary<string, object>;
-                object type, data;
-                if (item != null && item.TryGetValue("type", out type) && Convert.ToString(type) == "1"
-                    && item.TryGetValue("data", out data) && data != null && LoginDohCache.IsPublicIPv4(data.ToString().Trim()))
-                    values.Add(data.ToString().Trim());
-            }
-            return values.ToArray();
-        }
     }
 
     // Only numeric transfer activity is kept. No response bytes, credentials,
