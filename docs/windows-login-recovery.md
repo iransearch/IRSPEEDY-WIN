@@ -1,4 +1,4 @@
-# Windows login recovery (1.4.49 transfer progress diagnostics)
+# Windows login recovery (1.4.50 classic DNS experiment)
 
 Baseline: `a97564b3209539e48a6dd355ba38a4feedfe992f` (1.4.46).
 The supplied 1.4.45 log confirmed a Google winner, valid public A answers and
@@ -483,3 +483,38 @@ server generated the full JSON and its final chunk, whether the proxy forwarded
 the terminating chunk, and whether the client continued receiving data in its
 periodic samples. A public 200 status by itself does not prove a complete
 chunked response. Server logs were not available in this client workspace.
+
+
+## 1.4.50 classic DNS first experiment
+
+LoginPlainDnsVerification selects classic DNS instead of the login DoH fetcher.
+Google 8.8.8.8, Yandex Basic 77.88.8.8, Cloudflare 1.1.1.1 and AdGuard default
+94.140.14.14 race on UDP port 53. A and AAAA questions are sent concurrently.
+The first valid public answer wins; private-only, malformed, empty and error
+responses cannot win. Other requests are canceled by closing their sockets,
+then their workers are joined for cleanup, not awaited for DNS results. A
+truncated UDP response uses TCP to the same resolver within the original clock.
+No DNS settings on Windows are modified. DNS racing inside the VPN is unchanged.
+
+Packets validate the connected source, transaction ID, question, response flags,
+CNAME owner chain and bounded DNS name/compression parsing. Public IPv6 results
+are accepted and bracketed in curl --resolve; local/scoped/documentation IPv6
+and the existing nonpublic IPv4 ranges are rejected. Classic DNS is unencrypted
+and not authenticated; HTTPS host/SNI/certificate validation is still mandatory.
+The first DNS response is not a throughput test or a guarantee of working IPv6.
+
+The existing five-minute cache and per-login recovery state are reused. No DoH
+request is made in this experiment. System DNS remains sequential fallback only
+when the existing unsent/empty lookup policy permits it. A sent POST is never
+replayed. The five-second lookup, 20-second endpoint, 45-second flow and
+three-second connect limit stay unchanged. The old internal doh-first-* stage
+names remain for compatibility, but dns-order explicitly reports
+plain-dns-first-verification and resolver-mode reports plain-dns-verification.
+Provider events identify google/yandex/cloudflare/adguard and A/AAAA; the
+credential result retains actual destination IP, transfer counters and timings.
+Set LoginPlainDnsVerification to false to restore DoH without changing replay.
+
+Offline PlainDnsChecks covers parser validation, public A/AAAA filtering, a real
+loopback UDP exchange, cancellation of blocked receive, and first-valid-answer
+selection with joined slow losers. Full protected Windows WPF build and actual
+ISP behavior remain manual checks.

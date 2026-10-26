@@ -15,6 +15,7 @@ namespace IRSpeedyVPN.WebServices
         private static readonly LoginDohCache LoginDns = new LoginDohCache(FetchLoginAddresses);
         // Temporary verification build: resolve via DoH before using system DNS.
         internal const bool LoginDohFirstVerification = true;
+        internal const bool LoginPlainDnsVerification = true;
         internal CurlResponse SendLogin(string url, string method, string headers, string body,
             int timeoutMs, LoginNetworkContext context)
         {
@@ -152,7 +153,9 @@ namespace IRSpeedyVPN.WebServices
         private static double? OptionalMetric(string output, string marker)
             => Metric(output, marker, out var value) ? (double?)value : null;
         private static string[] FetchLoginAddresses(string host, int timeoutMs, CancellationToken cancellation)
-            => LoginDohProviders.Resolve(host, timeoutMs, cancellation, FetchLoginProvider, LogHelper.WriteExLog);
+            => LoginPlainDnsVerification
+                ? LoginPlainDns.Resolve(host, timeoutMs, cancellation, LogHelper.WriteExLog)
+                : LoginDohProviders.Resolve(host, timeoutMs, cancellation, FetchLoginProvider, LogHelper.WriteExLog);
 
         private static string[] FetchLoginProvider(string url, int timeoutMs, CancellationToken cancellation)
         {

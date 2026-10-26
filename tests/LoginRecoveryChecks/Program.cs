@@ -238,6 +238,7 @@ class Program
             DnsFailureChecks.Run(certificates);
             DohFirstChecks.Run(certificates);
             TransferDiagnosticChecks.Run(certificates);
+            PlainDnsChecks.Run();
             CompletionChecks.Run(certificates);
             RegressionChecks.Run();
             PrefetchChecks.Run();

@@ -56,3 +56,6 @@ verified HTTPS control/trial requests, rejects mismatched lengths and missing
 chunk terminators, and checks whitelisted header privacy/bounded body metadata.
 It also checks that a stalled one-line chunked JSON response reports periodic
 numeric receive progress and idle time without exposing response or credentials.
+
+`PlainDnsChecks.cs` checks classic DNS packet validation, A/AAAA public filtering,
+loopback UDP transport, canceled sockets and first-valid-answer racing.
