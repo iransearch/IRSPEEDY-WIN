@@ -38,3 +38,8 @@ registrations, without resetting the production shutdown latch.
 checks each contradictory indicator/unknown metrics and HTTPS-only scoping,
 executes a verified native HTTPS POST after recovery, and checks actual
 Failure()/controller failover with failed DoH and a DNS-failed recovery attempt.
+
+`DohFirstChecks.cs` exercises the temporary production DoH-first flag, native
+HTTPS via --resolve and sequential system fallback, cache refresh, strict TLS,
+post-send/partial HTTP replay rejection, cancellation and shared POST gating.
+The system-first checks explicitly retain the constructor's reference policy.

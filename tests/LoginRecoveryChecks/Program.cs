@@ -236,6 +236,7 @@ class Program
                 "diagnostics record recovery guards, DNS results and HTTP bypass");
             ControllerChecks.Run();
             DnsFailureChecks.Run(certificates);
+            DohFirstChecks.Run(certificates);
             RegressionChecks.Run();
             PrefetchChecks.Run();
             ImprovementChecks.Run(certificates);

@@ -135,8 +135,9 @@ namespace IRSpeedyVPN.WebServices
         private readonly ILoginTransport transport;
         private readonly ILoginResolver resolver;
         private readonly Action<string> log;
-        internal LoginRecovery(ILoginTransport transport, ILoginResolver resolver, Action<string> log)
-        { this.transport = transport; this.resolver = resolver; this.log = log; }
+        private readonly bool dohFirst;
+        internal LoginRecovery(ILoginTransport transport, ILoginResolver resolver, Action<string> log, bool dohFirst = false)
+        { this.transport = transport; this.resolver = resolver; this.log = log; this.dohFirst = dohFirst; }
         private void Log(LoginNetworkContext context, string host, string detail)
         {
             try { log?.Invoke("[LoginRecovery] login=" + context.Id + " host=" + host + " " + detail); }
@@ -148,14 +149,112 @@ namespace IRSpeedyVPN.WebServices
             var target = new Uri(url);
             var deadline = context.Endpoint ?? new LoginDeadline(context, timeoutMs);
             deadline.Check();
+            if (dohFirst && target.Scheme == Uri.UriSchemeHttps && !IPAddress.TryParse(target.Host, out _))
+                return SendDohFirst(url, method, headers, body, context, target, deadline);
             var progress = new LoginConnectProgress();
             using (var prefetch = new LoginPrefetch(target.Scheme == Uri.UriSchemeHttps
                 && !IPAddress.TryParse(target.Host, out _) && transport is ILoginConnectTransport
                 ? resolver as ILoginPrefetchResolver : null, target.Host, deadline, context, progress))
                 return SendCore(url, method, headers, body, context, target, deadline, progress, prefetch);
         }
+
+        private LoginCurlResult SendDohFirst(string url, string method, string headers, string body,
+            LoginNetworkContext context, Uri target, LoginDeadline deadline)
+        {
+            Log(context, target.Host, "stage=dns-order mode=doh-first-verification remainingMs=" + deadline.RemainingMs);
+            LoginCurlResult last = null;
+            var answer = context.BeginRecovery(target.Host)
+                ? LookupDohFirst(context, target.Host, deadline, false) : null;
+            var failedPeers = new HashSet<string>(StringComparer.Ordinal);
+            for (int pass = 0; answer != null && pass < 2; pass++)
+            {
+                deadline.Check();
+                var addresses = answer.Values.Where(ip => !failedPeers.Contains(ip)).ToArray();
+                if (addresses.Length != 0)
+                {
+                    Log(context, target.Host, "stage=doh-first-attempt resolve=True cached=" + answer.FromCache
+                        + " addressCount=" + addresses.Length + " pass=" + pass + " remainingMs=" + deadline.RemainingMs);
+                    try { last = Retry(target, url, method, headers, body, addresses, deadline, context); }
+                    catch (OperationCanceledException) { throw; }
+                    catch (TimeoutException ex)
+                    { throw new LoginTransportTimeoutException("DoH first: " + (last == null ? "no completed attempt" : last.Summary), ex); }
+                    catch (Exception ex)
+                    {
+                        // A launched attempt with no result has no trustworthy trailer.
+                        // Do not turn an unexpected transport error into a second POST.
+                        throw new LoginTransportException("DoH first: " + (last == null ? "no completed attempt" : last.Summary)
+                            + "; transport failed (" + ex.GetType().Name + ").", true);
+                    }
+                    Log(context, target.Host, "stage=doh-first-result resolve=True cached=" + answer.FromCache
+                        + " effectiveMayHaveBeenSent=" + last.MayHaveBeenSentFor(true) + " " + last.Summary);
+                    if (last.HttpCode > 0)
+                    {
+                        // A timed-out/partial HTTP response is still a sent POST.
+                        if (last.ExitCode != 0) throw Failure(last, null);
+                        return last; // Every HTTP response is final for this DNS order.
+                    }
+                    if (last.Unavailable) break; // No curl ran; system path may use managed fallback.
+                    if (last.MayHaveBeenSentFor(true)) throw Failure(last, null);
+                    resolver.Invalidate(target.Host, answer);
+                    if (last.RemoteIp != null) failedPeers.Add(last.RemoteIp);
+                    if (!last.CanRecover && !last.CanResolveAlternatePeer) break;
+                }
+                else Log(context, target.Host, "stage=doh-first-skip reason=same-failed-peer");
+                // Preserve one bounded refresh for a failing cached set. No fresh
+                // answer failure restarts lookup, and system DNS cannot restart DoH.
+                if (!answer.FromCache || pass != 0) break;
+                resolver.Invalidate(target.Host, answer);
+                answer = LookupDohFirst(context, target.Host, deadline, true);
+            }
+            Log(context, target.Host, "stage=system-fallback reason=" + (last == null ? "no-doh-answer"
+                : last.Unavailable ? "curl-unavailable" : "proven-unsent-doh-failure")
+                + " remainingMs=" + deadline.RemainingMs + (last == null ? "" : " initial=" + last.Summary));
+            deadline.Check();
+            try
+            {
+                // No speculative prefetch and no second DNS recovery in this mode.
+                var system = SendCore(url, method, headers, body, context, target, deadline,
+                    new LoginConnectProgress(), null, allowRecovery: false);
+                Log(context, target.Host, "stage=verification-result source=system resolve=False " + system.Summary);
+                return system;
+            }
+            catch (LoginTransportException ex)
+            {
+                throw new LoginTransportException("DoH first: " + (last == null ? "no-answer" : last.Summary)
+                    + "; system fallback: " + ex.Message, ex.MayHaveBeenSent, ex);
+            }
+            catch (LoginTransportTimeoutException ex)
+            {
+                throw new LoginTransportTimeoutException("DoH first: " + (last == null ? "no-answer" : last.Summary), ex);
+            }
+        }
+
+        private LoginAddresses LookupDohFirst(LoginNetworkContext context, string host, LoginDeadline deadline, bool refresh)
+        {
+            deadline.Check();
+            int budget = deadline.LookupBudgetMs;
+            Log(context, host, "stage=doh-first-lookup refresh=" + refresh + " budgetMs=" + budget);
+            if (budget <= 100) return null;
+            try
+            {
+                var answer = resolver.Resolve(host, budget, context.Cancellation, refresh);
+                deadline.Check();
+                Log(context, host, "stage=doh-first-answer addressCount=" + (answer == null ? 0 : answer.Values.Length)
+                    + " cached=" + (answer != null && answer.FromCache));
+                return answer;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                deadline.Check();
+                Log(context, host, "stage=doh-first-lookup-failed type=" + ex.GetType().Name);
+                return null; // DNS GETs contain no POST; system fallback is safe.
+            }
+        }
+
         private LoginCurlResult SendCore(string url, string method, string headers, string body,
-            LoginNetworkContext context, Uri target, LoginDeadline deadline, LoginConnectProgress progress, LoginPrefetch prefetch)
+            LoginNetworkContext context, Uri target, LoginDeadline deadline, LoginConnectProgress progress, LoginPrefetch prefetch,
+            bool allowRecovery = true)
         {
             LoginCurlResult first;
             try
@@ -193,9 +292,15 @@ namespace IRSpeedyVPN.WebServices
             }
             if (first.HttpCode > 0)
             {
+                if (!allowRecovery && first.ExitCode != 0) throw Failure(first, null, target.Scheme == Uri.UriSchemeHttps);
                 Log(context, target.Host, "stage=http-return reason=http-response doh=False nonzeroExit="
                     + (first.ExitCode != 0) + " " + first.Summary);
                 return first;
+            }
+            if (!allowRecovery)
+            {
+                Log(context, target.Host, "stage=skip reason=verification-system-only " + first.Summary);
+                throw Failure(first, null, target.Scheme == Uri.UriSchemeHttps);
             }
             Log(context, target.Host, "stage=recovery-decision https=" + (target.Scheme == Uri.UriSchemeHttps)
                 + " effectiveMayHaveBeenSent=" + first.MayHaveBeenSentFor(target.Scheme == Uri.UriSchemeHttps)

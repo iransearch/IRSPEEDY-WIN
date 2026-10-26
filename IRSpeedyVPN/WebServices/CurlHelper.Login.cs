@@ -13,10 +13,13 @@ namespace IRSpeedyVPN.WebServices
     internal sealed partial class CurlHelper
     {
         private static readonly LoginDohCache LoginDns = new LoginDohCache(FetchLoginAddresses);
+        // Temporary verification build: resolve via DoH before using system DNS.
+        internal const bool LoginDohFirstVerification = true;
         internal CurlResponse SendLogin(string url, string method, string headers, string body,
             int timeoutMs, LoginNetworkContext context)
         {
-            var recovery = new LoginRecovery(new LoginTransport(this), LoginDns, LogHelper.WriteExLog);
+            var recovery = new LoginRecovery(new LoginTransport(this), LoginDns, LogHelper.WriteExLog,
+                dohFirst: LoginDohFirstVerification);
             var result = recovery.Send(url, method, headers, body, timeoutMs, context);
             return new CurlResponse(result.Body, result.HttpCode);
         }

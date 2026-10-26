@@ -1,11 +1,15 @@
-# Windows login recovery (1.4.44)
+# Windows login recovery (1.4.45 verification build)
 
-Baseline: `e11c1cd613e28e607e24b653f914f015f4520c53` (1.4.43).
-The Windows 8.21.0 curl log showed exit 6 with complete metrics, zero
-connect/TLS/upload/HTTP/redirects, no remote_ip, but time_pretransfer=0.017777
-(or 0.014752). The conservative pretransfer guard blocked both DoH recovery
-and next-host failover. This release adds a narrow DNS-stage proof applied
-only to HTTPS decisions; it preserves the raw conservative metric flag.
+Baseline: `58562004d8bd7ad1cdaa2a133172ad3269b04060` (1.4.44).
+This temporary verification build enables `CurlHelper.LoginDohFirstVerification`:
+HTTPS hostname logins first use the existing Google/Cloudflare DoH race/cache,
+then curl --resolve. System DNS is a sequential fallback only after no DNS answer,
+curl launch unavailability, or a failure proven unsent by the existing HTTPS
+metric policy (including the narrow exit-6 proof from 1.4.44). This is an
+explicit test order, not a permanent change to the intended default. Set the
+single verification switch to false to restore the retained system-first path.
+No UI setting or user-visible appearance changed.
+
 The existing generic UI message is `ارتباط با سرور برقرار نیست`.
 
 The four API endpoints retain their sequential order, last-good preference,
@@ -14,9 +18,40 @@ keeps its four-second minimum and existing stages/appearance. Application exit
 cancels network/presentation waits and skips work on the closing window. VPN
 DNS racing, Shield, routing and Core are unchanged.
 
-## Request and replay policy
+## DoH-first verification order
 
-The first attempt uses bundled curl and system DNS, with a connection timeout
+The initial lookup uses the existing shared five-second race cap, shortened by
+remaining endpoint/flow time minus a three-second POST reserve. A valid cached
+set can satisfy lookup under the same five-minute cache policy. A fresh public
+answer sends a single curl request with --resolve, preserving URL, Host, SNI and
+certificate verification. Only DNS GETs race. Every credential request, including
+system fallback and managed fallback when curl cannot launch, uses the existing
+shared credential gate. Speculative prefetch is not started in this mode.
+
+Every completed HTTP response returns through the existing application status
+policy; it never triggers system-DNS fallback. Nonzero curl exit with an HTTP
+code is a partial/failed transfer and is replay-blocking in verification mode,
+including on the system fallback. Unknown stage, upload, completed TLS or other
+sending evidence prevents both system fallback and next-API transport failover.
+If an unsent attempt used a cached set, that set is evicted/refetched at most
+once within the original lookup/endpoint budget, just as in the reference path.
+A fresh unsent failure falls back to system DNS once; it cannot restart DoH.
+HTTP and IP-literal URLs retain the previous policy without new DNS lookups.
+
+Log stages: dns-order mode=doh-first-verification; doh-first-lookup/answer;
+doh-first-attempt/result with resolve=True, cache state, address count and curl
+metrics; system-fallback with fixed reason and initial failure; and
+verification-result source=system resolve=False. The provider race retains its
+winner name and elapsed time records. No body, credentials, raw headers or curl
+stderr are logged. Final system-fallback transport errors preserve the initial
+DoH attempt's sanitized metadata. If no time remains for system fallback, the
+existing deadline stops the flow; no timeout is extended. The disclosure of API
+hostnames to both DoH providers now occurs on every uncached HTTPS-hostname
+login, even when system DNS would be healthy.
+
+## Shared replay policy and retained system-first reference path
+
+In the retained system-first path, the first attempt uses bundled curl and system DNS, with a connection timeout
 of at most 3 seconds inside the endpoint deadline. curl `-w` records HTTP status,
 time_connect, time_appconnect, time_pretransfer, size_upload, num_redirects and remote_ip
 on failures as well as successes. Parsing takes each marker's last occurrence,
@@ -287,3 +322,24 @@ exit 6 / positive pretransfer now logs definitelyNotSent=True,
 effectiveMayHaveBeenSent=False, starts Google/Cloudflare, and permits the
 next host after bounded DNS failure. Reconnect and verify normal successful
 login; no Windows packaged build was executed by the Linux harness.
+
+## 1.4.45 verification checks and manual follow-up
+
+DohFirstChecks covers a fake provider race with a private-only invalid answer,
+a valid winner and a real certificate-verified HTTPS POST; exact one-POST
+system fallback after a bad DoH peer; cached failure eviction/one refresh;
+401/406/500 without DNS-order replay; native post-send connection drop;
+wrong-domain certificate rejection before and after system fallback; lookup
+empty/error without DNS loops; unknown/posted/partial-HTTP replay blocking;
+managed fallback only for unavailable curl; shared credential serialization;
+lookup/POST budget allocation; and cancellation/expiry before I/O or during DNS.
+The complete earlier system-first/recovery/prefetch checks remain enabled to
+verify that switching the experimental flag off restores that behavior.
+
+On Windows, with internet connected and ordinary system DNS healthy, log in and
+verify a Google/Cloudflare winner (or a fresh cache hit), doh-first-attempt with
+resolve=True, and doh-first-result exit=0/http=200, without system-fallback.
+Also test with internet fully disconnected: each host should record bounded
+no-answer/failure, one system attempt and safe next-host failover. These logs
+verify the real bundled curl/certificate backend; the Linux tests do not run the
+protected single-file WPF package.
