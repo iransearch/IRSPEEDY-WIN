@@ -17,8 +17,10 @@ sealed class LocalServer : IDisposable
     volatile bool stopped;
     internal int Posts, Gets, Status = 200, DelayMs, BodyDelayMs, PartialBodyBytes;
     internal bool Drop;
+    internal bool CloseDelimited, HonorClose, Chunked, MissingLastChunk;
+    internal int HoldOpenMs, DeclaredLengthDelta;
     internal string Json = "{\"Status\":0,\"Answer\":[{\"type\":1,\"data\":\"93.184.216.34\"},{\"type\":1,\"data\":\"93.184.216.35\"}]}";
-    internal string LastHost, LastBody;
+    internal string LastHost, LastBody, LastConnection, LastProtocol;
     internal int Port => ((IPEndPoint)listener.LocalEndpoint).Port;
     internal LocalServer(X509Certificate2 certificate = null)
     { this.certificate = certificate; listener.Start(); _ = Accept(); }
@@ -50,10 +52,13 @@ sealed class LocalServer : IDisposable
                     while (headers.Length < 16384 && !headers.ToString().EndsWith("\r\n\r\n"))
                     { if (await stream.ReadAsync(one, 0, 1) == 0) return; headers.Append((char)one[0]); }
                     string head = headers.ToString(); int length = 0;
+                    LastProtocol = head.Split('\r')[0].Split(' ')[2];
+                    LastConnection = null;
                     foreach (var line in head.Split(new[] { "\r\n" }, StringSplitOptions.None))
                     {
                         if (line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)) int.TryParse(line.Substring(15).Trim(), out length);
                         if (line.StartsWith("Host:", StringComparison.OrdinalIgnoreCase)) LastHost = line.Substring(5).Trim();
+                        if (line.StartsWith("Connection:", StringComparison.OrdinalIgnoreCase)) LastConnection = line.Substring(11).Trim();
                     }
                     using (var payload = new MemoryStream())
                     {
@@ -65,8 +70,17 @@ sealed class LocalServer : IDisposable
                     if (DelayMs > 0) await Task.Delay(DelayMs);
                     if (Drop) return;
                     byte[] body = Encoding.UTF8.GetBytes(certificate == null ? Json : "{\"ok\":true}");
-                    byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 " + Status + " Result\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: " + body.Length + "\r\n\r\n");
+                    string connection = CloseDelimited && !(HonorClose && LastConnection == "close") ? "keep-alive" : "close";
+                    string framing = Chunked ? "Transfer-Encoding: chunked\r\n" : CloseDelimited ? ""
+                        : "Content-Length: " + (body.Length + DeclaredLengthDelta) + "\r\n";
+                    byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 " + Status + " Result\r\nConnection: " + connection
+                        + "\r\nContent-Type: application/json\r\n" + framing + "\r\n");
                     await stream.WriteAsync(response, 0, response.Length);
+                    if (Chunked)
+                    {
+                        byte[] size = Encoding.ASCII.GetBytes(body.Length.ToString("X") + "\r\n");
+                        await stream.WriteAsync(size, 0, size.Length);
+                    }
                     int sent = 0;
                     if (BodyDelayMs > 0)
                     {
@@ -76,6 +90,13 @@ sealed class LocalServer : IDisposable
                         await Task.Delay(BodyDelayMs);
                     }
                     await stream.WriteAsync(body, sent, body.Length - sent);
+                    if (Chunked)
+                    {
+                        byte[] ending = Encoding.ASCII.GetBytes(MissingLastChunk ? "\r\n" : "\r\n0\r\n\r\n");
+                        await stream.WriteAsync(ending, 0, ending.Length);
+                    }
+                    await stream.FlushAsync();
+                    if (HoldOpenMs > 0 && !(HonorClose && LastConnection == "close")) await Task.Delay(HoldOpenMs);
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is AuthenticationException || ex is ObjectDisposedException) { }

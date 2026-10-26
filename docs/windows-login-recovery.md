@@ -1,11 +1,14 @@
-# Windows login recovery (1.4.46 verification diagnostics)
+# Windows login recovery (1.4.47 completion trial)
 
-Baseline: `94d7bc0af460627eedfa82025ad12b9b30d86c9c` (1.4.45).
+Baseline: `a97564b3209539e48a6dd355ba38a4feedfe992f` (1.4.46).
 The supplied 1.4.45 log confirmed a Google winner, valid public A answers and
 native --resolve connection/TLS success. Both credential attempts received HTTP
 200 but ended with curl exit 28; no system/next-host replay was attempted.
-This release adds transfer-only diagnostics to locate the response stall;
-request order, deadlines, replay rules and TLS validation are unchanged.
+The 1.4.46 log then showed HTTP/1.1 to 172.67.139.142, first byte below
+one second, around 68 KB received, and timeout on two separate user attempts.
+This release trials HTTP/1.1 plus Connection: close on native credential POSTs
+and records sanitized response framing/body-shape metadata. DoH-first order,
+deadlines, replay rules and TLS validation are unchanged.
 
 This temporary verification build enables `CurlHelper.LoginDohFirstVerification`:
 HTTPS hostname logins first use the existing Google/Cloudflare DoH race/cache,
@@ -384,3 +387,50 @@ positive partial download isolates incomplete transfer. No raw response,
 credentials, user headers or certificate-validation bypass should be enabled.
 The protected single-file Windows package still requires a Windows build and
 smoke test; Linux native tests and .NET 4.8 compilation do not execute that UI.
+
+## 1.4.47 HTTP/1.1 completion trial
+
+Native BuildLoginArgs POSTs explicitly request --http1.1 and Connection: close.
+The option is present on the first credential attempt, not a replay after a
+posted timeout. It applies to both --resolve and system-DNS credential curl;
+DoH provider GETs, ordinary non-login curl, managed fallback, VPN DNS, Shield,
+routing and Core retain their previous policies. This is a controlled experiment
+for the reported HTTP/1.1 transfer stall, not a proven server-side diagnosis.
+
+A single verbose stderr observer extracts only final response blocks (interim
+1xx blocks are ignored). ExecuteCurl continues retaining only the stderr length,
+not raw stderr. Only these fixed categories/numeric values reach result logs:
+contentType (allowlisted media type, with parameters discarded), contentLength
+(nonnegative Int64 or absent/invalid-or-conflicting), transferEncoding
+(allowlisted codings only), connection (close/keep-alive/upgrade/other/absent),
+headersKnown, responseFraming, downloadVsLength and framingConflict. Unrecognized
+header values are reduced to other; Set-Cookie, authentication fields and every
+other header are ignored. No headers are mixed into stdout/body/replay trailers,
+so header text cannot spoof replay metrics. No raw header dump or file is used.
+
+BodyKind is a fixed diagnostic category: empty, html-prefix, json-parseable,
+json-unparseable, other (including opaque/encrypted content), over-limit or
+unknown. JSON classification is limited to object/array-looking bodies up to
+262144 characters and depth 64 using the existing framework serializer. No body,
+JSON keys/values, cookie, token or parsing-exception text is logged. A parseable
+JSON body never changes HTTP completion, application validation or replay gates.
+Missing terminal chunks or incorrect lengths remain failures even with complete
+JSON text. Length comparison is disabled with Transfer-Encoding or no known
+length; no-body statuses are categorized separately. Header metadata is native
+POST diagnostics only; managed or unobserved responses remain headersKnown=False.
+
+CompletionChecks runs a real verified HTTPS control that returns all JSON data
+but keeps an unframed connection open: curl times out and remains replay-blocking.
+A separate explicit action with the connection-close trial succeeds through
+production DoH-first with one POST. Negative native checks preserve failure and
+zero replay for a missing chunk terminator and a mismatched Content-Length.
+Synthetic checks cover interim headers, duplicate/conflicting lengths, secret
+cookies/parameters, malformed values, header-block truncation and body/depth bounds.
+All earlier recovery, transfer, cancellation, process and UI checks remain enabled.
+
+Manual Windows follow-up: log in with internet connected and inspect headersKnown,
+contentType/contentLength/transferEncoding/connection, responseFraming,
+downloadVsLength, bodyKind and the existing transfer metrics. Report whether the
+same --resolve login completes with exit=0, or still times out. Server/CDN framing
+may still require correction; this trial does not silently accept incomplete HTTP.
+No protected single-file Windows WPF package was built or executed here.

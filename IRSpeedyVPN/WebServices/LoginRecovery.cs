@@ -60,6 +60,7 @@ namespace IRSpeedyVPN.WebServices
         // Optional diagnostics only: absence never changes replay eligibility.
         internal double? FirstByteSeconds, TotalSeconds, DownloadedBytes;
         internal string HttpVersion;
+        internal string ResponseHeadersSummary = "headersKnown=False", BodyKind = "unknown";
         internal int Redirects;
         internal bool TransferMetricsKnown => FirstByteSeconds.HasValue && TotalSeconds.HasValue
             && DownloadedBytes.HasValue && IsKnownHttpVersion(HttpVersion);
@@ -107,7 +108,8 @@ namespace IRSpeedyVPN.WebServices
             + " total=" + DiagnosticNumber(TotalSeconds)
             + " download=" + DiagnosticNumber(DownloadedBytes)
             + " httpVersion=" + (IsKnownHttpVersion(HttpVersion) ? HttpVersion : "unknown")
-            + " bodyChars=" + (Body == null ? "unknown" : Body.Length.ToString(CultureInfo.InvariantCulture));
+            + " bodyChars=" + (Body == null ? "unknown" : Body.Length.ToString(CultureInfo.InvariantCulture))
+            + " " + ResponseHeadersSummary + " bodyKind=" + BodyKind;
     }
 
     internal sealed class LoginTransportException : Exception

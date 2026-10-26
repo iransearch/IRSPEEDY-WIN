@@ -26,7 +26,7 @@ sealed class NativeTransport : ILoginConnectTransport
         string args = CurlHelper.BuildLoginArgs(url, method, headers, body, actual, timeoutMs - 100);
         if (args.Contains("--insecure") || args.Contains(" -k ")) throw new Exception("TLS verification disabled");
         args += " --cacert \"" + CaPath + "\"";
-        if (progress != null) args += " --verbose";
+        if (progress != null && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) args += " --verbose";
         var result = CurlHelper.ExecuteLocal(args, timeoutMs, cancellation, progress);
         Results.Add(result); return result;
     }
@@ -238,6 +238,7 @@ class Program
             DnsFailureChecks.Run(certificates);
             DohFirstChecks.Run(certificates);
             TransferDiagnosticChecks.Run(certificates);
+            CompletionChecks.Run(certificates);
             RegressionChecks.Run();
             PrefetchChecks.Run();
             ImprovementChecks.Run(certificates);

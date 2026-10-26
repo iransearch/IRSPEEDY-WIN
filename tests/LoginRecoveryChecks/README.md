@@ -48,3 +48,7 @@ The system-first checks explicitly retain the constructor's reference policy.
 scalar log privacy, and reproduces HTTP 200 with stalled zero/one-byte bodies
 using real certificate-verified curl through the production DoH-first path.
 These diagnostics never change the existing replay-evidence fields.
+
+`CompletionChecks.cs` tests the HTTP/1.1 connection-close experiment using real
+verified HTTPS control/trial requests, rejects mismatched lengths and missing
+chunk terminators, and checks whitelisted header privacy/bounded body metadata.

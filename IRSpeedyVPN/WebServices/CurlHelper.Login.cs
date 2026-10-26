@@ -63,12 +63,13 @@ namespace IRSpeedyVPN.WebServices
                     int remainingMs = timeoutMs - (int)Math.Min(int.MaxValue, elapsed.ElapsedMilliseconds);
                     if (remainingMs <= 100) throw new TimeoutException("Login curl launch deadline expired.");
                     string args = BuildLoginArgs(url, method, headers, body, resolve, remainingMs - 100);
-                    if (progress != null) args += " --verbose";
+                    if (progress != null && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) args += " --verbose";
+                    var responseHeaders = new LoginResponseDiagnostics();
                     var result = ExecuteCurl(candidate.Path, args, remainingMs, out started, cancellation,
                         progress == null ? (Action)null : progress.Start,
-                        progress == null ? (Action<string>)null : progress.Observe);
+                        line => { progress?.Observe(line); responseHeaders.Observe(line); });
                     _curlUnavailable = false;
-                    return ParseLoginResult(result.Output, result.ExitCode);
+                    return ParseLoginResult(result.Output, result.ExitCode, responseHeaders);
                 }
                 catch (OperationCanceledException) { if (started) _curlUnavailable = false; throw; }
                 catch (TimeoutException)
@@ -96,6 +97,10 @@ namespace IRSpeedyVPN.WebServices
             // and explicit --resolve. Login must not silently follow redirects:
             // metrics from a later connection cannot prove the first POST was unsent.
             string args = BuildArgs(url, method, headers, body, null, null, resolve, followRedirects: false);
+            // Temporary completion trial for credential POSTs only. DoH GETs and
+            // ordinary curl callers retain their previous protocol/connection policy.
+            if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase))
+                args += " --http1.1 -H \"Connection: close\" --verbose";
             string seconds = (timeoutMs / 1000d).ToString("0.###", CultureInfo.InvariantCulture);
             return args + " --noproxy \"*\" --connect-timeout "
                 + Math.Min(3d, timeoutMs / 1000d).ToString("0.###", CultureInfo.InvariantCulture)
@@ -106,7 +111,7 @@ namespace IRSpeedyVPN.WebServices
                 + "\\n__LOGIN_FIRST_BYTE__:%{time_starttransfer}\\n__LOGIN_TOTAL__:%{time_total}"
                 + "\\n__LOGIN_DOWNLOAD__:%{size_download}\\n__LOGIN_VERSION__:%{http_version}\\n\"";
         }
-        internal static LoginCurlResult ParseLoginResult(string output, int exitCode)
+        internal static LoginCurlResult ParseLoginResult(string output, int exitCode, LoginResponseDiagnostics responseHeaders = null)
         {
             var result = new LoginCurlResult { ExitCode = exitCode };
             double connect, tls, ready, upload;
@@ -130,6 +135,8 @@ namespace IRSpeedyVPN.WebServices
             if (LoginCurlResult.IsKnownHttpVersion(version)) result.HttpVersion = version;
             int boundary = output.LastIndexOf(MarkerHttpCode, StringComparison.Ordinal);
             result.Body = boundary < 0 ? "" : output.Substring(0, boundary).TrimEnd('\r', '\n');
+            result.BodyKind = LoginResponseDiagnostics.ClassifyBody(result.Body);
+            responseHeaders?.Apply(result);
             return result;
         }
         private static bool Metric(string output, string marker, out double value)
@@ -176,6 +183,134 @@ namespace IRSpeedyVPN.WebServices
                     values.Add(data.ToString().Trim());
             }
             return values.ToArray();
+        }
+    }
+
+    // Receives transient curl verbose lines on stderr. Only fixed categories and
+    // a numeric length survive; no raw line/header value is stored or logged.
+    internal sealed class LoginResponseDiagnostics
+    {
+        private readonly object gate = new object();
+        private bool inHeaders, complete, sawLength;
+        private int responseStatus;
+        private long? length;
+        private string lengthState = "absent", type = "absent", transfer = "absent", connection = "absent";
+        internal void Observe(string line)
+        {
+            if (line == null || !line.StartsWith("< ", StringComparison.Ordinal)) return;
+            lock (gate)
+            {
+                if (line.StartsWith("< HTTP/", StringComparison.Ordinal))
+                {
+                    inHeaders = false;
+                    int start = line.IndexOf(' ', 2), status;
+                    if (start < 0 || line.Length < start + 4
+                        || !int.TryParse(line.Substring(start + 1, 3), NumberStyles.None, CultureInfo.InvariantCulture, out status)
+                        || status < 200 || status > 599) return;
+                    complete = false; inHeaders = true; sawLength = false; length = null;
+                    responseStatus = status;
+                    lengthState = type = transfer = connection = "absent";
+                    return;
+                }
+                if (!inHeaders) return;
+                if (line.Trim() == "<") { complete = true; inHeaders = false; return; }
+                int colon = line.IndexOf(':', 2);
+                if (colon < 0 || colon > 64) return;
+                string name = line.Substring(2, colon - 2).Trim().ToLowerInvariant();
+                if (name != "content-type" && name != "content-length" && name != "transfer-encoding" && name != "connection") return;
+                string value = line.Length <= 4096 ? line.Substring(colon + 1).Trim().ToLowerInvariant() : "";
+                if (name == "content-type")
+                { string media = ContentType(value); type = type == "absent" || type == media ? media : "other"; }
+                else if (name == "content-length")
+                {
+                    long parsed;
+                    bool valid = SameLength(value, out parsed);
+                    if (!valid || (sawLength && (lengthState != "valid" || length != parsed)))
+                    { lengthState = "invalid-or-conflicting"; length = null; }
+                    else { lengthState = "valid"; length = parsed; }
+                    sawLength = true;
+                }
+                else if (name == "transfer-encoding")
+                {
+                    string tokens = SafeTokens(value, new[] { "chunked", "gzip", "deflate", "compress", "identity" });
+                    transfer = transfer == "absent" ? tokens : transfer == "other" || tokens == "other" || transfer.Length + tokens.Length > 128
+                        ? "other" : transfer + "," + tokens;
+                }
+                else
+                {
+                    string tokens = SafeTokens(value, new[] { "close", "keep-alive", "upgrade" });
+                    connection = connection == "close" ? "close" : tokens == "other" ? "other" : ("," + tokens + ",").Contains(",close,") ? "close"
+                        : ("," + tokens + ",").Contains(",keep-alive,") ? "keep-alive" : "upgrade";
+                }
+            }
+        }
+        private static bool SameLength(string value, out long length)
+        {
+            length = 0;
+            var values = value.Split(',');
+            if (values.Length > 8) return false;
+            for (int i = 0; i < values.Length; i++)
+            {
+                long parsed;
+                if (!long.TryParse(values[i].Trim(), NumberStyles.None, CultureInfo.InvariantCulture, out parsed)
+                    || (i > 0 && parsed != length)) return false;
+                length = parsed;
+            }
+            return true;
+        }
+        private static string SafeTokens(string value, string[] allowed)
+        {
+            var tokens = value.Split(',');
+            if (tokens.Length == 0 || tokens.Length > 8) return "other";
+            for (int i = 0; i < tokens.Length; i++)
+            { tokens[i] = tokens[i].Trim(); if (Array.IndexOf(allowed, tokens[i]) < 0) return "other"; }
+            return string.Join(",", tokens);
+        }
+        private static string ContentType(string value)
+        {
+            string media = value.Split(';')[0].Trim();
+            switch (media)
+            {
+                case "application/json": case "text/json": case "text/html":
+                case "text/plain": case "application/octet-stream": case "application/problem+json": return media;
+                default: return media.StartsWith("application/", StringComparison.Ordinal) && media.EndsWith("+json", StringComparison.Ordinal)
+                    ? "other-json" : "other";
+            }
+        }
+        internal void Apply(LoginCurlResult result)
+        {
+            lock (gate)
+            {
+                if (!complete) { result.ResponseHeadersSummary = "headersKnown=False"; return; }
+                bool noBody = responseStatus == 204 || responseStatus == 304;
+                string framing = noBody ? "no-body" : transfer != "absent" ? transfer == "chunked" || transfer.EndsWith(",chunked", StringComparison.Ordinal)
+                    ? "chunked" : "transfer-coded-or-unknown" : lengthState == "valid" ? "content-length"
+                    : lengthState == "absent" ? "close-delimited" : "invalid-length";
+                string comparison = "unknown";
+                if (!noBody && transfer == "absent" && length.HasValue && result.DownloadedBytes.HasValue)
+                    comparison = result.DownloadedBytes.Value < length.Value ? "below" : result.DownloadedBytes.Value == length.Value ? "equal" : "above";
+                result.ResponseHeadersSummary = "headersKnown=True contentType=" + type
+                    + " contentLength=" + (length.HasValue ? length.Value.ToString(CultureInfo.InvariantCulture) : lengthState)
+                    + " transferEncoding=" + transfer + " connection=" + connection
+                    + " responseFraming=" + framing + " downloadVsLength=" + comparison
+                    + " framingConflict=" + (transfer != "absent" && sawLength);
+            }
+        }
+        internal static string ClassifyBody(string body)
+        {
+            if (body == null) return "unknown";
+            if (body.Length > 262144) return "over-limit";
+            string text = body.TrimStart('\uFEFF', ' ', '\t', '\r', '\n');
+            if (text.Length == 0) return "empty";
+            if (text.StartsWith("<!doctype html", StringComparison.OrdinalIgnoreCase)
+                || text.StartsWith("<html", StringComparison.OrdinalIgnoreCase)) return "html-prefix";
+            if (text[0] != '{' && text[0] != '[') return "other"; // e.g. an opaque/encrypted body
+            try
+            {
+                new JavaScriptSerializer { MaxJsonLength = 262144, RecursionLimit = 64 }.Deserialize<object>(text);
+                return "json-parseable";
+            }
+            catch { return "json-unparseable"; } // Exception text can contain response data: never log it.
         }
     }
 }

@@ -42,9 +42,13 @@ namespace System.Web.Script.Serialization
 {
     sealed class JavaScriptSerializer
     {
+        public int MaxJsonLength { get; set; } = 2097152;
+        public int RecursionLimit { get; set; } = 100;
         public T Deserialize<T>(string value)
         {
-            using (var document = System.Text.Json.JsonDocument.Parse(value))
+            if (value.Length > MaxJsonLength) throw new ArgumentException("JSON exceeds fixture limit");
+            using (var document = System.Text.Json.JsonDocument.Parse(value,
+                new System.Text.Json.JsonDocumentOptions { MaxDepth = RecursionLimit }))
                 return (T)Convert(document.RootElement);
         }
         static object Convert(System.Text.Json.JsonElement item)
@@ -85,10 +89,11 @@ namespace IRSpeedyVPN.WebServices
         internal static LoginCurlResult ExecuteLocal(string args, int timeoutMs, CancellationToken cancellation, LoginConnectProgress progress = null)
         {
             bool started;
+            var responseHeaders = new LoginResponseDiagnostics();
             var result = ExecuteCurl("/usr/bin/curl", args, timeoutMs, out started, cancellation,
                 progress == null ? (Action)null : progress.Start,
-                progress == null ? (Action<string>)null : progress.Observe);
-            return ParseLoginResult(result.Output, result.ExitCode);
+                line => { progress?.Observe(line); responseHeaders.Observe(line); });
+            return ParseLoginResult(result.Output, result.ExitCode, responseHeaders);
         }
     }
 }
