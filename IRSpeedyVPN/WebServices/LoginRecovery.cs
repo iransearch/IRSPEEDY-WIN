@@ -57,7 +57,19 @@ namespace IRSpeedyVPN.WebServices
         internal string Body, RemoteIp;
         internal bool Unavailable, MetricsKnown;
         internal double ConnectSeconds, TlsSeconds, PretransferSeconds, UploadedBytes;
+        // Optional diagnostics only: absence never changes replay eligibility.
+        internal double? FirstByteSeconds, TotalSeconds, DownloadedBytes;
+        internal string HttpVersion;
         internal int Redirects;
+        internal bool TransferMetricsKnown => FirstByteSeconds.HasValue && TotalSeconds.HasValue
+            && DownloadedBytes.HasValue && IsKnownHttpVersion(HttpVersion);
+        internal static bool IsKnownHttpVersion(string value)
+            => value == "0" || value == "1" || value == "1.0" || value == "1.1" || value == "2" || value == "3";
+        private static string DiagnosticNumber(double? value)
+            => value.HasValue ? value.Value.ToString("R", CultureInfo.InvariantCulture) : "unknown";
+        private string RemoteIpForLog => IPAddress.TryParse(RemoteIp, out var ip) ? ip.ToString() : "unknown";
+        private string RemoteFamilyForLog => !IPAddress.TryParse(RemoteIp, out var ip) ? "unknown"
+            : ip.AddressFamily == AddressFamily.InterNetworkV6 ? "IPv6" : "IPv4";
         // These fields come from -w even on nonzero exit. Unknown/partial metrics
         // are never evidence that it is safe to repeat a credential POST.
         internal bool MayHaveBeenSent => !MetricsKnown || UploadedBytes > 0 || HttpCode > 0
@@ -88,7 +100,14 @@ namespace IRSpeedyVPN.WebServices
             + " mayHaveBeenSent=" + MayHaveBeenSent + " definitelyNotSent=" + DefinitelyNotSent
             + " canRecover=" + CanRecover
             + " canResolveAlternatePeer=" + CanResolveAlternatePeer
-            + " remoteIpKnown=" + (RemoteIp != null);
+            + " remoteIpKnown=" + (RemoteIp != null)
+            + " remoteIp=" + RemoteIpForLog + " remoteFamily=" + RemoteFamilyForLog
+            + " transferMetrics=" + TransferMetricsKnown
+            + " firstByte=" + DiagnosticNumber(FirstByteSeconds)
+            + " total=" + DiagnosticNumber(TotalSeconds)
+            + " download=" + DiagnosticNumber(DownloadedBytes)
+            + " httpVersion=" + (IsKnownHttpVersion(HttpVersion) ? HttpVersion : "unknown")
+            + " bodyChars=" + (Body == null ? "unknown" : Body.Length.ToString(CultureInfo.InvariantCulture));
     }
 
     internal sealed class LoginTransportException : Exception

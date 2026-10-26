@@ -102,7 +102,9 @@ namespace IRSpeedyVPN.WebServices
                 + " --max-time " + seconds
                 + " -w \"\\n" + MarkerHttpCode + "%{http_code}\\n__LOGIN_CONNECT__:%{time_connect}\\n__LOGIN_TLS__:%{time_appconnect}"
                 + "\\n__LOGIN_READY__:%{time_pretransfer}\\n__LOGIN_UPLOAD__:%{size_upload}"
-                + "\\n__LOGIN_REDIRECTS__:%{num_redirects}\\n__LOGIN_HTTP__:%{http_code}\\n__LOGIN_REMOTE__:%{remote_ip}\\n\"";
+                + "\\n__LOGIN_REDIRECTS__:%{num_redirects}\\n__LOGIN_HTTP__:%{http_code}\\n__LOGIN_REMOTE__:%{remote_ip}"
+                + "\\n__LOGIN_FIRST_BYTE__:%{time_starttransfer}\\n__LOGIN_TOTAL__:%{time_total}"
+                + "\\n__LOGIN_DOWNLOAD__:%{size_download}\\n__LOGIN_VERSION__:%{http_version}\\n\"";
         }
         internal static LoginCurlResult ParseLoginResult(string output, int exitCode)
         {
@@ -121,6 +123,11 @@ namespace IRSpeedyVPN.WebServices
             IPAddress remote;
             if (IPAddress.TryParse(ParseTrailingValue(output, "__LOGIN_REMOTE__:"), out remote))
                 result.RemoteIp = remote.ToString();
+            result.FirstByteSeconds = OptionalMetric(output, "__LOGIN_FIRST_BYTE__:");
+            result.TotalSeconds = OptionalMetric(output, "__LOGIN_TOTAL__:");
+            result.DownloadedBytes = OptionalMetric(output, "__LOGIN_DOWNLOAD__:");
+            string version = ParseTrailingValue(output, "__LOGIN_VERSION__:");
+            if (LoginCurlResult.IsKnownHttpVersion(version)) result.HttpVersion = version;
             int boundary = output.LastIndexOf(MarkerHttpCode, StringComparison.Ordinal);
             result.Body = boundary < 0 ? "" : output.Substring(0, boundary).TrimEnd('\r', '\n');
             return result;
@@ -128,6 +135,8 @@ namespace IRSpeedyVPN.WebServices
         private static bool Metric(string output, string marker, out double value)
             => double.TryParse(ParseTrailingValue(output, marker), NumberStyles.Float, CultureInfo.InvariantCulture, out value)
                 && !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0;
+        private static double? OptionalMetric(string output, string marker)
+            => Metric(output, marker, out var value) ? (double?)value : null;
         private static string[] FetchLoginAddresses(string host, int timeoutMs, CancellationToken cancellation)
             => LoginDohProviders.Resolve(host, timeoutMs, cancellation, FetchLoginProvider, LogHelper.WriteExLog);
 

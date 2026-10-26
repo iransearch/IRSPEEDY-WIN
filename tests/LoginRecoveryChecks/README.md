@@ -43,3 +43,8 @@ Failure()/controller failover with failed DoH and a DNS-failed recovery attempt.
 HTTPS via --resolve and sequential system fallback, cache refresh, strict TLS,
 post-send/partial HTTP replay rejection, cancellation and shared POST gating.
 The system-first checks explicitly retain the constructor's reference policy.
+
+`TransferDiagnosticChecks.cs` validates optional transfer trailer parsing and
+scalar log privacy, and reproduces HTTP 200 with stalled zero/one-byte bodies
+using real certificate-verified curl through the production DoH-first path.
+These diagnostics never change the existing replay-evidence fields.

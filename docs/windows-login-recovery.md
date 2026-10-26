@@ -1,6 +1,12 @@
-# Windows login recovery (1.4.45 verification build)
+# Windows login recovery (1.4.46 verification diagnostics)
 
-Baseline: `58562004d8bd7ad1cdaa2a133172ad3269b04060` (1.4.44).
+Baseline: `94d7bc0af460627eedfa82025ad12b9b30d86c9c` (1.4.45).
+The supplied 1.4.45 log confirmed a Google winner, valid public A answers and
+native --resolve connection/TLS success. Both credential attempts received HTTP
+200 but ended with curl exit 28; no system/next-host replay was attempted.
+This release adds transfer-only diagnostics to locate the response stall;
+request order, deadlines, replay rules and TLS validation are unchanged.
+
 This temporary verification build enables `CurlHelper.LoginDohFirstVerification`:
 HTTPS hostname logins first use the existing Google/Cloudflare DoH race/cache,
 then curl --resolve. System DNS is a sequential fallback only after no DNS answer,
@@ -343,3 +349,38 @@ Also test with internet fully disconnected: each host should record bounded
 no-answer/failure, one system attempt and safe next-host failover. These logs
 verify the real bundled curl/certificate backend; the Linux tests do not run the
 protected single-file WPF package.
+
+## 1.4.46 transfer-only diagnostics
+
+The final native -w trailer adds time_starttransfer, time_total, size_download
+and http_version. LoginCurlResult stores these as optional diagnostics, separate
+from the existing MetricsKnown/replay evidence. Missing/invalid values are
+logged as unknown (never as an invented zero); they cannot change replay or
+DoH eligibility. Numeric parsing rejects negative, NaN and infinite values.
+Each marker still uses its final occurrence. HTTP versions use a fixed
+allowlist, and remoteIp is emitted only as a canonical IP address (with
+remoteFamily=IPv4/IPv6/unknown). No arbitrary stderr/header/body text is emitted.
+
+Result summaries log transferMetrics, firstByte and total (seconds), download
+(body bytes reported by curl), httpVersion, remoteIp/family and bodyChars
+(captured .NET string length). These fields appear on system and --resolve
+attempts and are retained in sanitized transport errors. bodyChars is a count,
+not response content; bytes and characters need not be equal for non-ASCII or
+encoded payloads. A first-byte timestamp is curl's first response byte and can
+include an informational response; it is not the time the complete body arrived.
+No expected Content-Length is inferred and a download count is not proof that
+an application response is valid.
+
+TransferDiagnosticChecks validates final-marker precedence, missing/invalid
+optional values, scalar-only log privacy, canonical IPv4/IPv6, invariant
+formatting, successful verified native HTTPS and real HTTP 200 timeouts with
+zero or one body byte. The timeout tests execute the production DoH-first path
+and confirm one POST, no system fallback and replay-blocking final errors.
+
+Windows follow-up: keep internet connected, log in with this verification build
+and compare firstByte/total/download/bodyChars/httpVersion/remoteIp across
+attempts. A final HTTP 200 with zero download isolates a header-only timeout;
+positive partial download isolates incomplete transfer. No raw response,
+credentials, user headers or certificate-validation bypass should be enabled.
+The protected single-file Windows package still requires a Windows build and
+smoke test; Linux native tests and .NET 4.8 compilation do not execute that UI.

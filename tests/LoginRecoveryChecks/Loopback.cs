@@ -15,7 +15,7 @@ sealed class LocalServer : IDisposable
     readonly TcpListener listener = new TcpListener(IPAddress.Loopback, 0);
     readonly X509Certificate2 certificate;
     volatile bool stopped;
-    internal int Posts, Gets, Status = 200, DelayMs;
+    internal int Posts, Gets, Status = 200, DelayMs, BodyDelayMs, PartialBodyBytes;
     internal bool Drop;
     internal string Json = "{\"Status\":0,\"Answer\":[{\"type\":1,\"data\":\"93.184.216.34\"},{\"type\":1,\"data\":\"93.184.216.35\"}]}";
     internal string LastHost, LastBody;
@@ -66,7 +66,16 @@ sealed class LocalServer : IDisposable
                     if (Drop) return;
                     byte[] body = Encoding.UTF8.GetBytes(certificate == null ? Json : "{\"ok\":true}");
                     byte[] response = Encoding.ASCII.GetBytes("HTTP/1.1 " + Status + " Result\r\nConnection: close\r\nContent-Type: application/json\r\nContent-Length: " + body.Length + "\r\n\r\n");
-                    await stream.WriteAsync(response, 0, response.Length); await stream.WriteAsync(body, 0, body.Length);
+                    await stream.WriteAsync(response, 0, response.Length);
+                    int sent = 0;
+                    if (BodyDelayMs > 0)
+                    {
+                        sent = Math.Min(PartialBodyBytes, body.Length);
+                        if (sent > 0) await stream.WriteAsync(body, 0, sent);
+                        await stream.FlushAsync();
+                        await Task.Delay(BodyDelayMs);
+                    }
+                    await stream.WriteAsync(body, sent, body.Length - sent);
                 }
             }
             catch (Exception ex) when (ex is IOException || ex is AuthenticationException || ex is ObjectDisposedException) { }
