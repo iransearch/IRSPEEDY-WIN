@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using IRSpeedyVPN.WebServices;
@@ -20,7 +22,7 @@ static class CompletionChecks
     {
         string post = CurlHelper.BuildLoginArgs("https://login.test/", "POST", "", "fixture", null, 1000);
         string get = CurlHelper.BuildLoginArgs("https://8.8.8.8/resolve", "GET", "", null, null, 1000);
-        Check(post.Contains(" --http1.1 -H \"Connection: close\" --verbose")
+        Check(post.Contains(" --http1.1 -H \"Connection: close\" --verbose --no-buffer")
             && !post.Contains(" -L ") && !post.Contains("--insecure")
             && !get.Contains("Connection: close") && !get.Contains("--http1.1") && !get.Contains("--verbose"),
             "completion trial is scoped to native credential POSTs without changing DoH GETs or TLS/redirect checks");
@@ -57,6 +59,24 @@ static class CompletionChecks
     }
     static void Native(Certificates certificates)
     {
+        using (var server = new LocalServer(certificates.Correct))
+        {
+            server.Chunked = true; server.MissingLastChunk = true; server.HoldOpenMs = 3500;
+            string url = "https://login.test:" + server.Port + "/";
+            string args = CurlHelper.BuildLoginArgs(url, "POST", "", "credential-must-not-be-logged",
+                "login.test:" + server.Port + ":127.0.0.1", 2800)
+                + " --cacert \"" + certificates.CaPath + "\"";
+            var snapshots = new List<string>();
+            var output = new LoginOutputProgress();
+            var timed = CurlHelper.ExecuteLocal(args, 3000, CancellationToken.None, null, output, snapshots.Add);
+            var periodic = snapshots.FirstOrDefault(s => s.StartsWith("point=periodic ", StringComparison.Ordinal));
+            Check(timed.ExitCode == 28 && timed.HttpCode == 200 && server.Posts == 1
+                && periodic != null && periodic.Contains("stdoutChars=")
+                && Field(periodic, "stdoutChars") > 0 && Field(periodic, "idleMs") >= 1000
+                && snapshots.Any(s => s.StartsWith("point=exit exitCode=28 ", StringComparison.Ordinal))
+                && !snapshots.Any(s => s.Contains("credential") || s.Contains("{\"ok\"")),
+                "single stalled chunked POST reports numeric last-chunk idle time without response or credential logging");
+        }
         using (var server = new LocalServer(certificates.Correct))
         {
             server.CloseDelimited = true; server.HonorClose = true; server.HoldOpenMs = 1400;
@@ -97,5 +117,14 @@ static class CompletionChecks
                 && result.Summary.Contains(missingChunk ? "responseFraming=chunked" : "downloadVsLength=below"),
                 "connection-close never accepts or replays complete JSON with " + (missingChunk ? "a missing terminal chunk" : "a mismatched Content-Length"));
         }
+    }
+    static long Field(string sample, string field)
+    {
+        string start = field + "=";
+        int offset = sample.IndexOf(start, StringComparison.Ordinal);
+        if (offset < 0) return -1;
+        offset += start.Length;
+        int end = sample.IndexOf(' ', offset);
+        return long.Parse(sample.Substring(offset, end < 0 ? sample.Length - offset : end - offset), CultureInfo.InvariantCulture);
     }
 }

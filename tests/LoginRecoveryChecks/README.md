@@ -54,3 +54,5 @@ These diagnostics never change the existing replay-evidence fields.
 `CompletionChecks.cs` tests the HTTP/1.1 connection-close experiment using real
 verified HTTPS control/trial requests, rejects mismatched lengths and missing
 chunk terminators, and checks whitelisted header privacy/bounded body metadata.
+It also checks that a stalled one-line chunked JSON response reports periodic
+numeric receive progress and idle time without exposing response or credentials.

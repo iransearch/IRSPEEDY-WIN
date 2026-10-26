@@ -86,13 +86,14 @@ namespace IRSpeedyVPN.WebServices
         { bool started; ExecuteCurl(executable, args, timeout, out started, cancellation); }
         // Linux executes the installed curl. PE/runtime selection remains Windows
         // specific; process deadlines, cancellation, args and parsing are production.
-        internal static LoginCurlResult ExecuteLocal(string args, int timeoutMs, CancellationToken cancellation, LoginConnectProgress progress = null)
+        internal static LoginCurlResult ExecuteLocal(string args, int timeoutMs, CancellationToken cancellation,
+            LoginConnectProgress progress = null, LoginOutputProgress outputProgress = null, Action<string> outputLog = null)
         {
             bool started;
             var responseHeaders = new LoginResponseDiagnostics();
             var result = ExecuteCurl("/usr/bin/curl", args, timeoutMs, out started, cancellation,
                 progress == null ? (Action)null : progress.Start,
-                line => { progress?.Observe(line); responseHeaders.Observe(line); });
+                line => { progress?.Observe(line); responseHeaders.Observe(line); }, outputProgress, outputLog);
             return ParseLoginResult(result.Output, result.ExitCode, responseHeaders);
         }
     }

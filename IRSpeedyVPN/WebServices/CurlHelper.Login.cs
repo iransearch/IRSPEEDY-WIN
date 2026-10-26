@@ -65,9 +65,16 @@ namespace IRSpeedyVPN.WebServices
                     string args = BuildLoginArgs(url, method, headers, body, resolve, remainingMs - 100);
                     if (progress != null && !string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) args += " --verbose";
                     var responseHeaders = new LoginResponseDiagnostics();
+                    var outputProgress = string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)
+                        ? new LoginOutputProgress() : null;
+                    string attemptId = outputProgress == null ? null : Guid.NewGuid().ToString("N");
+                    Action<string> outputLog = outputProgress == null ? (Action<string>)null : (sample =>
+                        LogHelper.WriteExLog("[LoginRecovery] stage=credential-output attempt=" + attemptId
+                            + " host=" + new Uri(url).Host + " " + sample));
                     var result = ExecuteCurl(candidate.Path, args, remainingMs, out started, cancellation,
                         progress == null ? (Action)null : progress.Start,
-                        line => { progress?.Observe(line); responseHeaders.Observe(line); });
+                        line => { progress?.Observe(line); responseHeaders.Observe(line); },
+                        outputProgress, outputLog);
                     _curlUnavailable = false;
                     return ParseLoginResult(result.Output, result.ExitCode, responseHeaders);
                 }
@@ -100,7 +107,7 @@ namespace IRSpeedyVPN.WebServices
             // Temporary completion trial for credential POSTs only. DoH GETs and
             // ordinary curl callers retain their previous protocol/connection policy.
             if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase))
-                args += " --http1.1 -H \"Connection: close\" --verbose";
+                args += " --http1.1 -H \"Connection: close\" --verbose --no-buffer";
             string seconds = (timeoutMs / 1000d).ToString("0.###", CultureInfo.InvariantCulture);
             return args + " --noproxy \"*\" --connect-timeout "
                 + Math.Min(3d, timeoutMs / 1000d).ToString("0.###", CultureInfo.InvariantCulture)
@@ -183,6 +190,28 @@ namespace IRSpeedyVPN.WebServices
                     values.Add(data.ToString().Trim());
             }
             return values.ToArray();
+        }
+    }
+
+    // Only numeric transfer activity is kept. No response bytes, credentials,
+    // headers or URLs enter a progress sample. The curl -w trailer may add a
+    // final stdout chunk, so periodic samples distinguish it from body progress.
+    internal sealed class LoginOutputProgress
+    {
+        private long characters, firstAtMs = -1, lastAtMs = -1;
+        internal void Observe(int count, long elapsedMs)
+        {
+            if (count <= 0) return;
+            Interlocked.CompareExchange(ref firstAtMs, elapsedMs, -1);
+            Interlocked.Add(ref characters, count);
+            Interlocked.Exchange(ref lastAtMs, elapsedMs);
+        }
+        internal string Snapshot(long elapsedMs)
+        {
+            long first = Interlocked.Read(ref firstAtMs), last = Interlocked.Read(ref lastAtMs);
+            return "elapsedMs=" + elapsedMs + " stdoutChars=" + Interlocked.Read(ref characters)
+                + " firstChunkMs=" + first + " lastChunkMs=" + last
+                + " idleMs=" + (last < 0 ? -1 : Math.Max(0, elapsedMs - last));
         }
     }
 

@@ -1,4 +1,4 @@
-# Windows login recovery (1.4.48 extended completion budget)
+# Windows login recovery (1.4.49 transfer progress diagnostics)
 
 Baseline: `a97564b3209539e48a6dd355ba38a4feedfe992f` (1.4.46).
 The supplied 1.4.45 log confirmed a Google winner, valid public A answers and
@@ -454,3 +454,32 @@ connect timeout and every other flow's timeout remain unchanged. Cancellation,
 certificate validation, sequential credential gate and replay protection are
 unchanged. This is a bounded test for slow completion, not proof that the CDN
 will send the terminating chunk; a posted timeout remains a final failure.
+
+## 1.4.49 receive-progress diagnostics
+
+The 1.4.48 Windows log confirmed two separate HTTP/1.1 chunked responses on
+the same peer that timed out at the new 20-second endpoint limit, with 68–71 KB
+downloaded and an incomplete/unparseable JSON body. It did not establish when
+the last response data arrived. Increasing the timeout further without that
+evidence is not justified.
+
+Native login POST stdout is now read in small chunks rather than line by line:
+an entire JSON response may be a single line, and ReadLine would not reveal
+receive progress until the transfer ends. The POST-only curl option --no-buffer
+flushes downloaded content to that pipe promptly; otherwise curl's own stdout
+buffering hides the last chunk. Every two seconds and on completion
+or deadline the log records a random attempt ID, hostname, elapsed time,
+characters observed, first/last stdout chunk times and idle time since the
+last chunk. `stdoutChars` includes the curl write-out trailer after exit and
+is not an exact network byte count. Only the periodic samples can distinguish
+a long idle transfer from a slowly advancing one. No body, credentials,
+arbitrary headers or raw stderr are logged. Other curl calls and DoH GETs keep
+their original reader and timeouts. This observation does not change request
+completion, TLS, response acceptance, failover or replay decisions.
+
+For server/CDN correlation, compare the API's request timestamp and response
+byte count with its reverse-proxy/CDN logs for the same host. Check whether the
+server generated the full JSON and its final chunk, whether the proxy forwarded
+the terminating chunk, and whether the client continued receiving data in its
+periodic samples. A public 200 status by itself does not prove a complete
+chunked response. Server logs were not available in this client workspace.

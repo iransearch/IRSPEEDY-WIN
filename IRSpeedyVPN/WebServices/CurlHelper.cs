@@ -583,7 +583,9 @@ namespace IRSpeedyVPN.WebServices
             out bool processStarted,
             CancellationToken cancellation = default(CancellationToken),
             Action started = null,
-            Action<string> stderrObserver = null)
+            Action<string> stderrObserver = null,
+            LoginOutputProgress outputProgress = null,
+            Action<string> outputLog = null)
         {
             processStarted = false;
             var processStopwatch = Stopwatch.StartNew();
@@ -609,12 +611,13 @@ namespace IRSpeedyVPN.WebServices
                     RedirectStandardError = true
                 };
 
-                stdout = (sender, args) =>
-                {
-                    if (args.Data != null)
-                        output.AppendLine(args.Data);
-                    else stdoutClosed.TrySetResult(true);
-                };
+                if (outputProgress == null)
+                    stdout = (sender, args) =>
+                    {
+                        if (args.Data != null)
+                            output.AppendLine(args.Data);
+                        else stdoutClosed.TrySetResult(true);
+                    };
                 stderr = (sender, args) =>
                 {
                     if (args.Data != null)
@@ -624,7 +627,7 @@ namespace IRSpeedyVPN.WebServices
                     }
                     else stderrClosed.TrySetResult(true);
                 };
-                process.OutputDataReceived += stdout;
+                if (stdout != null) process.OutputDataReceived += stdout;
                 process.ErrorDataReceived += stderr;
 
                 cancellation.ThrowIfCancellationRequested();
@@ -633,10 +636,32 @@ namespace IRSpeedyVPN.WebServices
 
                 processStarted = true;
                 started?.Invoke();
-                process.BeginOutputReadLine();
+                if (outputProgress == null) process.BeginOutputReadLine();
+                else
+                {
+                    // Read incrementally: ReadLine buffers a large one-line JSON
+                    // response until EOF and cannot identify the last live chunk.
+                    var reader = process.StandardOutput;
+                    Task.Run(async () =>
+                    {
+                        try
+                        {
+                            var buffer = new char[4096];
+                            int count;
+                            while ((count = await reader.ReadAsync(buffer, 0, buffer.Length).ConfigureAwait(false)) > 0)
+                            {
+                                output.Append(buffer, 0, count);
+                                outputProgress.Observe(count, processStopwatch.ElapsedMilliseconds);
+                            }
+                            stdoutClosed.TrySetResult(true);
+                        }
+                        catch { stdoutClosed.TrySetResult(false); }
+                    });
+                }
                 process.BeginErrorReadLine();
 
                 bool exited = false;
+                long nextOutputSampleMs = 2000;
                 while (true)
                 {
                     if (cancellation.IsCancellationRequested)
@@ -650,10 +675,19 @@ namespace IRSpeedyVPN.WebServices
                         ? timeoutMilliseconds.Value - processStopwatch.ElapsedMilliseconds : int.MaxValue;
                     if (remainingMs <= 0) break;
                     if (process.WaitForExit((int)Math.Min(50L, remainingMs))) { exited = true; break; }
+                    if (outputProgress != null && processStopwatch.ElapsedMilliseconds >= nextOutputSampleMs)
+                    {
+                        try { outputLog?.Invoke("point=periodic " + outputProgress.Snapshot(processStopwatch.ElapsedMilliseconds)); }
+                        catch { } // Diagnostics cannot change the transport result.
+                        nextOutputSampleMs += 2000;
+                    }
                 }
 
                 if (!exited)
                 {
+                    if (outputProgress != null)
+                        try { outputLog?.Invoke("point=deadline " + outputProgress.Snapshot(processStopwatch.ElapsedMilliseconds)); }
+                        catch { }
                     stopAttempted = true;
                     StopCurlProcess(process);
                     throw new TimeoutException("curl process did not exit before the timeout.");
@@ -663,7 +697,18 @@ namespace IRSpeedyVPN.WebServices
                     ? (int)Math.Min(ProcessCleanupTimeoutMs, Math.Max(0L, timeoutMilliseconds.Value - processStopwatch.ElapsedMilliseconds))
                     : ProcessCleanupTimeoutMs;
                 if (!Task.WaitAll(new Task[] { stdoutClosed.Task, stderrClosed.Task }, drainMs))
+                {
+                    if (outputProgress != null)
+                        try { outputLog?.Invoke("point=drain-timeout " + outputProgress.Snapshot(processStopwatch.ElapsedMilliseconds)); }
+                        catch { }
                     throw new TimeoutException("curl output did not close before the timeout.");
+                }
+                if (!stdoutClosed.Task.Result)
+                    throw new IOException("curl stdout could not be read completely.");
+                if (outputProgress != null)
+                    try { outputLog?.Invoke("point=exit exitCode=" + process.ExitCode + " "
+                        + outputProgress.Snapshot(processStopwatch.ElapsedMilliseconds)); }
+                    catch { }
                 cancellation.ThrowIfCancellationRequested();
                 return new CurlProcessResult
                 {
