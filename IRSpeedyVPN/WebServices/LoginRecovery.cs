@@ -39,6 +39,7 @@ namespace IRSpeedyVPN.WebServices
 
     internal sealed class LoginDeadline
     {
+        internal const int RecoveryPostReserveMs = 3000;
         private readonly LoginNetworkContext context;
         private readonly Stopwatch clock = Stopwatch.StartNew();
         private readonly int budgetMs;
@@ -47,12 +48,13 @@ namespace IRSpeedyVPN.WebServices
         internal int RemainingMs => Math.Min(context.RemainingMs, (int)Math.Max(0, budgetMs - clock.ElapsedMilliseconds));
         internal void Check()
         { context.Check(); if (RemainingMs <= 0) throw new TimeoutException("Login endpoint deadline expired."); }
+        internal int LookupBudgetMs => Math.Min(LoginDohProviders.LookupBudgetMs, RemainingMs - RecoveryPostReserveMs);
     }
 
     internal sealed class LoginCurlResult
     {
         internal int ExitCode, HttpCode;
-        internal string Body;
+        internal string Body, RemoteIp;
         internal bool Unavailable, MetricsKnown;
         internal double ConnectSeconds, TlsSeconds, PretransferSeconds, UploadedBytes;
         internal int Redirects;
@@ -67,6 +69,10 @@ namespace IRSpeedyVPN.WebServices
         internal bool CanRecover => !Unavailable && !MayHaveBeenSent &&
             (ExitCode == 6 || ExitCode == 7 || ExitCode == 35 || ExitCode == 60
                 || (ExitCode == 28 && ConnectSeconds == 0));
+        // This only authorizes resolving. A retry additionally requires a public
+        // address different from every known failed peer below.
+        internal bool CanResolveAlternatePeer => !Unavailable && !MayHaveBeenSent
+            && ExitCode == 28 && ConnectSeconds > 0 && RemoteIp != null && IPAddress.TryParse(RemoteIp, out _);
         internal string Summary => "exit=" + ExitCode + " http=" + HttpCode
             + " metrics=" + MetricsKnown + " connect=" + ConnectSeconds.ToString("R", CultureInfo.InvariantCulture)
             + " tls=" + TlsSeconds.ToString("R", CultureInfo.InvariantCulture)
@@ -174,7 +180,8 @@ namespace IRSpeedyVPN.WebServices
                 }
             }
             if (first.HttpCode > 0) return first;
-            if (!first.CanRecover || target.Scheme != Uri.UriSchemeHttps || IPAddress.TryParse(target.Host, out _))
+            if ((!first.CanRecover && !first.CanResolveAlternatePeer)
+                || target.Scheme != Uri.UriSchemeHttps || IPAddress.TryParse(target.Host, out _))
             {
                 Log(context, target.Host, "stage=skip reason=unsafe-or-ineligible " + first.Summary);
                 throw Failure(first, null, target.Scheme == Uri.UriSchemeHttps);
@@ -189,38 +196,39 @@ namespace IRSpeedyVPN.WebServices
             {
                 deadline.Check();
                 // Leave time for the real request. No lookup gets a new deadline.
-                int lookupMs = Math.Min(LoginDohProviders.LookupBudgetMs, deadline.RemainingMs - 1000);
+                int lookupMs = deadline.LookupBudgetMs;
                 if (lookupMs <= 0) throw Failure(first, null);
                 bool wasPrefetched;
                 answer = prefetch.Take(out wasPrefetched);
-                if (wasPrefetched) prefetch.Accept(answer);
-                else answer = resolver.Resolve(target.Host, lookupMs, context.Cancellation, false);
-                deadline.Check();
-                if (answer == null || answer.Values.Length == 0) throw Failure(first, null);
-                second = Retry(target, url, method, headers, body, answer, deadline, context);
-                Log(context, target.Host, "stage=doh-result cached=" + answer.FromCache + " " + second.Summary);
-                if (second.HttpCode > 0) return second;
-                resolver.Invalidate(target.Host, answer);
-                // A cached bad answer gets one fresh network lookup, inside this
-                // same recovery and deadline. Never replay a POST that may be sent.
-                if (answer.FromCache && second.CanRecover)
+                if (!wasPrefetched) answer = resolver.Resolve(target.Host, lookupMs, context.Cancellation, false);
+                var failedPeers = new HashSet<string>(StringComparer.Ordinal);
+                if (first.RemoteIp != null) failedPeers.Add(first.RemoteIp);
+                // One cached set and at most one fresh set, never recursive. Keep
+                // the original answer for reference-safe cache invalidation.
+                for (int pass = 0; pass < 2; pass++)
                 {
                     deadline.Check();
-                    lookupMs = Math.Min(LoginDohProviders.LookupBudgetMs, deadline.RemainingMs - 1000);
-                    if (lookupMs > 0)
+                    if (answer == null || answer.Values.Length == 0) throw Failure(first, second);
+                    var addresses = answer.Values.Where(ip => !failedPeers.Contains(ip)).ToArray();
+                    if (addresses.Length != 0)
                     {
-                        Log(context, target.Host, "stage=cache-refresh reason=pre-send-failure");
-                        answer = resolver.Resolve(target.Host, lookupMs, context.Cancellation, true);
-                        deadline.Check();
-                        if (answer != null && answer.Values.Length > 0)
-                        {
-                            var cachedFailure = second;
-                            second = Retry(target, url, method, headers, body, answer, deadline, context);
-                            Log(context, target.Host, "stage=refresh-result previousExit=" + cachedFailure.ExitCode + " " + second.Summary);
-                            if (second.HttpCode > 0) return second;
-                            resolver.Invalidate(target.Host, answer);
-                        }
+                        if (wasPrefetched) prefetch.Accept(answer);
+                        second = Retry(target, url, method, headers, body, addresses, deadline, context);
+                        Log(context, target.Host, "stage=" + (pass == 0 ? "doh-result" : "refresh-result")
+                            + " cached=" + answer.FromCache + " " + second.Summary);
+                        if (second.HttpCode > 0) return second;
+                        resolver.Invalidate(target.Host, answer);
+                        if (!second.CanRecover && !second.CanResolveAlternatePeer) throw Failure(first, second);
+                        if (second.RemoteIp != null) failedPeers.Add(second.RemoteIp);
                     }
+                    else Log(context, target.Host, "stage=skip reason=same-failed-peer cached=" + answer.FromCache);
+                    if (!answer.FromCache || pass != 0) break;
+                    resolver.Invalidate(target.Host, answer);
+                    lookupMs = deadline.LookupBudgetMs;
+                    if (lookupMs <= 0) break;
+                    Log(context, target.Host, "stage=cache-refresh reason=pre-send-failure");
+                    answer = resolver.Resolve(target.Host, lookupMs, context.Cancellation, true);
+                    wasPrefetched = false;
                 }
                 throw Failure(first, second);
             }
@@ -248,11 +256,11 @@ namespace IRSpeedyVPN.WebServices
             }
         }
         private LoginCurlResult Retry(Uri target, string url, string method, string headers, string body,
-            LoginAddresses answer, LoginDeadline deadline, LoginNetworkContext context)
+            string[] addresses, LoginDeadline deadline, LoginNetworkContext context)
         {
             deadline.Check();
             return CredentialAttempt(deadline, context, remaining => transport.Curl(url, method, headers, body,
-                target.Host + ":" + target.Port + ":" + string.Join(",", answer.Values),
+                target.Host + ":" + target.Port + ":" + string.Join(",", addresses),
                 remaining, context.Cancellation));
         }
         private static LoginCurlResult CredentialAttempt(LoginDeadline deadline, LoginNetworkContext context,
@@ -261,7 +269,7 @@ namespace IRSpeedyVPN.WebServices
             deadline.Check();
             if (!CredentialGate.Wait(deadline.RemainingMs, context.Cancellation))
                 throw new TimeoutException("Login attempt queue deadline expired before sending.");
-            try { deadline.Check(); return attempt(deadline.RemainingMs); }
+            try { deadline.Check(); CurlHelper.EnsureCredentialCurlStopped(); return attempt(deadline.RemainingMs); }
             finally { CredentialGate.Release(); }
         }
         private static LoginTransportException Failure(LoginCurlResult first, LoginCurlResult second, bool https = true)

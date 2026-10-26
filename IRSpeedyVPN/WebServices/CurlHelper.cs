@@ -8,6 +8,7 @@ using System.Net;
 using System.Text;
 using System.Globalization;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace IRSpeedyVPN.WebServices
 {
@@ -588,8 +589,13 @@ namespace IRSpeedyVPN.WebServices
             var processStopwatch = Stopwatch.StartNew();
             var output = new StringBuilder();
             int stderrLength = 0;
+            var stdoutClosed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var stderrClosed = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
-            using (var process = new Process())
+            var process = new Process();
+            DataReceivedEventHandler stdout = null, stderr = null;
+            bool stopAttempted = false;
+            try
             {
                 process.StartInfo = new ProcessStartInfo
                 {
@@ -603,19 +609,23 @@ namespace IRSpeedyVPN.WebServices
                     RedirectStandardError = true
                 };
 
-                process.OutputDataReceived += (sender, args) =>
+                stdout = (sender, args) =>
                 {
                     if (args.Data != null)
                         output.AppendLine(args.Data);
+                    else stdoutClosed.TrySetResult(true);
                 };
-                process.ErrorDataReceived += (sender, args) =>
+                stderr = (sender, args) =>
                 {
                     if (args.Data != null)
                     {
                         Interlocked.Add(ref stderrLength, args.Data.Length + 2);
                         try { stderrObserver?.Invoke(args.Data); } catch { }
                     }
+                    else stderrClosed.TrySetResult(true);
                 };
+                process.OutputDataReceived += stdout;
+                process.ErrorDataReceived += stderr;
 
                 cancellation.ThrowIfCancellationRequested();
                 if (!process.Start())
@@ -626,44 +636,49 @@ namespace IRSpeedyVPN.WebServices
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                bool exited;
-                if (timeoutMilliseconds.HasValue)
+                bool exited = false;
+                while (true)
                 {
-                    // Process startup consumes the same deadline as the request.
-                    long remainingMs = timeoutMilliseconds.Value - processStopwatch.ElapsedMilliseconds;
-                    exited = false;
-                    while (remainingMs > 0)
+                    if (cancellation.IsCancellationRequested)
                     {
-                        if (cancellation.IsCancellationRequested)
-                        {
-                            try { process.Kill(); process.WaitForExit(); } catch { }
-                            cancellation.ThrowIfCancellationRequested();
-                        }
-                        if (process.WaitForExit((int)Math.Min(50L, remainingMs))) { exited = true; break; }
-                        remainingMs = timeoutMilliseconds.Value - processStopwatch.ElapsedMilliseconds;
+                        stopAttempted = true;
+                        StopCurlProcess(process);
+                        cancellation.ThrowIfCancellationRequested();
                     }
-                }
-                else
-                {
-                    process.WaitForExit();
-                    exited = true;
+                    // Startup, process execution and reader drain share the budget.
+                    long remainingMs = timeoutMilliseconds.HasValue
+                        ? timeoutMilliseconds.Value - processStopwatch.ElapsedMilliseconds : int.MaxValue;
+                    if (remainingMs <= 0) break;
+                    if (process.WaitForExit((int)Math.Min(50L, remainingMs))) { exited = true; break; }
                 }
 
                 if (!exited)
                 {
-                    try { process.Kill(); process.WaitForExit(); }
-                    catch { }
+                    stopAttempted = true;
+                    StopCurlProcess(process);
                     throw new TimeoutException("curl process did not exit before the timeout.");
                 }
 
-                // Flush asynchronous stdout/stderr event handlers before reading results.
-                process.WaitForExit();
+                int drainMs = timeoutMilliseconds.HasValue
+                    ? (int)Math.Min(ProcessCleanupTimeoutMs, Math.Max(0L, timeoutMilliseconds.Value - processStopwatch.ElapsedMilliseconds))
+                    : ProcessCleanupTimeoutMs;
+                if (!Task.WaitAll(new Task[] { stdoutClosed.Task, stderrClosed.Task }, drainMs))
+                    throw new TimeoutException("curl output did not close before the timeout.");
+                cancellation.ThrowIfCancellationRequested();
                 return new CurlProcessResult
                 {
                     Output = output.ToString(),
                     ExitCode = process.ExitCode,
                     StderrLength = stderrLength
                 };
+            }
+            finally
+            {
+                if (processStarted && !stopAttempted && !HasStopped(process)) StopCurlProcess(process);
+                if (stdout != null) process.OutputDataReceived -= stdout;
+                if (stderr != null) process.ErrorDataReceived -= stderr;
+                CloseCurlReaders(process);
+                if (!IsPendingStop(process)) process.Dispose();
             }
         }
 

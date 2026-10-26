@@ -66,7 +66,7 @@ class ControllerChecks {
 }
 '''
 
-files = [source/name for name in ['LoginRecovery.cs','LoginPrefetch.cs','CurlHelper.Login.cs','CurlHelper.cs','HttpFallback.cs','DohResolver.cs']]
+files = [source/name for name in ['LoginRecovery.cs','LoginPrefetch.cs','CurlHelper.Login.cs','CurlHelper.Process.cs','CurlHelper.cs','HttpFallback.cs','DohResolver.cs']]
 files.append(root/'IRSpeedyVPN/Common/LogPolicy.cs')
 with tempfile.TemporaryDirectory(prefix='login-recovery-') as directory:
     path = Path(directory)
@@ -85,7 +85,7 @@ with tempfile.TemporaryDirectory(prefix='login-recovery-') as directory:
     api += [here/'Fixtures.cs', here/'Api/Fixtures.cs', here/'Api/Program.cs']
     # Only the test bridge in Fixtures needs CurlHelper. Use the same actual
     # production transport files as the integration executable above.
-    api += [source/name for name in ['CurlHelper.cs','CurlHelper.Login.cs','DohResolver.cs','HttpFallback.cs']]
+    api += [source/name for name in ['CurlHelper.cs','CurlHelper.Login.cs','CurlHelper.Process.cs','DohResolver.cs','HttpFallback.cs']]
     subprocess.run([dotnet, compiler, '-nologo','-langversion:7.3','-define:API_FLOW_TEST','-target:exe','-out:'+str(output)]
         + ['-r:'+str(item) for item in Path(refs).glob('*.dll')]+[str(item) for item in api], check=True)
     subprocess.run([dotnet,str(output)],check=True)

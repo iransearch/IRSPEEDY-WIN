@@ -4,6 +4,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Diagnostics;
+using System.Net;
 using System.Threading;
 using System.Web.Script.Serialization;
 
@@ -40,6 +41,7 @@ namespace IRSpeedyVPN.WebServices
             string resolve, int timeoutMs, CancellationToken cancellation, LoginConnectProgress progress = null)
         {
             cancellation.ThrowIfCancellationRequested();
+            if (string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase)) EnsureCredentialCurlStopped();
             if (timeoutMs <= 100) throw new TimeoutException("Login attempt has no remaining budget.");
             var elapsed = Stopwatch.StartNew();
             var diagnostic = SafeCaptureDiagnostics(url, method);
@@ -97,7 +99,7 @@ namespace IRSpeedyVPN.WebServices
                 + " --max-time " + seconds
                 + " -w \"\\n" + MarkerHttpCode + "%{http_code}\\n__LOGIN_CONNECT__:%{time_connect}\\n__LOGIN_TLS__:%{time_appconnect}"
                 + "\\n__LOGIN_READY__:%{time_pretransfer}\\n__LOGIN_UPLOAD__:%{size_upload}"
-                + "\\n__LOGIN_REDIRECTS__:%{num_redirects}\\n__LOGIN_HTTP__:%{http_code}\\n\"";
+                + "\\n__LOGIN_REDIRECTS__:%{num_redirects}\\n__LOGIN_HTTP__:%{http_code}\\n__LOGIN_REMOTE__:%{remote_ip}\\n\"";
         }
         internal static LoginCurlResult ParseLoginResult(string output, int exitCode)
         {
@@ -113,6 +115,9 @@ namespace IRSpeedyVPN.WebServices
             result.ConnectSeconds = connect; result.TlsSeconds = tls;
             result.PretransferSeconds = ready; result.UploadedBytes = upload;
             result.Redirects = redirects; result.HttpCode = http;
+            IPAddress remote;
+            if (IPAddress.TryParse(ParseTrailingValue(output, "__LOGIN_REMOTE__:"), out remote))
+                result.RemoteIp = remote.ToString();
             int boundary = output.LastIndexOf(MarkerHttpCode, StringComparison.Ordinal);
             result.Body = boundary < 0 ? "" : output.Substring(0, boundary).TrimEnd('\r', '\n');
             return result;

@@ -82,7 +82,7 @@ namespace IRSpeedyVPN.WebServices
                 {
                     if (requestedStop || !progress.IsConnecting || !context.RecoveryAvailable(host)) return null;
                     deadline.Check();
-                    budget = Math.Min(LoginDohProviders.LookupBudgetMs, deadline.RemainingMs - 1000);
+                    budget = deadline.LookupBudgetMs;
                     if (budget <= 100) return null;
                     attempted = true;
                 }

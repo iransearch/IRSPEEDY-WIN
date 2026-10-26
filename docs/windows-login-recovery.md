@@ -1,11 +1,11 @@
-# Windows login recovery (1.4.40)
+# Windows login recovery (1.4.41)
 
-Baseline: `feddf9c2b939eb0602e670d59b3906aa23448608` (1.4.39).
-The baseline matched the reported replay, managed-fallback, launch-timeout and
-argument-construction issues. `_curlUnavailable` is static. Both Login2 callers
-already caught Exception; the foreground wrapper still needed shutdown guards
-around its initial dispatcher await and presentation cleanup. The existing
-generic UI message is `ارتباط با سرور برقرار نیست`, which is retained.
+Baseline: `6f84d86596c1eeff1538677fec516d4e1a2d9458` (1.4.40).
+The source confirmed the one-second POST reserve and unbounded process/pipe
+cleanup waits. This update increases the reserve, bounds cleanup and uses
+validated remote_ip to avoid retrying failed peers. The previous HTTPS replay,
+managed classification, static curl availability and exit-time UI guards remain.
+The existing generic UI message is `ارتباط با سرور برقرار نیست`.
 
 The four API endpoints retain their sequential order, last-good preference,
 30-second shared network deadline and 8-second endpoint limit. Normal loading
@@ -17,7 +17,7 @@ DNS racing, Shield, routing and Core are unchanged.
 
 The first attempt uses bundled curl and system DNS, with a connection timeout
 of at most 3 seconds inside the endpoint deadline. curl `-w` records HTTP status,
-time_connect, time_appconnect, time_pretransfer, size_upload and num_redirects
+time_connect, time_appconnect, time_pretransfer, size_upload, num_redirects and remote_ip
 on failures as well as successes. Parsing takes each marker's last occurrence,
 so identical text in the response body cannot override the final trailer.
 
@@ -32,16 +32,21 @@ Missing/invalid metrics fail closed, including positive submillisecond values.
 A completed TCP connection alone does not prove a POST reached an HTTPS server.
 Known-zero TLS/pretransfer/upload/HTTP/redirect indicators permit next-host
 failover on handshake stalls/resets, including exit 28/52/55/56. Same-host DoH
-recovery remains narrower: exit 6/7/35/60, or exit 28 only when time_connect is
-zero; all must be proven unsent. Plain HTTP retains the previous conservative
+CanRecover remains narrower: exit 6/7/35/60, or exit 28 only when time_connect is
+zero; all must be proven unsent. A separate conditional lookup also permits
+HTTPS exit 28 after TCP when the same all-zero sending indicators hold and a
+valid remote_ip is known. It authorizes a credential retry only if DoH supplies
+a different public address. Missing/invalid peer or transfer metrics cannot
+enable this path. Plain HTTP retains the previous conservative
 exit 52/55/56 and post-TCP exit 28 guards and never uses same-host DoH recovery.
 
 Every HTTP response bypasses DoH. HTTP 401/406 are final; explicit HTTP 500 and
 invalid/empty application responses keep their existing endpoint policy. After
 a transport failure with possible sending, no API host may replay the POST.
 
-At most one recovery is allowed per hostname per Login2 call. All public A
-records are passed together through `--resolve host:443:IP1,IP2` (or the explicit
+At most one recovery is allowed per hostname per Login2 call. Public A records
+excluding every known failed peer are passed together through
+`--resolve host:443:IP1,IP2` (or the explicit
 URI port). URL, Host, SNI and certificate checks stay intact. Login redirects
 are explicitly disabled through BuildArgs; other callers keep their default.
 Neither transport disables TLS validation. A static credential-attempt gate
@@ -52,6 +57,16 @@ A started curl killed by its outer process deadline has unknown sending state:
 its TimeoutException stops endpoint replay, without disabling curl globally.
 Pre-launch TimeoutException propagates without changing availability. Only
 exhausting absent, invalid-PE or unlaunchable candidates sets `_curlUnavailable`.
+
+Termination after Kill waits at most 2 seconds. Output/error EOF is acknowledged
+separately, with a drain bounded by the remaining request budget and a 2-second
+cap: an exited parent with inherited pipe handles cannot block indefinitely.
+There is no parameterless WaitForExit in the execution/cleanup path. If the OS
+does not confirm termination within the grace, the process handle is retained
+and later credential attempts fail closed until exit is confirmed. No reaper
+thread is created, PID reuse cannot release the guard, and unavailable-curl
+managed fallback cannot bypass it. Killing and draining do not authorize replay
+or consume a new network-request budget; termination grace is cleanup time.
 
 ## Managed fallback
 
@@ -81,11 +96,17 @@ multicast and the existing additional nonpublic ranges are rejected.
 
 One lookup clock is capped at 5 seconds for the entire race, never 5 seconds per
 provider (the final requested cap replaces the earlier 2-second proposal).
-It is further capped by the host/login deadline minus a 1-second POST
-reserve. On completion, cancellation or expiry, the resolver cancels and joins
+It is further capped by the host/login deadline minus a **3-second POST
+reserve**, in ordinary recovery, cache refresh and prefetch alike. After a
+3-second first attempt in an 8-second endpoint, a non-prefetched lookup gets
+at most about 2 seconds, leaving about 3 seconds for TLS, POST and response.
+Scheduling, cleanup and another login's credential-gate queue can consume some
+of that remainder; it is a lookup-allocation reserve, not a deadline extension.
+On completion, cancellation or expiry, the resolver cancels and joins
 all provider workers before returning. Native curl is killed and reaped; managed
-I/O is aborted and its provider worker is joined. There is no background loser
-left to outlive the lookup. The old VPN race executes in the Go Core with
+I/O is aborted and its provider worker is joined. Unconfirmed OS termination is
+retained behind the fail-closed credential guard rather than waited on forever.
+The old VPN race executes in the Go Core with
 DNS-wire transports/configuration, rather than this JSON resolver; there is no
 direct reusable helper for an additional login provider, so none was added.
 
@@ -95,21 +116,34 @@ the connecting phase; raw stderr/headers are neither stored nor logged. If curl
 is still connecting at one second, a speculative race can start under the same
 budget/reserve. No POST is raced or started by this monitor.
 
-A first HTTP response, success, cancellation or non-CanRecover failure discards
+Privacy: on a system-DNS lookup/connection still pending after one second, the
+API hostname is sent directly to **both Google and Cloudflare**, even if system
+DNS is merely slow and the first request eventually succeeds. Canceling the
+prefetch/discarding its cache result cannot retract an already-sent DNS query.
+These GETs carry no username/password or login body. This disclosure is the
+explicit tradeoff of the existing prefetch policy; no new toggle/UI was added.
+
+A first HTTP response, success, cancellation or ineligible transport failure discards
 the speculative answer and cancels/joins pending prefetch. A healthy login below
-one second makes zero DNS requests. Only a real CanRecover failure consumes the
-prefetch result and commits a new answer to the five-minute cache. If that race
+one second makes zero DNS requests. Only a proven-unsent eligible failure with a
+usable peer consumes the prefetch result and commits a new answer to the
+five-minute cache. If that race
 already failed, it is not repeated. If prefetch never started, ordinary bounded
 recovery does the lookup. HTTP response headers cancel in-flight prefetch even
 while the initial curl is still reading its body. The monitor is joined before
 LoginRecovery.Send exits.
 
-A failing cached answer set is evicted. If its retry remains CanRecover, the
-same recovery may perform one fresh lookup and a final request within the same
+A failing cached answer set is evicted. If its retry remains proven-unsent and
+eligible (including conditional alternate-peer timeout), the same recovery may
+perform one fresh lookup and a final request within the same
 deadline. Fresh-answer failure never recurses. Only answers are shared across
 logins; recovery eligibility/cancellation are per login. No cache-first preference
 hint was added: system DNS remains first, with the requested prefetch supplying
 latency overlap without changing the next login's initial transport policy.
+If a cached set contains only the already failed peer, it is evicted/refetched
+once without issuing a redundant credential request. A fresh set containing
+only failed peers ends recovery. Cache invalidation retains the original answer
+reference even when the retry uses a filtered address subset.
 
 `[LoginRecovery]` records contain hostname, fixed stage/reason, provider winner
 and elapsed milliseconds, exit/HTTP code and connection/upload metrics. They
@@ -150,11 +184,20 @@ checks plus the actual async presentation wrapper with a fake dispatcher for
 exit during action/render/minimum wait and generic timeout text/four-second
 minimum. These are method-level checks, not a Windows WPF executable build.
 
-Validation result for the final five-second cap: full run.py exit 0, **175 PASS**
-records, including both .NET 4.8 compilation checks. Environment: .NET SDK
-8.0.422/Roslyn, .NET 8.0.28 runtime/references, .NET Framework reference assemblies
-4.8 package 1.0.3, and Linux curl 8.5.0. A response arriving after two seconds is
-explicitly tested to succeed under the new shared five-second cap.
+The 1.4.41 additions exercise a real slow HTTPS response after a 3-second first
+failure/near-budget DoH; the prefetch reserve; empty/spoofed/invalid remote_ip;
+same/different peers on exit 28/35/60; cached same-peer eviction; native TLS-stall
+recovery with one verified POST; killed-process cancellation; inherited stdout/
+stderr pipe handles; and a retained live process blocking credentials until
+confirmed exit. The shared five-second race cap and all earlier checks remain.
+
+Validation: the full run.py exits 0 with **198 PASS** records, including both
+production .NET Framework 4.8 compilation checks. Environment: .NET SDK
+8.0.422/Roslyn, .NET 8.0.28 runtime/references, reference assemblies net48 package
+1.0.3 and Linux curl 8.5.0. Native curl can report zero time_connect despite an
+accepted loopback TCP socket; the native test accepts that existing CanRecover
+case too, while separate deterministic tests cover positive-connect alternate-
+peer gating. No TCP-only timing is treated as evidence of a sent HTTPS POST.
 
 ## Manual Windows checklist / verification limits
 
@@ -162,10 +205,17 @@ explicitly tested to succeed under the new shared five-second cap.
   The packaged binary is unavailable here, so verify the final build with
   `curl64.exe --version`. Confirm its -w trailer on exit 6/7/35 and multi-address
   comma-separated --resolve support (curl >= 7.59), plus verbose connected/TLS
-  milestones on that Windows build.
+  milestones and remote_ip on that Windows build.
 - With a test hosts entry targeting an unreachable/wrong IP, verify recovery
   sends exactly one POST. A certificate for another domain must still be rejected
   after fallback. Cancel/exit during DoH must leave no curl child process.
+- Verify same-IP DoH answers skip the retry, and a TCP-accepted/TLS-stalled
+  poisoned address can recover only via a different public peer with zero sent
+  indicators. Exercise inherited pipe handles and AV-denied Kill on Windows:
+  cleanup must return within the bounded grace and credentials must stay blocked
+  until process exit is confirmed. Linux tests cover real ordinary Kill/pipe
+  inheritance and inject a retained live process to test that guard; they do not
+  reproduce antivirus refusal.
 - Linux native curl tests and .NET 4.8 reference compilation do not execute the
   protected single-file Windows package, Windows certificate backend or WPF
   dispatcher. These Windows smoke checks remain outstanding.

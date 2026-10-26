@@ -227,6 +227,7 @@ class Program
             ControllerChecks.Run();
             RegressionChecks.Run();
             PrefetchChecks.Run();
+            ImprovementChecks.Run(certificates);
         }
     }
 }

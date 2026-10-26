@@ -199,8 +199,10 @@ static class RegressionChecks
         {
             var timed = CurlHelper.ExecuteLocal(CurlHelper.BuildLoginArgs("https://127.0.0.1:" + stall.Port + "/", "POST", "", "test", null, 3500), 4000, CancellationToken.None);
             Check(timed.ExitCode == 28 && timed.ConnectSeconds > 0 && timed.TlsSeconds == 0 && timed.MetricsKnown
-                && !timed.MayHaveBeenSent && !timed.CanRecover, "real TLS handshake stall allows only next-host failover");
-            Failover(Fails(new LoginRecovery(new StubTransport { Handler = resolve => timed }, EmptyDns, null), "https://login.test/"), true);
+                && !timed.MayHaveBeenSent && !timed.CanRecover && timed.CanResolveAlternatePeer,
+                "real TLS handshake stall is unsent and requires a different peer for same-host recovery");
+            Failover(Fails(new LoginRecovery(new StubTransport { Handler = resolve => timed },
+                new LoginDohCache((host, timeout, token) => new string[0]), null), "https://login.test/"), true);
         }
     }
     sealed class ManagedFailureTransport : ILoginTransport
