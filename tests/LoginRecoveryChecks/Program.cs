@@ -235,6 +235,7 @@ class Program
                 && logs.Any(line => line.Contains("stage=http-return")),
                 "diagnostics record recovery guards, DNS results and HTTP bypass");
             ControllerChecks.Run();
+            DnsFailureChecks.Run(certificates);
             RegressionChecks.Run();
             PrefetchChecks.Run();
             ImprovementChecks.Run(certificates);

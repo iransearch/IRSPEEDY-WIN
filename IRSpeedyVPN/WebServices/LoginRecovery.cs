@@ -62,11 +62,17 @@ namespace IRSpeedyVPN.WebServices
         // are never evidence that it is safe to repeat a credential POST.
         internal bool MayHaveBeenSent => !MetricsKnown || UploadedBytes > 0 || HttpCode > 0
             || Redirects != 0 || TlsSeconds > 0 || PretransferSeconds > 0;
+        // Bundled Windows curl can report positive time_pretransfer on exit 6
+        // without resolving/connecting. Only complete DNS-stage evidence can
+        // override that conservative signal; callers apply this proof to HTTPS.
+        internal bool DefinitelyNotSent => !Unavailable && MetricsKnown && ExitCode == 6
+            && ConnectSeconds == 0 && TlsSeconds == 0 && UploadedBytes == 0
+            && HttpCode == 0 && Redirects == 0 && RemoteIp == null;
         // The all-zero TLS proof is specific to HTTPS. Retain the previous
         // conservative exit-code guard when a caller supplies a plain HTTP URL.
-        internal bool MayHaveBeenSentFor(bool https) => MayHaveBeenSent || (!https
+        internal bool MayHaveBeenSentFor(bool https) => (MayHaveBeenSent && !(https && DefinitelyNotSent)) || (!https
             && (ExitCode == 52 || ExitCode == 55 || ExitCode == 56 || (ExitCode == 28 && ConnectSeconds > 0)));
-        internal bool CanRecover => !Unavailable && !MayHaveBeenSent &&
+        internal bool CanRecover => !Unavailable && (!MayHaveBeenSent || DefinitelyNotSent) &&
             (ExitCode == 6 || ExitCode == 7 || ExitCode == 35 || ExitCode == 60
                 || (ExitCode == 28 && ConnectSeconds == 0));
         // This only authorizes resolving. A retry additionally requires a public
@@ -79,7 +85,8 @@ namespace IRSpeedyVPN.WebServices
             + " upload=" + UploadedBytes.ToString("R", CultureInfo.InvariantCulture)
             + " pretransfer=" + PretransferSeconds.ToString("R", CultureInfo.InvariantCulture)
             + " redirects=" + Redirects + " unavailable=" + Unavailable
-            + " mayHaveBeenSent=" + MayHaveBeenSent + " canRecover=" + CanRecover
+            + " mayHaveBeenSent=" + MayHaveBeenSent + " definitelyNotSent=" + DefinitelyNotSent
+            + " canRecover=" + CanRecover
             + " canResolveAlternatePeer=" + CanResolveAlternatePeer
             + " remoteIpKnown=" + (RemoteIp != null);
     }
@@ -191,6 +198,7 @@ namespace IRSpeedyVPN.WebServices
                 return first;
             }
             Log(context, target.Host, "stage=recovery-decision https=" + (target.Scheme == Uri.UriSchemeHttps)
+                + " effectiveMayHaveBeenSent=" + first.MayHaveBeenSentFor(target.Scheme == Uri.UriSchemeHttps)
                 + " literalHost=" + IPAddress.TryParse(target.Host, out _)
                 + " recoveryAvailable=" + context.RecoveryAvailable(target.Host)
                 + " remainingMs=" + deadline.RemainingMs + " lookupBudgetMs=" + deadline.LookupBudgetMs
@@ -275,7 +283,7 @@ namespace IRSpeedyVPN.WebServices
                 // credential bodies, headers, or arbitrary resolver error text.
                 throw new LoginTransportException("Initial: " + first.Summary + "; recovery: "
                     + (second == null ? ex.GetType().Name : second.Summary + "; " + ex.GetType().Name),
-                    second != null && second.MayHaveBeenSent);
+                    second != null && second.MayHaveBeenSentFor(true));
             }
         }
         private LoginCurlResult Retry(Uri target, string url, string method, string headers, string body,

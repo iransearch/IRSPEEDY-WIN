@@ -1,12 +1,11 @@
-# Windows login recovery (1.4.42)
+# Windows login recovery (1.4.44)
 
-Baseline: `63ed3d2a5b2d3a686f4490bd26e73ea7c408288b` (1.4.41).
-The source confirmed pending-process handles were pruned only before another
-credential attempt. If a process exited with no later login, its static registry
-entry/handle remained for the application lifetime. This release gives that
-registry independent cleanup and explicit shutdown ownership. The previous
-three-second POST reserve, bounded native waits, remote_ip filtering, HTTPS
-replay rules, managed classification and exit-time UI guards remain.
+Baseline: `e11c1cd613e28e607e24b653f914f015f4520c53` (1.4.43).
+The Windows 8.21.0 curl log showed exit 6 with complete metrics, zero
+connect/TLS/upload/HTTP/redirects, no remote_ip, but time_pretransfer=0.017777
+(or 0.014752). The conservative pretransfer guard blocked both DoH recovery
+and next-host failover. This release adds a narrow DNS-stage proof applied
+only to HTTPS decisions; it preserves the raw conservative metric flag.
 The existing generic UI message is `ارتباط با سرور برقرار نیست`.
 
 The four API endpoints retain their sequential order, last-good preference,
@@ -30,7 +29,19 @@ For HTTPS, possible sending is determined only by:
     || TlsSeconds > 0 || PretransferSeconds > 0
 ```
 
-Missing/invalid metrics fail closed, including positive submillisecond values.
+`MayHaveBeenSent` retains this raw rule. For HTTPS only, `DefinitelyNotSent`
+can override it when **all** of these hold: curl is available, MetricsKnown,
+exit 6, zero connect/TLS/upload/HTTP/redirects and no remote_ip. Positive
+pretransfer alone cannot defeat this complete DNS-failure proof. The same
+HTTPS-aware decision is used for DoH eligibility and final Failure()/exception
+classification, including a failed recovery curl. Plain HTTP never applies the
+override. Exits 7/35/60/28/52/55/56 do not gain an exception for positive
+pretransfer. Unknown/partial metrics or any contradictory connection/sending
+indicator still close the override. A possibly-sent second attempt is never
+cleared by proof belonging to the initial attempt.
+
+Missing/invalid metrics fail closed, including positive submillisecond values
+outside that narrow DNS-stage exception.
 A completed TCP connection alone does not prove a POST reached an HTTPS server.
 Known-zero TLS/pretransfer/upload/HTTP/redirect indicators permit next-host
 failover on handshake stalls/resets, including exit 28/52/55/56. Same-host DoH
@@ -257,3 +268,22 @@ exits with an HTTP code; controller events distinguish invalid/null responses,
 HTTP policy and replay-blocking transport failures. No credentials, response
 bodies, raw curl output or headers are logged. This release only adds diagnostics;
 retry and response handling policies are unchanged.
+
+## 1.4.44 DNS-stage regression checks
+
+The exact captured Windows trailer is parsed, then used before a real native
+curl HTTPS retry against a certificate-verified loopback server (one POST).
+Negative cases independently set unknown metrics, TCP, TLS, upload, HTTP,
+redirects, peer, unavailable curl, partial trailer and other exit codes.
+Production Failure() plus the extracted production controller are exercised
+with no DoH answer and a DNS-failed recovery curl, permitting exactly one
+next-host failover. A posted recovery failure remains replay-blocking. Logs
+include raw mayHaveBeenSent, definitelyNotSent and HTTPS-aware
+effectiveMayHaveBeenSent without credentials. No DNS-provider budgets,
+UI, VPN, Shield, routing or Core behavior was changed.
+
+Manual Windows check: repeat offline login with the bundled curl and verify
+exit 6 / positive pretransfer now logs definitelyNotSent=True,
+effectiveMayHaveBeenSent=False, starts Google/Cloudflare, and permits the
+next host after bounded DNS failure. Reconnect and verify normal successful
+login; no Windows packaged build was executed by the Linux harness.

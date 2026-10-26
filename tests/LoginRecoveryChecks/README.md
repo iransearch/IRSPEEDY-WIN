@@ -33,3 +33,8 @@ process/pipe cleanup and fail-closed credential blocking on unconfirmed exit.
 owner handoff, live-process retention and timer cleanup/re-arming. Child-process
 probes exercise the actual ProcessExit hook and explicit shutdown, including late
 registrations, without resetting the production shutdown latch.
+
+`DnsFailureChecks.cs` reproduces the Windows exit-6 positive-pretransfer trailer,
+checks each contradictory indicator/unknown metrics and HTTPS-only scoping,
+executes a verified native HTTPS POST after recovery, and checks actual
+Failure()/controller failover with failed DoH and a DNS-failed recovery attempt.
