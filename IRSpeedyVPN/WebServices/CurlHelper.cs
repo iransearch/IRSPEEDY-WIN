@@ -678,7 +678,7 @@ namespace IRSpeedyVPN.WebServices
                 if (stdout != null) process.OutputDataReceived -= stdout;
                 if (stderr != null) process.ErrorDataReceived -= stderr;
                 CloseCurlReaders(process);
-                if (!IsPendingStop(process)) process.Dispose();
+                ReleaseCurlProcess(process);
             }
         }
 

@@ -208,6 +208,7 @@ namespace IRSpeedyVPN
             if (ExitCleanupStarted) return;
             ExitCleanupStarted = true;
             loginApplicationExit.Cancel();
+            CurlHelper.ShutdownPendingCurlStops();
             VpnTimeZone.EndConnection();
             IsEnabled = false;
             IsUserLogin = false;

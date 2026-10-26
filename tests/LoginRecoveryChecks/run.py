@@ -72,7 +72,7 @@ with tempfile.TemporaryDirectory(prefix='login-recovery-') as directory:
     path = Path(directory)
     shim = path/'dns_fail.so'
     subprocess.run(['cc','-shared','-fPIC',str(here/'dns_fail.c'),'-ldl','-o',str(shim)],check=True)
-    test_env = dict(os.environ, IRSPEEDY_TEST_DNS_SHIM=str(shim))
+    test_env = dict(os.environ, IRSPEEDY_TEST_DNS_SHIM=str(shim), IRSPEEDY_TEST_DOTNET=str(Path(dotnet).resolve()))
     (path/'ControllerFixture.cs').write_text(fixture)
     output = path/'checks.dll'
     command = [dotnet, compiler, '-nologo', '-langversion:7.3', '-target:exe', '-out:'+str(output)]

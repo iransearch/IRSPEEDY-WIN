@@ -71,7 +71,13 @@ namespace IRSpeedyVPN.WebServices
     internal sealed partial class CurlHelper
     {
         internal static void SetAvailabilityForTest(bool unavailable) { _curlUnavailable = unavailable; }
-        internal static void RememberPendingForTest(System.Diagnostics.Process process) { RememberPendingStop(process); }
+        internal static void RememberPendingForTest(System.Diagnostics.Process process)
+        { RememberPendingStop(process); ReleaseCurlProcess(process); }
+        internal static void RememberOwnedForTest(System.Diagnostics.Process process) { RememberPendingStop(process); }
+        internal static void ReleaseOwnerForTest(System.Diagnostics.Process process) { ReleaseCurlProcess(process); }
+        internal static int PendingCountForTest { get { lock (PendingStopGate) return PendingStops.Count; } }
+        internal static bool PendingTimerForTest { get { lock (PendingStopGate) return pendingStopTimer != null; } }
+        internal static Timer PendingTimerInstanceForTest { get { lock (PendingStopGate) return pendingStopTimer; } }
         internal static void ExecuteCommandForTest(string executable, string args, int timeout, CancellationToken cancellation)
         { bool started; ExecuteCurl(executable, args, timeout, out started, cancellation); }
         // Linux executes the installed curl. PE/runtime selection remains Windows

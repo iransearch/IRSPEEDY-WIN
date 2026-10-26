@@ -28,3 +28,8 @@ The runner also executes existing password re-login and loading-stage checks.
 `ImprovementChecks.cs` covers the three-second POST reserve with slow loopback
 HTTPS, alternate-peer remote_ip gating, cached peer filtering, bounded native
 process/pipe cleanup and fail-closed credential blocking on unconfirmed exit.
+
+`PendingStopChecks.cs` checks real handle closure without a subsequent login,
+owner handoff, live-process retention and timer cleanup/re-arming. Child-process
+probes exercise the actual ProcessExit hook and explicit shutdown, including late
+registrations, without resetting the production shutdown latch.

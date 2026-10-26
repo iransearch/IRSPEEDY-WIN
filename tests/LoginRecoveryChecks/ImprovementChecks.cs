@@ -143,6 +143,7 @@ static class ImprovementChecks
             }
         }
         using (var pending = Process.Start(new ProcessStartInfo("/bin/sleep", "30") { UseShellExecute = false }))
+        using (var monitor = Process.GetProcessById(pending.Id))
         {
             CurlHelper.RememberPendingForTest(pending);
             var t = new StubTransport { Handler = resolve => new LoginCurlResult { HttpCode = 200 } };
@@ -152,7 +153,7 @@ static class ImprovementChecks
                 try { Send(t, dns); throw new Exception("uncertain curl allowed a later POST"); }
                 catch (LoginTransportTimeoutException) { Check(t.Calls == 0, "unconfirmed curl termination blocks later credential attempts instead of releasing a second POST"); }
             }
-            finally { pending.Kill(); pending.WaitForExit(2000); CurlHelper.EnsureCredentialCurlStopped(); }
+            finally { monitor.Kill(); monitor.WaitForExit(2000); CurlHelper.EnsureCredentialCurlStopped(); }
             Check(Send(t, dns).HttpCode == 200 && t.Calls == 1,
                 "credentials resume only after the retained process handle confirms exit");
         }

@@ -53,8 +53,10 @@ class Program
     { try { action(); } catch (LoginTransportException ex) { return ex; } throw new Exception("expected transport failure"); }
     static void Canceled(Action action)
     { try { action(); } catch (OperationCanceledException) { return; } throw new Exception("expected cancellation"); }
-    static void Main()
+    static void Main(string[] args)
     {
+        if (args.Length == 2 && (args[0] == "--pending-exit-probe" || args[0] == "--pending-shutdown-probe"))
+        { PendingStopChecks.Probe(args[0], args[1]); return; }
         using (var certificates = new Certificates())
         using (var good = new LocalServer(certificates.Correct))
         using (var wrong = new LocalServer(certificates.Wrong))
@@ -228,6 +230,7 @@ class Program
             RegressionChecks.Run();
             PrefetchChecks.Run();
             ImprovementChecks.Run(certificates);
+            PendingStopChecks.Run();
         }
     }
 }

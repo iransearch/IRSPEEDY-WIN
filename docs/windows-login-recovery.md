@@ -1,10 +1,12 @@
-# Windows login recovery (1.4.41)
+# Windows login recovery (1.4.42)
 
-Baseline: `6f84d86596c1eeff1538677fec516d4e1a2d9458` (1.4.40).
-The source confirmed the one-second POST reserve and unbounded process/pipe
-cleanup waits. This update increases the reserve, bounds cleanup and uses
-validated remote_ip to avoid retrying failed peers. The previous HTTPS replay,
-managed classification, static curl availability and exit-time UI guards remain.
+Baseline: `63ed3d2a5b2d3a686f4490bd26e73ea7c408288b` (1.4.41).
+The source confirmed pending-process handles were pruned only before another
+credential attempt. If a process exited with no later login, its static registry
+entry/handle remained for the application lifetime. This release gives that
+registry independent cleanup and explicit shutdown ownership. The previous
+three-second POST reserve, bounded native waits, remote_ip filtering, HTTPS
+replay rules, managed classification and exit-time UI guards remain.
 The existing generic UI message is `ارتباط با سرور برقرار نیست`.
 
 The four API endpoints retain their sequential order, last-good preference,
@@ -67,6 +69,22 @@ and later credential attempts fail closed until exit is confirmed. No reaper
 thread is created, PID reuse cannot release the guard, and unavailable-curl
 managed fallback cannot bypass it. Killing and draining do not authorize replay
 or consume a new network-request budget; termination grace is cleanup time.
+
+Pending-stop handle ownership (1.4.42): ExecuteCurl first detaches stdout/stderr
+callbacks and closes its readers, then hands the process to the pending registry.
+A single shared ThreadPool timer, armed only while entries remain, checks for
+exit every second. Exited, handed-off processes are removed and Disposed without
+any subsequent login. The timer is itself Disposed when the registry empties;
+a later pending stop re-arms it. A live process is retained, and an executing
+owner's process is never disposed by that timer before handoff. Credential checks
+also prune, but are no longer the sole cleanup path.
+
+Notify_Exit calls ShutdownPendingCurlStops after canceling login. ProcessExit
+and DomainUnload hooks provide idempotent backstops. Shutdown stops/disposes the
+timer and releases handed-off handles; owners still executing Dispose in their
+own finally. Late timeout registrations cannot repopulate the registry, and a
+shutdown latch continues to block credentials even after the registry is empty.
+No wait-for-exit, per-process polling task or dedicated cleanup thread is added.
 
 ## Managed fallback
 
@@ -191,13 +209,21 @@ recovery with one verified POST; killed-process cancellation; inherited stdout/
 stderr pipe handles; and a retained live process blocking credentials until
 confirmed exit. The shared five-second race cap and all earlier checks remain.
 
-Validation: the full run.py exits 0 with **198 PASS** records, including both
+The 1.4.41 full run.py exited 0 with **198 PASS** records, including both
 production .NET Framework 4.8 compilation checks. Environment: .NET SDK
 8.0.422/Roslyn, .NET 8.0.28 runtime/references, reference assemblies net48 package
 1.0.3 and Linux curl 8.5.0. Native curl can report zero time_connect despite an
 accepted loopback TCP socket; the native test accepts that existing CanRecover
 case too, while separate deterministic tests cover positive-connect alternate-
 peer gating. No TCP-only timing is treated as evidence of a sent HTTPS POST.
+
+The 1.4.42 regression checks inspect real SafeProcessHandle.IsClosed to verify
+independent cleanup without another POST; owner handoff; retaining live processes;
+timer disposal/re-arming; the actual ProcessExit hook in a child executable; and
+explicit shutdown with active owners and late registration. Shutdown probes run
+in separate executables so the real fail-closed latch is never reset for tests.
+The full 1.4.42 run.py exits 0 with **205 PASS** records, including both .NET
+Framework 4.8 compilation checks; no normal loading/replay/DNS behavior changed.
 
 ## Manual Windows checklist / verification limits
 
