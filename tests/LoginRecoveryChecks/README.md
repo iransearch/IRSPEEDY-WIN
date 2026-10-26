@@ -24,6 +24,8 @@ racing, invalid winners, cancel/join cleanup, speculative cache lifecycle and
 credential serialization. `ui_lifecycle.py` executes the actual presentation
 wrapper against a fake dispatcher for shutdown and generic timeout errors.
 The runner also executes existing password re-login and loading-stage checks.
+The production Login2 API fixture checks the 20-second endpoint deadline inside
+the 45-second login flow; posted or ambiguous failures still block failover.
 
 `ImprovementChecks.cs` covers the three-second POST reserve with slow loopback
 HTTPS, alternate-peer remote_ip gating, cached peer filtering, bounded native

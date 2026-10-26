@@ -118,7 +118,7 @@ namespace IRSpeedyVPN.WebServices
             var curlResp = loginContext == null
                 ? _curl.Send(url, method, headers.ToString(), body, null, timeoutSeconds, resolveOverride)
                 : _curl.SendLogin(url, method, headers.ToString(), body,
-                    Math.Min(8000, (timeoutSeconds ?? 8) * 1000), loginContext);
+                    Math.Min(20000, (timeoutSeconds ?? 20) * 1000), loginContext);
             var rawResponse = curlResp.Body;
             var httpCodeInt = curlResp.HttpCode;
 

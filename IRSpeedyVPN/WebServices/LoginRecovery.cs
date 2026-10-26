@@ -21,7 +21,7 @@ namespace IRSpeedyVPN.WebServices
         internal readonly CancellationToken Cancellation;
         internal readonly string Id = Guid.NewGuid().ToString("N");
         internal LoginDeadline Endpoint { get; private set; }
-        internal LoginNetworkContext(CancellationToken cancellation, int budgetMs = 30000)
+        internal LoginNetworkContext(CancellationToken cancellation, int budgetMs = 45000)
         { Cancellation = cancellation; this.budgetMs = budgetMs; }
         internal int RemainingMs => (int)Math.Max(0, budgetMs - clock.ElapsedMilliseconds);
         internal void Check()

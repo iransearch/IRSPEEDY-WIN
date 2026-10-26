@@ -22,8 +22,12 @@ class ApiProgram
             };
             var response = controller.Login2("credential-must-not-be-logged", "password-must-not-be-logged");
             if (response.StatusCode != code || calls != 1) throw new Exception("empty HTTP rejection replayed");
+            if (RestHelper.LastTimeoutSeconds != 20 || contexts[contexts.Count - 1].Endpoint.RemainingMs < 19000
+                || contexts[contexts.Count - 1].RemainingMs < 44000)
+                throw new Exception("production login endpoint/flow budgets are not 20/45 seconds");
             Console.WriteLine("PASS complete production Login2 keeps empty-body " + (int)code + " final");
         }
+        Console.WriteLine("PASS production Login2 supplies a 20-second endpoint inside a 45-second flow");
         if (ReferenceEquals(contexts[0], contexts[1]) || !contexts[0].BeginRecovery("same.test") || !contexts[1].BeginRecovery("same.test"))
             throw new Exception("Login2 shared recovery state");
         Console.WriteLine("PASS complete production Login2 allocates independent per-login state");

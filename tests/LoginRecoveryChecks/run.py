@@ -34,16 +34,17 @@ namespace IRSpeedyVPN.WebServices {
  class RestHelper { internal string BaseAddress; }
  class BaseHttpResponse<T> { internal HttpStatusCode StatusCode; }
  class ControllerHarness {
- const int LoginRequestTimeoutSeconds=10,LoginEndpointTimeoutSeconds=8;
+ const int LoginRequestTimeoutSeconds=10,LoginEndpointTimeoutSeconds=20;
  readonly List<RestHelper> _services=new List<RestHelper>{new RestHelper{BaseAddress="https://first.test/"},new RestHelper{BaseAddress="https://second.test/"}};
  int _index; static string _lastGoodBaseUrl;
  internal BaseHttpResponse<object> Run(Func<RestHelper,int?,BaseHttpResponse<object>> call,LoginNetworkContext context)
- => ExecuteWithFailover("test","Login",call,30,true,context);
+ => ExecuteWithFailover("test","Login",call,45,true,context);
 '''+controller[start:end]+get_base+'''} }
 class ControllerChecks {
  internal static void Run() {
   int calls=0;
   var result=new IRSpeedyVPN.WebServices.ControllerHarness().Run((host,timeout)=>{
+   if(timeout!=20)throw new Exception("controller did not reserve 20 seconds for a fresh login endpoint");
    if(++calls==1)throw new IRSpeedyVPN.WebServices.LoginTransportException("initial 7; retry 60",false);
    return new IRSpeedyVPN.WebServices.BaseHttpResponse<object>{StatusCode=HttpStatusCode.OK};
   },new IRSpeedyVPN.WebServices.LoginNetworkContext(default(System.Threading.CancellationToken)));

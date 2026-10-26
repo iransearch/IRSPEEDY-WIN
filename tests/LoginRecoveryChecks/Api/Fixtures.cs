@@ -50,11 +50,15 @@ namespace IRSpeedyVPN.WebServices
     sealed class RestHelper
     {
         internal static Func<string, object, LoginNetworkContext, object> Handler;
+        internal static int? LastTimeoutSeconds;
         internal readonly string BaseAddress;
         internal RestHelper(string address) { BaseAddress = address; }
         internal BaseHttpResponse<T> SendRequest<T>(string path, object data, IEncryptor encryptor, IDecryptor decryptor,
             string token = null, int? timeoutSeconds = null, bool skipDoh = false, LoginNetworkContext loginContext = null)
-            => (BaseHttpResponse<T>)Handler(BaseAddress, data, loginContext);
+        {
+            LastTimeoutSeconds = timeoutSeconds;
+            return (BaseHttpResponse<T>)Handler(BaseAddress, data, loginContext);
+        }
     }
 #endif
 }

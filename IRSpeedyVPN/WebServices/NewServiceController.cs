@@ -24,8 +24,8 @@ namespace IRSpeedyVPN.WebServices
         // Network budget shared by the endpoints of each authentication flow.
         // A separate settings request may follow login when its response omits settings.
         private const int LoginRequestTimeoutSeconds = 10;
-        private const int SlowNetworkLoginBudgetSeconds = 30;
-        private const int LoginEndpointTimeoutSeconds = 8;
+        private const int SlowNetworkLoginBudgetSeconds = 45;
+        private const int LoginEndpointTimeoutSeconds = 20;
         // Secondary settings call is kept short so total login work stays fast.
         private const int GetSettingsTimeoutSeconds = 4;
 

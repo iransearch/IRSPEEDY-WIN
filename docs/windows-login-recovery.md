@@ -1,4 +1,4 @@
-# Windows login recovery (1.4.47 completion trial)
+# Windows login recovery (1.4.48 extended completion budget)
 
 Baseline: `a97564b3209539e48a6dd355ba38a4feedfe992f` (1.4.46).
 The supplied 1.4.45 log confirmed a Google winner, valid public A answers and
@@ -6,9 +6,10 @@ native --resolve connection/TLS success. Both credential attempts received HTTP
 200 but ended with curl exit 28; no system/next-host replay was attempted.
 The 1.4.46 log then showed HTTP/1.1 to 172.67.139.142, first byte below
 one second, around 68 KB received, and timeout on two separate user attempts.
-This release trials HTTP/1.1 plus Connection: close on native credential POSTs
-and records sanitized response framing/body-shape metadata. DoH-first order,
-deadlines, replay rules and TLS validation are unchanged.
+Version 1.4.47 trialed HTTP/1.1 plus Connection: close on native credential
+POSTs and recorded sanitized response framing/body-shape metadata. Version
+1.4.48 extends the login deadlines only; DoH-first order, replay rules and TLS
+validation are unchanged.
 
 This temporary verification build enables `CurlHelper.LoginDohFirstVerification`:
 HTTPS hostname logins first use the existing Google/Cloudflare DoH race/cache,
@@ -22,7 +23,7 @@ No UI setting or user-visible appearance changed.
 The existing generic UI message is `ارتباط با سرور برقرار نیست`.
 
 The four API endpoints retain their sequential order, last-good preference,
-30-second shared network deadline and 8-second endpoint limit. Normal loading
+45-second shared network deadline and 20-second endpoint limit. Normal loading
 keeps its four-second minimum and existing stages/appearance. Application exit
 cancels network/presentation waits and skips work on the closing window. VPN
 DNS racing, Shield, routing and Core are unchanged.
@@ -171,8 +172,8 @@ One lookup clock is capped at 5 seconds for the entire race, never 5 seconds per
 provider (the final requested cap replaces the earlier 2-second proposal).
 It is further capped by the host/login deadline minus a **3-second POST
 reserve**, in ordinary recovery, cache refresh and prefetch alike. After a
-3-second first attempt in an 8-second endpoint, a non-prefetched lookup gets
-at most about 2 seconds, leaving about 3 seconds for TLS, POST and response.
+3-second first attempt, a non-prefetched lookup gets at most 5 seconds inside
+the 20-second endpoint, leaving the remainder for TLS, POST and response.
 Scheduling, cleanup and another login's credential-gate queue can consume some
 of that remainder; it is a lookup-allocation reserve, not a deadline extension.
 On completion, cancellation or expiry, the resolver cancels and joins
@@ -434,3 +435,22 @@ downloadVsLength, bodyKind and the existing transfer metrics. Report whether the
 same --resolve login completes with exit=0, or still times out. Server/CDN framing
 may still require correction; this trial does not silently accept incomplete HTTP.
 No protected single-file Windows WPF package was built or executed here.
+
+## 1.4.48 extended login deadline
+
+The 1.4.47 Windows log showed verified TLS and an uploaded credential POST,
+followed by HTTP 200, a chunked application/json response and approximately
+68 KB downloaded. curl timed out at the previous eight-second endpoint limit;
+the JSON body was not parseable at that point. Connection: close did not make
+that chunked transfer complete. A separate user login also hit the endpoint
+deadline without a completed curl result. Neither failure authorizes a second
+POST through system DNS or another API host.
+
+Login2 now allows up to 20 seconds per API endpoint and 45 seconds across its
+sequential endpoints. The production REST login transport uses the same 20-second
+cap, and a standalone login context defaults to 45 seconds. Lookup racing still
+has a five-second maximum and a three-second POST reserve. The 3-second initial
+connect timeout and every other flow's timeout remain unchanged. Cancellation,
+certificate validation, sequential credential gate and replay protection are
+unchanged. This is a bounded test for slow completion, not proof that the CDN
+will send the terminating chunk; a posted timeout remains a final failure.
