@@ -345,6 +345,7 @@ namespace IRSpeedyVPN.WebServices
                         // replayed on the next API host either. HTTP responses keep
                         // their existing policy (including an explicit HTTP 500).
                         if (ex is OperationCanceledException
+                            || ex is LoginTransportTimeoutException
                             || (ex is LoginTransportException sent && sent.MayHaveBeenSent)) throw;
 
                         if (!allowFailover)

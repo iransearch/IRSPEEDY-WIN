@@ -7,6 +7,7 @@ from pathlib import Path
 import subprocess
 import sys
 import tempfile
+import os
 
 root = Path(__file__).resolve().parents[2]
 here = Path(__file__).resolve().parent
@@ -65,10 +66,13 @@ class ControllerChecks {
 }
 '''
 
-files = [source/name for name in ['LoginRecovery.cs','CurlHelper.Login.cs','CurlHelper.cs','HttpFallback.cs','DohResolver.cs']]
+files = [source/name for name in ['LoginRecovery.cs','LoginPrefetch.cs','CurlHelper.Login.cs','CurlHelper.cs','HttpFallback.cs','DohResolver.cs']]
 files.append(root/'IRSpeedyVPN/Common/LogPolicy.cs')
 with tempfile.TemporaryDirectory(prefix='login-recovery-') as directory:
     path = Path(directory)
+    shim = path/'dns_fail.so'
+    subprocess.run(['cc','-shared','-fPIC',str(here/'dns_fail.c'),'-ldl','-o',str(shim)],check=True)
+    test_env = dict(os.environ, IRSPEEDY_TEST_DNS_SHIM=str(shim))
     (path/'ControllerFixture.cs').write_text(fixture)
     output = path/'checks.dll'
     command = [dotnet, compiler, '-nologo', '-langversion:7.3', '-target:exe', '-out:'+str(output)]
@@ -76,8 +80,8 @@ with tempfile.TemporaryDirectory(prefix='login-recovery-') as directory:
     command += [str(item) for item in files]+[str(item) for item in here.glob('*.cs')]+[str(path/'ControllerFixture.cs')]
     subprocess.run(command, check=True)
     (path/'checks.runtimeconfig.json').write_text('{"runtimeOptions":{"tfm":"net8.0","framework":{"name":"Microsoft.NETCore.App","version":"8.0.0"}}}')
-    subprocess.run([dotnet, str(output)], check=True)
-    api = [source/name for name in ['NewServiceController.cs','LoginRecovery.cs','BaseHttpResponse.cs','DefaultEncryptedResponse.cs','DefaultPlainResponse.cs']]
+    subprocess.run([dotnet, str(output)], check=True, env=test_env)
+    api = [source/name for name in ['NewServiceController.cs','LoginRecovery.cs','LoginPrefetch.cs','BaseHttpResponse.cs','DefaultEncryptedResponse.cs','DefaultPlainResponse.cs']]
     api += [here/'Fixtures.cs', here/'Api/Fixtures.cs', here/'Api/Program.cs']
     # Only the test bridge in Fixtures needs CurlHelper. Use the same actual
     # production transport files as the integration executable above.
@@ -97,3 +101,6 @@ with tempfile.TemporaryDirectory(prefix='login-recovery-') as directory:
             '-out:'+str(path/'api-net48.dll')] + ['-r:'+str(framework/(name+'.dll')) for name in references]
             + [str(item) for item in files+api_framework]+[str(here/'Fixtures.cs'),str(here/'Api/Fixtures.cs')],check=True)
         print('PASS complete production controller, REST serialization and transport wiring compile against .NET 4.8')
+    subprocess.run([sys.executable, str(root/'tests/PasswordReloginChecks/run.py'), dotnet, compiler, refs],check=True)
+    subprocess.run([sys.executable, str(root/'tests/LoginPresentationChecks/run.py'), dotnet, compiler, refs],check=True)
+    subprocess.run([sys.executable, str(here/'ui_lifecycle.py'), dotnet, compiler, refs],check=True)

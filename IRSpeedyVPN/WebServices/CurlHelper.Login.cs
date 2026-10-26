@@ -19,22 +19,25 @@ namespace IRSpeedyVPN.WebServices
             var result = recovery.Send(url, method, headers, body, timeoutMs, context);
             return new CurlResponse(result.Body, result.HttpCode);
         }
-        private sealed class LoginTransport : ILoginTransport
+        private sealed class LoginTransport : ILoginConnectTransport
         {
             private readonly CurlHelper owner;
             internal LoginTransport(CurlHelper owner) { this.owner = owner; }
             public LoginCurlResult Curl(string url, string method, string headers, string body,
                 string resolve, int timeoutMs, CancellationToken cancellation)
                 => owner.SendLoginAttempt(url, method, headers, body, resolve, timeoutMs, cancellation);
+            public LoginCurlResult CurlObserved(string url, string method, string headers, string body,
+                int timeoutMs, CancellationToken cancellation, LoginConnectProgress progress)
+                => owner.SendLoginAttempt(url, method, headers, body, null, timeoutMs, cancellation, progress);
             public LoginCurlResult Managed(string url, string method, string headers, string body,
                 int timeoutMs, CancellationToken cancellation)
             {
-                var response = HttpFallback.Send(url, method, headers, body, null, timeoutMs, cancellation);
+                var response = HttpFallback.Send(url, method, headers, body, null, timeoutMs, cancellation, loginRequest: true);
                 return new LoginCurlResult { Body = response.Body, HttpCode = response.HttpCode };
             }
         }
         internal LoginCurlResult SendLoginAttempt(string url, string method, string headers, string body,
-            string resolve, int timeoutMs, CancellationToken cancellation)
+            string resolve, int timeoutMs, CancellationToken cancellation, LoginConnectProgress progress = null)
         {
             cancellation.ThrowIfCancellationRequested();
             if (timeoutMs <= 100) throw new TimeoutException("Login attempt has no remaining budget.");
@@ -55,11 +58,20 @@ namespace IRSpeedyVPN.WebServices
                     int remainingMs = timeoutMs - (int)Math.Min(int.MaxValue, elapsed.ElapsedMilliseconds);
                     if (remainingMs <= 100) throw new TimeoutException("Login curl launch deadline expired.");
                     string args = BuildLoginArgs(url, method, headers, body, resolve, remainingMs - 100);
-                    var result = ExecuteCurl(candidate.Path, args, remainingMs, out started, cancellation);
+                    if (progress != null) args += " --verbose";
+                    var result = ExecuteCurl(candidate.Path, args, remainingMs, out started, cancellation,
+                        progress == null ? (Action)null : progress.Start,
+                        progress == null ? (Action<string>)null : progress.Observe);
                     _curlUnavailable = false;
                     return ParseLoginResult(result.Output, result.ExitCode);
                 }
-                catch (OperationCanceledException) { throw; }
+                catch (OperationCanceledException) { if (started) _curlUnavailable = false; throw; }
+                catch (TimeoutException)
+                {
+                    if (!started) throw;
+                    _curlUnavailable = false;
+                    throw new LoginTransportTimeoutException();
+                }
                 catch
                 {
                     if (started)
@@ -78,8 +90,7 @@ namespace IRSpeedyVPN.WebServices
             // BuildArgs retains the original URL, Host/SNI, certificate validation
             // and explicit --resolve. Login must not silently follow redirects:
             // metrics from a later connection cannot prove the first POST was unsent.
-            string args = BuildArgs(url, method, headers, body, null, null, resolve)
-                .Replace(" -sS -L ", " -sS ");
+            string args = BuildArgs(url, method, headers, body, null, null, resolve, followRedirects: false);
             string seconds = (timeoutMs / 1000d).ToString("0.###", CultureInfo.InvariantCulture);
             return args + " --noproxy \"*\" --connect-timeout "
                 + Math.Min(3d, timeoutMs / 1000d).ToString("0.###", CultureInfo.InvariantCulture)
@@ -110,16 +121,22 @@ namespace IRSpeedyVPN.WebServices
             => double.TryParse(ParseTrailingValue(output, marker), NumberStyles.Float, CultureInfo.InvariantCulture, out value)
                 && !double.IsNaN(value) && !double.IsInfinity(value) && value >= 0;
         private static string[] FetchLoginAddresses(string host, int timeoutMs, CancellationToken cancellation)
+            => LoginDohProviders.Resolve(host, timeoutMs, cancellation, FetchLoginProvider, LogHelper.WriteExLog);
+
+        private static string[] FetchLoginProvider(string url, int timeoutMs, CancellationToken cancellation)
         {
+            var elapsed = Stopwatch.StartNew();
             var response = new CurlHelper().SendLoginAttempt(
-                "https://8.8.8.8/resolve?type=A&name=" + Uri.EscapeDataString(host),
+                url,
                 "GET", "Accept: application/dns-json\r\n", null, null, timeoutMs, cancellation);
             // This GET contains no credentials. Managed fallback is still restricted
             // to curl launch failures, with the same caller-supplied deadline.
             if (response.Unavailable)
             {
-                var fallback = HttpFallback.Send("https://8.8.8.8/resolve?type=A&name=" + Uri.EscapeDataString(host),
-                    "GET", "Accept: application/dns-json\r\n", null, null, timeoutMs, cancellation);
+                int remainingMs = timeoutMs - (int)Math.Min(int.MaxValue, elapsed.ElapsedMilliseconds);
+                if (remainingMs <= 0) throw new TimeoutException("DoH provider deadline expired.");
+                var fallback = HttpFallback.Send(url,
+                    "GET", "Accept: application/dns-json\r\n", null, null, remainingMs, cancellation);
                 response.HttpCode = fallback.HttpCode; response.Body = fallback.Body;
             }
             if (response.HttpCode != 200) return new string[0];
@@ -129,7 +146,7 @@ namespace IRSpeedyVPN.WebServices
         {
             var root = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
             object status, answers;
-            if (root == null || !root.TryGetValue("Status", out status) || Convert.ToInt32(status) != 0
+            if (root == null || !root.TryGetValue("Status", out status) || status == null || Convert.ToString(status, CultureInfo.InvariantCulture) != "0"
                 || !root.TryGetValue("Answer", out answers)) return new string[0];
             var records = answers as IEnumerable;
             var values = new List<string>();

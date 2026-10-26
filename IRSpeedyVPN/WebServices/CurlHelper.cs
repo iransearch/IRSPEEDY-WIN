@@ -580,7 +580,9 @@ namespace IRSpeedyVPN.WebServices
             string arguments,
             int? timeoutMilliseconds,
             out bool processStarted,
-            CancellationToken cancellation = default(CancellationToken))
+            CancellationToken cancellation = default(CancellationToken),
+            Action started = null,
+            Action<string> stderrObserver = null)
         {
             processStarted = false;
             var processStopwatch = Stopwatch.StartNew();
@@ -609,7 +611,10 @@ namespace IRSpeedyVPN.WebServices
                 process.ErrorDataReceived += (sender, args) =>
                 {
                     if (args.Data != null)
+                    {
                         Interlocked.Add(ref stderrLength, args.Data.Length + 2);
+                        try { stderrObserver?.Invoke(args.Data); } catch { }
+                    }
                 };
 
                 cancellation.ThrowIfCancellationRequested();
@@ -617,6 +622,7 @@ namespace IRSpeedyVPN.WebServices
                     throw new InvalidOperationException("curl process could not be started.");
 
                 processStarted = true;
+                started?.Invoke();
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
@@ -630,7 +636,7 @@ namespace IRSpeedyVPN.WebServices
                     {
                         if (cancellation.IsCancellationRequested)
                         {
-                            try { process.Kill(); } catch { }
+                            try { process.Kill(); process.WaitForExit(); } catch { }
                             cancellation.ThrowIfCancellationRequested();
                         }
                         if (process.WaitForExit((int)Math.Min(50L, remainingMs))) { exited = true; break; }
@@ -645,7 +651,7 @@ namespace IRSpeedyVPN.WebServices
 
                 if (!exited)
                 {
-                    try { process.Kill(); }
+                    try { process.Kill(); process.WaitForExit(); }
                     catch { }
                     throw new TimeoutException("curl process did not exit before the timeout.");
                 }
@@ -998,10 +1004,11 @@ namespace IRSpeedyVPN.WebServices
             string body,
             string proxy,
             int? timeoutSeconds,
-            string resolveOverride)
+            string resolveOverride,
+            bool followRedirects = true)
         {
             var args = new StringBuilder();
-            args.Append(" -sS -L ");
+            args.Append(followRedirects ? " -sS -L " : " -sS ");
 
             bool isPost = string.Equals(method, "POST", StringComparison.OrdinalIgnoreCase);
             if (isPost)

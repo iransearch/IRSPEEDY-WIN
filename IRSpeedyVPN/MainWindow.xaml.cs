@@ -935,7 +935,7 @@ namespace IRSpeedyVPN
         }
         private async void RunLoginWithPresentation(Action action)
         {
-            if (loginPresentationActive) return;
+            if (loginPresentationActive || loginApplicationExit.IsCancellationRequested) return;
             loginPresentationActive = true;
             loginServerListPending = false;
             loginServerListPrepared = false;
@@ -947,26 +947,44 @@ namespace IRSpeedyVPN
             HeaderDivider.Visibility = Visibility.Collapsed;
             txtVersion.Visibility = Visibility.Collapsed;
             // Let the first layout/render complete before starting the minimum timer.
-            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
             var visibleTime = Stopwatch.StartNew();
-            try { await System.Threading.Tasks.Task.Run(action); }
-            catch (Exception ex) { LogHelper.WriteLog(ex); ShowMessage("ارتباط با سرور برقرار نیست"); }
+            try
+            {
+                await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ContextIdle);
+                visibleTime.Restart();
+                loginApplicationExit.Token.ThrowIfCancellationRequested();
+                await System.Threading.Tasks.Task.Run(action);
+            }
+            catch (Exception ex)
+            {
+                LogHelper.WriteLog(ex);
+                if (!loginApplicationExit.IsCancellationRequested) ShowMessage("ارتباط با سرور برقرار نیست");
+            }
             finally
             {
-                await uCLoginLoading.FinishStagesAsync(
-                    IsUserLogin && loginServerListPending);
-                int remaining = Math.Max(0, 4000 - (int)visibleTime.ElapsedMilliseconds);
-                if (remaining > 0) await System.Threading.Tasks.Task.Delay(remaining);
-                await PrepareLoginResultAsync();
-                await uCLoginLoading.FadeOutAsync();
-                uCLoginLoading.Visibility = Visibility.Collapsed;
-                HideLoading();
-                loginPresentationActive = false;
-                StartPostLoginChecks();
-                TransitionBox.IsEnabled = true;
-                txtVersion.Visibility = ReferenceEquals(TransitionBox.Content, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
-                panelHeaderIcons.Visibility = (ReferenceEquals(TransitionBox.Content, uCServerList) || ReferenceEquals(TransitionBox.Content, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
-                HeaderDivider.Visibility = panelHeaderIcons.Visibility;
+                try
+                {
+                    loginApplicationExit.Token.ThrowIfCancellationRequested();
+                    await uCLoginLoading.FinishStagesAsync(
+                        IsUserLogin && loginServerListPending);
+                    int remaining = Math.Max(0, 4000 - (int)visibleTime.ElapsedMilliseconds);
+                    if (remaining > 0) await System.Threading.Tasks.Task.Delay(remaining, loginApplicationExit.Token);
+                    loginApplicationExit.Token.ThrowIfCancellationRequested();
+                    await PrepareLoginResultAsync();
+                    loginApplicationExit.Token.ThrowIfCancellationRequested();
+                    await uCLoginLoading.FadeOutAsync();
+                    loginApplicationExit.Token.ThrowIfCancellationRequested();
+                    uCLoginLoading.Visibility = Visibility.Collapsed;
+                    HideLoading();
+                    loginPresentationActive = false;
+                    StartPostLoginChecks();
+                    TransitionBox.IsEnabled = true;
+                    txtVersion.Visibility = ReferenceEquals(TransitionBox.Content, uCLogin) ? Visibility.Collapsed : Visibility.Visible;
+                    panelHeaderIcons.Visibility = (ReferenceEquals(TransitionBox.Content, uCServerList) || ReferenceEquals(TransitionBox.Content, uCUserInfo)) ? Visibility.Visible : Visibility.Collapsed;
+                    HeaderDivider.Visibility = panelHeaderIcons.Visibility;
+                }
+                catch (OperationCanceledException) when (loginApplicationExit.IsCancellationRequested) { }
+                finally { loginPresentationActive = false; }
             }
         }
         private void SetLoginStage(int stage)
@@ -1045,7 +1063,7 @@ namespace IRSpeedyVPN
             {
                 if (!onlyRenew)
                 {
-                    ShowMessage("ارتباط با سرور برقرار نیست");
+                    if (!loginApplicationExit.IsCancellationRequested) ShowMessage("ارتباط با سرور برقرار نیست");
                     LogHelper.WriteLog(ex);
                 }
             }

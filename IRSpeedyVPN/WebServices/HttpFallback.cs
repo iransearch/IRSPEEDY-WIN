@@ -30,7 +30,8 @@ namespace IRSpeedyVPN.WebServices
             string body,
             string proxy,
             int? timeoutMilliseconds,
-            CancellationToken cancellation = default(CancellationToken))
+            CancellationToken cancellation = default(CancellationToken),
+            bool loginRequest = false)
         {
             cancellation.ThrowIfCancellationRequested();
             if (timeoutMilliseconds.HasValue && timeoutMilliseconds.Value <= 0)
@@ -44,7 +45,7 @@ namespace IRSpeedyVPN.WebServices
                 : "GET";
 
             // curl -L
-            request.AllowAutoRedirect = true;
+            request.AllowAutoRedirect = !loginRequest;
 
             // curl reads neither the IE settings nor WinHTTP's, and while connected the
             // app points the system proxy at its own listener - going through
@@ -65,6 +66,7 @@ namespace IRSpeedyVPN.WebServices
             // upload + headers + response body. Abort also bounds a slow/dripping body.
             int deadlineExpired = 0;
             string stage = "get-request-stream";
+            bool writeStarted = false;
             var elapsed = Stopwatch.StartNew();
             long networkStart = ConnectionDiagnostics.EventSequence;
             int deadlineMs = timeoutMilliseconds.HasValue && timeoutMilliseconds.Value > 0
@@ -87,6 +89,7 @@ namespace IRSpeedyVPN.WebServices
                         using (var stream = request.GetRequestStream())
                         {
                             stage = "write-body";
+                            writeStarted = true;
                             stream.Write(payload, 0, payload.Length);
                         }
                     }
@@ -111,9 +114,26 @@ namespace IRSpeedyVPN.WebServices
                         "connection.observed_age_ms", ConnectionDiagnostics.ObservedModeAgeMs.ToString());
                     if (Volatile.Read(ref deadlineExpired) != 0)
                         throw new TimeoutException("The HTTP request deadline expired.", ex);
+                    if (loginRequest)
+                        throw new LoginTransportException("Managed login failed: " + ex.GetType().Name + "; stage=" + stage,
+                            ManagedMayHaveBeenSent(ex, request.RequestUri.Scheme == Uri.UriSchemeHttps, stage, writeStarted));
                     throw;
                 }
             }
+        }
+
+        internal static bool ManagedMayHaveBeenSent(Exception error, bool https,
+            string stage = null, bool writeStarted = false)
+        {
+            // No TLS-zero proof exists for HTTP. Buffered writes, renegotiation,
+            // response reads and unknown timeouts also remain conservative.
+            if (!https || writeStarted || stage == "read-body") return true;
+            var web = error as WebException;
+            if (web == null || web.Response != null) return true;
+            if (web.Status == WebExceptionStatus.NameResolutionFailure || web.Status == WebExceptionStatus.ConnectFailure)
+                return false;
+            return !((web.Status == WebExceptionStatus.TrustFailure || web.Status == WebExceptionStatus.SecureChannelFailure)
+                && stage == "get-request-stream");
         }
 
         /// <summary>

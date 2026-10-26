@@ -25,8 +25,11 @@ namespace IRSpeedyVPN.Common
 #if NETFRAMEWORK
         internal static System.Web.Script.Serialization.JavaScriptConverter JsonConverter => null;
 #endif
-        internal sealed class Runtime { internal string TempPath => "/nonexistent-test-runtime"; }
-        internal static Runtime ResourceManager => new Runtime();
+        internal static string RuntimePath = "/nonexistent-test-runtime";
+        internal static int RuntimeDelayMs;
+        internal sealed class Runtime { internal string TempPath => RuntimePath; }
+        internal static Runtime ResourceManager
+        { get { if (RuntimeDelayMs > 0) Thread.Sleep(RuntimeDelayMs); return new Runtime(); } }
         internal static void GetRuntimeSnapshot(out bool ready, out string path, out string error)
         { ready = true; path = "/nonexistent-test-runtime"; error = null; }
     }
@@ -67,12 +70,15 @@ namespace IRSpeedyVPN.WebServices
 {
     internal sealed partial class CurlHelper
     {
+        internal static void SetAvailabilityForTest(bool unavailable) { _curlUnavailable = unavailable; }
         // Linux executes the installed curl. PE/runtime selection remains Windows
         // specific; process deadlines, cancellation, args and parsing are production.
-        internal static LoginCurlResult ExecuteLocal(string args, int timeoutMs, CancellationToken cancellation)
+        internal static LoginCurlResult ExecuteLocal(string args, int timeoutMs, CancellationToken cancellation, LoginConnectProgress progress = null)
         {
             bool started;
-            var result = ExecuteCurl("/usr/bin/curl", args, timeoutMs, out started, cancellation);
+            var result = ExecuteCurl("/usr/bin/curl", args, timeoutMs, out started, cancellation,
+                progress == null ? (Action)null : progress.Start,
+                progress == null ? (Action<string>)null : progress.Observe);
             return ParseLoginResult(result.Output, result.ExitCode);
         }
     }

@@ -2,7 +2,7 @@
 
 See [the implementation and validation notes](../../docs/windows-login-recovery.md).
 
-Requirements: Python 3, .NET 8 runtime/SDK files, native curl at `/usr/bin/curl`.
+Requirements: Python 3, C compiler (`cc`), .NET 8 runtime/SDK files, native curl at `/usr/bin/curl`.
 The tests create temporary CA/certificates and loopback listeners, then delete
 their files. They never change system DNS, proxies or the machine trust store.
 
@@ -16,3 +16,11 @@ boundaries and a .NET 8 JSON adapter. The runner also compiles the actual
 controller failover methods and the complete controller with `Api/` REST/model
 fixtures. With .NET 4.8 references, complete production controller, RestHelper,
 curl, DoH parser, managed HTTP and recovery files are compiled together.
+
+`RegressionChecks.cs` covers HTTPS/HTTP replay evidence, managed phases, static
+curl availability, trailer/argument robustness and native exits 6/7; `dns_fail.c`
+keeps the real-curl .invalid check offline. `PrefetchChecks.cs` covers provider
+racing, invalid winners, cancel/join cleanup, speculative cache lifecycle and
+credential serialization. `ui_lifecycle.py` executes the actual presentation
+wrapper against a fake dispatcher for shutdown and generic timeout errors.
+The runner also executes existing password re-login and loading-stage checks.

@@ -21,9 +21,9 @@ class LoginData { public string data,message="denied",DecryptedString="account";
 class Controller {
  public Response<Result> Next=new Response<Result>{StatusCode=HttpStatusCode.OK,ResponseData=new Result{IsSuccess=true,Code=0}};
  public Response<LoginData> Auth=new Response<LoginData>{StatusCode=HttpStatusCode.OK,ResponseData=new LoginData()};
- public string AuthPassword; public int Changes,Logins;
+ public string AuthPassword; public int Changes,Logins; public Exception Failure;
  public Response<Result> ChangePassword(string u,string o,string n){Changes++;return Next;}
- public Response<LoginData> Login2(string u,string p,CancellationToken cancellation=default(CancellationToken)){Logins++;AuthPassword=p;return Auth;}
+ public Response<LoginData> Login2(string u,string p,CancellationToken cancellation=default(CancellationToken)){cancellation.ThrowIfCancellationRequested();if(Failure!=null)throw Failure;Logins++;AuthPassword=p;return Auth;}
 }
 class TimerStub {public void Change(int a,int b){} }
 class LoginForm { public string User,Password; public bool Remember; public void SetUserPassword(string u,string p,bool r){User=u;Password=p;Remember=r;} public void HideRenewMessage(){} }
@@ -88,10 +88,26 @@ tests = r'''
  Check(staleRefresh.IsUserLogin && staleRefresh.localResource.Saves==0,"old password rejection cannot log out new session");
  var busy=new Program();busy.passwordChangeInProgress=true;
  Check(await busy.ChangeAccountPasswordAsync("old","00123")!=null && busy.serviceController.Changes==0,"duplicate mutation blocked");
+ var exiting=new Program();exiting.loginApplicationExit.Cancel();
+ Check(!exiting.Login("user","test",false) && exiting.Error==null,"shutdown cancellation is caught by production Login without touching a closing dispatcher");
+ foreach(var failure in new Exception[]{new TimeoutException("Authentication flow timeout budget exhausted: flow=Login"),new InvalidOperationException("Initial: exit=56; recovery failed")}){
+  var failed=new Program();failed.serviceController.Failure=failure;
+  Check(!failed.Login("user","test",false) && failed.Error=="ارتباط با سرور برقرار نیست","deadline/technical failure never escapes Login or appears as technical UI text");
+  failed.ValidateSessionAndRefreshServerList();
+  Check(failed.IsUserLogin,"background Login2 caller catches network failure without logging out the session");
+ }
+ var canceledRefresh=new Program();canceledRefresh.loginApplicationExit.Cancel();canceledRefresh.ValidateSessionAndRefreshServerList();
+ Check(canceledRefresh.IsUserLogin,"background Login2 caller catches exit cancellation");
  }
 }
 '''
 with tempfile.TemporaryDirectory() as d:
  p=Path(d);(p/'Program.cs').write_text(prefix.replace('PREPARE_METHOD',prepare)+flow+login+refresh+tests)
  (p/'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion><NoWarn>CS0649;CS0414</NoWarn></PropertyGroup></Project>')
- subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',str(p/'Checks.csproj'),'-v:q'],check=True)
+ if len(sys.argv)==4:
+  dotnet,compiler,refs=sys.argv[1:]
+  subprocess.run([dotnet,compiler,'-nologo','-langversion:7.3','-target:exe','-out:'+str(p/'checks.dll')]+['-r:'+str(dll) for dll in Path(refs).glob('*.dll')]+[str(source) for source in p.glob('*.cs')],check=True)
+  (p/'checks.runtimeconfig.json').write_text('{"runtimeOptions":{"tfm":"net8.0","framework":{"name":"Microsoft.NETCore.App","version":"8.0.0"}}}')
+  subprocess.run([dotnet,str(p/'checks.dll')],check=True)
+ else:
+  subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',str(p/'Checks.csproj'),'-v:q'],check=True)

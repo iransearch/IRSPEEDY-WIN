@@ -6,7 +6,7 @@ using System.Net;
 using System.Threading;
 using IRSpeedyVPN.WebServices;
 
-sealed class NativeTransport : ILoginTransport
+sealed class NativeTransport : ILoginConnectTransport
 {
     internal readonly List<string> Resolves = new List<string>();
     internal readonly List<LoginCurlResult> Results = new List<LoginCurlResult>();
@@ -14,6 +14,10 @@ sealed class NativeTransport : ILoginTransport
     internal readonly string CaPath;
     internal NativeTransport(string caPath) { CaPath = caPath; }
     public LoginCurlResult Curl(string url, string method, string headers, string body, string resolve, int timeoutMs, CancellationToken cancellation)
+        => Run(url, method, headers, body, resolve, timeoutMs, cancellation, null);
+    public LoginCurlResult CurlObserved(string url, string method, string headers, string body, int timeoutMs, CancellationToken cancellation, LoginConnectProgress progress)
+        => Run(url, method, headers, body, null, timeoutMs, cancellation, progress);
+    private LoginCurlResult Run(string url, string method, string headers, string body, string resolve, int timeoutMs, CancellationToken cancellation, LoginConnectProgress progress)
     {
         Resolves.Add(resolve);
         var uri = new Uri(url);
@@ -22,7 +26,8 @@ sealed class NativeTransport : ILoginTransport
         string args = CurlHelper.BuildLoginArgs(url, method, headers, body, actual, timeoutMs - 100);
         if (args.Contains("--insecure") || args.Contains(" -k ")) throw new Exception("TLS verification disabled");
         args += " --cacert \"" + CaPath + "\"";
-        var result = CurlHelper.ExecuteLocal(args, timeoutMs, cancellation);
+        if (progress != null) args += " --verbose";
+        var result = CurlHelper.ExecuteLocal(args, timeoutMs, cancellation, progress);
         Results.Add(result); return result;
     }
     public LoginCurlResult Managed(string url, string method, string headers, string body, int timeoutMs, CancellationToken cancellation)
@@ -92,6 +97,11 @@ class Program
             Check(timed.MayHaveBeenSent && transport.Results.Last().ExitCode == 28 && fetches == 0
                 && good.Posts == posts + 1 && transport.Resolves.Count == attempts + 1,
                 "real timeout after connection/upload never replays POST or starts DoH");
+            good.DelayMs = 0;
+
+            good.DelayMs = 1400; posts = good.Posts;
+            Check(Send(recovery, url).HttpCode == 200 && good.Posts == posts + 1 && fetches == 0,
+                "native curl connected/TLS milestones suppress prefetch during a slow HTTP response");
             good.DelayMs = 0;
 
             // A wrong DNS answer can lead to a server with the wrong certificate.
@@ -175,11 +185,14 @@ class Program
             }
             foreach (int code in new[] { 52, 55, 56, 0, 1 })
                 Check(!Failure(code).CanRecover, "ineligible exit " + code);
-            var tcpTimeout = Failure(28); tcpTimeout.ConnectSeconds = .000001;
+            var tcpTimeout = Failure(28); tcpTimeout.ConnectSeconds = .000001; tcpTimeout.TlsSeconds = .000001;
             Check(!tcpTimeout.CanRecover && tcpTimeout.MayHaveBeenSent,
                 "timeout after TCP connect forbids replay on every endpoint, including submillisecond timings");
             foreach (int code in new[] { 52, 55, 56 })
-                Check(Failure(code).MayHaveBeenSent, "exit " + code + " forbids replay on every endpoint");
+            {
+                var afterTls = Failure(code); afterTls.TlsSeconds = .000001;
+                Check(afterTls.MayHaveBeenSent, "exit " + code + " after TLS forbids replay on every endpoint");
+            }
             var upload = Failure(7); upload.UploadedBytes = 1;
             Check(!upload.CanRecover, "any positive upload prevents recovery");
             var tls = Failure(35); tls.TlsSeconds = .000001;
@@ -212,6 +225,8 @@ class Program
             Check(logs.All(line => !line.Contains("secret-user") && !line.Contains("password")), "event logs contain no credentials");
             Check(logs.All(IRSpeedyVPN.Common.LogPolicy.ShouldWrite), "recovery event records survive the production log filter");
             ControllerChecks.Run();
+            RegressionChecks.Run();
+            PrefetchChecks.Run();
         }
     }
 }

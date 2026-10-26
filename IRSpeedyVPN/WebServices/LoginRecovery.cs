@@ -6,6 +6,8 @@ using System.Linq;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Concurrent;
 
 namespace IRSpeedyVPN.WebServices
 {
@@ -28,7 +30,9 @@ namespace IRSpeedyVPN.WebServices
             if (RemainingMs <= 0) throw new TimeoutException("Login network deadline expired.");
         }
         internal bool BeginRecovery(string host)
-        { Check(); return recovered.Add(host); }
+        { Check(); lock (recovered) return recovered.Add(host); }
+        internal bool RecoveryAvailable(string host)
+        { lock (recovered) return !recovered.Contains(host); }
         internal void BeginEndpoint(int timeoutMs)
         { Check(); Endpoint = new LoginDeadline(this, timeoutMs); }
     }
@@ -55,9 +59,11 @@ namespace IRSpeedyVPN.WebServices
         // These fields come from -w even on nonzero exit. Unknown/partial metrics
         // are never evidence that it is safe to repeat a credential POST.
         internal bool MayHaveBeenSent => !MetricsKnown || UploadedBytes > 0 || HttpCode > 0
-            || Redirects != 0 || TlsSeconds > 0 || PretransferSeconds > 0
-            || ExitCode == 52 || ExitCode == 55 || ExitCode == 56
-            || (ExitCode == 28 && ConnectSeconds > 0);
+            || Redirects != 0 || TlsSeconds > 0 || PretransferSeconds > 0;
+        // The all-zero TLS proof is specific to HTTPS. Retain the previous
+        // conservative exit-code guard when a caller supplies a plain HTTP URL.
+        internal bool MayHaveBeenSentFor(bool https) => MayHaveBeenSent || (!https
+            && (ExitCode == 52 || ExitCode == 55 || ExitCode == 56 || (ExitCode == 28 && ConnectSeconds > 0)));
         internal bool CanRecover => !Unavailable && !MayHaveBeenSent &&
             (ExitCode == 6 || ExitCode == 7 || ExitCode == 35 || ExitCode == 60
                 || (ExitCode == 28 && ConnectSeconds == 0));
@@ -72,6 +78,15 @@ namespace IRSpeedyVPN.WebServices
         internal readonly bool MayHaveBeenSent;
         internal LoginTransportException(string message, bool mayHaveBeenSent, Exception inner = null)
             : base(message, inner) { MayHaveBeenSent = mayHaveBeenSent; }
+    }
+
+    // A forcibly stopped curl has no trustworthy trailer. Preserve TimeoutException
+    // semantics for callers while preventing the controller from replaying its POST.
+    internal sealed class LoginTransportTimeoutException : TimeoutException
+    {
+        internal LoginTransportTimeoutException() : base("Login curl deadline expired; request stage is unknown.") { }
+        internal LoginTransportTimeoutException(string initial, Exception inner)
+            : base("Initial: " + initial + "; recovery: login curl deadline expired; request stage is unknown.", inner) { }
     }
 
     internal sealed class LoginAddresses
@@ -96,6 +111,9 @@ namespace IRSpeedyVPN.WebServices
 
     internal sealed class LoginRecovery
     {
+        // Background account refresh and a foreground login may overlap. Only
+        // credential attempts take this gate; DNS GETs can race independently.
+        private static readonly SemaphoreSlim CredentialGate = new SemaphoreSlim(1, 1);
         private readonly ILoginTransport transport;
         private readonly ILoginResolver resolver;
         private readonly Action<string> log;
@@ -112,8 +130,24 @@ namespace IRSpeedyVPN.WebServices
             var target = new Uri(url);
             var deadline = context.Endpoint ?? new LoginDeadline(context, timeoutMs);
             deadline.Check();
-            var first = transport.Curl(url, method, headers, body, null,
-                deadline.RemainingMs, context.Cancellation);
+            var progress = new LoginConnectProgress();
+            using (var prefetch = new LoginPrefetch(target.Scheme == Uri.UriSchemeHttps
+                && !IPAddress.TryParse(target.Host, out _) && transport is ILoginConnectTransport
+                ? resolver as ILoginPrefetchResolver : null, target.Host, deadline, context, progress))
+                return SendCore(url, method, headers, body, context, target, deadline, progress, prefetch);
+        }
+        private LoginCurlResult SendCore(string url, string method, string headers, string body,
+            LoginNetworkContext context, Uri target, LoginDeadline deadline, LoginConnectProgress progress, LoginPrefetch prefetch)
+        {
+            LoginCurlResult first;
+            try
+            {
+                var observed = transport as ILoginConnectTransport;
+                first = CredentialAttempt(deadline, context, remaining => observed == null
+                    ? transport.Curl(url, method, headers, body, null, remaining, context.Cancellation)
+                    : observed.CurlObserved(url, method, headers, body, remaining, context.Cancellation, progress));
+            }
+            finally { progress.Complete(); }
             Log(context, target.Host, "stage=system " + first.Summary);
             if (first.Unavailable)
             {
@@ -123,22 +157,27 @@ namespace IRSpeedyVPN.WebServices
                 Log(context, target.Host, "stage=managed reason=curl-unavailable");
                 try
                 {
-                    var managed = transport.Managed(url, method, headers, body, deadline.RemainingMs, context.Cancellation);
+                    var managed = CredentialAttempt(deadline, context, remaining =>
+                        transport.Managed(url, method, headers, body, remaining, context.Cancellation));
                     Log(context, target.Host, "stage=managed-result http=" + managed.HttpCode);
                     return managed;
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex)
                 {
-                    Log(context, target.Host, "stage=failed reason=managed type=" + ex.GetType().Name);
-                    throw new LoginTransportException("Initial: curl-unavailable; managed login failed (" + ex.GetType().Name + ").", true);
+                    bool mayHaveBeenSent = target.Scheme != Uri.UriSchemeHttps || (ex is LoginTransportException managedFailure
+                        ? managedFailure.MayHaveBeenSent
+                        : HttpFallback.ManagedMayHaveBeenSent(ex, true));
+                    Log(context, target.Host, "stage=failed reason=managed type=" + ex.GetType().Name
+                        + " mayHaveBeenSent=" + mayHaveBeenSent);
+                    throw new LoginTransportException("Initial: curl-unavailable; managed login failed (" + ex.GetType().Name + ").", mayHaveBeenSent);
                 }
             }
             if (first.HttpCode > 0) return first;
             if (!first.CanRecover || target.Scheme != Uri.UriSchemeHttps || IPAddress.TryParse(target.Host, out _))
             {
                 Log(context, target.Host, "stage=skip reason=unsafe-or-ineligible " + first.Summary);
-                throw Failure(first, null);
+                throw Failure(first, null, target.Scheme == Uri.UriSchemeHttps);
             }
             deadline.Check();
             if (!context.BeginRecovery(target.Host)) throw Failure(first, null);
@@ -150,9 +189,12 @@ namespace IRSpeedyVPN.WebServices
             {
                 deadline.Check();
                 // Leave time for the real request. No lookup gets a new deadline.
-                int lookupMs = Math.Min(2000, deadline.RemainingMs - 1000);
+                int lookupMs = Math.Min(LoginDohProviders.LookupBudgetMs, deadline.RemainingMs - 1000);
                 if (lookupMs <= 0) throw Failure(first, null);
-                answer = resolver.Resolve(target.Host, lookupMs, context.Cancellation, false);
+                bool wasPrefetched;
+                answer = prefetch.Take(out wasPrefetched);
+                if (wasPrefetched) prefetch.Accept(answer);
+                else answer = resolver.Resolve(target.Host, lookupMs, context.Cancellation, false);
                 deadline.Check();
                 if (answer == null || answer.Values.Length == 0) throw Failure(first, null);
                 second = Retry(target, url, method, headers, body, answer, deadline, context);
@@ -164,7 +206,7 @@ namespace IRSpeedyVPN.WebServices
                 if (answer.FromCache && second.CanRecover)
                 {
                     deadline.Check();
-                    lookupMs = Math.Min(2000, deadline.RemainingMs - 1000);
+                    lookupMs = Math.Min(LoginDohProviders.LookupBudgetMs, deadline.RemainingMs - 1000);
                     if (lookupMs > 0)
                     {
                         Log(context, target.Host, "stage=cache-refresh reason=pre-send-failure");
@@ -183,6 +225,11 @@ namespace IRSpeedyVPN.WebServices
                 throw Failure(first, second);
             }
             catch (OperationCanceledException) { throw; }
+            catch (LoginTransportTimeoutException ex)
+            {
+                Log(context, target.Host, "stage=failed reason=retry-process-timeout first=" + first.Summary);
+                throw new LoginTransportTimeoutException(first.Summary, ex);
+            }
             catch (LoginTransportException ex)
             {
                 Log(context, target.Host, "stage=failed firstExit=" + first.ExitCode
@@ -204,19 +251,97 @@ namespace IRSpeedyVPN.WebServices
             LoginAddresses answer, LoginDeadline deadline, LoginNetworkContext context)
         {
             deadline.Check();
-            return transport.Curl(url, method, headers, body,
+            return CredentialAttempt(deadline, context, remaining => transport.Curl(url, method, headers, body,
                 target.Host + ":" + target.Port + ":" + string.Join(",", answer.Values),
-                deadline.RemainingMs, context.Cancellation);
+                remaining, context.Cancellation));
         }
-        private static LoginTransportException Failure(LoginCurlResult first, LoginCurlResult second)
+        private static LoginCurlResult CredentialAttempt(LoginDeadline deadline, LoginNetworkContext context,
+            Func<int, LoginCurlResult> attempt)
+        {
+            deadline.Check();
+            if (!CredentialGate.Wait(deadline.RemainingMs, context.Cancellation))
+                throw new TimeoutException("Login attempt queue deadline expired before sending.");
+            try { deadline.Check(); return attempt(deadline.RemainingMs); }
+            finally { CredentialGate.Release(); }
+        }
+        private static LoginTransportException Failure(LoginCurlResult first, LoginCurlResult second, bool https = true)
             => new LoginTransportException("Initial: " + first.Summary + "; recovery: "
                 + (second == null ? "not-performed-or-no-answer" : second.Summary),
-                second == null ? first.MayHaveBeenSent : second.MayHaveBeenSent);
+                second == null ? first.MayHaveBeenSentFor(https) : second.MayHaveBeenSentFor(https));
+    }
+
+    // DNS only: a completion-order race under one capped lookup clock. Every
+    // provider is canceled and joined before returning, including on cancellation.
+    internal static class LoginDohProviders
+    {
+        internal const int LookupBudgetMs = 5000;
+        internal static readonly string[] Providers =
+        {
+            "https://8.8.8.8/resolve?type=A&name=",
+            "https://1.1.1.1/dns-query?type=A&name="
+        };
+        internal static string[] Resolve(string host, int timeoutMs, CancellationToken cancellation,
+            Func<string, int, CancellationToken, string[]> query, Action<string> log)
+        {
+            int budget = Math.Min(LookupBudgetMs, timeoutMs);
+            var clock = Stopwatch.StartNew();
+            cancellation.ThrowIfCancellationRequested();
+            if (budget <= 100) return new string[0];
+            using (var stop = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
+            using (var replies = new BlockingCollection<ProviderReply>())
+            {
+                stop.CancelAfter(budget);
+                var workers = Providers.Select((provider, index) => Task.Factory.StartNew(() =>
+                {
+                    var reply = new ProviderReply { Index = index, Outcome = "no-answer", Values = new string[0] };
+                    try
+                    {
+                        stop.Token.ThrowIfCancellationRequested();
+                        int remaining = budget - (int)Math.Min(int.MaxValue, clock.ElapsedMilliseconds);
+                        if (remaining > 100)
+                            reply.Values = (query(provider + Uri.EscapeDataString(host), remaining, stop.Token) ?? new string[0])
+                                .Where(LoginDohCache.IsPublicIPv4).Distinct().ToArray();
+                    }
+                    catch (OperationCanceledException) { reply.Outcome = "canceled"; }
+                    catch (Exception ex) { reply.Outcome = ex is TimeoutException ? "timeout" : "failed"; }
+                    reply.ElapsedMs = clock.ElapsedMilliseconds;
+                    replies.Add(reply);
+                }, CancellationToken.None, TaskCreationOptions.LongRunning, TaskScheduler.Default)).ToArray();
+                string[] result = new string[0];
+                try
+                {
+                    for (int received = 0; received < workers.Length; received++)
+                    {
+                        cancellation.ThrowIfCancellationRequested();
+                        int remaining = budget - (int)Math.Min(int.MaxValue, clock.ElapsedMilliseconds);
+                        ProviderReply reply;
+                        if (remaining <= 0 || !replies.TryTake(out reply, remaining, cancellation)) break;
+                        if (reply.Values.Length != 0 && reply.ElapsedMs < budget)
+                        {
+                            Write(log, host, reply.Index, "winner", reply.ElapsedMs);
+                            result = reply.Values; break;
+                        }
+                        Write(log, host, reply.Index, reply.Outcome, reply.ElapsedMs);
+                    }
+                }
+                finally { stop.Cancel(); Task.WaitAll(workers); }
+                cancellation.ThrowIfCancellationRequested();
+                return result;
+            }
+        }
+        private sealed class ProviderReply
+        { internal int Index; internal string Outcome; internal string[] Values; internal long ElapsedMs; }
+        private static void Write(Action<string> log, string host, int provider, string outcome, long elapsedMs)
+        {
+            try { log?.Invoke("[LoginRecovery] host=" + host + " stage=provider provider="
+                + (provider == 0 ? "google" : "cloudflare") + " outcome=" + outcome + " elapsedMs=" + elapsedMs); }
+            catch { }
+        }
     }
 
     // Cache only public IPv4 answer sets, never login retry state. Reference
     // comparison prevents an old failing caller from evicting a newer answer.
-    internal sealed class LoginDohCache : ILoginResolver
+    internal sealed class LoginDohCache : ILoginPrefetchResolver
     {
         private sealed class Entry { internal string[] Values; internal DateTime Expires; }
         private readonly Dictionary<string, Entry> cache = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);
@@ -224,6 +349,10 @@ namespace IRSpeedyVPN.WebServices
         private readonly Func<string, int, CancellationToken, string[]> fetch;
         internal LoginDohCache(Func<string, int, CancellationToken, string[]> fetch) { this.fetch = fetch; }
         public LoginAddresses Resolve(string host, int timeoutMs, CancellationToken cancellation, bool refresh)
+            => ResolveCore(host, timeoutMs, cancellation, refresh, true);
+        public LoginAddresses Prefetch(string host, int timeoutMs, CancellationToken cancellation)
+            => ResolveCore(host, timeoutMs, cancellation, false, false);
+        private LoginAddresses ResolveCore(string host, int timeoutMs, CancellationToken cancellation, bool refresh, bool commit)
         {
             cancellation.ThrowIfCancellationRequested();
             if (timeoutMs <= 0) return null;
@@ -233,13 +362,16 @@ namespace IRSpeedyVPN.WebServices
                 if (!refresh && cache.TryGetValue(host, out entry) && entry.Expires > DateTime.UtcNow)
                     return new LoginAddresses(entry.Values, true);
             }
-            var values = (fetch(host, Math.Min(2000, timeoutMs), cancellation) ?? new string[0])
+            var values = (fetch(host, Math.Min(LoginDohProviders.LookupBudgetMs, timeoutMs), cancellation) ?? new string[0])
                 .Where(IsPublicIPv4).Select(value => IPAddress.Parse(value).ToString()).Distinct().ToArray();
             cancellation.ThrowIfCancellationRequested();
             if (values.Length == 0) return null;
-            lock (gate) cache[host] = new Entry { Values = values, Expires = DateTime.UtcNow.AddMinutes(5) };
-            return new LoginAddresses(values, false);
+            var answer = new LoginAddresses(values, false);
+            if (commit) Accept(host, answer);
+            return answer;
         }
+        public void Accept(string host, LoginAddresses answer)
+        { if (!answer.FromCache) lock (gate) cache[host] = new Entry { Values = answer.Values, Expires = DateTime.UtcNow.AddMinutes(5) }; }
         public void Invalidate(string host, LoginAddresses answer)
         {
             lock (gate)

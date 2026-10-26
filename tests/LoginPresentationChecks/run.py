@@ -55,4 +55,10 @@ class Program {
 with tempfile.TemporaryDirectory(prefix='login-presentation-') as d:
  p=Path(d);(p/'Program.cs').write_text(harness+methods+tests)
  (p/'checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion></PropertyGroup></Project>')
- subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',d,'-v:q'],check=True)
+ if len(sys.argv)==4:
+  dotnet,compiler,refs=sys.argv[1:]
+  subprocess.run([dotnet,compiler,'-nologo','-langversion:7.3','-target:exe','-out:'+str(p/'checks.dll')]+['-r:'+str(dll) for dll in Path(refs).glob('*.dll')]+[str(source) for source in p.glob('*.cs')],check=True)
+  (p/'checks.runtimeconfig.json').write_text('{"runtimeOptions":{"tfm":"net8.0","framework":{"name":"Microsoft.NETCore.App","version":"8.0.0"}}}')
+  subprocess.run([dotnet,str(p/'checks.dll')],check=True)
+ else:
+  subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',d,'-v:q'],check=True)
