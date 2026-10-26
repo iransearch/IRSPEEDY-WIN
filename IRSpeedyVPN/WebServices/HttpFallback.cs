@@ -29,8 +29,10 @@ namespace IRSpeedyVPN.WebServices
             string headers,
             string body,
             string proxy,
-            int? timeoutMilliseconds)
+            int? timeoutMilliseconds,
+            CancellationToken cancellation = default(CancellationToken))
         {
+            cancellation.ThrowIfCancellationRequested();
             if (timeoutMilliseconds.HasValue && timeoutMilliseconds.Value <= 0)
                 throw new TimeoutException("The HTTP request has no remaining budget.");
 
@@ -68,6 +70,7 @@ namespace IRSpeedyVPN.WebServices
             int deadlineMs = timeoutMilliseconds.HasValue && timeoutMilliseconds.Value > 0
                 ? timeoutMilliseconds.Value
                 : Timeout.Infinite;
+            using (cancellation.Register(() => { try { request.Abort(); } catch { } }))
             using (var deadline = new Timer(_ =>
             {
                 Interlocked.Exchange(ref deadlineExpired, 1);
@@ -96,6 +99,7 @@ namespace IRSpeedyVPN.WebServices
                 }
                 catch (Exception ex)
                 {
+                    cancellation.ThrowIfCancellationRequested();
                     ErrorReporting.Annotate(ex, "http.stage", stage, "http.transport", "http-fallback",
                         "http.endpoint", ErrorReporting.EndpointAlias(url),
                         "http.route", string.IsNullOrWhiteSpace(proxy) ? "direct-no-explicit-proxy" : "explicit-proxy",

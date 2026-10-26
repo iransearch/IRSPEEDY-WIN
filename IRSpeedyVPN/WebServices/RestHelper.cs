@@ -34,7 +34,8 @@ namespace IRSpeedyVPN.WebServices
             IDecryptor decryptor,
             string token = null,
             int? timeoutSeconds = null,
-            bool skipDoh = false)
+            bool skipDoh = false,
+            LoginNetworkContext loginContext = null)
         {
             string url = _baseAddress + relPath;
 
@@ -98,7 +99,7 @@ namespace IRSpeedyVPN.WebServices
             // with --resolve, so on those machines the lookup would cost a round trip
             // per request and then be thrown away.
             string resolveOverride = null;
-            if (!skipDoh && !CurlHelper.IsUnavailable)
+            if (loginContext == null && !skipDoh && !CurlHelper.IsUnavailable)
             {
                 try
                 {
@@ -114,7 +115,10 @@ namespace IRSpeedyVPN.WebServices
             }
 
             // Send through curl.exe
-            var curlResp = _curl.Send(url, method, headers.ToString(), body, null, timeoutSeconds, resolveOverride);
+            var curlResp = loginContext == null
+                ? _curl.Send(url, method, headers.ToString(), body, null, timeoutSeconds, resolveOverride)
+                : _curl.SendLogin(url, method, headers.ToString(), body,
+                    Math.Min(8000, (timeoutSeconds ?? 8) * 1000), loginContext);
             var rawResponse = curlResp.Body;
             var httpCodeInt = curlResp.HttpCode;
 

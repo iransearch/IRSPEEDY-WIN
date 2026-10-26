@@ -439,12 +439,11 @@ namespace IRSpeedyVPN
                 token.ThrowIfCancellationRequested();
                 if (!current() || !IsUserLogin) { serverRefreshGate.Release(); return false; }
                 ShowMessage("");
-                // Login2 is synchronous. Let Connect/logout cancel their wait
-                // immediately; its late response is guarded and the worker keeps
-                // the API gate until the request actually ends.
+                // Connect/logout cancel both the wait and the network request.
+                // Keep the gate until curl/.NET have stopped and retain late-result guards.
                 refresh = Task.Run(() =>
                 {
-                    try { return !LoadLocal && RefreshAuthenticatedServerList(current); }
+                    try { return !LoadLocal && RefreshAuthenticatedServerList(current, token); }
                     finally { serverRefreshGate.Release(); }
                 });
             }
@@ -461,7 +460,8 @@ namespace IRSpeedyVPN
             }
         }
 
-        private bool RefreshAuthenticatedServerList(Func<bool> canApply = null)
+        private bool RefreshAuthenticatedServerList(Func<bool> canApply = null,
+            CancellationToken cancellation = default(CancellationToken))
         {
             bool refreshed = false;
             try
@@ -476,81 +476,84 @@ namespace IRSpeedyVPN
                     return false;
                 }
 
-                var response = serviceController.Login2(username, password);
-                // Apply refresh results on the UI thread atomically with password re-login.
-                // An old in-flight refresh must never log out or restore the previous password.
-                Dispatcher.Invoke((Action)(() =>
+                using (var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation, loginApplicationExit.Token))
                 {
-                    if (!IsUserLogin || gInfo.Username != username || gInfo.Password != password
-                        || sessionVersion != Interlocked.Read(ref connectionRequestVersion)
-                        || (canApply != null && !canApply())) return;
-                    if (response == null)
-                        return;
-
-                    if (response.StatusCode != HttpStatusCode.OK)
+                    var response = serviceController.Login2(username, password, linked.Token);
+                    // Apply refresh results on the UI thread atomically with password re-login.
+                    // An old in-flight refresh must never log out or restore the previous password.
+                    Dispatcher.Invoke((Action)(() =>
                     {
-                        // Do not log out on timeouts, endpoint outages, 5xx responses, etc.
-                        // Only statuses that explicitly mean authentication/session rejection
-                        // terminate the local login session.
-                        if (IsExplicitSessionFailure(response.StatusCode))
-                            LogoutInvalidSession(response.ResponseData?.message);
-                        return;
-                    }
+                        if (!IsUserLogin || gInfo.Username != username || gInfo.Password != password
+                            || sessionVersion != Interlocked.Read(ref connectionRequestVersion)
+                            || (canApply != null && !canApply())) return;
+                        if (response == null)
+                            return;
 
-                    var account = response.ResponseData?.Decrypted;
-                    if (account?.UserAccount == null || account.groups == null)
-                        return;
+                        if (response.StatusCode != HttpStatusCode.OK)
+                        {
+                            // Do not log out on timeouts, endpoint outages, 5xx responses, etc.
+                            // Only statuses that explicitly mean authentication/session rejection
+                            // terminate the local login session.
+                            if (IsExplicitSessionFailure(response.StatusCode))
+                                LogoutInvalidSession(response.ResponseData?.message);
+                            return;
+                        }
 
-                    account.UserAccount.Username = username;
+                        var account = response.ResponseData?.Decrypted;
+                        if (account?.UserAccount == null || account.groups == null)
+                            return;
 
-                    if (account.UserAccount.ExpiryDate != null
-                        && account.UserAccount.ExpiryDate.Value < VpnTimeZone.AccountNow)
-                    {
-                        RechareLogout(false);
-                        return;
-                    }
+                        account.UserAccount.Username = username;
 
-                    var status = account.UserAccount.Status;
-                    if (status == "Expired")
-                    {
-                        RechareLogout(false);
-                        return;
-                    }
+                        if (account.UserAccount.ExpiryDate != null
+                            && account.UserAccount.ExpiryDate.Value < VpnTimeZone.AccountNow)
+                        {
+                            RechareLogout(false);
+                            return;
+                        }
 
-                    // AuthServerError means the validation service itself is unavailable;
-                    // it is not proof that the user's credentials/session are invalid.
-                    if (status == "AuthServerError")
-                        return;
+                        var status = account.UserAccount.Status;
+                        if (status == "Expired")
+                        {
+                            RechareLogout(false);
+                            return;
+                        }
 
-                    var validStatus = status == "OK" || status == "FirstUse" || status == null;
-                    if (!validStatus)
-                    {
-                        LogoutInvalidSession("نام کاربری یا رمز عبور صحیح نیست");
-                        return;
-                    }
+                        // AuthServerError means the validation service itself is unavailable;
+                        // it is not proof that the user's credentials/session are invalid.
+                        if (status == "AuthServerError")
+                            return;
 
-                    // Login2 may not carry the separate settings payload. Keep the currently
-                    // active settings so the cache remains complete without a GetSettings call.
-                    if (account.Settings == null)
-                        account.Settings = gInfo.settings;
+                        var validStatus = status == "OK" || status == "FirstUse" || status == null;
+                        if (!validStatus)
+                        {
+                            LogoutInvalidSession("نام کاربری یا رمز عبور صحیح نیست");
+                            return;
+                        }
 
-                    var currentService = gInfo.CurrentService;
+                        // Login2 may not carry the separate settings payload. Keep the currently
+                        // active settings so the cache remains complete without a GetSettings call.
+                        if (account.Settings == null)
+                            account.Settings = gInfo.settings;
 
-                    // Replace only the list/account cache. Keep CurrentService pointing at the
-                    // exact live object so a successful 30-minute refresh cannot disconnect or
-                    // replace the currently running VPN session.
-                    {
-                        serviceFactory.RenewServiceList(account.groups);
-                        gInfo.Import(account, password, localResource.TempPath);
-                        gInfo.CurrentService = currentService;
-                        gInfo.ServerResponse = response.ResponseData.DecryptedString;
-                        uCServerList.RefreshServicesFromFactory(preserveManualRefresh: canApply != null);
-                        refreshed = true;
-                    }
+                        var currentService = gInfo.CurrentService;
 
-                    if (IsRememberChecked)
-                        localResource.SaveConfig(account, password);
-                }));
+                        // Replace only the list/account cache. Keep CurrentService pointing at the
+                        // exact live object so a successful 30-minute refresh cannot disconnect or
+                        // replace the currently running VPN session.
+                        {
+                            serviceFactory.RenewServiceList(account.groups);
+                            gInfo.Import(account, password, localResource.TempPath);
+                            gInfo.CurrentService = currentService;
+                            gInfo.ServerResponse = response.ResponseData.DecryptedString;
+                            uCServerList.RefreshServicesFromFactory(preserveManualRefresh: canApply != null);
+                            refreshed = true;
+                        }
+
+                        if (IsRememberChecked)
+                            localResource.SaveConfig(account, password);
+                    }));
+                }
                 return refreshed;
             }
             catch (Exception ex)

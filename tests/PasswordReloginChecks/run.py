@@ -23,7 +23,7 @@ class Controller {
  public Response<LoginData> Auth=new Response<LoginData>{StatusCode=HttpStatusCode.OK,ResponseData=new LoginData()};
  public string AuthPassword; public int Changes,Logins;
  public Response<Result> ChangePassword(string u,string o,string n){Changes++;return Next;}
- public Response<LoginData> Login2(string u,string p){Logins++;AuthPassword=p;return Auth;}
+ public Response<LoginData> Login2(string u,string p,CancellationToken cancellation=default(CancellationToken)){Logins++;AuthPassword=p;return Auth;}
 }
 class TimerStub {public void Change(int a,int b){} }
 class LoginForm { public string User,Password; public bool Remember; public void SetUserPassword(string u,string p,bool r){User=u;Password=p;Remember=r;} public void HideRenewMessage(){} }
@@ -41,6 +41,7 @@ class Cache {public string TempPath="temp";public string Password="old";public i
 class LogHelper {public static void WriteExLog(string s){} public static void WriteLog(Exception e){} }
 static class VpnTimeZone { public static DateTime AccountNow=>DateTime.Now; }
 class Program {
+ readonly CancellationTokenSource loginApplicationExit=new CancellationTokenSource();
  readonly SemaphoreSlim serverRefreshGate=new SemaphoreSlim(1,1);bool LoadLocal;FakeDispatcher Dispatcher=new FakeDispatcher();Factory serviceFactory=new Factory();
  void LogoutInvalidSession(string m){IsUserLogin=false;}void RechareLogout(bool value){IsUserLogin=false;}
  bool IsExplicitSessionFailure(HttpStatusCode s)=>s==HttpStatusCode.Forbidden;

@@ -200,12 +200,14 @@ namespace IRSpeedyVPN
         }
 
         internal static bool ExitCleanupStarted { get; private set; }
+        private readonly CancellationTokenSource loginApplicationExit = new CancellationTokenSource();
         private bool exitCleanupFinished;
 
         private async void Notify_Exit(object sender, EventArgs e)
         {
             if (ExitCleanupStarted) return;
             ExitCleanupStarted = true;
+            loginApplicationExit.Cancel();
             VpnTimeZone.EndConnection();
             IsEnabled = false;
             IsUserLogin = false;
@@ -1005,7 +1007,7 @@ namespace IRSpeedyVPN
                 IsRememberChecked = Remember;
                 lastLoginUsername = username;
                 lastLoginPassword = password;
-                var res = serviceController.Login2(username, password);
+                var res = serviceController.Login2(username, password, loginApplicationExit.Token);
                 LogHelper.WriteExLog("[LoginPerformance] stage=auth-complete elapsedMs=" + loginStopwatch.ElapsedMilliseconds);
                 if (res.StatusCode == System.Net.HttpStatusCode.NotAcceptable)
                 {

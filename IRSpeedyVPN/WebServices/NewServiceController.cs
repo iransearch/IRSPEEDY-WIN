@@ -9,6 +9,7 @@ using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Runtime.ExceptionServices;
+using System.Threading;
 using v2rayN;
 
 namespace IRSpeedyVPN.WebServices
@@ -63,8 +64,9 @@ namespace IRSpeedyVPN.WebServices
         /// <summary>
         /// Old ServiceController.Login2 -> New service server list.
         /// </summary>
-        internal BaseHttpResponse<DefaultEncryptedResponse<AccountInfoEx>> Login2(string username, string password)
-            => getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString());
+        internal BaseHttpResponse<DefaultEncryptedResponse<AccountInfoEx>> Login2(string username, string password,
+            CancellationToken cancellation = default(CancellationToken))
+            => getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString(), cancellation);
 
         internal BaseHttpResponse<ChangePasswordResult> ChangePassword(string username, string oldPassword, string newPassword)
             => PasswordChangeClient.Send(username, oldPassword, newPassword);
@@ -97,9 +99,11 @@ namespace IRSpeedyVPN.WebServices
             string userName,
             string password,
             string deviceName,
-            string deviceToken)
+            string deviceToken,
+            CancellationToken cancellation = default(CancellationToken))
         {
             string requestId = Guid.NewGuid().ToString("N");
+            var loginContext = new LoginNetworkContext(cancellation, SlowNetworkLoginBudgetSeconds * 1000);
             LogHelper.WriteExLog("[StartupAuth] stage=start flow=Login requestId=" + requestId);
 
             return ExecuteWithFailover(
@@ -112,7 +116,12 @@ namespace IRSpeedyVPN.WebServices
                 var res = service.SendRequest<DefaultEncryptedResponse<AccountInfoEx>>(
                     "api/server/list/all",
                     BuildAuthPayload(userName, password, deviceName, deviceToken, guid),
-                    null, null, null, timeoutSeconds, skipDoh: true);
+                    null, null, null, timeoutSeconds, skipDoh: true, loginContext: loginContext);
+
+                // Authentication/device-limit responses are final even when a
+                // gateway omits the application's JSON message or response body.
+                if (res != null && (res.StatusCode == HttpStatusCode.Unauthorized
+                    || res.StatusCode == HttpStatusCode.NotAcceptable)) return res;
 
                 bool validResponse = IsValidEncryptedServerListResponse(res, guid);
                 LogHelper.WriteExLog("[StartupAuth] stage=validate-response requestId=" + requestId
@@ -131,7 +140,7 @@ namespace IRSpeedyVPN.WebServices
                 // Otherwise treat as retryable
                 return null;
             },
-                SlowNetworkLoginBudgetSeconds);
+                SlowNetworkLoginBudgetSeconds, loginContext: loginContext);
         }
 
         internal BaseHttpResponse<DefaultPlainResponse<AccountInfoEx>> RemoveToken(
@@ -214,7 +223,8 @@ namespace IRSpeedyVPN.WebServices
             string flowName,
             Func<RestHelper, int?, BaseHttpResponse<TResponse>> call,
             int timeoutSeconds,
-            bool allowFailover = true)
+            bool allowFailover = true,
+            LoginNetworkContext loginContext = null)
         {
             LogHelper.WriteExLog("[StartupAuth] stage=start requestId=" + requestId + " flow=" + flowName);
 
@@ -233,6 +243,7 @@ namespace IRSpeedyVPN.WebServices
             {
                 while (attempts < _services.Count)
                 {
+                    loginContext?.Check();
                     var svc = _services[_index];
                     string endpoint = GetBaseUrl(svc);
                     int? perAttemptTimeout = null;
@@ -268,6 +279,9 @@ namespace IRSpeedyVPN.WebServices
 
                     try
                     {
+                        // Include payload construction/serialization and runtime
+                        // selection in the endpoint's existing deadline as well.
+                        loginContext?.BeginEndpoint((perAttemptTimeout ?? LoginEndpointTimeoutSeconds) * 1000);
                         var result = call(svc, perAttemptTimeout);
                         attemptSw.Stop();
 
@@ -326,6 +340,12 @@ namespace IRSpeedyVPN.WebServices
                             + " elapsedMs=" + attemptSw.ElapsedMilliseconds
                             + " exception=" + ex.GetType().FullName
                             + " hresult=0x" + ex.HResult.ToString("X8"));
+
+                        // Cancellation and ambiguous/posted requests must not be
+                        // replayed on the next API host either. HTTP responses keep
+                        // their existing policy (including an explicit HTTP 500).
+                        if (ex is OperationCanceledException
+                            || (ex is LoginTransportException sent && sent.MayHaveBeenSent)) throw;
 
                         if (!allowFailover)
                             throw;

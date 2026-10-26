@@ -11,7 +11,7 @@ using System.Threading;
 
 namespace IRSpeedyVPN.WebServices
 {
-    internal sealed class CurlHelper
+    internal sealed partial class CurlHelper
     {
         private const ushort PeMachineI386 = 0x014C;
         private const ushort PeMachineAmd64 = 0x8664;
@@ -579,7 +579,8 @@ namespace IRSpeedyVPN.WebServices
             string executablePath,
             string arguments,
             int? timeoutMilliseconds,
-            out bool processStarted)
+            out bool processStarted,
+            CancellationToken cancellation = default(CancellationToken))
         {
             processStarted = false;
             var processStopwatch = Stopwatch.StartNew();
@@ -611,6 +612,7 @@ namespace IRSpeedyVPN.WebServices
                         Interlocked.Add(ref stderrLength, args.Data.Length + 2);
                 };
 
+                cancellation.ThrowIfCancellationRequested();
                 if (!process.Start())
                     throw new InvalidOperationException("curl process could not be started.");
 
@@ -623,7 +625,17 @@ namespace IRSpeedyVPN.WebServices
                 {
                     // Process startup consumes the same deadline as the request.
                     long remainingMs = timeoutMilliseconds.Value - processStopwatch.ElapsedMilliseconds;
-                    exited = process.WaitForExit((int)Math.Max(0L, remainingMs));
+                    exited = false;
+                    while (remainingMs > 0)
+                    {
+                        if (cancellation.IsCancellationRequested)
+                        {
+                            try { process.Kill(); } catch { }
+                            cancellation.ThrowIfCancellationRequested();
+                        }
+                        if (process.WaitForExit((int)Math.Min(50L, remainingMs))) { exited = true; break; }
+                        remainingMs = timeoutMilliseconds.Value - processStopwatch.ElapsedMilliseconds;
+                    }
                 }
                 else
                 {
