@@ -29,7 +29,8 @@ namespace IRSpeedyVPN.Residential
             Height = 0; Visibility = Visibility.Collapsed; ClipToBounds = true;
             IsHitTestVisible = false; Focusable = false;
             var body = new Grid { Height = 74, RenderTransform = translation };
-            bar = new Border { Height = 64, Margin = new Thickness(0, 10, 0, 0), Padding = new Thickness(14, 10, 14, 10),
+            // 64 - 2*border(1) - 2*padding(9) = 44: never compress the ring.
+            bar = new Border { Height = 64, Margin = new Thickness(0, 10, 0, 0), Padding = new Thickness(14, 9, 14, 9),
                 CornerRadius = new CornerRadius(12), Background = Color("#202838"), BorderBrush = Color("#2D3850"), BorderThickness = new Thickness(1) };
             body.Children.Add(bar); Content = body;
             // Physical columns: badge left, text middle, ring right. Avoid inherited mirroring.
@@ -38,8 +39,8 @@ namespace IRSpeedyVPN.Residential
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             bar.Child = layout;
-            ring = new TrafficRing { Width = 44, Height = 44, FlowDirection = FlowDirection.LeftToRight };
-            ring.Children.Add(new Ellipse { Fill = Brushes.Transparent, Style = null, Stroke = Color("#1FFFFFFF"), StrokeThickness = 5 });
+            ring = new TrafficRing { Width = 44, Height = 44, VerticalAlignment = VerticalAlignment.Center, FlowDirection = FlowDirection.LeftToRight };
+            ring.Children.Add(new Ellipse { Margin = new Thickness(0.5), Fill = Brushes.Transparent, Style = null, Stroke = Color("#1FFFFFFF"), StrokeThickness = 5 });
             arc = new Path { Fill = Brushes.Transparent, Style = null, Stroke = Color("#F2C53D"), StrokeThickness = 5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
             ring.Children.Add(arc);
             percentage = Text("", 11, Brushes.White); percentage.FontWeight = FontWeights.SemiBold;
@@ -134,17 +135,17 @@ namespace IRSpeedyVPN.Residential
             if (ratio <= 0) return geometry;
             using (var context = geometry.Open())
             {
-                context.BeginFigure(new Point(22, 2.5), false, false);
+                context.BeginFigure(new Point(22, 3), false, false);
                 if (ratio >= 1)
                 {
-                    context.ArcTo(new Point(22, 41.5), new Size(19.5, 19.5), 0, false, SweepDirection.Clockwise, true, false);
-                    context.ArcTo(new Point(22, 2.5), new Size(19.5, 19.5), 0, false, SweepDirection.Clockwise, true, false);
+                    context.ArcTo(new Point(22, 41), new Size(19, 19), 0, false, SweepDirection.Clockwise, true, false);
+                    context.ArcTo(new Point(22, 3), new Size(19, 19), 0, false, SweepDirection.Clockwise, true, false);
                 }
                 else
                 {
                     double angle = ratio * Math.PI * 2;
-                    context.ArcTo(new Point(22 + 19.5 * Math.Sin(angle), 22 - 19.5 * Math.Cos(angle)),
-                        new Size(19.5, 19.5), 0, ratio > .5, SweepDirection.Clockwise, true, false);
+                    context.ArcTo(new Point(22 + 19 * Math.Sin(angle), 22 - 19 * Math.Cos(angle)),
+                        new Size(19, 19), 0, ratio > .5, SweepDirection.Clockwise, true, false);
                 }
             }
             geometry.Freeze(); return geometry;

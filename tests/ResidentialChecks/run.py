@@ -10,7 +10,7 @@ dotnet, csc, refs8, refs48 = sys.argv[1:]
 base = root / 'IRSpeedyVPN'
 models = [base/'Residential/ResidentialModels.cs', base/'Residential/ResidentialSubscription.cs', base/'Common/Json/JsonConvertibleAttribute.cs', base/'Common/Json/JsonPropertyAttribute.cs']
 def compile_to(output, refs, sources, extra_refs=()):
-    subprocess.run([dotnet,csc,'-nologo','-langversion:7.3','-nowarn:0649,0169,0067','-target:'+('exe' if output.name in ['checks.dll','state.dll'] else 'library'),'-out:'+str(output)]
+    subprocess.run([dotnet,csc,'-nologo','-langversion:7.3','-nowarn:0649,0169,0067','-target:'+('exe' if output.name in ['checks.dll','state.dll','startup.dll'] else 'library'),'-out:'+str(output)]
         + ['-r:'+str(p) for p in Path(refs).glob('*.dll') if p.name not in ['System.EnterpriseServices.Wrapper.dll','System.EnterpriseServices.Thunk.dll']] + ['-r:'+str(p) for p in extra_refs] + [str(p) for p in sources], check=True)
 with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     tmp=Path(tmp)
@@ -38,6 +38,18 @@ with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     compile_to(tmp/'state.dll', refs8, models+[base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',base/'Services/ServerCheckCache.cs',Path(__file__).with_name('CompileBoundary.cs'),Path(__file__).with_name('StateBoundary.cs'),Path(__file__).with_name('StateChecks.cs'),Path(__file__).with_name('CacheChecks.cs'),Path(__file__).with_name('HttpChecks.cs'),tmp/'GroupItem.cs',tmp/'StatusDetailProbe.cs',tmp/'DefaultSelectionProbe.cs',tmp/'RowInputProbe.cs'],[newtonsoft])
     (tmp/'state.runtimeconfig.json').write_text((tmp/'checks.runtimeconfig.json').read_text())
     subprocess.run([dotnet,str(tmp/'state.dll')],check=True)
+    recovery=(base/'Services/TunnelPlusService.NetworkRecovery.cs').read_text()
+    start=recovery.index('        private async Task RecheckResidentialStartupPoolAsync(')
+    method=recovery[start:recovery.index('        private Task<bool> QueuePoolAvailability(',start)]
+    (tmp/'StartupRecoveryWorker.cs').write_text('using System;using System.Linq;using System.Threading;using System.Threading.Tasks;using IRSpeedyVPN.Services.Libcore;namespace IRSpeedyVPN.Services{internal partial class TunnelPlusService{'+method+'}}')
+    startup_sources=[Path(__file__).with_name('StartupRecoveryChecks.cs'),tmp/'StartupRecoveryWorker.cs',Path(__file__).with_name('StartupRecoveryDtos.cs')]
+    compile_to(tmp/'startup.dll',refs8,startup_sources)
+    (tmp/'startup.runtimeconfig.json').write_text((tmp/'checks.runtimeconfig.json').read_text())
+    subprocess.run([dotnet,str(tmp/'startup.dll')],check=True)
+    compile_to(tmp/'startup-net48.dll',refs48,startup_sources)
+    assert 'Task.Run(() => RecheckResidentialStartupPoolAsync(generation, startupToken))' in recovery
+    assert 'if (this is Residential.ResidentialService && pooled)' in recovery
+    print('PASS production Residential startup recovery worker compiles against .NET Framework 4.8')
     compile_to(tmp/'residential-net48.dll', refs48, models + [base/'Residential/ResidentialTrafficBar.cs',base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs')])
     print('PASS Residential production C# against real .NET Framework 4.8 + WPF reference assemblies')
     ui_sources = list((base/'Residential').glob('*.cs')) + [p for p in (base/'Components/ServerListControl').glob('*.cs') if p.name!='CountryPickerSelector.cs'] + list((base/'UserControls').glob('UCServerList*.cs'))
@@ -92,6 +104,14 @@ assert 'TabKeyboardFocus' in uc and 'TargetName="TabFocus"' not in uc
 assert 'Value="0.55"' in uc and 'TargetName="ConnectSurface" Property="Effect" Value="{x:Null}"' in uc
 assert 'initializedProbeScopes.Contains(context)' in (base/'UserControls/UCServerList.xaml.cs').read_text()
 traffic=(base/'Residential/ResidentialTrafficBar.cs').read_text()
+# The border and vertical padding must leave the full 44-DIP ring viewport.
+assert 'Padding = new Thickness(14, 9, 14, 9)' in traffic and 64-2-9*2==44
+assert 'Margin = new Thickness(0.5)' in traffic
+assert 'new Point(22, 3)' in traffic and 'new Size(19, 19)' in traffic
+assert 22-19-5/2>=0 and 22+19+5/2<=44
+signal=next(e for e in xml.iter() if e.attrib.get('DataContext')=='{Binding SignalServer, Mode=OneWay}')
+assert signal.attrib['VerticalAlignment']=='Center' and not list(signal.iter('{http://schemas.microsoft.com/winfx/2006/xaml/presentation}TranslateTransform'))
+print('PASS full traffic-ring viewport and stroke margins; Residential ping shares the flag center without a vertical offset')
 assert 'Grid.SetColumn(ring, 2)' in traffic and 'Grid.SetColumn(badge, 0)' in traffic and 'percentage.Text' in traffic
 assert 'ReferenceEquals(TransitionBox.Content, uCServerList) ? ""' in main
 assert 'RetryRequested' not in controller and 'residentialChecksConsumed' not in controller

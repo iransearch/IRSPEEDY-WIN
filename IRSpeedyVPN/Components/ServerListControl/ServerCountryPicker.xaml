@@ -204,7 +204,6 @@
                   </StackPanel>
                 </Grid>
                 <StackPanel local:ServerCometPart.Part="0" DataContext="{Binding SignalServer, Mode=OneWay}" Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
-                  <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding IsResidential, Mode=OneWay}" Value="True"><Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="-8"/></Setter.Value></Setter></DataTrigger></Style.Triggers></Style></StackPanel.Style>
                   <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush, Mode=OneWay}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                   <StackPanel ToolTip="{Binding SignalToolTip, Mode=OneWay}">
                     <TextBlock Text="{Binding SignalText, Mode=OneWay}" FontWeight="Bold" FontSize="12.5" Foreground="{Binding SignalBrush, Mode=OneWay}"/>

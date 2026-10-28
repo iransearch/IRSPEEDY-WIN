@@ -1,4 +1,34 @@
-# Windows Residential (1.4.57)
+# Windows Residential (1.4.58)
+
+## 1.4.58: ring bounds, centered ping and initial pool recovery
+
+The 64-DIP traffic card previously left only 42 DIPs after its border and vertical
+padding for a 44-DIP ring. Vertical padding is now 9 DIPs, leaving exactly 44;
+the arc's 19-DIP radius and 5-DIP stroke also retain a half-DIP edge margin.
+The remaining fraction is unchanged: a 98% arc intentionally leaves 2% unfilled.
+Residential ping no longer has the -8-DIP name-line offset; it shares the flag's
+vertical center. VPN row appearance and all row dimensions remain unchanged.
+
+The supplied 1.4.57 log proves two different Turkey startup outcomes for the same
+one-member main pool: first, the completed initial round marks smart-proxy-0 dead
+with lastDialReason=timeout, zero alive/qualified members, and about 894 seconds
+until the next round; public-IP attempts fail with ConnectionReset. AI members
+are healthy independently. After manual reconnect, the main member is healthy
+(1129ms) and api.ipify.org returns HTTP 200 in 819ms. These observations do not
+identify the underlying cause of that first timeout, or prove an ISP DNS block.
+
+A Residential-only background worker now observes the initial round for up to
+20 seconds, waits for all probes to finish, and if every main member failed,
+gives the existing `proxy` selector one scoped recheck after a one-second grace.
+It revalidates status/generation under the existing lifecycle gate, never restarts
+Core or changes country, and never rechecks AI. Healthy, suspended, incomplete,
+missing/unsupported status and cancellation do not trigger recovery. Query/action
+RPCs retain 750ms bounds; disconnect/replacement invalidates the worker. A busy
+lifecycle gate skips recovery immediately rather than leaving a blocked worker. One
+recheck is a mitigation for transient startup failure, not a guarantee that an
+unreachable endpoint will connect. Existing periodic policy remains unchanged.
+Diagnostic events record accepted/unavailable/stopped results without links or
+credentials. Verify the second round and real connectivity on Windows/affected ISP.
 
 ## 1.4.57: contiguous location metadata
 
