@@ -193,12 +193,13 @@
                   </Grid>
                   <StackPanel local:ServerCometPart.Part="2" DataContext="{Binding NameServer, Mode=OneWay}" Grid.Column="1">
                       <TextBlock FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
-                    <Grid Margin="0,3,0,0" FlowDirection="RightToLeft">
+                    <!-- Desired width stays content-sized and right aligned. Auto preserves the
+                         complete city; only the remaining ISP column can ellipsize. -->
+                    <Grid Margin="0,3,0,0" FlowDirection="LeftToRight" HorizontalAlignment="Right" AutomationProperties.Name="{Binding LocationLine, Mode=OneWay}">
                       <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsResidential, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
-                      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
-                      <TextBlock Grid.Column="0" Text="{Binding City, Mode=OneWay}" MaxWidth="110" FontSize="11.5" Foreground="#A3ADC7" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight"/>
-                      <TextBlock Grid.Column="1" Text=" · " FontSize="11.5" Foreground="#A3ADC7"/>
-                      <TextBlock Grid.Column="2" Text="{Binding DisplayIsp, Mode=OneWay}" FontSize="11.5" Foreground="#8793B3" FlowDirection="LeftToRight" TextAlignment="Left" TextTrimming="CharacterEllipsis"/>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" FontSize="11.5" FlowDirection="LeftToRight" TextWrapping="NoWrap"><Run Text="{Binding LocationCity, Mode=OneWay}" Foreground="#A3ADC7"/><Run Text="{Binding LocationSeparator, Mode=OneWay}" Foreground="#8793B3"/></TextBlock>
+                      <TextBlock Grid.Column="1" Text="{Binding DisplayIsp, Mode=OneWay}" FontSize="11.5" Foreground="#8793B3" FlowDirection="LeftToRight" TextAlignment="Left" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"/>
                     </Grid>
                   </StackPanel>
                 </Grid>

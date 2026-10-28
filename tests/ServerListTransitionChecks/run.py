@@ -45,7 +45,7 @@ namespace IRSpeedyVPN.Common {
 namespace IRSpeedyVPN.Components.ServerListControl {
  class GroupItem {
   public bool IsResidential; public string City="",Isp="";
-  public string DisplayIsp=>Isp;public string RowToolTip=>CountryName;
+  public string LocationCity=>City;public string LocationSeparator=>"";public string LocationLine=>City+Isp;public string DisplayIsp=>Isp;public string RowToolTip=>CountryName;
   public string DisplaySignalText=>SignalText;
   public IVPNService Service; public string CountryName,Initials,SignalText,SignalToolTip="";
   public System.Windows.Media.ImageSource FlagSource;

@@ -18,6 +18,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public string City { get; }
         public string Isp { get; }
         public string DisplayIsp { get; }
+        public string LocationCity { get; }
+        public string LocationSeparator { get; }
+        public string LocationLine { get; }
         public string RowToolTip { get; }
         public double RowHeight => IsResidential ? 66 : 52;
         public double FlagSize => IsResidential ? 34 : 30;
@@ -45,6 +48,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             IsResidential = group.IsResidential; City = group.City; Isp = group.Isp;
             DisplayIsp = group.DisplayIsp; RowToolTip = group.RowToolTip;
+            LocationCity = group.LocationCity; LocationSeparator = group.LocationSeparator; LocationLine = group.LocationLine;
             Identity = LastSuccessfulServer.Key(group.Service);
             Service = group.Service;
             CountryName = group.CountryName;

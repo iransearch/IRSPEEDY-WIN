@@ -32,6 +32,11 @@ namespace IRSpeedyVPN.Residential
         internal const double ResidentialPingDisplayFactor = 0.7;
         internal static string DisplayIsp(string value) => Regex.Replace(value ?? "", @"\s*[\(\[]\s*AS\d+\s*[\)\]]", "", RegexOptions.IgnoreCase)
             .Trim().TrimEnd(' ', '-', '–', '—', '·');
+        // Keep separator decisions in the model; no conditional punctuation in XAML.
+        internal static string LocationSeparator(string city, string displayIsp) =>
+            !string.IsNullOrWhiteSpace(city) && !string.IsNullOrEmpty(displayIsp) ? " · " : "";
+        internal static string LocationLine(string city, string displayIsp) =>
+            (city ?? "").Trim() + LocationSeparator(city, displayIsp) + (displayIsp ?? "");
         internal static string ConnectionUri(string value) => (value ?? "").Split('#')[0];
         internal static long DisplayPing(long measured) => measured <= 0 ? measured
             : Math.Max(1, (long)Math.Round(measured * ResidentialPingDisplayFactor, MidpointRounding.AwayFromZero));

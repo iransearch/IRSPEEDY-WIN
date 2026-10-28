@@ -54,6 +54,18 @@ assert 'DisplayedServer.RowHeight' in picker and 'DisplayedServer.AutomationDesc
 assert 'IsFastest' not in picker and 'سریع‌ترین' not in picker and 'Row_KeyDown' in picker
 isp=next(e for e in xml.iter() if 'DisplayIsp' in e.attrib.get('Text',''))
 assert isp.attrib['FlowDirection']=='LeftToRight' and isp.attrib['TextTrimming']=='CharacterEllipsis'
+prefix=next(e for e in xml.iter() if any('LocationCity,' in child.attrib.get('Text','') for child in e))
+separator=next(e for e in prefix if 'LocationSeparator' in e.attrib.get('Text',''))
+assert separator.attrib['Foreground']=='#8793B3'
+location=next(e for e in xml.iter() if 'LocationLine' in e.attrib.get('AutomationProperties.Name',''))
+assert location.attrib['FlowDirection']=='LeftToRight' and location.attrib['HorizontalAlignment']=='Right'
+assert [e.attrib['Width'] for e in location.find('{http://schemas.microsoft.com/winfx/2006/xaml/presentation}Grid.ColumnDefinitions')]==['Auto','*']
+assert prefix.attrib['FlowDirection']=='LeftToRight' and 'TextTrimming' not in prefix.attrib and 'MaxWidth' not in prefix.attrib
+assert prefix.attrib['Grid.Column']=='0' and isp.attrib['Grid.Column']=='1'
+assert prefix.attrib['TextWrapping']==isp.attrib['TextWrapping']=='NoWrap'
+assert 'Text=" · "' not in picker
+print('PASS contiguous right-aligned LTR LocationLine: full city in Auto, only ISP ellipsizes, no unconditional separator')
+
 assert 'More locations are coming soon.' in picker and 'Signal_Retry' not in picker and 'PreviewMouseLeftButtonDown' not in picker
 uc=(base/'UserControls/UCServerList.xaml').read_text()
 assert 'ShowSmartCard="False"' in uc and 'ServiceTab_KeyDown' in uc

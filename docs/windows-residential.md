@@ -1,4 +1,21 @@
-# Windows Residential (1.4.56)
+# Windows Residential (1.4.57)
+
+## 1.4.57: contiguous location metadata
+
+Residential location metadata now uses a content-sized, right-aligned LTR Grid
+with two columns (`Auto`, `*`), rather than the full-width RTL three-column layout.
+The untrimmed city and conditional separator occupy the first column; only the
+ISP in the second column can ellipsize. Natural-width rows have no space between
+these parts. The existing 66-DIP row height, ping/radio offsets, selection and
+light-sweep ownership are unchanged. Very long cities can exhaust the available
+line width; they are never deliberately ellipsized to make room for an ISP.
+
+`LocationLine`, `LocationCity` and `LocationSeparator` share model formatting for city + ISP,
+city only, ISP only and empty values. The same immutable row snapshot carries these parts;
+there are no XAML separator conditions. City stays muted and the separator/ISP use #8793B3. `DisplayIsp` continues removing ASN and
+trailing delimiters. RowToolTip retains the full original ISP including ASN.
+Offline checks cover all four combinations, actual GroupItem forwarding and the
+new two-column XAML contract. WPF rendering remains a Windows smoke check.
 
 ## 1.4.56: shared VPN probe and selection policy
 

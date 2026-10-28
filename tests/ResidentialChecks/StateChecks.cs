@@ -75,6 +75,11 @@ internal static class StateChecks
             "missing subscription-userinfo never blocks loading the real country list");
         HttpChecks.Run().GetAwaiter().GetResult();
         Check(ResidentialPresentation.DisplayIsp("Vodafone GmbH (AS3209) - ")=="Vodafone GmbH","ASN and trailing separator are removed only from display ISP");
+        Check(ResidentialPresentation.LocationLine("Frankfurt am Main", "Vodafone GmbH")=="Frankfurt am Main · Vodafone GmbH", "LocationLine joins city and ISP with exactly one separator");
+        Check(ResidentialPresentation.LocationLine(" Berlin ", "")=="Berlin", "LocationLine city only has no trailing separator");
+        Check(ResidentialPresentation.LocationLine("", "Vodafone GmbH")=="Vodafone GmbH", "LocationLine ISP only has no leading separator");
+        Check(ResidentialPresentation.LocationLine(null, null)=="", "LocationLine empty parts have no separator");
+        Check(residentialRow.LocationLine==residentialRow.LocationCity+residentialRow.LocationSeparator+residentialRow.DisplayIsp, "actual GroupItem exposes the same contiguous LocationLine parts for the row");
         CacheChecks.Run();
         var defaults=new ResidentialViewModel(new GlobalInfo(),(url,token)=>Task.FromResult(new ResidentialViewModel.Payload {
             Body="vless://id@de.example:443#Frankfurt, DE / ISP\nvless://id@us.example:443#New York, US / ISP"}));

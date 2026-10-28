@@ -159,6 +159,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public string City => (Service as IRSpeedyVPN.Residential.ResidentialService)?.City ?? "";
         public string Isp => (Service as IRSpeedyVPN.Residential.ResidentialService)?.Isp ?? "";
         public string DisplayIsp => IRSpeedyVPN.Residential.ResidentialPresentation.DisplayIsp(Isp);
+        public string LocationCity => City.Trim();
+        public string LocationSeparator => IRSpeedyVPN.Residential.ResidentialPresentation.LocationSeparator(City, DisplayIsp);
+        public string LocationLine => IRSpeedyVPN.Residential.ResidentialPresentation.LocationLine(City, DisplayIsp);
         public string RowToolTip => CountryName + " · " + City + " · " + Isp.TrimEnd(' ', '-', '–', '—', '·');
         public string DisplaySignalText => IsResidential && IsChecking && SignalText == "—" ? "در حال تست…" : SignalText;
         private long DisplayLatency(long latency) => IsResidential ? IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(latency) : latency;
