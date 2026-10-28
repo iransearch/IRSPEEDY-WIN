@@ -4,14 +4,14 @@ Usage: run.py DOTNET CSC NET8_REFS NET48_REFS
 No live subscription, credentials, network or installed WPF desktop is used.
 """
 from pathlib import Path
-import json, subprocess, sys, tempfile, xml.etree.ElementTree as ET
+import json, shutil, subprocess, sys, tempfile, xml.etree.ElementTree as ET
 root = Path(__file__).resolve().parents[2]
 dotnet, csc, refs8, refs48 = sys.argv[1:]
 base = root / 'IRSpeedyVPN'
 models = [base/'Residential/ResidentialModels.cs', base/'Residential/ResidentialSubscription.cs', base/'Common/Json/JsonConvertibleAttribute.cs', base/'Common/Json/JsonPropertyAttribute.cs']
-def compile_to(output, refs, sources):
+def compile_to(output, refs, sources, extra_refs=()):
     subprocess.run([dotnet,csc,'-nologo','-langversion:7.3','-nowarn:0649,0169,0067','-target:'+('exe' if output.name in ['checks.dll','state.dll'] else 'library'),'-out:'+str(output)]
-        + ['-r:'+str(p) for p in Path(refs).glob('*.dll') if p.name not in ['System.EnterpriseServices.Wrapper.dll','System.EnterpriseServices.Thunk.dll']] + [str(p) for p in sources], check=True)
+        + ['-r:'+str(p) for p in Path(refs).glob('*.dll') if p.name not in ['System.EnterpriseServices.Wrapper.dll','System.EnterpriseServices.Thunk.dll']] + ['-r:'+str(p) for p in extra_refs] + [str(p) for p in sources], check=True)
 with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     tmp=Path(tmp)
     compile_to(tmp/'checks.dll', refs8, models+[Path(__file__).with_name('ModelChecks.cs')])
@@ -24,7 +24,13 @@ with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     status_source=(base/'UserControls/UCUserInfo.xaml.cs').read_text()
     status_methods=status_source[status_source.index('        private void RefreshServerDetail()'):status_source.index('        private void UserControl_IsVisibleChanged(')]
     (tmp/'StatusDetailProbe.cs').write_text('using System;using System.Collections.Generic;using System.Linq;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Models.NewService;class StatusDetailProbe{internal IRSpeedyVPN.Models.GlobalInfo globalInfo=new IRSpeedyVPN.Models.GlobalInfo();internal class Label{internal string Text;}internal Label txtServerDetail=new Label();private static string PersianDigits(string text)=>text;internal void Refresh()=>RefreshServerDetail();'+status_methods+'}')
-    compile_to(tmp/'state.dll', refs8, models+[base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs'),Path(__file__).with_name('StateBoundary.cs'),Path(__file__).with_name('StateChecks.cs'),Path(__file__).with_name('HttpChecks.cs'),tmp/'GroupItem.cs',tmp/'StatusDetailProbe.cs'])
+    selection_source=(base/'UserControls/UCServerList.Residential.cs').read_text()
+    start=selection_source.index('        private void TrySelectResidentialFastest()')
+    selection_method=selection_source[start:selection_source.index('\n        }',start)+10]
+    (tmp/'DefaultSelectionProbe.cs').write_text('using System.Linq;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Residential;class DefaultSelectionProbe{readonly ResidentialViewModel residential;bool isResidentialTab=true,connectionConnecting,connectionConnected;internal IVPNService selectedService;IVPNService residentialSelection;class Picker{internal IVPNService SelectedService;}readonly Picker residentialCountryPicker=new Picker();internal DefaultSelectionProbe(ResidentialViewModel vm){residential=vm;}void UpdateResidentialVisuals(){}internal void Choose()=>TrySelectResidentialFastest();'+selection_method+'}')
+    newtonsoft=Path(csc).resolve().parents[2]/'Newtonsoft.Json.dll'
+    shutil.copy2(newtonsoft,tmp/'Newtonsoft.Json.dll')
+    compile_to(tmp/'state.dll', refs8, models+[base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',base/'Services/ServerCheckCache.cs',Path(__file__).with_name('CompileBoundary.cs'),Path(__file__).with_name('StateBoundary.cs'),Path(__file__).with_name('StateChecks.cs'),Path(__file__).with_name('CacheChecks.cs'),Path(__file__).with_name('HttpChecks.cs'),tmp/'GroupItem.cs',tmp/'StatusDetailProbe.cs',tmp/'DefaultSelectionProbe.cs'],[newtonsoft])
     (tmp/'state.runtimeconfig.json').write_text((tmp/'checks.runtimeconfig.json').read_text())
     subprocess.run([dotnet,str(tmp/'state.dll')],check=True)
     compile_to(tmp/'residential-net48.dll', refs48, models + [base/'Residential/ResidentialTrafficBar.cs',base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs')])
@@ -40,9 +46,10 @@ xml=ET.fromstring(picker)
 parts=[v for e in xml.iter() for k,v in e.attrib.items() if k.endswith('ServerCometPart.Part')]
 assert sorted(parts)==['0','1','2','3','4']
 assert 'DisplayedServer.RowHeight' in picker and 'DisplayedServer.AutomationDescription' in picker
-assert 'IsFastest' not in picker and 'سریع‌ترین' not in picker and 'Row_KeyDown' in picker
-metadata=next(e for e in xml.iter() if e.tag.endswith('}TextBlock') and any('City' in child.attrib.get('Text','') for child in e))
-assert metadata.attrib['FlowDirection']=='LeftToRight' and metadata.attrib['TextAlignment']=='Right'
+assert 'IsFastest' in picker and 'سریع‌ترین' in picker and 'Row_KeyDown' in picker
+isp=next(e for e in xml.iter() if 'DisplayIsp' in e.attrib.get('Text',''))
+assert isp.attrib['FlowDirection']=='LeftToRight' and isp.attrib['TextTrimming']=='CharacterEllipsis'
+assert 'More locations are coming soon.' in picker and 'Signal_Retry' in picker
 uc=(base/'UserControls/UCServerList.xaml').read_text()
 assert 'ShowSmartCard="False"' in uc and 'ServiceTab_KeyDown' in uc
 for color in ['#1C2331','#2D3850','#3A5BC0','#2F4A9C','#A3ADC7']: assert color in uc
@@ -64,6 +71,12 @@ assert 'ValidateSessionAndRefreshServerList();' in cached and '_ = Task.Run(' in
 print('PASS remembered-account startup configures Residential before showing the chooser; old cache refresh uses the gated API off the startup path')
 success=main[main.index('uCServerList.MarkSuccessfulConnection(service);'):main.index('uCServerList.MarkSuccessfulConnection(service);')+200]
 assert 'ShowControl(uCUserInfo);' in success and 'ResidentialService' not in success
-print('PASS both successful connection kinds navigate to the status page; fastest badge removed and city/ISP direction corrected')
+assert 'TabKeyboardFocus' in uc and 'TargetName="TabFocus"' not in uc
+assert 'Value="0.55"' in uc and 'TargetName="ConnectSurface" Property="Effect" Value="{x:Null}"' in uc
+assert 'initializedProbeScopes.Contains(context)' in (base/'UserControls/UCServerList.xaml.cs').read_text()
+traffic=(base/'Residential/ResidentialTrafficBar.cs').read_text()
+assert 'Grid.SetColumn(ring, 2)' in traffic and 'Grid.SetColumn(badge, 0)' in traffic and 'percentage.Text' in traffic
+assert 'ReferenceEquals(TransitionBox.Content, uCServerList) ? ""' in main
+print('PASS status navigation, fastest badge, isolated ISP direction, retry/footer, disabled Connect and keyboard-only tab focus')
 print('PASS tabs, active connection identity, async picker ownership, shared row parts, keyboard/accessibility and existing 4-second loading wiring')
 

@@ -84,7 +84,8 @@ namespace IRSpeedyVPN.UserControls {
 namespace IRSpeedyVPN.Components.ServerListControl {
  public partial class ServerCountryPicker {
   readonly ItemsControl icCountries=new ItemsControl();readonly ScrollViewer ServerScroller=new ScrollViewer();readonly ServerListCometOverlay CometOverlay=new ServerListCometOverlay();
-  readonly Grid SmartCardHost=new Grid(),smartCheck=new Grid();readonly TextBlock EmptyResults=new TextBlock();
+  readonly Grid SmartCardHost=new Grid(),smartCheck=new Grid();readonly TextBlock EmptyResults=new TextBlock(),MoreLocations=new TextBlock();
   void InitializeComponent(){}
  }
 }
+

@@ -69,10 +69,14 @@ namespace IRSpeedyVPN.Services
         }
 
         private static string Key(IVPNService service, Url url)
+            => ConfigKey(service, url, service is IRSpeedyVPN.Residential.ResidentialService
+                ? IRSpeedyVPN.Residential.ResidentialPresentation.ConnectionUri(url.url) : url.url);
+
+        private static string ConfigKey(IVPNService service, Url url, string connection)
         {
             // ID identifies the row, the complete config fingerprint invalidates changed links.
             return Hash(JsonConvert.SerializeObject(new object[] { service.ID, service.Name, CountryKey(service),
-                url.url, url.extra_field_1, url.extra_field_2, url.chainproxy, url.is_subscription }));
+                connection, url.extra_field_1, url.extra_field_2, url.chainproxy, url.is_subscription }));
         }
 
         internal void Bind(IEnumerable<IVPNService> services)
@@ -87,6 +91,10 @@ namespace IRSpeedyVPN.Services
                         if (url == null || string.IsNullOrWhiteSpace(url.url)) continue;
                         string key = Key(service, url);
                         bound[url] = key;
+                        // Migrate the prior Residential fingerprint without discarding history.
+                        if (!state.Results.ContainsKey(key) && service is IRSpeedyVPN.Residential.ResidentialService
+                            && state.Results.TryGetValue(ConfigKey(service, url, url.url), out var legacy))
+                            state.Results[key] = legacy;
                         if (state.Results.TryGetValue(key, out var result)) Apply(url, result);
                         else
                         {
@@ -446,3 +454,4 @@ namespace IRSpeedyVPN.Services
         }
     }
 }
+

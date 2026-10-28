@@ -1,4 +1,60 @@
-# Windows Residential (1.4.54)
+# Windows Residential (1.4.55)
+
+## 1.4.55 probe lifecycle and requested presentation
+
+The submitted log showed a successful HTTP 200 download (3380 bytes), four
+countries, five supported candidates and valid traffic. Its only recorded probe
+country was VPN country 22, canceled during navigation; it contained no Residential
+probe result. It does not prove that the Residential endpoints failed or that
+previous ping files were deleted.
+
+The code used one login-bootstrap flag for both tabs. VPN could consume it before
+Residential opened, leaving a persisted stopped/completed Residential queue empty.
+Each account/service/protocol scope now retains its own cache instance and gets
+one bootstrap per login. Restarting a queue preserves committed results. Disconnect
+and connection-consumed state are handled across tabs without parallel Core tests.
+Scope/row start/end/empty-queue diagnostics distinguish no work from failure.
+
+Residential config fingerprints now exclude display/private URI fragments, while
+preserving transport parameters, credentials and original runtime links. Previous
+full-URI cache entries migrate on bind. A new city, ISP or private label no longer
+erases a valid ping; canceled tests restore committed results.
+
+Rows with compatible candidates stay selectable while pending, checking or after
+a failed probe. Only genuinely unsupported/empty pools disable/dim a row. Show
+`در حال تست…` when no ping is available, preserve cached/partial positive pings,
+and show `ناموفق` in #FB923C for completed failures. The failed indicator and header
+refresh start a retry through the existing manual-refresh pipeline. Selection
+availability is independent of test success: the shared planner still puts
+completed failures below waiting rows and moves only completed countries.
+
+The first completed positive results select the lowest displayed Residential ping
+only if nothing is already selected. An earlier manual selection is retained.
+The latest request restores the fastest badge removed in 1.4.54. Disabled Connect
+uses 55% opacity, no shadow and `یک سرور انتخاب کنید` as its tooltip.
+
+City and ISP use separate controls; ISP alone truncates at its end. ASN is removed
+from display but kept in the whole-row tooltip. The shared ISO resource maps US
+to `آمریکا`. Residential radio outlines use #6C7794 / 2 DIP, and the signal aligns
+with the country title. Short, unfiltered Residential lists show the requested
+`More locations are coming soon.` footer only when viewport space permits.
+
+The quota card uses explicit physical columns: ring right, text middle, active
+badge left. Track and arc share the same 44-DIP/5-DIP geometry, with transparent
+fill and no inherited ellipse style or inner disk. Remaining percentage appears
+in the ring. Tab focus uses WPF's keyboard-only FocusVisualStyle, 1.5 DIP #AAB4FF
+with a 2-DIP offset, with no mouse-focus border.
+
+The app's transition-ended handler could restore the obsolete server-list title
+after navigation had cleared it. It now leaves that title blank. This is an
+application-side candidate for clipped corner text; the log alone cannot identify
+an outside-window overlay in an unavailable screenshot.
+
+Additional offline checks execute the real persisted ServerCheckCache (including
+old-key migration), real row status/default-selection methods, and a selectable
+failed Residential row through the shared planner. All changed UI C# is checked
+against .NET Framework 4.8/WPF reference assemblies. Windows rendering, mouse vs
+keyboard focus, visual clipping and real Core probes remain manual smoke checks.
 
 ## 1.4.54 status page and row corrections
 

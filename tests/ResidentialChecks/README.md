@@ -15,6 +15,10 @@ assembly directory from `Microsoft.NETFramework.ReferenceAssemblies.net48`.
 No NuGet restore is needed by these commands. All generated assemblies are
 temporary. The .NET 4.8 compile uses actual WPF references; existing service
 boundaries are inert doubles, not substitute production implementations.
+The cache checks execute production `ServerCheckCache` with the .NET SDK's bundled
+`Newtonsoft.Json.dll`, copied next to the temporary test executable. They cover
+independent scopes, stopped queue restart, cancellation rollback, fragment-only
+metadata changes and migration of previous persisted fingerprints.
 
 The HTTPS fixture creates a temporary CA in the current test user's Root store,
 serves a local gzip/BOM subscription and removes that CA in `finally`. It never

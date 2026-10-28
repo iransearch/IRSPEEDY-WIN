@@ -41,7 +41,7 @@ namespace IRSpeedyVPN.UserControls
         internal IVPNService selectedService;
         internal void MarkSuccessfulConnection(IVPNService service)
         {
-            probeCache?.RecordConnectionResults(service);
+            foreach (var cache in probeCaches.Values) cache.RecordConnectionResults(service);
             (service is IRSpeedyVPN.Residential.ResidentialService ? residentialCountryPicker : vpnCountryPicker).MarkSuccessfulConnection(service);
             RecordServiceKind(service);
             UpdateConnectionState(service, false, true);
@@ -170,21 +170,24 @@ namespace IRSpeedyVPN.UserControls
             string context = (globalInfo?.Username ?? "") + "\n" + scope + "\n" + (protocol ?? "");
             if (probeCache == null || probeCacheContext != context)
             {
-                probeCache = new ServerCheckCache(globalInfo?.Username ?? "", scope + "\n" + (protocol ?? ""));
+                if (!probeCaches.TryGetValue(context, out probeCache))
+                    probeCaches[context] = probeCache = new ServerCheckCache(globalInfo?.Username ?? "", scope + "\n" + (protocol ?? ""));
                 probeCacheContext = context;
             }
             probeCache.Bind(services);
-            if (probeLoginRoundRequested)
+            if (services.Length > 0 && (probeLoginRoundRequested || !initializedProbeScopes.Contains(context)))
             {
                 // Bind first so the bootstrap queue is built from the current API
                 // objects, never stale rows left from the previous login.
                 probeCache.RestartForLogin();
+                initializedProbeScopes.Add(context);
                 probeLoginRoundRequested = false;
-                LogHelper.WriteExLog("[ServerChecks] login bootstrap round restarted rows=" + services.Length);
+                LogHelper.WriteExLog("[ServerChecks] login bootstrap round restarted rows=" + services.Length + " scope=" + (isResidentialTab ? "Residential" : "VPN"));
             }
             countryPicker.Load(services, _isUrlTestSupported);
             countryPicker.SelectedService = selectedService;
             countryPicker.SetFilter(txtSearch.Text);
+            TrySelectResidentialFastest();
             UpdateResidentialVisuals();
 
             RunBackgroundUrlTests(services);
@@ -246,6 +249,8 @@ namespace IRSpeedyVPN.UserControls
         private bool probeLoginRoundRequested;
         private ServerCheckCache probeCache;
         private string probeCacheContext;
+        private readonly Dictionary<string, ServerCheckCache> probeCaches = new Dictionary<string, ServerCheckCache>();
+        private readonly HashSet<string> initializedProbeScopes = new HashSet<string>();
 
         internal void PauseServerChecks()
         {
@@ -278,6 +283,7 @@ namespace IRSpeedyVPN.UserControls
 
         internal void PrepareServerChecksForLogin()
         {
+            initializedProbeScopes.Clear();
             // Every real login/app start begins one complete bootstrap scan. Cached
             // results remain visible, but a previously completed/stopped persisted
             // round must not leave NextService empty and silently suppress testing.
@@ -292,6 +298,9 @@ namespace IRSpeedyVPN.UserControls
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(() => ResumeServerChecksAfterCleanup(restartRound)); return; }
             if (restartRound)
             {
+                vpnChecksConsumed = residentialChecksConsumed = false;
+                initializedProbeScopes.Clear();
+                if (probeCacheContext != null) initializedProbeScopes.Add(probeCacheContext);
                 countryPicker.BeginCheckCycle();
                 probesRequireDisconnect = false;
                 probeRestartRequested = true;
@@ -310,7 +319,13 @@ namespace IRSpeedyVPN.UserControls
         private async void RunBackgroundUrlTests(IVPNService[] services)
         {
             if (manualRefreshBusy || probesPaused || probesRequireDisconnect || services == null || probeCache == null
-                || globalInfo?.CurrentService != null) return;
+                || globalInfo?.CurrentService != null)
+            {
+                if (isResidentialTab) LogHelper.WriteExLog("[ServerChecks] scope=Residential decision=deferred"
+                    + " manual=" + manualRefreshBusy + " paused=" + probesPaused + " consumed=" + probesRequireDisconnect
+                    + " connected=" + (globalInfo?.CurrentService != null) + " bound=" + (probeCache != null));
+                return;
+            }
             if (probeRunning) { probeWakeRequested = true; return; }
             var cache = probeCache;
             if (probeRestartRequested)
@@ -322,7 +337,11 @@ namespace IRSpeedyVPN.UserControls
                 countryPicker.EndCheckCycleSetup();
             }
             var service = cache.NextService;
-            if (service == null || !services.Contains(service)) return;
+            if (service == null || !services.Contains(service))
+            {
+                LogHelper.WriteExLog("[ServerChecks] scope=" + (isResidentialTab ? "Residential" : "VPN") + " decision=queue-empty rows=" + services.Length);
+                return;
+            }
             _urlTestCts?.Dispose();
             _urlTestCts = new CancellationTokenSource();
             var token = _urlTestCts.Token;
@@ -348,6 +367,8 @@ namespace IRSpeedyVPN.UserControls
             ServerCheckCache cache, CancellationToken token)
         {
             var picker = countryPicker;
+            string scope = service is IRSpeedyVPN.Residential.ResidentialService ? "Residential" : "VPN";
+            LogHelper.WriteExLog("[ServerChecks] scope=" + scope + " stage=row-start id=" + service.ID);
             if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
             int acceptingProgress = 1;
             picker.SetGroupChecking(service, true);
@@ -407,7 +428,11 @@ namespace IRSpeedyVPN.UserControls
             // (or restored cache on cancellation) before advancing/draining the worker.
             // Cancellation must not discard this refresh as it did in the queued path.
             if (ReferenceEquals(services, _currentServices))
+            {
                 picker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);
+                TrySelectResidentialFastest();
+            }
+            LogHelper.WriteExLog("[ServerChecks] scope=" + scope + " stage=row-end id=" + service.ID + " canceled=" + (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested));
             if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
             await Task.Run(() =>
             {
@@ -554,4 +579,5 @@ namespace IRSpeedyVPN.UserControls
         #endregion
     }
 }
+
 

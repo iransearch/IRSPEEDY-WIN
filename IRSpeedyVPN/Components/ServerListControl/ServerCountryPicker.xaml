@@ -1,4 +1,4 @@
-<UserControl xmlns:local="clr-namespace:IRSpeedyVPN.Components.ServerListControl" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker" mc:Ignorable="d" Loaded="Picker_Loaded" Unloaded="Picker_Unloaded" IsVisibleChanged="Picker_IsVisibleChanged" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" Foreground="{DynamicResource TextBodyBrush}">
+<UserControl xmlns:local="clr-namespace:IRSpeedyVPN.Components.ServerListControl" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:d="http://schemas.microsoft.com/expression/blend/2008" x:Class="IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker" mc:Ignorable="d" Loaded="Picker_Loaded" SizeChanged="Picker_SizeChanged" Unloaded="Picker_Unloaded" IsVisibleChanged="Picker_IsVisibleChanged" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" Foreground="{DynamicResource TextBodyBrush}">
   <UserControl.Resources>
   <DrawingImage x:Key="Mosaic.SmartSelection">
     <DrawingImage.Drawing>
@@ -145,7 +145,7 @@
                 <!-- Stable ServerRowPart IDs avoid enum-name conversion after release obfuscation. -->
                 <Grid local:ServerCometPart.Part="4" DataContext="{Binding SelectionServer, Mode=OneWay}" Grid.Column="3" Width="18" Height="18" HorizontalAlignment="Right" VerticalAlignment="Center">
                   <Grid.Style><Style TargetType="Grid"><Style.Triggers><DataTrigger Binding="{Binding Mode=OneWay}" Value="{x:Null}"><Setter Property="Visibility" Value="Hidden"/></DataTrigger></Style.Triggers></Style></Grid.Style>
-                  <Ellipse Stroke="{DynamicResource Theme.SelectionRingBrush}" StrokeThickness="1.5"/>
+                  <Ellipse><Ellipse.Style><Style TargetType="Ellipse"><Setter Property="Stroke" Value="{DynamicResource Theme.SelectionRingBrush}"/><Setter Property="StrokeThickness" Value="1.5"/><Style.Triggers><DataTrigger Binding="{Binding IsResidential, Mode=OneWay}" Value="True"><Setter Property="Stroke" Value="#6C7794"/><Setter Property="StrokeThickness" Value="2"/></DataTrigger></Style.Triggers></Style></Ellipse.Style></Ellipse>
                   <Grid Margin="-4">
                     <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsSelectedCountry, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                     <Ellipse Fill="{DynamicResource Theme.SurfaceBrush}" Stroke="{DynamicResource ServerCardBorderBrush}" StrokeThickness="1"/>
@@ -192,14 +192,24 @@
                     </Path>
                   </Grid>
                   <StackPanel local:ServerCometPart.Part="2" DataContext="{Binding NameServer, Mode=OneWay}" Grid.Column="1">
-                      <TextBlock FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
-                    <TextBlock Margin="0,3,0,0" FontSize="11.5" Foreground="{DynamicResource TextMutedBrush}" TextTrimming="CharacterEllipsis" TextAlignment="Right" FlowDirection="LeftToRight">
-                      <TextBlock.Style><Style TargetType="TextBlock"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsResidential, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></TextBlock.Style>
-                      <Run Text="{Binding City, Mode=OneWay}"/><Run Text=" · "/><Run Text="{Binding Isp, Mode=OneWay}" Foreground="#8793B3" FlowDirection="LeftToRight"/>
-                    </TextBlock>
+                      <DockPanel LastChildFill="True">
+                        <Border DockPanel.Dock="Left" CornerRadius="20" Background="#213FCF8E" Padding="6,2" Margin="0,0,5,0" VerticalAlignment="Center">
+                          <Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsFastest, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Border.Style>
+                          <TextBlock Text="سریع‌ترین" FontSize="10.5" FontWeight="SemiBold" Foreground="#3FCF8E"/>
+                        </Border>
+                        <TextBlock FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
+                      </DockPanel>
+                    <Grid Margin="0,3,0,0" FlowDirection="RightToLeft">
+                      <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsResidential, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
+                      <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
+                      <TextBlock Grid.Column="0" Text="{Binding City, Mode=OneWay}" MaxWidth="110" FontSize="11.5" Foreground="#A3ADC7" TextTrimming="CharacterEllipsis" FlowDirection="LeftToRight"/>
+                      <TextBlock Grid.Column="1" Text=" · " FontSize="11.5" Foreground="#A3ADC7"/>
+                      <TextBlock Grid.Column="2" Text="{Binding DisplayIsp, Mode=OneWay}" FontSize="11.5" Foreground="#8793B3" FlowDirection="LeftToRight" TextAlignment="Left" TextTrimming="CharacterEllipsis"/>
+                    </Grid>
                   </StackPanel>
                 </Grid>
-                <StackPanel local:ServerCometPart.Part="0" DataContext="{Binding SignalServer, Mode=OneWay}" Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
+                <StackPanel local:ServerCometPart.Part="0" DataContext="{Binding SignalServer, Mode=OneWay}" Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center" PreviewMouseLeftButtonDown="Signal_Retry">
+                  <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding IsResidential, Mode=OneWay}" Value="True"><Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="-8"/></Setter.Value></Setter></DataTrigger></Style.Triggers></Style></StackPanel.Style>
                   <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush, Mode=OneWay}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                   <StackPanel ToolTip="{Binding SignalToolTip, Mode=OneWay}">
                     <TextBlock Text="{Binding SignalText, Mode=OneWay}" FontWeight="Bold" FontSize="12.5" Foreground="{Binding SignalBrush, Mode=OneWay}"/>
@@ -309,16 +319,17 @@
       </Button>
     </Grid>
     <!-- The 6-DIP rail sits outside the cards, with a fixed left gutter. -->
-    <ScrollViewer x:Name="ServerScroller" Grid.Row="1" Margin="-4,0,0,0" Style="{StaticResource ServerScrollViewer}" Padding="0" Focusable="False">
+    <ScrollViewer x:Name="ServerScroller" Grid.Row="1" Margin="-4,0,0,0" Style="{StaticResource ServerScrollViewer}" ScrollChanged="ServerViewport_Changed" Padding="0" Focusable="False">
       <ItemsControl x:Name="icCountries" Focusable="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Button Style="{StaticResource ServerCardButton}" Height="{Binding DisplayedServer.RowHeight, Mode=OneWay}" Margin="0,0,0,8" IsEnabled="{Binding IsSelectable, Mode=OneWay}" Cursor="{Binding RowCursor, Mode=OneWay}" Click="Row_Click" PreviewKeyDown="Row_KeyDown" Tag="{Binding DisplayedServer.Identity, Mode=OneWay}" AutomationProperties.Name="{Binding DisplayedServer.AutomationDescription, Mode=OneWay}" AutomationProperties.HelpText="{Binding DisplayedServer.SignalText, Mode=OneWay}"/>
+            <Button Style="{StaticResource ServerCardButton}" Height="{Binding DisplayedServer.RowHeight, Mode=OneWay}" Margin="0,0,0,8" IsEnabled="{Binding IsSelectable, Mode=OneWay}" Cursor="{Binding RowCursor, Mode=OneWay}" Click="Row_Click" PreviewKeyDown="Row_KeyDown" Tag="{Binding DisplayedServer.Identity, Mode=OneWay}" AutomationProperties.Name="{Binding DisplayedServer.AutomationDescription, Mode=OneWay}" AutomationProperties.HelpText="{Binding DisplayedServer.SignalText, Mode=OneWay}" ToolTip="{Binding DisplayedServer.RowToolTip, Mode=OneWay}" ToolTipService.ShowOnDisabled="True"/>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>
     </ScrollViewer>
     <TextBlock x:Name="EmptyResults" Grid.Row="1" Text="سروری پیدا نشد" FontSize="13" Foreground="{DynamicResource TextMutedBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed" IsHitTestVisible="False"/>
+    <TextBlock x:Name="MoreLocations" Grid.Row="1" Text="More locations are coming soon." FontSize="13" Foreground="#8793B3" FlowDirection="LeftToRight" HorizontalAlignment="Center" VerticalAlignment="Top" Visibility="Collapsed" IsHitTestVisible="False"/>
     <local:ServerListCometOverlay x:Name="CometOverlay" Grid.RowSpan="2" FlowDirection="LeftToRight" IsHitTestVisible="False" Focusable="False"/>
   </Grid>
 </UserControl>

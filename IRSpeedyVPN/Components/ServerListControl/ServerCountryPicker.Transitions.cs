@@ -40,7 +40,13 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             EmptyResults.Visibility = _groups.Count == 0 && _serverList.Slots.Count == 0
                 ? Visibility.Visible : Visibility.Collapsed;
+            if (MoreLocations == null) return;
+            MoreLocations.Margin = new Thickness(0, _groups.Count * 74 + 10, 0, 0);
+            MoreLocations.Visibility = !ShowSmartCard && string.IsNullOrWhiteSpace(_filter) && _groups.Count > 0 && _groups.Count <= 5
+                && ServerScroller.ViewportHeight > _groups.Count * 74 + 45 ? Visibility.Visible : Visibility.Collapsed;
         }
+        private void Picker_SizeChanged(object sender, SizeChangedEventArgs e) => UpdateEmptyResultVisibility();
+        private void ServerViewport_Changed(object sender, System.Windows.Controls.ScrollChangedEventArgs e) => UpdateEmptyResultVisibility();
 
         private void QueueRowsUpdate()
         {
@@ -67,3 +73,4 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
     }
 }
+

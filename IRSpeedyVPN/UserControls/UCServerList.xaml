@@ -6,13 +6,13 @@
         card + country rows (ServerCountryPicker), Connect button.
     -->
   <UserControl.Resources>
+    <Style x:Key="TabKeyboardFocus" TargetType="Control"><Setter Property="Template"><Setter.Value><ControlTemplate><Border Margin="-2" BorderBrush="#AAB4FF" BorderThickness="1.5" CornerRadius="11"/></ControlTemplate></Setter.Value></Setter></Style>
     <Style x:Key="ServiceTab" TargetType="RadioButton">
-      <Setter Property="Height" Value="38"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="#A3ADC7"/><Setter Property="Background" Value="Transparent"/><Setter Property="Cursor" Value="Hand"/>
+      <Setter Property="FocusVisualStyle" Value="{StaticResource TabKeyboardFocus}"/><Setter Property="BorderThickness" Value="0"/><Setter Property="BorderBrush" Value="Transparent"/><Setter Property="Height" Value="38"/><Setter Property="FontSize" Value="14"/><Setter Property="Foreground" Value="#A3ADC7"/><Setter Property="Background" Value="Transparent"/><Setter Property="Cursor" Value="Hand"/>
       <Setter Property="Template"><Setter.Value><ControlTemplate TargetType="RadioButton">
-        <Grid><Border x:Name="TabSurface" Background="{TemplateBinding Background}" CornerRadius="9"/><Border x:Name="TabFocus" BorderThickness="1" BorderBrush="#AAB4FF" CornerRadius="9" Visibility="Collapsed"/><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
+        <Grid><Border x:Name="TabSurface" Background="{TemplateBinding Background}" CornerRadius="9"/><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
         <ControlTemplate.Triggers>
           <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/><Setter TargetName="TabSurface" Property="Background"><Setter.Value><LinearGradientBrush StartPoint="0,0" EndPoint="0,1"><GradientStop Color="#3A5BC0" Offset="0"/><GradientStop Color="#2F4A9C" Offset="1"/></LinearGradientBrush></Setter.Value></Setter></Trigger>
-          <Trigger Property="IsKeyboardFocusWithin" Value="True"><Setter TargetName="TabFocus" Property="Visibility" Value="Visible"/></Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
@@ -68,12 +68,12 @@
       <local:ServerCountryPicker x:Name="residentialCountryPicker" ShowSmartCard="False" Visibility="Collapsed"/>
     </Grid>
     <!-- Connect button -->
-    <Button x:Name="btnConnect" Grid.Row="4" Content="اتصال" Background="{DynamicResource AccentGradientBrush}" Height="56" Margin="0,12,0,0" Click="btnConnect_Click" Cursor="Hand" AutomationProperties.Name="اتصال">
+    <Button x:Name="btnConnect" ToolTipService.ShowOnDisabled="True" Grid.Row="4" Content="اتصال" Background="{DynamicResource AccentGradientBrush}" Height="56" Margin="0,12,0,0" Click="btnConnect_Click" Cursor="Hand" AutomationProperties.Name="اتصال">
       <Button.Template>
         <ControlTemplate TargetType="Button">
           <Grid x:Name="bd">
           <Grid.RenderTransform><TranslateTransform/></Grid.RenderTransform>
-          <Border CornerRadius="{StaticResource ConnectButtonCornerRadius}" Background="{TemplateBinding Background}">
+          <Border x:Name="ConnectSurface" CornerRadius="{StaticResource ConnectButtonCornerRadius}" Background="{TemplateBinding Background}">
             <Border.Effect>
               <DropShadowEffect x:Name="ConnectShadow" Color="{DynamicResource AccentColor}" Opacity="0.5" BlurRadius="22" ShadowDepth="10" Direction="270"/>
             </Border.Effect>
@@ -84,6 +84,7 @@
             </StackPanel>
           </Grid>
           <ControlTemplate.Triggers>
+            <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.55"/><Setter TargetName="ConnectSurface" Property="Effect" Value="{x:Null}"/></Trigger>
             <Trigger Property="IsMouseOver" Value="True">
               <Trigger.EnterActions><BeginStoryboard><Storyboard>
                 <DoubleAnimation Storyboard.TargetName="bd" Storyboard.TargetProperty="(UIElement.RenderTransform).(TranslateTransform.Y)" To="-1" Duration="0:0:0.15"/>
@@ -102,4 +103,5 @@
     </Button>
   </Grid>
 </UserControl>
+
 

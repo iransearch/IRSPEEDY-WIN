@@ -45,6 +45,8 @@ namespace IRSpeedyVPN.Common {
 namespace IRSpeedyVPN.Components.ServerListControl {
  class GroupItem {
   public bool IsResidential,IsFastest; public string City="",Isp="";
+  public string DisplayIsp=>Isp;public string RowToolTip=>CountryName;public bool ProbeFailed;
+  public string DisplaySignalText=>SignalText;public System.Windows.Media.Brush DisplaySignalBrush=>SignalBrush;
   public IVPNService Service; public string CountryName,Initials,SignalText,SignalToolTip="";
   public System.Windows.Media.ImageSource FlagSource;
   public System.Windows.Media.Brush SignalBrush;
@@ -89,6 +91,13 @@ class Program {
   }
  }
  static void Main(){
+  var resVm=new ServerListViewModel();resVm.BeginCheckCycle();
+  var resFailed=G(801);resFailed.IsResidential=true;resFailed.SortKey=long.MaxValue;resFailed.ProbeFailed=true;
+  var resWaiting=G(802);resWaiting.IsResidential=true;resWaiting.SortKey=long.MaxValue;
+  resVm.Publish(new[]{S(resFailed),S(resWaiting)},false);
+  resVm.Publish(new[]{S(resWaiting),S(resFailed)},true,true,S(resFailed).Identity);Drain(resVm);
+  Check(resVm.Slots[0].DisplayedServer.Service.ID==802&&resVm.Slots[1].DisplayedServer.IsSelectable,
+    "selectable failed Residential rows still sort below waiting rows without changing shared sweep eligibility");
   // BAML defers enum conversion until the country-row template is loaded.
   // Reproduce SmartAssembly field renaming and exercise the same converter
   // against the actual XAML values, independently of WPF/desktop availability.
@@ -280,4 +289,5 @@ with tempfile.TemporaryDirectory(prefix='server-comet-') as directory:
         subprocess.run([dotnet, str(path/'checks.dll')], check=True)
     else:
         subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',directory,'-v:q'],check=True)
+
 

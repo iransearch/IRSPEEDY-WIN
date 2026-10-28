@@ -46,6 +46,15 @@ internal static class StateChecks
         var vpn=new IRSpeedyVPN.Services.TunnelPlusService(new ServerEx{urls=new System.Collections.Generic.List<Url>{raw}},new GlobalInfo());
         var vpnRow=new GroupItem{Service=vpn};vpnRow.RefreshSignals();
         Check(vpnRow.SignalText=="101 ms"&&vpnRow.SortKey==101,"actual production GroupItem retains unchanged VPN ping and order");
+        residentialRow.IsChecking=true;
+        Check(residentialRow.IsSelectable && residentialRow.DisplaySignalText=="71 ms","cached Residential ping stays visible while a new test runs");
+        raw.latency=0;raw.latencychkTime=default(DateTime);residentialRow.RefreshSignals();
+        Check(residentialRow.IsSelectable && residentialRow.DisplaySignalText=="در حال تست…","Residential without a cached ping stays selectable and shows checking state");
+        residentialRow.ShowProgress(101);
+        Check(residentialRow.DisplaySignalText=="71 ms" && residentialRow.SortKey==long.MaxValue,"first real ping is displayed during testing without prematurely enabling country sorting");
+        residentialRow.IsChecking=false;raw.latency=-1;raw.latencychkTime=DateTime.Now;residentialRow.RefreshSignals();
+        Check(residentialRow.IsSelectable&&residentialRow.ProbeFailed&&residentialRow.DisplaySignalText=="ناموفق","failed Residential probe is distinct from disabled transport and remains selectable");
+        raw.latency=101;residentialRow.RefreshSignals();
         var status=new StatusDetailProbe();status.globalInfo.CurrentService=service;status.Refresh();
         Check(status.txtServerDetail.Text.StartsWith("71 "),"production connected page uses the same Residential display factor as its row");
         status.globalInfo.CurrentService=vpn;status.Refresh();
@@ -63,6 +72,18 @@ internal static class StateChecks
         Check(androidCatalog.VisibleTraffic==null && androidCatalog.CanConnect,
             "missing subscription-userinfo never blocks loading the real country list");
         HttpChecks.Run().GetAwaiter().GetResult();
+        Check(ResidentialPresentation.DisplayIsp("Vodafone GmbH (AS3209) - ")=="Vodafone GmbH","ASN and trailing separator are removed only from display ISP");
+        CacheChecks.Run();
+        var defaults=new ResidentialViewModel(new GlobalInfo(),(url,token)=>Task.FromResult(new ResidentialViewModel.Payload {
+            Body="vless://id@de.example:443#Frankfurt, DE / ISP\nvless://id@us.example:443#New York, US / ISP"}));
+        defaults.Configure(Account("defaults"));
+        var selection=new DefaultSelectionProbe(defaults);selection.Choose();
+        Check(selection.selectedService==null,"default selection waits for a real positive ping");
+        defaults.Services[0].GetServerUrls()[0].latency=200;defaults.Services[1].GetServerUrls()[0].latency=100;
+        selection.Choose();
+        Check(ReferenceEquals(selection.selectedService,defaults.Services[1]),"production default selection chooses the lowest displayed Residential ping");
+        selection.selectedService=defaults.Services[0];selection.Choose();
+        Check(ReferenceEquals(selection.selectedService,defaults.Services[0]),"a user's earlier manual selection is never replaced by the automatic fastest choice");
     }
 }
 

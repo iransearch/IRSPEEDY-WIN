@@ -158,6 +158,15 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public bool IsResidential => Service is IRSpeedyVPN.Residential.ResidentialService;
         public string City => (Service as IRSpeedyVPN.Residential.ResidentialService)?.City ?? "";
         public string Isp => (Service as IRSpeedyVPN.Residential.ResidentialService)?.Isp ?? "";
+        public string DisplayIsp => IRSpeedyVPN.Residential.ResidentialPresentation.DisplayIsp(Isp);
+        public string RowToolTip => CountryName + " · " + City + " · " + Isp.TrimEnd(' ', '-', '–', '—', '·');
+        public bool IsFastest { get; set; }
+        public bool ProbeFailed => IsResidential && !IsChecking && SortKey == long.MaxValue && GetUrls().Count > 0
+            && GetUrls().All(u => u.latencychkTime != default(DateTime));
+        public string DisplaySignalText => IsResidential && IsChecking && SignalText == "—" ? "در حال تست…"
+            : ProbeFailed ? "ناموفق" : IsResidential && SignalText == "—" && IsSelectable ? "در انتظار تست" : SignalText;
+        public Brush DisplaySignalBrush => ProbeFailed ? (Brush)new BrushConverter().ConvertFromString("#FB923C")
+            : IsResidential && SignalText == "—" ? ThemeManager.Instance.GetLiveBrush("TextSecondaryBrush") : SignalBrush;
         private long DisplayLatency(long latency) => IsResidential ? IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(latency) : latency;
 
         public ImageSource FlagSource { get; private set; }
@@ -269,7 +278,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 return;
             }
 
-            IsSelectable = false;
+            IsSelectable = IsResidential && urls.Any(u => !string.IsNullOrWhiteSpace(u.url));
             SortKey = long.MaxValue;
             var allFresh = urls.Count > 0 && urls.All(u =>
                 u.latencychkTime != default(DateTime));
@@ -312,6 +321,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private SelectionKind _kind = SelectionKind.None;
 
         public event Action<IVPNService> ServerSelected;
+        public event Action<IVPNService> RetryRequested;
 
         public IVPNService SelectedService
         {
@@ -499,6 +509,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         private void ResortGroups()
         {
+            var fastest = _allGroups.Where(g => g.IsResidential && g.SortKey > 0 && g.SortKey < long.MaxValue)
+                .OrderBy(g => g.SortKey).ThenBy(g => g.Service.ID).FirstOrDefault();
+            foreach (var group in _allGroups) group.IsFastest = ReferenceEquals(group, fastest);
             var ordered = ServerListRanking.Order(_allGroups, g => g.IsLastSuccessfulConnection,
                 g => g.SortKey, g => g.CountryName, g => g.Service?.ID ?? int.MaxValue).ToList();
 
@@ -572,6 +585,11 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             if (e.Key != Key.Enter && e.Key != Key.Space) return;
             Row_Click(sender, e); e.Handled = true;
+        }
+        private void Signal_Retry(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left || !((sender as FrameworkElement)?.DataContext is ServerItem item) || !item.ProbeFailed) return;
+            RetryRequested?.Invoke(item.Service); e.Handled = true;
         }
 
         private void Row_Click(object sender, RoutedEventArgs e)

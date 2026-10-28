@@ -30,6 +30,9 @@ namespace IRSpeedyVPN.Residential
     internal static class ResidentialPresentation
     {
         internal const double ResidentialPingDisplayFactor = 0.7;
+        internal static string DisplayIsp(string value) => Regex.Replace(value ?? "", @"\s*[\(\[]\s*AS\d+\s*[\)\]]", "", RegexOptions.IgnoreCase)
+            .Trim().TrimEnd(' ', '-', '–', '—', '·');
+        internal static string ConnectionUri(string value) => (value ?? "").Split('#')[0];
         internal static long DisplayPing(long measured) => measured <= 0 ? measured
             : Math.Max(1, (long)Math.Round(measured * ResidentialPingDisplayFactor, MidpointRounding.AwayFromZero));
         internal static string Digest(string value)

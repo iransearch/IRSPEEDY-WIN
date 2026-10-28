@@ -137,6 +137,7 @@ namespace IRSpeedyVPN.UserControls
                                     picker.SetGroupChecking(row, false);
                                     picker.RefreshGroup(row);
                                 }
+                                TrySelectResidentialFastest();
                             }));
                         };
                         TunnelPlusService.TestRefreshBatch(batch.Select(c => c.Probe).ToArray(), globalInfo, token, progress, complete);
@@ -179,4 +180,5 @@ namespace IRSpeedyVPN.UserControls
         }
     }
 }
+
 

@@ -16,7 +16,7 @@ namespace IRSpeedyVPN.Residential
         private readonly Border bar, badge;
         private readonly Grid ring;
         private readonly Path arc;
-        private readonly TextBlock remaining, used;
+        private readonly TextBlock remaining, used, percentage;
         private readonly TranslateTransform translation = new TranslateTransform();
         private bool shownOnce, targetVisible, previousConnected, pendingEntrance;
         private long animationGeneration;
@@ -32,15 +32,19 @@ namespace IRSpeedyVPN.Residential
             bar = new Border { Height = 64, Margin = new Thickness(0, 10, 0, 0), Padding = new Thickness(14, 10, 14, 10),
                 CornerRadius = new CornerRadius(12), Background = Color("#202838"), BorderBrush = Color("#2D3850"), BorderThickness = new Thickness(1) };
             body.Children.Add(bar); Content = body;
-            var layout = new Grid { FlowDirection = FlowDirection.RightToLeft };
+            // Physical columns: badge left, text middle, ring right. Avoid inherited mirroring.
+            var layout = new Grid { FlowDirection = FlowDirection.LeftToRight };
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
             layout.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             bar.Child = layout;
             ring = new TrafficRing { Width = 44, Height = 44, FlowDirection = FlowDirection.LeftToRight };
-            ring.Children.Add(new Ellipse { Stroke = Color("#1FFFFFFF"), StrokeThickness = 5, Margin = new Thickness(2.5) });
-            arc = new Path { Stroke = Color("#F2C53D"), StrokeThickness = 5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
-            ring.Children.Add(arc); layout.Children.Add(ring);
+            ring.Children.Add(new Ellipse { Fill = Brushes.Transparent, Style = null, Stroke = Color("#1FFFFFFF"), StrokeThickness = 5 });
+            arc = new Path { Fill = Brushes.Transparent, Style = null, Stroke = Color("#F2C53D"), StrokeThickness = 5, StrokeStartLineCap = PenLineCap.Round, StrokeEndLineCap = PenLineCap.Round };
+            ring.Children.Add(arc);
+            percentage = Text("", 11, Brushes.White); percentage.FontWeight = FontWeights.SemiBold;
+            percentage.HorizontalAlignment = HorizontalAlignment.Center; ring.Children.Add(percentage);
+            Grid.SetColumn(ring, 2); layout.Children.Add(ring);
             var labels = new StackPanel { Margin = new Thickness(10, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center };
             Grid.SetColumn(labels, 1); layout.Children.Add(labels);
             var line = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.LeftToRight };
@@ -55,7 +59,7 @@ namespace IRSpeedyVPN.Residential
             var status = new StackPanel { Orientation = Orientation.Horizontal };
             status.Children.Add(new Ellipse { Width = 7, Height = 7, Fill = Color("#3FCF8E"), Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
             var statusText = Text("در حال استفاده", 11, Color("#3FCF8E")); statusText.FontWeight = FontWeights.SemiBold; status.Children.Add(statusText);
-            badge.Child = status; Grid.SetColumn(badge, 2); layout.Children.Add(badge);
+            badge.Child = status; Grid.SetColumn(badge, 0); layout.Children.Add(badge);
             Loaded += (s, e) =>
             {
                 SystemParameters.StaticPropertyChanged += ParametersChanged;
@@ -79,6 +83,7 @@ namespace IRSpeedyVPN.Residential
             if (traffic != null)
             {
                 remaining.Text = traffic.RemainingText; used.Text = traffic.UsageText;
+                percentage.Text = traffic.Total == 0 ? "∞" : Math.Round(traffic.Ratio * 100).ToString(CultureInfo.InvariantCulture) + "%";
                 string description = Math.Round(traffic.Ratio * 100).ToString(CultureInfo.InvariantCulture) + " percent of traffic left";
                 AutomationProperties.SetName(ring, description); AutomationProperties.SetName(this, description);
                 arc.Data = MakeArc(traffic.Ratio);
@@ -146,3 +151,4 @@ namespace IRSpeedyVPN.Residential
         }
     }
 }
+

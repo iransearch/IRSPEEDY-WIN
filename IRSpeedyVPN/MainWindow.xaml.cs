@@ -390,7 +390,7 @@ namespace IRSpeedyVPN
         {
             if (TransitionBox.Content is IHasTitle)
             {
-                lblCtrlTitle.Text = ((IHasTitle)TransitionBox.Content).Title;
+                lblCtrlTitle.Text = ReferenceEquals(TransitionBox.Content, uCServerList) ? "" : ((IHasTitle)TransitionBox.Content).Title;
             }
         }
 

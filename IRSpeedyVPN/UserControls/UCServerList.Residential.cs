@@ -20,6 +20,7 @@ namespace IRSpeedyVPN.UserControls
         private long tabGeneration;
         private string configuredAccount = "";
         private IVPNService vpnSelection, residentialSelection;
+        private bool vpnChecksConsumed, residentialChecksConsumed;
         private ServerCountryPicker countryPicker => isResidentialTab ? residentialCountryPicker : vpnCountryPicker;
         internal event EventHandler OnDisconnectRequest;
         private string ServiceKindSetting => "LastServiceKind." + ResidentialPresentation.Digest(globalInfo?.Username ?? "");
@@ -48,6 +49,7 @@ namespace IRSpeedyVPN.UserControls
                 if (isResidentialTab) selectedService = service;
                 UpdateResidentialVisuals(); UpdateHeaderIcons();
             };
+            residentialCountryPicker.RetryRequested += service => RefreshServerResults();
         }
         internal void ConfigureResidential(AccountInfoEx account)
         {
@@ -65,6 +67,9 @@ namespace IRSpeedyVPN.UserControls
             settingTab = false;
             if (account == null)
             {
+                probeCaches.Clear(); initializedProbeScopes.Clear();
+                probeCache = null; probeCacheContext = null;
+                vpnChecksConsumed = residentialChecksConsumed = false;
                 vpnSelection = residentialSelection = selectedService = null;
                 residentialConnected = connectionConnecting = connectionConnected = false;
                 residentialCountryPicker.Load(new IVPNService[0], false);
@@ -89,8 +94,10 @@ namespace IRSpeedyVPN.UserControls
                 PauseServerChecks();
                 await DrainServerChecksAsync();
                 if (version != tabGeneration) return;
+                if (isResidentialTab) residentialChecksConsumed = probesRequireDisconnect; else vpnChecksConsumed = probesRequireDisconnect;
                 if (isResidentialTab) residentialSelection = selectedService; else vpnSelection = selectedService;
                 isResidentialTab = next;
+                probesRequireDisconnect = next ? residentialChecksConsumed : vpnChecksConsumed;
                 selectedService = next ? residentialSelection : vpnSelection;
                 probesPaused = false; _isLoading = false;
                 if (next) RefreshCountry(null); else ResolveServiceAndProtocol();
@@ -113,6 +120,7 @@ namespace IRSpeedyVPN.UserControls
             btnConnect.Content = connectionConnecting ? "در حال اتصال…" : connectionConnected ? "قطع اتصال" : "اتصال";
             System.Windows.Automation.AutomationProperties.SetName(btnConnect, (string)btnConnect.Content);
             btnConnect.IsEnabled = connectionConnecting || connectionConnected || !isResidentialTab || (residential.CanConnect && selectedService != null);
+            btnConnect.ToolTip = !btnConnect.IsEnabled && isResidentialTab && selectedService == null ? "یک سرور انتخاب کنید" : null;
             if (connectionConnected)
                 btnConnect.Background = new LinearGradientBrush((Color)ColorConverter.ConvertFromString("#2FB77C"), (Color)ColorConverter.ConvertFromString("#1F8C5C"), 90);
             else btnConnect.SetResourceReference(BackgroundProperty, "AccentGradientBrush");
@@ -131,5 +139,17 @@ namespace IRSpeedyVPN.UserControls
             try { RegHelper.SetSettingValue(ServiceKindSetting, service is ResidentialService ? "Residential" : "VPN"); }
             catch (Exception ex) { LogHelper.WriteLog(ex); }
         }
+        private void TrySelectResidentialFastest()
+        {
+            if (!isResidentialTab || selectedService != null || connectionConnecting || connectionConnected) return;
+            var fastest = residential.Services.Where(s => s.GetServerUrls().Any(u => u.latency > 0))
+                .OrderBy(s => ResidentialPresentation.DisplayPing(s.GetServerUrls().Where(u => u.latency > 0).Min(u => u.latency)))
+                .ThenBy(s => s.ID).FirstOrDefault();
+            if (fastest == null) return;
+            selectedService = residentialSelection = fastest;
+            residentialCountryPicker.SelectedService = fastest;
+            UpdateResidentialVisuals();
+        }
     }
 }
+
