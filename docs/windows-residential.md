@@ -1,4 +1,30 @@
-# Windows Residential (1.4.58)
+# Windows Residential (1.4.59)
+
+## 1.4.59: traffic card reference redesign
+
+The supplied glowing dashboard image is the visual reference: blue gradient shell,
+yellow remaining-traffic ring with database glyph on the left, larger remaining
+amount, muted usage line, consumption percentage and horizontal consumption track.
+The later `IRSpeedy-TrafficCard-WPF-Matched.zip` supersedes the first ZIP, which
+implemented a different full-card fill. Its native ring/bar layout, three-stop
+blue/yellow palettes and storage glyph are adapted to the existing compact window;
+demo bytes, fixed 420-DIP minimum, standalone window/slider and .NET 8 project are
+not imported. Production remains .NET Framework 4.8, using the existing byte formatter.
+
+The card is 100 DIPs tall (110 including its entrance gap), with a 58-DIP ring,
+25-DIP radius, 5-DIP stroke and explicit edge clearance. Physical LTR columns keep
+this reference orientation inside the RTL app. The existing shared byte formatter
+still supplies actual remaining/used amounts. The ring shows remaining fraction;
+the separate bar/percentage show the complement consumed. Unlimited traffic has
+a full remaining ring, infinity label and zero consumption fill. Missing/invalid
+traffic stays collapsed. The info glyph only explains the two measures on hover;
+there is no new click action. The green in-use pill replaces it only while the
+actual connection is Residential.
+
+Initial display, later 250ms fade/height/translation entrances, reduced-motion,
+account caching, fetch timers, cancellation, connection and recovery are unchanged.
+Consumption fill follows resize and refresh, cancels stale width clocks, and has
+no timer/render-loop subscription. No row or connection code changes are included.
 
 ## 1.4.58: ring bounds, centered ping and initial pool recovery
 

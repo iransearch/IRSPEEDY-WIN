@@ -104,15 +104,23 @@ assert 'TabKeyboardFocus' in uc and 'TargetName="TabFocus"' not in uc
 assert 'Value="0.55"' in uc and 'TargetName="ConnectSurface" Property="Effect" Value="{x:Null}"' in uc
 assert 'initializedProbeScopes.Contains(context)' in (base/'UserControls/UCServerList.xaml.cs').read_text()
 traffic=(base/'Residential/ResidentialTrafficBar.cs').read_text()
-# The border and vertical padding must leave the full 44-DIP ring viewport.
-assert 'Padding = new Thickness(14, 9, 14, 9)' in traffic and 64-2-9*2==44
-assert 'Margin = new Thickness(0.5)' in traffic
-assert 'new Point(22, 3)' in traffic and 'new Size(19, 19)' in traffic
-assert 22-19-5/2>=0 and 22+19+5/2<=44
+# Card/ring geometry from the supplied image, with clearance inside both bounds.
+assert 'CardHeight = 100' in traffic and 'ExpandedHeight = CardHeight + EntranceGap' in traffic
+assert 'Padding = new Thickness(16, 12, 16, 12)' in traffic and 100-2-12*2>=58
+assert 'RingSize = 58' in traffic and 'RingRadius = 25' in traffic and 'RingStroke = 5' in traffic
+assert 58/2-25-5/2>0 and 58/2+25+5/2<58
+assert 'Width = RingSize, Height = RingSize' in traffic and 'new Size(RingRadius, RingRadius)' in traffic
+assert 'usedFraction = traffic.Total == 0 ? 0 : 1 - traffic.Ratio' in traffic
+assert 'Math.Max(0, usageTrack.ActualWidth) * usedFraction' in traffic
+assert 'remainingValue.Text = traffic.RemainingText; usedValue.Text = traffic.UsageText;' in traffic
+assert 'usageTrack.SizeChanged +=' in traffic and 'usageFill.BeginAnimation(WidthProperty, null)' in traffic
+assert '650' not in traffic and 'TimeSpan.FromMilliseconds(250)' in traffic
+assert 'info.Visibility = connected ? Visibility.Collapsed : Visibility.Visible' in traffic
+assert '250ms' in (root/'docs/windows-residential.md').read_text().replace('250 ms','250ms')
 signal=next(e for e in xml.iter() if e.attrib.get('DataContext')=='{Binding SignalServer, Mode=OneWay}')
 assert signal.attrib['VerticalAlignment']=='Center' and not list(signal.iter('{http://schemas.microsoft.com/winfx/2006/xaml/presentation}TranslateTransform'))
-print('PASS full traffic-ring viewport and stroke margins; Residential ping shares the flag center without a vertical offset')
-assert 'Grid.SetColumn(ring, 2)' in traffic and 'Grid.SetColumn(badge, 0)' in traffic and 'percentage.Text' in traffic
+print('PASS reference traffic card: ring fits, actual usage drives the resize-safe fill and percentage, existing entrance lifecycle is preserved')
+assert 'Grid.SetColumn(ring, 0)' in traffic and 'Grid.SetColumn(side, 2)' in traffic and 'percentage.Text' in traffic
 assert 'ReferenceEquals(TransitionBox.Content, uCServerList) ? ""' in main
 assert 'RetryRequested' not in controller and 'residentialChecksConsumed' not in controller
 assert 'HasSuccessfulTest' not in (base/'Components/ServerListControl/ServerListViewModel.cs').read_text()
