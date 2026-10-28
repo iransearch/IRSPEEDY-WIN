@@ -191,6 +191,8 @@ namespace IRSpeedyVPN
                 SetLoginStage(2);
                 await Task.Run(() => serviceFactory.RenewServiceList(account.groups));
                 IsUserLogin = true;
+                // Cached startup bypasses ProcessInfo; it must configure Residential too.
+                uCServerList.ConfigureResidential(account);
 
                 // Disable the legacy 10-minute Login() renew loop. Session maintenance
                 // below validates credentials/session and refreshes servers every 30 min.
@@ -200,6 +202,16 @@ namespace IRSpeedyVPN
                 ShowMessage("");
                 ShowLoginServerList();
                 StartSessionMaintenance();
+                // Older cached payloads predate residential_vpn. Refresh using the
+                // existing authenticated, gated API path without delaying startup.
+                if (!LoadLocal && account.residential_vpn == null && account.UserAccount.residential_vpn == null)
+                {
+                    LogHelper.WriteExLog("[Residential] stage=cached-config-missing action=background-account-refresh");
+                    _ = Task.Run(() =>
+                    {
+                        if (IsUserLogin && !ExitCleanupStarted) ValidateSessionAndRefreshServerList();
+                    });
+                }
                 return true;
             }
             catch (Exception ex)
@@ -576,4 +588,5 @@ namespace IRSpeedyVPN
         }
     }
 }
+
 

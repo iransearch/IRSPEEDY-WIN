@@ -31,7 +31,14 @@ internal static class ModelChecks
         Check(ResidentialSubscription.Parse(Convert.ToBase64String(Encoding.UTF8.GetBytes(link)))[0].Nodes[0].Link == link, "base64 subscription");
         string base64url = Convert.ToBase64String(Encoding.UTF8.GetBytes(link)).TrimEnd('=').Replace('+','-').Replace('/','_');
         Check(ResidentialSubscription.Parse(base64url)[0].Nodes[0].Link == link, "URL-safe unpadded base64 subscription");
+        Check(ResidentialSubscription.Parse("\uFEFF" + link)[0].Nodes[0].Link == link, "Android BOM-prefixed plaintext subscription");
+        Check(ResidentialSubscription.Parse("\uFEFF" + base64url)[0].Nodes[0].Link == link, "Android BOM-prefixed Base64 subscription");
+        string android = "hysteria2://test@server.example:443#Frankfurt, Hesse, DE / ISP (AS1)#user-tag";
+        var androidNode = ResidentialSubscription.Parse(android)[0].Nodes[0];
+        Check(androidNode.Link == android && androidNode.Geography == "Frankfurt, Hesse, DE" && androidNode.Isp == "ISP (AS1)", "exact Android 1864dda fixture retains connection URI and strips private label suffix");
+        Check(ResidentialSubscription.Parse("malformed\n" + android + "\nvless://:443#Frankfurt, DE / ISP")[0].Nodes.Count == 1, "one malformed entry does not discard Android country metadata");
         Invalid("garbage"); Invalid("vless://a@host:443#Unknown"); Invalid("http://example.invalid/#Frankfurt, DE"); Invalid(new string('a', ResidentialSubscription.MaxBytes + 1));
         Console.WriteLine("Residential model checks: " + count);
     }
 }
+

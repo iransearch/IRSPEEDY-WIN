@@ -48,5 +48,17 @@ internal static class StateChecks
         Check(vpnRow.SignalText=="101 ms"&&vpnRow.SortKey==101,"actual production GroupItem retains unchanged VPN ping and order");
         Check(ResidentialService.IsPoolCompatible("vless://a@host:443") && ResidentialService.IsPoolCompatible("hy2://a@host:443")
             && !ResidentialService.IsPoolCompatible("anytls://a@host:443") && !ResidentialService.IsPoolCompatible("tuic://a@host:443"),"Residential never advertises native protocols unsupported by the existing Windows country pool");
+        var androidCatalog = new ResidentialViewModel(new GlobalInfo(), (url,token)=>Task.FromResult(new ResidentialViewModel.Payload {
+            Body="\uFEFFhysteria2://test@one.example:443#Frankfurt, Hesse, DE / ISP A#private\n"
+                +"hysteria2://test@two.example:443#Berlin, Berlin, DE / ISP B#other\n"
+                +"anytls://test@nl.example:443#Amsterdam, North Holland, NL / ISP#private",
+            TrafficHeader=null }));
+        androidCatalog.Configure(Account("android"));
+        Check(androidCatalog.Services.Length==2 && androidCatalog.Services.Sum(s=>s.GetServerUrls().Count)==2,
+            "Android countries are published even when a country has no Windows-compatible pool candidates");
+        Check(androidCatalog.VisibleTraffic==null && androidCatalog.CanConnect,
+            "missing subscription-userinfo never blocks loading the real country list");
+        HttpChecks.Run().GetAwaiter().GetResult();
     }
 }
+

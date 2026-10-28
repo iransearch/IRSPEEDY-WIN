@@ -10,6 +10,7 @@ namespace IRSpeedyVPN.Models.NewService
     [JsonConvertible]
     public class AccountInfoEx
     {
+        [JsonProperty("residential_vpn")]
         public IRSpeedyVPN.Residential.ResidentialConfig residential_vpn { get; set; }
         public List<Group> groups { get; set; }
         [JsonProperty("user_data")]
@@ -24,4 +25,5 @@ namespace IRSpeedyVPN.Models.NewService
 
 
 }
+
 

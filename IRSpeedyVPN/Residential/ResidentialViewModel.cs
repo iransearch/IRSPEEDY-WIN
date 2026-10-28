@@ -4,6 +4,7 @@ using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Models.NewService;
 using System;
 using System.ComponentModel;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -46,6 +47,10 @@ namespace IRSpeedyVPN.Residential
             bool allowed = config?.IsUsable == true && !ResidentialPresentation.IsEco(user?.GroupID ?? user?.group_id ?? user?.pid, user?.GroupName ?? user?.group_name);
             string next = account == null ? "" : ResidentialPresentation.Digest((global.Username ?? "") + "\n" + config?.subscription_url + "\n" + allowed);
             if (key == next) return;
+            LogHelper.WriteExLog("[Residential] stage=configure account=" + (account != null)
+                + " rootConfig=" + (account?.residential_vpn != null) + " nestedConfig=" + (user?.residential_vpn != null)
+                + " enabled=" + (config?.enabled ?? false) + " validUrl=" + ResidentialConfig.ValidUrl(config?.subscription_url)
+                + " allowed=" + allowed);
             generation++;
             download?.Cancel(); download = null;
             timer.Stop();
@@ -69,38 +74,44 @@ namespace IRSpeedyVPN.Residential
             long epoch = generation;
             var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             download = cancellation;
+            var elapsed = Stopwatch.StartNew();
+            string stage = "download";
+            LogHelper.WriteExLog("[Residential] stage=download-start generation=" + epoch);
             try
             {
                 var payload = await fetch(url, cancellation.Token);
                 cancellation.Token.ThrowIfCancellationRequested();
                 if (epoch != generation) return;
-                var parsed = ResidentialSubscription.Parse(payload.Body);
-                var catalog = parsed.Select(country =>
-                {
-                    var compatible = new ResidentialCountry { Code = country.Code };
-                    compatible.Nodes.AddRange(country.Nodes.Where(n => ResidentialService.IsPoolCompatible(n.Link)));
-                    return compatible;
-                }).Where(c => c.Nodes.Count > 0).ToArray();
-                int unsupported = parsed.Sum(c => c.Nodes.Count) - catalog.Sum(c => c.Nodes.Count);
-                if (unsupported > 0) LogHelper.WriteExLog("[Residential] unsupported-pool-links=" + unsupported);
+                stage = "parse";
+                var catalog = ResidentialSubscription.Parse(payload.Body);
+                int unsupported = catalog.Sum(c => c.Nodes.Count(n => !ResidentialService.IsPoolCompatible(n.Link)));
+                LogHelper.WriteExLog("[Residential] stage=catalog-parsed countries=" + catalog.Length
+                    + " nodes=" + catalog.Sum(c => c.Nodes.Count) + " unsupportedPoolLinks=" + unsupported
+                    + " elapsedMs=" + elapsed.ElapsedMilliseconds);
                 string next = string.Join("\n", catalog.OrderBy(c => c.Id).SelectMany(c => c.Nodes.Select(n => n.Link)));
                 bool changed = membership != next;
                 if (changed)
                 {
+                    stage = "services";
                     Services = catalog.Select(c => (IVPNService)new ResidentialService(c, global, key)).ToArray();
                     membership = next;
                 }
                 Traffic = ResidentialTraffic.Parse(payload.TrafficHeader);
                 failed = false; fetchedAt = DateTime.UtcNow;
+                stage = "publish";
                 Changed();
                 if (changed) CatalogChanged?.Invoke();
+                LogHelper.WriteExLog("[Residential] stage=published countries=" + Services.Length + " traffic=" + (Traffic != null));
             }
             catch (Exception ex)
             {
                 if (epoch != generation) return;
                 failed = true;
                 // Never log the token-bearing subscription URL or subscription links.
-                LogHelper.WriteExLog("[Residential] refresh-failed type=" + ex.GetType().Name);
+                LogHelper.WriteExLog("[Residential] stage=" + stage + " result=failed type=" + ex.GetType().Name
+                    + " reason=" + (ex is WebException web ? web.Status.ToString() : cancellation.IsCancellationRequested ? "canceled-or-deadline" : "invalid-response")
+                    + " httpStatus=" + (ex is WebException http && http.Response is HttpWebResponse response ? (int)response.StatusCode : 0)
+                    + " elapsedMs=" + elapsed.ElapsedMilliseconds);
                 Changed();
             }
             finally
@@ -118,6 +129,7 @@ namespace IRSpeedyVPN.Residential
                 if (!ResidentialConfig.ValidUrl(url)) throw new FormatException("Invalid subscription URL");
                 var request = (HttpWebRequest)WebRequest.Create(url);
                 request.Method = "GET"; request.Accept = "text/plain";
+                request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
                 request.Headers[HttpRequestHeader.CacheControl] = "no-cache";
                 request.AllowAutoRedirect = false; request.Timeout = 10000; request.ReadWriteTimeout = 10000;
                 // No CookieContainer, credentials, auth headers, or certificate callback.
@@ -125,6 +137,7 @@ namespace IRSpeedyVPN.Residential
                 using (var response = (HttpWebResponse)await request.GetResponseAsync().ConfigureAwait(false))
                 {
                     int code = (int)response.StatusCode;
+                    LogHelper.WriteExLog("[Residential] stage=http-response status=" + code + " redirects=" + redirects);
                     if (code >= 300 && code < 400)
                     {
                         if (redirects == 3 || string.IsNullOrWhiteSpace(response.Headers["Location"])) throw new WebException("Subscription redirects");
@@ -141,6 +154,8 @@ namespace IRSpeedyVPN.Residential
                             if (bytes.Length + read > ResidentialSubscription.MaxBytes) throw new FormatException("Subscription size");
                             bytes.Write(buffer, 0, read);
                         }
+                        LogHelper.WriteExLog("[Residential] stage=download-complete bytes=" + bytes.Length
+                            + " trafficHeader=" + (response.Headers["subscription-userinfo"] != null));
                         return new Payload { Body = Encoding.UTF8.GetString(bytes.ToArray()), TrafficHeader = response.Headers["subscription-userinfo"] };
                     }
                 }
@@ -149,3 +164,4 @@ namespace IRSpeedyVPN.Residential
         }
     }
 }
+

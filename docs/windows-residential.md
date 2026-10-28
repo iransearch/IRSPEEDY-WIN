@@ -1,4 +1,29 @@
-# Windows Residential (1.4.52)
+# Windows Residential (1.4.53)
+
+## 1.4.53 loading correction
+
+The remembered-account path (`TryApplyCachedAccountAsync`) bypasses `ProcessInfo`.
+1.4.52 configured Residential in manual login and maintenance refresh but omitted
+this cached startup path, leaving the repository unconfigured after reopening the
+app. It now configures Residential before showing the chooser. If an older cached
+account has no `residential_vpn` object in either supported location, schedule one
+background refresh through the existing authenticated API and `serverRefreshGate`;
+do not wait for that request in startup or repeat authentication in a loop.
+
+Match the subscription parsing in Android commit
+`1864ddaedf7f79f564b19bee1d54f425c5b2aaa1`: remove UTF-8 BOM before plain/Base64
+detection, parse the connection URI separately from display/private fragment tags,
+and preserve complete original links. HTTP gzip/deflate decompression is enabled.
+Publish every parsed country independently of Windows pool protocol compatibility;
+unsupported links are excluded only from executable pool candidates. Missing quota
+metadata never prevents publishing the country list. Explicit JSON wire names and
+rename exclusions protect the new subscription settings in packaged builds.
+
+Sanitized diagnostics identify configure, download, HTTP status/byte count,
+parse, published-country count and failures. No URL, token, node link, account
+payload, exception message or credentials are logged. The original screenshot
+alone cannot establish whether the live account additionally has an API, network
+or subscription-format failure; these stages make that distinction visible.
 
 ## Data and connection contract
 
@@ -29,8 +54,10 @@ protocol builders, routing, Shield, tests and country pool. No Core, Shield or
 VPN DNS race changes are included. **Current compatibility limit:** the Windows
 country pool accepts VLESS, Trojan, VMess, ss and Hysteria2/hy2. Android's AnyTLS,
 TUIC, SSH and `shadowsocks://` alias are not advertised as connectable pool links
-on Windows; they require separate transport work. Unsupported links are counted
-without logging their values. No synthetic servers or fake traffic are shown.
+on Windows; they require separate transport work. Their countries remain visible,
+and availability is determined by compatible Windows candidates and existing
+probes. Unsupported links are counted without logging their values. No synthetic
+servers or fake traffic are shown.
 
 ## State, presentation and lifecycle
 
@@ -71,14 +98,23 @@ minimum Connecting presentation remains unchanged.
 
 `tests/ResidentialChecks/run.py DOTNET CSC NET8_REFS NET48_REFS` runs offline:
 
-- 25 subscription, quota, formatting, endpoint validation and ECO model checks.
-- 11 repository/ping checks: account cancellation, late results, shared cache,
+- 29 subscription, quota, formatting, endpoint validation and ECO model checks,
+  including BOM-prefixed plain/Base64 and the exact Android private-tag fixture.
+- Repository/ping checks: account cancellation, late results, shared cache,
   retained selection objects, logout, ECO, hidden failure, timer retry, real
-  GroupItem Residential conversion, unchanged VPN pings and transport limits.
+  GroupItem Residential conversion, unchanged VPN pings, transport limits,
+  complete country publication and independent missing quota metadata.
+- Real loopback HTTPS GET through the production repository/download/parser:
+  gzip + BOM + Android metadata publishes two country pools and quota. A temporary
+  local CA is installed in the test process user's certificate store and removed
+  afterward; ordinary certificate/hostname validation stays enabled. Cancellation
+  closes the real socket and drains the test server worker.
 - Compiles production Residential code against actual .NET Framework 4.8 / WPF
   references, then production picker, row planner, sweep animation and UCServerList
   partials against the same references with inert existing service boundaries.
 - XML, immutable binding, keyboard, automation and connection-wiring contracts.
+  The cached startup guard verifies configuration before list display and a
+  background gated metadata refresh for pre-Residential cached payloads.
 
 Also run `tests/ServerListTransitionChecks/run.py`, `bindings.py` and
 `cycle_wiring.py`. The planner/timeline suite covers 720 permutations, rapid
@@ -111,3 +147,4 @@ prove a live authenticated subscription connection.
 
 The authenticated visual reference could not be inspected without signing in.
 The implementation follows the user's approved textual sizes, colors and behavior.
+

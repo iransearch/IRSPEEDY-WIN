@@ -17,13 +17,13 @@ namespace IRSpeedyVPN.Residential
         internal string AccountScope { get; }
         internal ResidentialService(ResidentialCountry country, GlobalInfo global, string accountScope)
             : base(new ServerEx { ID = country.Id, Country = country.Code, status = 1,
-                urls = country.Nodes.Select(n => new Url { url = n.Link, status = 1,
+                urls = country.Nodes.Where(n => IsPoolCompatible(n.Link)).Select(n => new Url { url = n.Link, status = 1,
                     extra_field_2 = new[] { "vless", "trojan", "vmess", "ss", "shadowsocks" }.Contains(n.Link.Split(':')[0].ToLowerInvariant()) ? "xray" : "singbox" }).ToList() }, global)
         {
             this.country = country;
             AccountScope = accountScope;
             Name = "Residential";
-            SetSmartFastUrls(country.Nodes.Select(n => n.Link).ToArray());
+            SetSmartFastUrls(GetServerUrls().Select(n => n.url).ToArray());
             SelectedServerUrl = GetServerUrls().FirstOrDefault();
         }
         private ResidentialNode DisplayNode
@@ -38,3 +38,4 @@ namespace IRSpeedyVPN.Residential
         internal string Isp => DisplayNode.Isp;
     }
 }
+

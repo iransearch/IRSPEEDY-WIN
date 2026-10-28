@@ -25,12 +25,15 @@ namespace IRSpeedyVPN.Residential
         internal static ResidentialCountry[] Parse(string text)
         {
             if (text == null || Encoding.UTF8.GetByteCount(text) > MaxBytes) throw new FormatException("Subscription size");
+            // Android strips the UTF-8 signature before testing plain/Base64 content.
+            text = text.Replace("\uFEFF", "").Trim();
             if (!text.Contains("://"))
             {
                 string encoded = new string(text.Where(c => !char.IsWhiteSpace(c)).ToArray()).Replace('-', '+').Replace('_', '/');
                 encoded = encoded.PadRight((encoded.Length + 3) / 4 * 4, '=');
                 text = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
             }
+            text = text.Replace("\uFEFF", "").Trim();
             var countries = new Dictionary<string, ResidentialCountry>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
             int count = 0;
@@ -46,20 +49,25 @@ namespace IRSpeedyVPN.Residential
                 string label;
                 try { label = Uri.UnescapeDataString(link.Substring(hash + 1)).Split('#')[0].Trim(); }
                 catch (UriFormatException) { continue; }
-                string[] meta = label.Split(new[] { '/' }, 2);
-                string geo = meta[0].Trim();
-                string code = geo.Split(',').Last().Trim().ToUpperInvariant();
+                int slash = label.IndexOf(" / ", StringComparison.Ordinal);
+                if (slash < 0) slash = label.IndexOf('/');
+                if (slash < 0) continue;
+                string geo = label.Substring(0, slash).Trim();
+                string network = label.Substring(slash + (label.Substring(slash).StartsWith(" / ", StringComparison.Ordinal) ? 3 : 1)).Trim();
+                int comma = geo.LastIndexOf(',');
+                if (comma < 0) continue;
+                string code = geo.Substring(comma + 1).Trim().ToUpperInvariant();
                 if (code == "UK") code = "GB";
                 if (code.Length != 2 || code.Any(c => c < 'A' || c > 'Z')) continue;
                 try { new RegionInfo(code); } catch (ArgumentException) { continue; }
                 if (!link.StartsWith("vmess://", StringComparison.OrdinalIgnoreCase) && !link.StartsWith("ss://", StringComparison.OrdinalIgnoreCase))
                 {
                     Uri uri;
-                    if (!Uri.TryCreate(link, UriKind.Absolute, out uri) || string.IsNullOrWhiteSpace(uri.Host) || uri.Port == 0) continue;
+                    if (!Uri.TryCreate(link.Substring(0, hash), UriKind.Absolute, out uri) || string.IsNullOrWhiteSpace(uri.Host) || uri.Port == 0) continue;
                 }
                 ResidentialCountry country;
                 if (!countries.TryGetValue(code, out country)) countries[code] = country = new ResidentialCountry { Code = code };
-                country.Nodes.Add(new ResidentialNode { Link = link, Identity = identity, Geography = geo, Isp = meta.Length > 1 ? meta[1].Trim() : "" });
+                country.Nodes.Add(new ResidentialNode { Link = link, Identity = identity, Geography = geo, Isp = network });
                 seen.Add(identity);
             }
             if (countries.Count == 0) throw new FormatException("Empty Residential subscription");
@@ -67,3 +75,4 @@ namespace IRSpeedyVPN.Residential
         }
     }
 }
+

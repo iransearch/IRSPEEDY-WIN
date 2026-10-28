@@ -10,9 +10,12 @@ using IRSpeedyVPN.Common.Json;
 namespace IRSpeedyVPN.Residential
 {
     [JsonConvertible]
+    [System.Reflection.Obfuscation(Exclude = true, ApplyToMembers = true)]
     public sealed class ResidentialConfig
     {
+        [JsonProperty("enabled")]
         public bool enabled { get; set; }
+        [JsonProperty("subscription_url")]
         public string subscription_url { get; set; }
         public bool IsUsable => enabled && ValidUrl(subscription_url);
         internal static bool ValidUrl(string value)
@@ -82,3 +85,4 @@ namespace IRSpeedyVPN.Residential
         }
     }
 }
+

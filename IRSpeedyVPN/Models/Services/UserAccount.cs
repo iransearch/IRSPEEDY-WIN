@@ -4,6 +4,7 @@ namespace IRSpeedyVPN.Models.Services
 {
     public class UserAccount
     {    
+        [System.Reflection.Obfuscation(Exclude = true)]
         public IRSpeedyVPN.Residential.ResidentialConfig residential_vpn { get; set; }
         public object GroupID { get; set; }
         public object group_id { get; set; }
@@ -23,3 +24,4 @@ namespace IRSpeedyVPN.Models.Services
     }
 
 }
+

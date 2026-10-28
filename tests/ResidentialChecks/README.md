@@ -1,6 +1,6 @@
 # Residential checks
 
-Run without real network access or credentials:
+Run without external network access or credentials (HTTPS tests use loopback):
 
 ```sh
 python tests/ResidentialChecks/run.py "$DOTNET" "$CSC" "$NET8_REFS" "$NET48_REFS"
@@ -16,5 +16,12 @@ No NuGet restore is needed by these commands. All generated assemblies are
 temporary. The .NET 4.8 compile uses actual WPF references; existing service
 boundaries are inert doubles, not substitute production implementations.
 
+The HTTPS fixture creates a temporary CA in the current test user's Root store,
+serves a local gzip/BOM subscription and removes that CA in `finally`. It never
+disables TLS validation. Use an isolated test user/container as with other local
+certificate fixtures. It checks the production GET-to-country-publication path
+and verifies cancellation drains the socket/server task.
+
 See `docs/windows-residential.md` for scope and required Windows visual/BAML,
 accessibility, live transport and lifecycle smoke tests.
+
