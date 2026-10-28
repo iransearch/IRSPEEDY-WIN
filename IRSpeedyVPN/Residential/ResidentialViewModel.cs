@@ -22,6 +22,7 @@ namespace IRSpeedyVPN.Residential
         private readonly DispatcherTimer timer;
         private readonly Func<string, CancellationToken, Task<Payload>> fetch;
         private CancellationTokenSource download;
+        private Task<bool> refreshTask;
         private string key = "", url, membership = "";
         private long generation;
         private bool visible, connected, failed;
@@ -52,7 +53,7 @@ namespace IRSpeedyVPN.Residential
                 + " enabled=" + (config?.enabled ?? false) + " validUrl=" + ResidentialConfig.ValidUrl(config?.subscription_url)
                 + " allowed=" + allowed);
             generation++;
-            download?.Cancel(); download = null;
+            download?.Cancel(); download = null; refreshTask = null;
             timer.Stop();
             key = next; url = allowed ? config.subscription_url : null; IsAllowed = allowed;
             Services = new IVPNService[0]; Traffic = null; membership = ""; failed = false;
@@ -68,11 +69,27 @@ namespace IRSpeedyVPN.Residential
             try { await RefreshAsync(); }
             catch (Exception ex) { LogHelper.WriteExLog("[Residential] refresh-error type=" + ex.GetType().Name); }
         }
-        internal async Task RefreshAsync()
+        internal Task<bool> RefreshAsync(bool force = false, CancellationToken cancellation = default(CancellationToken))
         {
-            if (!IsAllowed || download != null || (!failed && DateTime.UtcNow - fetchedAt < TimeSpan.FromSeconds(30))) return;
+            if (cancellation.IsCancellationRequested) return Task.FromCanceled<bool>(cancellation);
+            if (refreshTask != null && !refreshTask.IsCompleted) return JoinRefreshAsync(refreshTask, download, cancellation);
+            if (!IsAllowed || download != null || (!force && !failed && DateTime.UtcNow - fetchedAt < TimeSpan.FromSeconds(30))) return Task.FromResult(false);
+            return refreshTask = RefreshCoreAsync(cancellation);
+        }
+        private static async Task<bool> JoinRefreshAsync(Task<bool> pending, CancellationTokenSource owner, CancellationToken cancellation)
+        {
+            using (cancellation.Register(() => { try { owner?.Cancel(); } catch (ObjectDisposedException) { } }))
+            {
+                bool result = await pending;
+                cancellation.ThrowIfCancellationRequested();
+                return result;
+            }
+        }
+        private async Task<bool> RefreshCoreAsync(CancellationToken callerCancellation)
+        {
             long epoch = generation;
-            var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            var cancellation = CancellationTokenSource.CreateLinkedTokenSource(callerCancellation);
+            cancellation.CancelAfter(TimeSpan.FromSeconds(10));
             download = cancellation;
             var elapsed = Stopwatch.StartNew();
             string stage = "download";
@@ -81,7 +98,7 @@ namespace IRSpeedyVPN.Residential
             {
                 var payload = await fetch(url, cancellation.Token);
                 cancellation.Token.ThrowIfCancellationRequested();
-                if (epoch != generation) return;
+                if (epoch != generation) return false;
                 stage = "parse";
                 var catalog = ResidentialSubscription.Parse(payload.Body);
                 int unsupported = catalog.Sum(c => c.Nodes.Count(n => !ResidentialService.IsPoolCompatible(n.Link)));
@@ -102,10 +119,11 @@ namespace IRSpeedyVPN.Residential
                 Changed();
                 if (changed) CatalogChanged?.Invoke();
                 LogHelper.WriteExLog("[Residential] stage=published countries=" + Services.Length + " traffic=" + (Traffic != null));
+                return true;
             }
             catch (Exception ex)
             {
-                if (epoch != generation) return;
+                if (epoch != generation) return false;
                 failed = true;
                 // Never log the token-bearing subscription URL or subscription links.
                 LogHelper.WriteExLog("[Residential] stage=" + stage + " result=failed type=" + ex.GetType().Name
@@ -113,6 +131,7 @@ namespace IRSpeedyVPN.Residential
                     + " httpStatus=" + (ex is WebException http && http.Response is HttpWebResponse response ? (int)response.StatusCode : 0)
                     + " elapsedMs=" + elapsed.ElapsedMilliseconds);
                 Changed();
+                return false;
             }
             finally
             {

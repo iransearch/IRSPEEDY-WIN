@@ -1,60 +1,41 @@
-# Windows Residential (1.4.55)
+# Windows Residential (1.4.56)
 
-## 1.4.55 probe lifecycle and requested presentation
+## 1.4.56: shared VPN probe and selection policy
 
-The submitted log showed a successful HTTP 200 download (3380 bytes), four
-countries, five supported candidates and valid traffic. Its only recorded probe
-country was VPN country 22, canceled during navigation; it contained no Residential
-probe result. It does not prove that the Residential endpoints failed or that
-previous ping files were deleted.
+The superseded 1.4.55 selectable-failure and row-retry policy has been removed.
+There is no fastest badge or IsFastest row-model state. The optional Residential
+initial auto-choice remains a controller concern, not row presentation.
 
-The code used one login-bootstrap flag for both tabs. VPN could consume it before
-Residential opened, leaving a persisted stopped/completed Residential queue empty.
-Each account/service/protocol scope now retains its own cache instance and gets
-one bootstrap per login. Restarting a queue preserves committed results. Disconnect
-and connection-consumed state are handled across tabs without parallel Core tests.
-Scope/row start/end/empty-queue diagnostics distinguish no work from failure.
+| Area | VPN behavior and Residential alignment |
+| --- | --- |
+| Queue and scheduling | Same scoped bootstrap queue, sequential country worker, initial shuffle, failed-first disconnect order, member concurrency and retry policy. Separate caches and once-per-login scope initialization remain. |
+| Queued row | No positive result: disabled, arrow cursor, muted dash. |
+| Checking | Cached/current positive result remains visible and selectable. Without one, Residential displays the explicitly requested `در حال تست…` and stays disabled; VPN retains its checking flag sheen/dash. Real positive member progress follows the same shared eligibility rule. |
+| Success/failure | Positive current/cached result permits selection. Failed current results disable/dim the row even if display-only success history exists. VPN's muted dash and failure tooltip are used; the orange failure label is removed. |
+| Selection input | The same live GroupItem gate rejects mouse, Enter and Space on unhealthy rows without changing the selected card/service. WPF also skips disabled rows during keyboard navigation. |
+| Selected row later fails | VPN preserves its existing selection; Residential also preserves it, but its Connect action is disabled with `یک سرور انتخاب کنید` until the selection has a positive result, as explicitly requested. VPN Connect/default-selection behavior is unchanged. |
+| Ordering and animation | Both use IsSelectable to partition completed successes/failures. Only completed countries move; pending order, star pin and the shared light-sweep planner remain unchanged. HasSuccessfulTest is removed. |
+| Header refresh | Both drain work, fetch current service data, clear/reset only after a successful fetch, then use the shared ServerRefreshPlan. Residential fetches its subscription rather than the VPN account endpoint. A failed fetch retries the old list and preserves its previous results until probes finish. No row retry handler exists. |
+| Connection gating | One shared probesRequireDisconnect gate and CurrentService check; per-tab consumed-state overrides are removed. Neither tab probes during a live connection. |
+| Cancel / tab switch | Same cancel, drain, committed-result rollback and resume path. A manual subscription refresh joins an existing GET, honors cancellation and does not start a parallel request. |
+| Default selection | VPN retains its global Smart card and existing selection rules. Residential's retained auto-choice considers only positive results in rows that are not checking, and never replaces an existing manual choice. A last-connection star alone does not preselect an untested country. |
 
-Residential config fingerprints now exclude display/private URI fragments, while
-preserving transport parameters, credentials and original runtime links. Previous
-full-URI cache entries migrate on bind. A new city, ISP or private label no longer
-erases a valid ping; canceled tests restore committed results.
+The test-specific data/presentation differences are the 0.7 Residential display
+factor, city/ISP metadata, the explicitly requested checking text, and the retained
+healthy initial auto-choice. Country pools remain protocol-compatible with the
+existing Windows Core. The restored status-page route and the remaining quota,
+keyboard focus, country-name, radio and footer presentation are unchanged.
 
-Rows with compatible candidates stay selectable while pending, checking or after
-a failed probe. Only genuinely unsupported/empty pools disable/dim a row. Show
-`در حال تست…` when no ping is available, preserve cached/partial positive pings,
-and show `ناموفق` in #FB923C for completed failures. The failed indicator and header
-refresh start a retry through the existing manual-refresh pipeline. Selection
-availability is independent of test success: the shared planner still puts
-completed failures below waiting rows and moves only completed countries.
+Scoped caches preserve committed results, fragment-only metadata normalization
+and migration of prior full-URI fingerprints. The log analysis from 1.4.55 remains:
+the supplied log loaded four countries but contained only canceled VPN probes;
+it did not prove Residential endpoint failure or deletion of cache files.
 
-The first completed positive results select the lowest displayed Residential ping
-only if nothing is already selected. An earlier manual selection is retained.
-The latest request restores the fastest badge removed in 1.4.54. Disabled Connect
-uses 55% opacity, no shadow and `یک سرور انتخاب کنید` as its tooltip.
-
-City and ISP use separate controls; ISP alone truncates at its end. ASN is removed
-from display but kept in the whole-row tooltip. The shared ISO resource maps US
-to `آمریکا`. Residential radio outlines use #6C7794 / 2 DIP, and the signal aligns
-with the country title. Short, unfiltered Residential lists show the requested
-`More locations are coming soon.` footer only when viewport space permits.
-
-The quota card uses explicit physical columns: ring right, text middle, active
-badge left. Track and arc share the same 44-DIP/5-DIP geometry, with transparent
-fill and no inherited ellipse style or inner disk. Remaining percentage appears
-in the ring. Tab focus uses WPF's keyboard-only FocusVisualStyle, 1.5 DIP #AAB4FF
-with a 2-DIP offset, with no mouse-focus border.
-
-The app's transition-ended handler could restore the obsolete server-list title
-after navigation had cleared it. It now leaves that title blank. This is an
-application-side candidate for clipped corner text; the log alone cannot identify
-an outside-window overlay in an unavailable screenshot.
-
-Additional offline checks execute the real persisted ServerCheckCache (including
-old-key migration), real row status/default-selection methods, and a selectable
-failed Residential row through the shared planner. All changed UI C# is checked
-against .NET Framework 4.8/WPF reference assemblies. Windows rendering, mouse vs
-keyboard focus, visual clipping and real Core probes remain manual smoke checks.
+Tests execute the production row mouse/key handlers and initial auto-choice, real
+persisted caches, forced subscription refresh/failure/cancellation and the shared
+planner. All relevant UI C# is also compiled against .NET Framework 4.8/WPF
+references. Actual Windows rendering/BAML/input automation and live Core probes
+remain manual checks.
 
 ## 1.4.54 status page and row corrections
 

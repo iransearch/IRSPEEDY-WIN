@@ -192,13 +192,7 @@
                     </Path>
                   </Grid>
                   <StackPanel local:ServerCometPart.Part="2" DataContext="{Binding NameServer, Mode=OneWay}" Grid.Column="1">
-                      <DockPanel LastChildFill="True">
-                        <Border DockPanel.Dock="Left" CornerRadius="20" Background="#213FCF8E" Padding="6,2" Margin="0,0,5,0" VerticalAlignment="Center">
-                          <Border.Style><Style TargetType="Border"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsFastest, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Border.Style>
-                          <TextBlock Text="سریع‌ترین" FontSize="10.5" FontWeight="SemiBold" Foreground="#3FCF8E"/>
-                        </Border>
-                        <TextBlock FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
-                      </DockPanel>
+                      <TextBlock FlowDirection="LeftToRight" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource AppFontFamilySemiBold}" FontSize="14" Foreground="{DynamicResource RowTitleBrush}" TextAlignment="Right" ToolTip="{Binding CountryName, Mode=OneWay}"><Run FlowDirection="RightToLeft" Text="{Binding CountryName, Mode=OneWay}"/></TextBlock>
                     <Grid Margin="0,3,0,0" FlowDirection="RightToLeft">
                       <Grid.Style><Style TargetType="Grid"><Setter Property="Visibility" Value="Collapsed"/><Style.Triggers><DataTrigger Binding="{Binding IsResidential, Mode=OneWay}" Value="True"><Setter Property="Visibility" Value="Visible"/></DataTrigger></Style.Triggers></Style></Grid.Style>
                       <Grid.ColumnDefinitions><ColumnDefinition Width="Auto"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="*"/></Grid.ColumnDefinitions>
@@ -208,7 +202,7 @@
                     </Grid>
                   </StackPanel>
                 </Grid>
-                <StackPanel local:ServerCometPart.Part="0" DataContext="{Binding SignalServer, Mode=OneWay}" Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center" PreviewMouseLeftButtonDown="Signal_Retry">
+                <StackPanel local:ServerCometPart.Part="0" DataContext="{Binding SignalServer, Mode=OneWay}" Grid.Column="0" Orientation="Horizontal" FlowDirection="LeftToRight" VerticalAlignment="Center">
                   <StackPanel.Style><Style TargetType="StackPanel"><Style.Triggers><DataTrigger Binding="{Binding IsResidential, Mode=OneWay}" Value="True"><Setter Property="RenderTransform"><Setter.Value><TranslateTransform Y="-8"/></Setter.Value></Setter></DataTrigger></Style.Triggers></Style></StackPanel.Style>
                   <Ellipse Width="6" Height="6" Fill="{Binding SignalBrush, Mode=OneWay}" Margin="0,0,6,0" VerticalAlignment="Center"/>
                   <StackPanel ToolTip="{Binding SignalToolTip, Mode=OneWay}">

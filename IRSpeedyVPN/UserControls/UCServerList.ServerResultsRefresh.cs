@@ -57,7 +57,9 @@ namespace IRSpeedyVPN.UserControls
                 // Fetch and bind the latest API snapshot while this round owns
                 // the pause. A failed fetch tests the old list without erasing
                 // its committed results; cancellation still stops the round.
-                bool listRefreshed = !isResidentialTab && RefreshServerListRequest != null && await RefreshServerListRequest(current, token);
+                bool listRefreshed = isResidentialTab
+                    ? await residential.RefreshAsync(force: true, cancellation: token)
+                    : RefreshServerListRequest != null && await RefreshServerListRequest(current, token);
                 if (listRefreshed)
                 {
                     services = _currentServices;
@@ -138,6 +140,7 @@ namespace IRSpeedyVPN.UserControls
                                     picker.RefreshGroup(row);
                                 }
                                 TrySelectResidentialFastest();
+                                UpdateResidentialVisuals();
                             }));
                         };
                         TunnelPlusService.TestRefreshBatch(batch.Select(c => c.Probe).ToArray(), globalInfo, token, progress, complete);

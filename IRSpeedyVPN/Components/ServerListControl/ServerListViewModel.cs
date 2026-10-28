@@ -19,9 +19,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public string Isp { get; }
         public string DisplayIsp { get; }
         public string RowToolTip { get; }
-        public bool IsFastest { get; }
-        public bool ProbeFailed { get; }
-        public bool HasSuccessfulTest => IsResidential ? SortKey > 0 && SortKey < long.MaxValue : IsSelectable;
         public double RowHeight => IsResidential ? 66 : 52;
         public double FlagSize => IsResidential ? 34 : 30;
         public System.Windows.Point FlagCenter => new System.Windows.Point(FlagSize / 2, FlagSize / 2);
@@ -47,7 +44,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
         internal ServerItem(GroupItem group)
         {
             IsResidential = group.IsResidential; City = group.City; Isp = group.Isp;
-            DisplayIsp = group.DisplayIsp; RowToolTip = group.RowToolTip; IsFastest = group.IsFastest; ProbeFailed = group.ProbeFailed;
+            DisplayIsp = group.DisplayIsp; RowToolTip = group.RowToolTip;
             Identity = LastSuccessfulServer.Key(group.Service);
             Service = group.Service;
             CountryName = group.CountryName;
@@ -55,9 +52,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
             FlagSource = group.FlagSource;
             Initials = group.Initials;
             SignalText = group.DisplaySignalText;
-            SignalToolTip = group.ProbeFailed ? group.SignalToolTip + "\nبرای تلاش مجدد کلیک کنید." : group.SignalToolTip;
+            SignalToolTip = group.SignalToolTip;
             // Keep the live theme brush so a theme change still reaches cached rows.
-            SignalBrush = group.DisplaySignalBrush;
+            SignalBrush = group.SignalBrush;
             IsSelectable = group.IsSelectable;
             IsChecking = group.IsChecking;
             IsSelectedCountry = group.IsSelectedCountry;
@@ -67,7 +64,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         internal bool LooksLike(ServerItem other)
         {
             return other != null && IsResidential == other.IsResidential && City == other.City && Isp == other.Isp
-                && IsFastest == other.IsFastest && ProbeFailed == other.ProbeFailed
                 && Identity == other.Identity && CountryName == other.CountryName
                 && ReferenceEquals(FlagSource, other.FlagSource) && Initials == other.Initials
                 && SignalText == other.SignalText && SignalToolTip == other.SignalToolTip
@@ -221,9 +217,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
             // application's order; pending rows keep their relative order, and
             // completed failures follow them. Progress alone is never completion.
             var pinned = latest.FirstOrDefault(item => item.IsLastSuccessfulConnection);
-            var ordered = latest.Where(item => item.Identity != pinned?.Identity && CanMove(item) && item.HasSuccessfulTest);
+            var ordered = latest.Where(item => item.Identity != pinned?.Identity && CanMove(item) && item.IsSelectable);
             var waiting = current.Where(item => item.Identity != pinned?.Identity && !CanMove(item));
-            var failed = latest.Where(item => item.Identity != pinned?.Identity && CanMove(item) && !item.HasSuccessfulTest);
+            var failed = latest.Where(item => item.Identity != pinned?.Identity && CanMove(item) && !item.IsSelectable);
             return (pinned != null ? new[] { pinned } : Array.Empty<ServerItem>())
                 .Concat(ordered).Concat(waiting).Concat(failed).ToArray();
         }

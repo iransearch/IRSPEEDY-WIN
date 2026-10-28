@@ -187,7 +187,7 @@ namespace IRSpeedyVPN.UserControls
             countryPicker.Load(services, _isUrlTestSupported);
             countryPicker.SelectedService = selectedService;
             countryPicker.SetFilter(txtSearch.Text);
-            TrySelectResidentialFastest();
+            if (!preserveManualRefresh) TrySelectResidentialFastest();
             UpdateResidentialVisuals();
 
             RunBackgroundUrlTests(services);
@@ -298,7 +298,6 @@ namespace IRSpeedyVPN.UserControls
             if (!Dispatcher.CheckAccess()) { Dispatcher.Invoke(() => ResumeServerChecksAfterCleanup(restartRound)); return; }
             if (restartRound)
             {
-                vpnChecksConsumed = residentialChecksConsumed = false;
                 initializedProbeScopes.Clear();
                 if (probeCacheContext != null) initializedProbeScopes.Add(probeCacheContext);
                 countryPicker.BeginCheckCycle();
@@ -431,6 +430,7 @@ namespace IRSpeedyVPN.UserControls
             {
                 picker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);
                 TrySelectResidentialFastest();
+                UpdateResidentialVisuals();
             }
             LogHelper.WriteExLog("[ServerChecks] scope=" + scope + " stage=row-end id=" + service.ID + " canceled=" + (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested));
             if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
@@ -452,7 +452,7 @@ namespace IRSpeedyVPN.UserControls
             if (OnConnectRequest == null) return;
             if (isResidentialTab)
             {
-                if (selectedService == null || !residential.CanConnect) return;
+                if (!ResidentialSelectionHasSuccess() || !residential.CanConnect) return;
                 residential.Refresh();
                 OnConnectRequest.Invoke(this, selectedService, null, null);
                 return;

@@ -9,7 +9,8 @@ python tests/ServerListTransitionChecks/contracts.py
 python tests/ServerListTransitionChecks/cycle_wiring.py
 ```
 
-The contract check also reads the 1.4.20 row artwork from git commit `823c842`.
+The contract check validates the current shared template and its retained VPN
+defaults directly; it does not require the obsolete 1.4.20 commit snapshot.
 For native Windows BAML/layout/animation checks, use the existing
 `run-wpf.ps1 -AppPath <unobfuscated IRSpeedyVPN.exe>` in a Windows PowerShell STA
 session. The native check has not been run in the Linux environment.
@@ -68,3 +69,4 @@ Linux validation uses Roslyn C# 7.3 and .NET 8 reference/runtime assemblies.
 This verifies the converter failure mode, stable IDs, presentation contracts
 and state-machine behavior. It does not execute SmartAssembly or the final
 protected Windows single-file application.
+

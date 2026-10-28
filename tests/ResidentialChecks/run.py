@@ -27,10 +27,15 @@ with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     selection_source=(base/'UserControls/UCServerList.Residential.cs').read_text()
     start=selection_source.index('        private void TrySelectResidentialFastest()')
     selection_method=selection_source[start:selection_source.index('\n        }',start)+10]
-    (tmp/'DefaultSelectionProbe.cs').write_text('using System.Linq;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Residential;class DefaultSelectionProbe{readonly ResidentialViewModel residential;bool isResidentialTab=true,connectionConnecting,connectionConnected;internal IVPNService selectedService;IVPNService residentialSelection;class Picker{internal IVPNService SelectedService;}readonly Picker residentialCountryPicker=new Picker();internal DefaultSelectionProbe(ResidentialViewModel vm){residential=vm;}void UpdateResidentialVisuals(){}internal void Choose()=>TrySelectResidentialFastest();'+selection_method+'}')
+    health_start=selection_source.index('        private bool ResidentialSelectionHasSuccess()')
+    health_method=selection_source[health_start:selection_source.index(';',health_start)+1]
+    (tmp/'DefaultSelectionProbe.cs').write_text('using System.Linq;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Residential;class DefaultSelectionProbe{readonly ResidentialViewModel residential;bool isResidentialTab=true,connectionConnecting,connectionConnected;internal IVPNService selectedService;IVPNService residentialSelection;class Picker{internal IVPNService SelectedService;internal System.Collections.Generic.HashSet<int> Checking=new System.Collections.Generic.HashSet<int>();internal bool IsServiceChecking(IVPNService service)=>Checking.Contains(service.ID);}readonly Picker residentialCountryPicker=new Picker();internal DefaultSelectionProbe(ResidentialViewModel vm){residential=vm;}void UpdateResidentialVisuals(){}internal void SetChecking(IVPNService service,bool value){if(value)residentialCountryPicker.Checking.Add(service.ID);else residentialCountryPicker.Checking.Remove(service.ID);}internal void Choose()=>TrySelectResidentialFastest();'+health_method+'internal bool CanConnect()=>ResidentialSelectionHasSuccess();'+selection_method+'}')
+    start=picker_source.index('        private void Row_KeyDown(')
+    handlers=picker_source[start:picker_source.index('        #endregion',start)]
+    (tmp/'RowInputProbe.cs').write_text('using System;using System.Linq;using System.Collections.Generic;using System.Windows;using System.Windows.Input;using IRSpeedyVPN.Common;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Components.ServerListControl;class RowInputProbe{readonly List<GroupItem> _allGroups=new List<GroupItem>();internal IVPNService Selected;internal int Changes;internal RowInputProbe(GroupItem group,IVPNService selected){_allGroups.Add(group);Selected=selected;}bool PrepareCountryPool(GroupItem g,IVPNService s)=>g.IsSelectable;void Apply(IVPNService service,GroupItem group,SelectionKind kind){Selected=service;Changes++;}Action<IVPNService> ServerSelected;internal void Click(IVPNService service){Row_Click(new FrameworkElement{DataContext=new ServerDisplaySlot{DisplayedServer=new ServerItem{Identity=LastSuccessfulServer.Key(service)}}},new RoutedEventArgs());}internal void PressKey(IVPNService service,Key key){Row_KeyDown(new FrameworkElement{DataContext=new ServerDisplaySlot{DisplayedServer=new ServerItem{Identity=LastSuccessfulServer.Key(service)}}},new KeyEventArgs{Key=key});}'+handlers+'}')
     newtonsoft=Path(csc).resolve().parents[2]/'Newtonsoft.Json.dll'
     shutil.copy2(newtonsoft,tmp/'Newtonsoft.Json.dll')
-    compile_to(tmp/'state.dll', refs8, models+[base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',base/'Services/ServerCheckCache.cs',Path(__file__).with_name('CompileBoundary.cs'),Path(__file__).with_name('StateBoundary.cs'),Path(__file__).with_name('StateChecks.cs'),Path(__file__).with_name('CacheChecks.cs'),Path(__file__).with_name('HttpChecks.cs'),tmp/'GroupItem.cs',tmp/'StatusDetailProbe.cs',tmp/'DefaultSelectionProbe.cs'],[newtonsoft])
+    compile_to(tmp/'state.dll', refs8, models+[base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',base/'Services/ServerCheckCache.cs',Path(__file__).with_name('CompileBoundary.cs'),Path(__file__).with_name('StateBoundary.cs'),Path(__file__).with_name('StateChecks.cs'),Path(__file__).with_name('CacheChecks.cs'),Path(__file__).with_name('HttpChecks.cs'),tmp/'GroupItem.cs',tmp/'StatusDetailProbe.cs',tmp/'DefaultSelectionProbe.cs',tmp/'RowInputProbe.cs'],[newtonsoft])
     (tmp/'state.runtimeconfig.json').write_text((tmp/'checks.runtimeconfig.json').read_text())
     subprocess.run([dotnet,str(tmp/'state.dll')],check=True)
     compile_to(tmp/'residential-net48.dll', refs48, models + [base/'Residential/ResidentialTrafficBar.cs',base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs')])
@@ -46,10 +51,10 @@ xml=ET.fromstring(picker)
 parts=[v for e in xml.iter() for k,v in e.attrib.items() if k.endswith('ServerCometPart.Part')]
 assert sorted(parts)==['0','1','2','3','4']
 assert 'DisplayedServer.RowHeight' in picker and 'DisplayedServer.AutomationDescription' in picker
-assert 'IsFastest' in picker and 'سریع‌ترین' in picker and 'Row_KeyDown' in picker
+assert 'IsFastest' not in picker and 'سریع‌ترین' not in picker and 'Row_KeyDown' in picker
 isp=next(e for e in xml.iter() if 'DisplayIsp' in e.attrib.get('Text',''))
 assert isp.attrib['FlowDirection']=='LeftToRight' and isp.attrib['TextTrimming']=='CharacterEllipsis'
-assert 'More locations are coming soon.' in picker and 'Signal_Retry' in picker
+assert 'More locations are coming soon.' in picker and 'Signal_Retry' not in picker and 'PreviewMouseLeftButtonDown' not in picker
 uc=(base/'UserControls/UCServerList.xaml').read_text()
 assert 'ShowSmartCard="False"' in uc and 'ServiceTab_KeyDown' in uc
 for color in ['#1C2331','#2D3850','#3A5BC0','#2F4A9C','#A3ADC7']: assert color in uc
@@ -77,6 +82,8 @@ assert 'initializedProbeScopes.Contains(context)' in (base/'UserControls/UCServe
 traffic=(base/'Residential/ResidentialTrafficBar.cs').read_text()
 assert 'Grid.SetColumn(ring, 2)' in traffic and 'Grid.SetColumn(badge, 0)' in traffic and 'percentage.Text' in traffic
 assert 'ReferenceEquals(TransitionBox.Content, uCServerList) ? ""' in main
-print('PASS status navigation, fastest badge, isolated ISP direction, retry/footer, disabled Connect and keyboard-only tab focus')
+assert 'RetryRequested' not in controller and 'residentialChecksConsumed' not in controller
+assert 'HasSuccessfulTest' not in (base/'Components/ServerListControl/ServerListViewModel.cs').read_text()
+print('PASS no fastest row model/badge or row retry; shared success gate, refresh and disabled Connect')
 print('PASS tabs, active connection identity, async picker ownership, shared row parts, keyboard/accessibility and existing 4-second loading wiring')
 

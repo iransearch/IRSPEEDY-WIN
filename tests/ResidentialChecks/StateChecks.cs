@@ -49,11 +49,13 @@ internal static class StateChecks
         residentialRow.IsChecking=true;
         Check(residentialRow.IsSelectable && residentialRow.DisplaySignalText=="71 ms","cached Residential ping stays visible while a new test runs");
         raw.latency=0;raw.latencychkTime=default(DateTime);residentialRow.RefreshSignals();
-        Check(residentialRow.IsSelectable && residentialRow.DisplaySignalText=="در حال تست…","Residential without a cached ping stays selectable and shows checking state");
+        Check(!residentialRow.IsSelectable && residentialRow.DisplaySignalText=="در حال تست…","Residential without a cached ping is disabled while checking");
         residentialRow.ShowProgress(101);
         Check(residentialRow.DisplaySignalText=="71 ms" && residentialRow.SortKey==long.MaxValue,"first real ping is displayed during testing without prematurely enabling country sorting");
         residentialRow.IsChecking=false;raw.latency=-1;raw.latencychkTime=DateTime.Now;residentialRow.RefreshSignals();
-        Check(residentialRow.IsSelectable&&residentialRow.ProbeFailed&&residentialRow.DisplaySignalText=="ناموفق","failed Residential probe is distinct from disabled transport and remains selectable");
+        Check(!residentialRow.IsSelectable&&residentialRow.DisplaySignalText=="—"&&residentialRow.SignalToolTip.Contains("ناموفق"),"failed Residential row uses the same disabled/dash/tooltip policy as VPN");
+        var input=new RowInputProbe(residentialRow,vpn);input.Click(service);input.PressKey(service,System.Windows.Input.Key.Enter);input.PressKey(service,System.Windows.Input.Key.Space);
+        Check(input.Changes==0&&ReferenceEquals(input.Selected,vpn),"actual mouse/Enter/Space handlers never select failed rows or alter the current selection");
         raw.latency=101;residentialRow.RefreshSignals();
         var status=new StatusDetailProbe();status.globalInfo.CurrentService=service;status.Refresh();
         Check(status.txtServerDetail.Text.StartsWith("71 "),"production connected page uses the same Residential display factor as its row");
@@ -82,8 +84,36 @@ internal static class StateChecks
         defaults.Services[0].GetServerUrls()[0].latency=200;defaults.Services[1].GetServerUrls()[0].latency=100;
         selection.Choose();
         Check(ReferenceEquals(selection.selectedService,defaults.Services[1]),"production default selection chooses the lowest displayed Residential ping");
+        selection.selectedService=null;
+        defaults.Services[0].GetServerUrls()[0].latency=-1;defaults.Services[1].GetServerUrls()[0].latency=-1;selection.Choose();
+        Check(selection.selectedService==null,"automatic Residential selection never chooses a failed row");
+        defaults.Services[0].GetServerUrls()[0].latency=200;selection.SetChecking(defaults.Services[0],true);selection.Choose();
+        Check(selection.selectedService==null,"automatic Residential selection excludes an actively checking row even with a cached ping");
+        selection.SetChecking(defaults.Services[0],false);
         selection.selectedService=defaults.Services[0];selection.Choose();
         Check(ReferenceEquals(selection.selectedService,defaults.Services[0]),"a user's earlier manual selection is never replaced by the automatic fastest choice");
+        Check(selection.CanConnect(),"positive selected Residential row permits Connect");
+        defaults.Services[0].GetServerUrls()[0].latency=-1;
+        Check(!selection.CanConnect()&&ReferenceEquals(selection.selectedService,defaults.Services[0]),
+            "failed selected row retains the VPN-style choice but disables Residential Connect");
+        int forcedCalls=0;bool reject=false;
+        var forced=new ResidentialViewModel(new GlobalInfo(),(url,token)=>{forcedCalls++;return reject
+            ? Task.FromException<ResidentialViewModel.Payload>(new System.Net.WebException()) : Task.FromResult(Payload());});
+        forced.Configure(Account("forced"));var kept=forced.Services[0];kept.GetServerUrls()[0].latency=123;
+        Check(forced.RefreshAsync(force:true).GetAwaiter().GetResult()&&forcedCalls==2&&ReferenceEquals(kept,forced.Services[0]),
+            "header refresh fetches a fresh subscription despite quota TTL and preserves service objects until the shared reset");
+        reject=true;
+        Check(!forced.RefreshAsync(force:true).GetAwaiter().GetResult()&&ReferenceEquals(kept,forced.Services[0])&&kept.GetServerUrls()[0].latency==123,
+            "failed subscription refresh retains the old pool and committed results for the shared retry pipeline");
+        var pending=new TaskCompletionSource<ResidentialViewModel.Payload>();CancellationToken requestToken=default(CancellationToken);int pendingCalls=0;
+        var joined=new ResidentialViewModel(new GlobalInfo(),(url,token)=>{pendingCalls++;requestToken=token;return pending.Task;});
+        joined.Configure(Account("joined"));
+        using(var cancel=new CancellationTokenSource())
+        {
+            var manual=joined.RefreshAsync(force:true,cancellation:cancel.Token);cancel.Cancel();pending.SetResult(Payload());bool canceled=false;
+            try {manual.GetAwaiter().GetResult();} catch(OperationCanceledException){canceled=true;}
+            Check(canceled&&requestToken.IsCancellationRequested&&pendingCalls==1,"canceling a header refresh joins and aborts the existing GET without launching a second request");
+        }
     }
 }
 

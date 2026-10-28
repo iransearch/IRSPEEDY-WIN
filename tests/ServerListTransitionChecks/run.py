@@ -44,9 +44,9 @@ namespace IRSpeedyVPN.Common {
 }
 namespace IRSpeedyVPN.Components.ServerListControl {
  class GroupItem {
-  public bool IsResidential,IsFastest; public string City="",Isp="";
-  public string DisplayIsp=>Isp;public string RowToolTip=>CountryName;public bool ProbeFailed;
-  public string DisplaySignalText=>SignalText;public System.Windows.Media.Brush DisplaySignalBrush=>SignalBrush;
+  public bool IsResidential; public string City="",Isp="";
+  public string DisplayIsp=>Isp;public string RowToolTip=>CountryName;
+  public string DisplaySignalText=>SignalText;
   public IVPNService Service; public string CountryName,Initials,SignalText,SignalToolTip="";
   public System.Windows.Media.ImageSource FlagSource;
   public System.Windows.Media.Brush SignalBrush;
@@ -92,12 +92,12 @@ class Program {
  }
  static void Main(){
   var resVm=new ServerListViewModel();resVm.BeginCheckCycle();
-  var resFailed=G(801);resFailed.IsResidential=true;resFailed.SortKey=long.MaxValue;resFailed.ProbeFailed=true;
-  var resWaiting=G(802);resWaiting.IsResidential=true;resWaiting.SortKey=long.MaxValue;
+  var resFailed=G(801);resFailed.IsResidential=true;resFailed.SortKey=long.MaxValue;resFailed.IsSelectable=false;
+  var resWaiting=G(802);resWaiting.IsResidential=true;resWaiting.SortKey=long.MaxValue;resWaiting.IsSelectable=false;
   resVm.Publish(new[]{S(resFailed),S(resWaiting)},false);
   resVm.Publish(new[]{S(resWaiting),S(resFailed)},true,true,S(resFailed).Identity);Drain(resVm);
-  Check(resVm.Slots[0].DisplayedServer.Service.ID==802&&resVm.Slots[1].DisplayedServer.IsSelectable,
-    "selectable failed Residential rows still sort below waiting rows without changing shared sweep eligibility");
+  Check(resVm.Slots[0].DisplayedServer.Service.ID==802&&!resVm.Slots[1].DisplayedServer.IsSelectable,
+    "disabled failed Residential rows sort below waiting rows with the shared VPN selection gate");
   // BAML defers enum conversion until the country-row template is loaded.
   // Reproduce SmartAssembly field renaming and exercise the same converter
   // against the actual XAML values, independently of WPF/desktop availability.
