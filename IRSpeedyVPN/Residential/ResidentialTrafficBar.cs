@@ -33,6 +33,7 @@ namespace IRSpeedyVPN.Residential
         public ResidentialTrafficBar()
         {
             Height = 0; Visibility = Visibility.Collapsed; ClipToBounds = true;
+            FontFamily = new FontFamily("Segoe UI"); FlowDirection = FlowDirection.LeftToRight;
             Focusable = false; UseLayoutRounding = true; SnapsToDevicePixels = true;
             var body = new Grid { Height = ExpandedHeight, RenderTransform = translation };
             bar = new Border { Height = CardHeight, Margin = new Thickness(0, EntranceGap, 0, 0), Padding = new Thickness(16, 12, 16, 12),
@@ -69,27 +70,27 @@ namespace IRSpeedyVPN.Residential
             var remaining = Text("", 22, Brushes.White); remaining.FontWeight = FontWeights.Bold;
             remaining.FlowDirection = FlowDirection.LeftToRight; remaining.TextTrimming = TextTrimming.CharacterEllipsis;
             remaining.Inlines.Add(remainingValue = new Run());
-            remaining.Inlines.Add(new Run(" باقی‌مانده") { FontSize = 11.5, FontWeight = FontWeights.Normal,
-                Foreground = Color("#A4B7ED"), FlowDirection = FlowDirection.RightToLeft });
+            remaining.Inlines.Add(new Run(" left") { FontSize = 11.5, FontWeight = FontWeights.Normal,
+                Foreground = Color("#A4B7ED"), FlowDirection = FlowDirection.LeftToRight });
             labels.Children.Add(remaining);
             var used = Text("", 11.5, Color("#95AAE5")); used.FlowDirection = FlowDirection.LeftToRight;
             used.TextTrimming = TextTrimming.CharacterEllipsis; used.Margin = new Thickness(0, 4, 0, 0);
             used.Inlines.Add(usedValue = new Run());
-            used.Inlines.Add(new Run(" مصرف شده") { FlowDirection = FlowDirection.RightToLeft }); labels.Children.Add(used);
+            used.Inlines.Add(new Run(" used") { FlowDirection = FlowDirection.LeftToRight }); labels.Children.Add(used);
             var side = new StackPanel { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center,
                 HorizontalAlignment = HorizontalAlignment.Right };
             Grid.SetColumn(side, 2); layout.Children.Add(side);
             info = new Border { Width = 22, Height = 22, CornerRadius = new CornerRadius(11),
                 BorderBrush = Color("#93ABE9"), BorderThickness = new Thickness(1.4), HorizontalAlignment = HorizontalAlignment.Right,
-                ToolTip = "حلقه: ترافیک باقی‌مانده · نوار و درصد: ترافیک مصرف‌شده" };
+                ToolTip = "Ring: traffic remaining. Bar and percentage: traffic used." };
             var infoText = Text("i", 13, Color("#A8BBF5")); infoText.FontWeight = FontWeights.Bold;
             infoText.HorizontalAlignment = HorizontalAlignment.Center; info.Child = infoText; side.Children.Add(info);
             badge = new Border { CornerRadius = new CornerRadius(20), Background = Color("#243FCF8E"),
                 Padding = new Thickness(6, 3, 6, 3), HorizontalAlignment = HorizontalAlignment.Right };
-            var status = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.RightToLeft };
+            var status = new StackPanel { Orientation = Orientation.Horizontal, FlowDirection = FlowDirection.LeftToRight };
             status.Children.Add(new Ellipse { Width = 5, Height = 5, Fill = Color("#3FCF8E"),
                 Margin = new Thickness(0, 0, 4, 0), VerticalAlignment = VerticalAlignment.Center });
-            var statusText = Text("در حال استفاده", 10, Color("#3FCF8E")); statusText.FontWeight = FontWeights.SemiBold;
+            var statusText = Text("In use", 10, Color("#3FCF8E")); statusText.FontWeight = FontWeights.SemiBold;
             status.Children.Add(statusText); badge.Child = status; side.Children.Add(badge);
             percentage = Text("", 15, Color("#FFE46A")); percentage.FontWeight = FontWeights.Bold;
             percentage.Margin = new Thickness(0, 5, 0, 0); percentage.HorizontalAlignment = HorizontalAlignment.Right; side.Children.Add(percentage);
@@ -123,7 +124,7 @@ namespace IRSpeedyVPN.Residential
             bool show = traffic != null && activeTab;
             if (traffic != null)
             {
-                remainingValue.Text = traffic.RemainingText; usedValue.Text = traffic.UsageText;
+                remainingValue.Text = traffic.RemainingText; usedValue.Text = traffic.UsageText.Replace(" / ", " of ");
                 usedFraction = traffic.Total == 0 ? 0 : 1 - traffic.Ratio;
                 percentage.Text = traffic.Total == 0 ? "∞" : Math.Round(usedFraction * 100).ToString(CultureInfo.InvariantCulture) + "%";
                 string description = traffic.Total == 0 ? "Unlimited traffic" : Math.Round(traffic.Ratio * 100).ToString(CultureInfo.InvariantCulture) + " percent of traffic left";

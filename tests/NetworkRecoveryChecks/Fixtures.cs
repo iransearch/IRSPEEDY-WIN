@@ -14,10 +14,11 @@ namespace IRSpeedyVPN.Services {
         sealed class Info { internal object CurrentService; }
         void Diagnostic(string stage, string fields) { }
         void RequestConnectionState(string reason) { }
-        internal static TunnelPlusService RecoveryFixture(int port)
+        internal static TunnelPlusService RecoveryFixture(int port, bool residential = false)
         {
-            var service = new TunnelPlusService { CorePort=port, IsConnected=true, autoSelectorPlan=new object(),
-                lastListenPort=1, gInfo=new Info() };
+            var service = residential ? new ResidentialRecoveryFixture() : new TunnelPlusService();
+            service.CorePort=port;service.IsConnected=true;service.autoSelectorPlan=new object();
+            service.lastListenPort=1;service.gInfo=new Info();
             service.gInfo.CurrentService=service;
             service.BeginNetworkRecoverySession();
             return service;
@@ -28,4 +29,5 @@ namespace IRSpeedyVPN.Services {
             EndNetworkRecoverySession();
         }
     }
+    internal sealed class ResidentialRecoveryFixture : TunnelPlusService { }
 }

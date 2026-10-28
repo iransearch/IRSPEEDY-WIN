@@ -106,6 +106,9 @@ namespace IRSpeedyVPN.Services
         public event OnConnectDisconnect onConnectDisconnect;
         bool useSystemProxy = false;
         Process coreProcess;
+        // A read-only exit binding, separate from process lifecycle ownership.
+        // The process may have been started by a previous country/test service.
+        private Process recoveryCoreProcess;
         Process vpnCoreProcess;
         bool coreOwned;
         bool vpnCoreOwned;
@@ -1434,6 +1437,8 @@ namespace IRSpeedyVPN.Services
 
         private static readonly object ownedExitGate = new object();
         private static readonly List<Process> ownedExitProcesses = new List<Process>();
+        private static Process ownedMainCoreProcess;
+        private static DateTime ownedMainCoreStartedUtc;
         private static volatile bool applicationExiting;
 
         internal static void BeginApplicationExit()
@@ -1468,6 +1473,7 @@ namespace IRSpeedyVPN.Services
                 if (ProtorpcClient.CanConnect("127.0.0.1", port, 200))
                 {
                     CoreDiagnosticMetadata.ObserveListener(port);
+                    BindReusedCoreExitSource(port);
                     Diagnostic("core-reuse", "port=" + port + " referencedPid=" + DiagnosticPid(process) + " owned=" + owned);
                     return;
                 }
@@ -1561,6 +1567,11 @@ namespace IRSpeedyVPN.Services
                         if (!startedProcess.Start())
                             throw new InvalidOperationException("Core process could not be started.");
                         ownedExitProcesses.Add(startedProcess);
+                        if (port == CorePort)
+                        {
+                            ownedMainCoreProcess = startedProcess;
+                            ownedMainCoreStartedUtc = DateTime.UtcNow;
+                        }
                     }
                     CoreDiagnosticMetadata.Register(port, startedProcess);
                     Diagnostic("core-spawn", "pid=" + DiagnosticPid(startedProcess) + " port=" + port
@@ -1578,6 +1589,11 @@ namespace IRSpeedyVPN.Services
                 process = startedProcess;
                 owned = true;
                 lastCoreStartUtc = DateTime.UtcNow;
+                if (port == CorePort)
+                {
+                    recoveryCoreProcess = startedProcess;
+                    lastCoreStartUtc = ownedMainCoreStartedUtc;
+                }
 
                 var sw = Stopwatch.StartNew();
                 while (sw.ElapsedMilliseconds < CoreConnectTimeoutMs)
@@ -2119,23 +2135,62 @@ namespace IRSpeedyVPN.Services
             return defaultValue;
         }
 
+        private void BindReusedCoreExitSource(int port)
+        {
+            if (port != CorePort) return;
+            recoveryCoreProcess = null;
+            Process process;
+            DateTime startedUtc;
+            lock (ownedExitGate)
+            {
+                process = ownedMainCoreProcess;
+                startedUtc = ownedMainCoreStartedUtc;
+            }
+            // Never adopt an external listener or a remembered PID that no longer
+            // owns this port. Binding grants no permission to kill/dispose it.
+            try
+            {
+                if (process != null && !process.HasExited && CoreDiagnosticMetadata.ListenerPid(port) == process.Id)
+                {
+                    recoveryCoreProcess = process;
+                    lastCoreStartUtc = startedUtc;
+                }
+            }
+            catch { }
+        }
+
         private void CoreProcess_Exited(object sender, EventArgs e)
         {
-            DiagnosticExit(sender as Process);
-            if (suppressCoreExit) { Diagnostic("core-exit-decision", "action=ignore reason=suppressed"); return; }
+            var process = sender as Process;
+            DiagnosticExit(process);
+            // Exited is subscribed once by the process creator. Recovery belongs
+            // to the current connection, regardless of its tab/country or creator.
+            var active = gInfo?.CurrentService as TunnelPlusService;
+            if (active == null)
+            {
+                Diagnostic("core-exit-decision", "action=ignore reason=no-active-service");
+                return;
+            }
+            active.HandleActiveCoreExit(process);
+        }
+
+        private void HandleActiveCoreExit(Process process)
+        {
             long generation = Interlocked.Read(ref connectionGeneration);
             // Never block Process.Exited on a lifecycle lock held by a process wait.
             Task.Run(() =>
             {
                 lock (connectionLifecycleGate)
                 {
-                    if (suppressCoreExit || userCancelRequested ||
+                    if (applicationExiting || suppressCoreExit || userCancelRequested ||
                         generation != Interlocked.Read(ref connectionGeneration) ||
-                        !ReferenceEquals(sender, coreProcess) || !IsConnected)
+                        !ReferenceEquals(gInfo?.CurrentService, this) || process == null ||
+                        !ReferenceEquals(process, recoveryCoreProcess) || !IsConnected)
                     {
                         Diagnostic("core-exit-decision", "action=ignore suppressed=" + suppressCoreExit
                             + " canceled=" + userCancelRequested + " generationMatches=" + (generation == Interlocked.Read(ref connectionGeneration))
-                            + " processMatches=" + ReferenceEquals(sender, coreProcess) + " connected=" + IsConnected);
+                            + " processMatches=" + ReferenceEquals(process, recoveryCoreProcess)
+                            + " activeMatches=" + ReferenceEquals(gInfo?.CurrentService, this) + " connected=" + IsConnected);
                         return;
                     }
                     if (!ShouldRetryCoreExit())

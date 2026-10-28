@@ -300,8 +300,10 @@ internal static class Program
         Console.WriteLine("PASS each recovery retry requests a main-pool sweep before TLS proof");
         await RepeatedRecoveryChecks();
 
+        foreach(bool residential in new[]{false,true})
+        {
         var listener=new TcpListener(IPAddress.Loopback,0);listener.Start();
-        var service=TunnelPlusService.RecoveryFixture(((IPEndPoint)listener.LocalEndpoint).Port);
+        var service=TunnelPlusService.RecoveryFixture(((IPEndPoint)listener.LocalEndpoint).Port,residential);
         try
         {
             service.ObserveInternetAvailability(false);service.ObserveInternetAvailability(true);
@@ -325,6 +327,7 @@ internal static class Program
             Check(!listener.Pending()&&service.RecoveryStatus==ConnectionRecoveryStatus.None,"Cancelled return revived queries/session");
         }
         finally{service.StopFixture();listener.Stop();}
-        Console.WriteLine("PASS production availability RPCs target main pool in order and cancel immediately on disconnect");
+        }
+        Console.WriteLine("PASS both VPN and Residential availability RPCs target the main pool in order and cancel immediately on disconnect");
     }
 }

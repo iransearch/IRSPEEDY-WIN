@@ -1,7 +1,6 @@
 using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Services.Libcore;
 using System;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -82,71 +81,6 @@ namespace IRSpeedyVPN.Services
             }
             if (InternetConnectivityMonitor.LastKnownOnline == false)
                 ObserveInternetAvailability(false);
-            if (this is Residential.ResidentialService && pooled)
-            {
-                var startupToken = recoveryLifetime.Token;
-                _ = Task.Run(() => RecheckResidentialStartupPoolAsync(generation, startupToken));
-            }
-        }
-
-        // A transient first probe can leave a one-member Residential pool dead until
-        // its 15-minute sweep. Retry that completed, entirely failed round once.
-        // Never restart Core, select another country, or interrupt an in-flight round.
-        private async Task RecheckResidentialStartupPoolAsync(long generation, CancellationToken cancellation)
-        {
-            var plan = autoSelectorPlan;
-            if (!(this is Residential.ResidentialService) || plan == null) return;
-            using (var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
-            {
-                budget.CancelAfter(20000);
-                var token = budget.Token;
-                Func<bool> current = () => !token.IsCancellationRequested && !userCancelRequested && IsConnected
-                    && generation == Interlocked.Read(ref connectionGeneration)
-                    && ReferenceEquals(plan, autoSelectorPlan) && ReferenceEquals(gInfo?.CurrentService, this);
-                try
-                {
-                    while (current())
-                    {
-                        await Task.Delay(500, token).ConfigureAwait(false);
-                        if (!current()) return;
-                        var client = new LibcoreServiceClient("127.0.0.1", CorePort, 750);
-                        var status = client.QueryAutoSelectors(750, token)?.Groups.FirstOrDefault(g => g.Tag == "proxy");
-                        if (status == null || status.Suspended) return;
-                        if (status.RoundsCompleted == 0 || status.ProbesInFlight > 0) continue;
-                        if (status.MembersAlive > 0 || status.MembersQualified > 0) return;
-                        if (status.MembersTotal <= 0 || status.MembersProbed < status.MembersTotal) return;
-                        await Task.Delay(1000, token).ConfigureAwait(false);
-                        // Serialize with config replacement. A stale worker must never
-                        // recheck the next connection's pool. Each RPC is bounded to 750ms.
-                        if (!Monitor.TryEnter(connectionLifecycleGate)) return;
-                        try
-                        {
-                            if (!current()) return;
-                            status = client.QueryAutoSelectors(750, token)?.Groups.FirstOrDefault(g => g.Tag == "proxy");
-                            if (status == null || status.Suspended || status.RoundsCompleted == 0
-                                || status.ProbesInFlight > 0 || status.MembersTotal <= 0
-                                || status.MembersProbed < status.MembersTotal
-                                || status.MembersAlive > 0 || status.MembersQualified > 0 || !current()) return;
-                            var result = client.RecheckAutoSelector("proxy", 750);
-                            Diagnostic("residential-startup-pool-recheck", "accepted=" + (result != null && string.IsNullOrEmpty(result.Error))
-                                + " members=" + status.MembersTotal + " completedRounds=" + status.RoundsCompleted
-                                + " reason=initial-round-no-healthy-members attempts=1");
-                        }
-                        finally { Monitor.Exit(connectionLifecycleGate); }
-                        return;
-                    }
-                }
-                catch (OperationCanceledException)
-                {
-                    Diagnostic("residential-startup-pool-recheck-stopped", "reason="
-                        + (cancellation.IsCancellationRequested ? "connection-canceled" : "budget-expired"));
-                }
-                catch (Exception ex)
-                {
-                    // Older/unsupported Core RPCs remain optional, with no retry loop.
-                    Diagnostic("residential-startup-pool-recheck-unavailable", "exception=" + ex.GetType().Name);
-                }
-            }
         }
 
         private Task<bool> QueuePoolAvailability(bool online, CancellationToken cancellation)

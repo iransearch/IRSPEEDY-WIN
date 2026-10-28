@@ -10,7 +10,7 @@ dotnet, csc, refs8, refs48 = sys.argv[1:]
 base = root / 'IRSpeedyVPN'
 models = [base/'Residential/ResidentialModels.cs', base/'Residential/ResidentialSubscription.cs', base/'Common/Json/JsonConvertibleAttribute.cs', base/'Common/Json/JsonPropertyAttribute.cs']
 def compile_to(output, refs, sources, extra_refs=()):
-    subprocess.run([dotnet,csc,'-nologo','-langversion:7.3','-nowarn:0649,0169,0067','-target:'+('exe' if output.name in ['checks.dll','state.dll','startup.dll'] else 'library'),'-out:'+str(output)]
+    subprocess.run([dotnet,csc,'-nologo','-langversion:7.3','-nowarn:0649,0169,0067','-target:'+('exe' if output.name in ['checks.dll','state.dll'] else 'library'),'-out:'+str(output)]
         + ['-r:'+str(p) for p in Path(refs).glob('*.dll') if p.name not in ['System.EnterpriseServices.Wrapper.dll','System.EnterpriseServices.Thunk.dll']] + ['-r:'+str(p) for p in extra_refs] + [str(p) for p in sources], check=True)
 with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     tmp=Path(tmp)
@@ -39,17 +39,9 @@ with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     (tmp/'state.runtimeconfig.json').write_text((tmp/'checks.runtimeconfig.json').read_text())
     subprocess.run([dotnet,str(tmp/'state.dll')],check=True)
     recovery=(base/'Services/TunnelPlusService.NetworkRecovery.cs').read_text()
-    start=recovery.index('        private async Task RecheckResidentialStartupPoolAsync(')
-    method=recovery[start:recovery.index('        private Task<bool> QueuePoolAvailability(',start)]
-    (tmp/'StartupRecoveryWorker.cs').write_text('using System;using System.Linq;using System.Threading;using System.Threading.Tasks;using IRSpeedyVPN.Services.Libcore;namespace IRSpeedyVPN.Services{internal partial class TunnelPlusService{'+method+'}}')
-    startup_sources=[Path(__file__).with_name('StartupRecoveryChecks.cs'),tmp/'StartupRecoveryWorker.cs',Path(__file__).with_name('StartupRecoveryDtos.cs')]
-    compile_to(tmp/'startup.dll',refs8,startup_sources)
-    (tmp/'startup.runtimeconfig.json').write_text((tmp/'checks.runtimeconfig.json').read_text())
-    subprocess.run([dotnet,str(tmp/'startup.dll')],check=True)
-    compile_to(tmp/'startup-net48.dll',refs48,startup_sources)
-    assert 'Task.Run(() => RecheckResidentialStartupPoolAsync(generation, startupToken))' in recovery
-    assert 'if (this is Residential.ResidentialService && pooled)' in recovery
-    print('PASS production Residential startup recovery worker compiles against .NET Framework 4.8')
+    assert 'ResidentialService' not in recovery and 'residential-startup' not in recovery
+    assert 'RecheckResidentialStartupPoolAsync' not in recovery
+    print('PASS both tabs use the same recovery path without a Residential-only startup retry')
     compile_to(tmp/'residential-net48.dll', refs48, models + [base/'Residential/ResidentialTrafficBar.cs',base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs')])
     print('PASS Residential production C# against real .NET Framework 4.8 + WPF reference assemblies')
     ui_sources = list((base/'Residential').glob('*.cs')) + [p for p in (base/'Components/ServerListControl').glob('*.cs') if p.name!='CountryPickerSelector.cs'] + list((base/'UserControls').glob('UCServerList*.cs'))
@@ -112,8 +104,10 @@ assert 58/2-25-5/2>0 and 58/2+25+5/2<58
 assert 'Width = RingSize, Height = RingSize' in traffic and 'new Size(RingRadius, RingRadius)' in traffic
 assert 'usedFraction = traffic.Total == 0 ? 0 : 1 - traffic.Ratio' in traffic
 assert 'Math.Max(0, usageTrack.ActualWidth) * usedFraction' in traffic
-assert 'remainingValue.Text = traffic.RemainingText; usedValue.Text = traffic.UsageText;' in traffic
+assert 'remainingValue.Text = traffic.RemainingText;' in traffic and 'traffic.UsageText.Replace(" / ", " of ")' in traffic
 assert 'usageTrack.SizeChanged +=' in traffic and 'usageFill.BeginAnimation(WidthProperty, null)' in traffic
+assert all(label in traffic for label in [' left',' used','In use'])
+assert not any('\u0600'<=c<='\u06ff' for c in traffic)
 assert '650' not in traffic and 'TimeSpan.FromMilliseconds(250)' in traffic
 assert 'info.Visibility = connected ? Visibility.Collapsed : Visibility.Visible' in traffic
 assert '250ms' in (root/'docs/windows-residential.md').read_text().replace('250 ms','250ms')

@@ -1,4 +1,36 @@
-# Windows Residential (1.4.59)
+# Windows Residential (1.4.60)
+
+## 1.4.60: shared recovery policy and English traffic card
+
+Residential now follows the existing VPN recovery policy without a type-specific
+startup action. Remove the 20-second observer, one-time `proxy` recheck and its
+obsolete test fixtures from 1.4.58. Both service kinds inherit the same network
+monitor, ordered pool down/return RPCs, main-route TLS proof, 15-second start-to-start
+retries, disconnect/generation guards and Core exit retry limits. Switching the
+visible tab is not a recovery trigger. No new retry trigger for an isolated bad
+endpoint or failed public-IP lookup has been introduced; the existing VPN policy
+and Core periodic selector checks still apply equally.
+
+Core exit handling now dispatches the process creator's event to the current
+active service. Reuse binds only the exact app-owned main process that still owns
+the control listener; auxiliary, external and stale process identities are rejected.
+The binding carries the real launch timestamp, so the existing immediate-exit
+and crash-loop limits apply equally to reused cores. This read-only binding does
+not transfer process ownership or permission to kill/dispose another service's
+process. Cancellation, shutdown, deliberate stop, service replacement and stale
+generations are checked again under the active service's lifecycle gate.
+
+The traffic card now uses Segoe UI and English-only labels/tooltips: `left`, `used`,
+`In use`, and a hover explanation of remaining versus used progress. Its usage line
+reads `0.4 of 20.0 GB used`; the existing shared byte/unit formatter and quota values
+are unchanged. The Matched layout, colors, dimensions and entrance behavior remain.
+
+Offline checks execute the same real pool-availability RPC fixture for both service
+kinds, actual child-process Exited delivery through the production handler, and
+stale/cancel/shutdown/identity/retry-limit cases. Core exit methods and the complete
+network recovery integration compile against .NET Framework 4.8 references; WPF
+traffic/picker compilation also passes. Full Windows rendering, packaged Core
+crash/reuse and ISP outage scenarios remain Windows smoke checks.
 
 ## 1.4.59: traffic card reference redesign
 

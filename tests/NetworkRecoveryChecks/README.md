@@ -38,3 +38,20 @@ Core regression checks live in Throne-G's `internal/autoselector` and
 members are reset once after network return; they rejoin after external proof;
 paused networking does not probe; a blackholed Hysteria handshake is cancelled
 and the next request receives a fresh client.
+
+
+## Shared recovery and Core ownership (1.4.60)
+
+The existing pool-availability RPC test now runs for both the VPN base fixture and
+a Residential-derived fixture. Neither service has a special startup sweep.
+
+Run `python core_exit.py DOTNET CSC NET8_REFS NET48_REFS` on Linux to compile the
+production exit binding/dispatch/policy methods and exercise real child-process
+exit delivery. The remaining application context, PID lookup and reconnect action
+are inert boundaries. Both service kinds cover a canceled original creator,
+active-service dispatch, stale generations, manual disconnect, deliberate stop,
+shutdown, foreign/auxiliary process identity and unchanged crash limits. The
+read-only listener binding does not acquire kill/dispose ownership. `CoreExitFixtures.cs`
+is intentionally excluded from the normal project and compiled only by this runner.
+The same production methods are also compiled against real .NET Framework 4.8
+references. This is not a packaged Windows Core crash/restart test.
