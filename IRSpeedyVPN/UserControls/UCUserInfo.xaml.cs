@@ -141,6 +141,8 @@ namespace IRSpeedyVPN.UserControls
             bool isSmart = smart != null && smart.IsSmartFast;
             bool isGlobalSmart = isSmart && service.SelectedServerUrl == null;
             long ping = ResolveRecordedLatency(service, isSmart);
+            if (service is IRSpeedyVPN.Residential.ResidentialService)
+                ping = IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(ping);
             txtServerDetail.Text = (ping > 0
                 ? PersianDigits(ping.ToString()) + " میلی‌ثانیه"
                 : "پینگ نامشخص") + (isGlobalSmart ? " · موقعیت هوشمند" : "");
@@ -226,3 +228,4 @@ namespace IRSpeedyVPN.UserControls
         }
     }
 }
+

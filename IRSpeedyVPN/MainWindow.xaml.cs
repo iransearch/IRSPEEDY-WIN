@@ -664,9 +664,7 @@ namespace IRSpeedyVPN
                 gInfo.ConnectionTime = DateTime.Now;
                 VpnTimeZone.BeginConnection(service);
                 uCServerList.MarkSuccessfulConnection(service);
-                // Residential keeps its quota and Disconnect action on the chooser.
-                // Preserve the existing VPN connection-info screen.
-                ShowControl(service is IRSpeedyVPN.Residential.ResidentialService ? (object)uCServerList : uCUserInfo);
+                ShowControl(uCUserInfo);
 
             }
             else
@@ -1583,5 +1581,6 @@ namespace IRSpeedyVPN
         }
     }
 }
+
 
 

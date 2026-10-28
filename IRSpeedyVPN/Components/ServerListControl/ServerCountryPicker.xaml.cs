@@ -158,8 +158,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public bool IsResidential => Service is IRSpeedyVPN.Residential.ResidentialService;
         public string City => (Service as IRSpeedyVPN.Residential.ResidentialService)?.City ?? "";
         public string Isp => (Service as IRSpeedyVPN.Residential.ResidentialService)?.Isp ?? "";
-        private bool fastest;
-        public bool IsFastest { get => fastest; set { if (fastest == value) return; fastest = value; On(); } }
         private long DisplayLatency(long latency) => IsResidential ? IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(latency) : latency;
 
         public ImageSource FlagSource { get; private set; }
@@ -501,10 +499,6 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         private void ResortGroups()
         {
-            long best = _allGroups.Where(g => g.IsResidential && g.SortKey > 0 && g.SortKey < long.MaxValue)
-                .Select(g => g.SortKey).DefaultIfEmpty(long.MaxValue).Min();
-            foreach (var group in _allGroups)
-                group.IsFastest = group.IsResidential && best < long.MaxValue && group.SortKey == best;
             var ordered = ServerListRanking.Order(_allGroups, g => g.IsLastSuccessfulConnection,
                 g => g.SortKey, g => g.CountryName, g => g.Service?.ID ?? int.MaxValue).ToList();
 
@@ -611,4 +605,5 @@ namespace IRSpeedyVPN.Components.ServerListControl
         #endregion
     }
 }
+
 

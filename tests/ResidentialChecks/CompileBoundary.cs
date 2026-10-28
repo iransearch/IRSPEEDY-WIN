@@ -2,8 +2,15 @@
 // compile against real WPF + .NET Framework 4.8 references, never fake WPF APIs.
 using System;
 using System.Collections.Generic;
-namespace IRSpeedyVPN.Interfaces { internal interface IVPNService { List<IRSpeedyVPN.Models.NewService.Url> GetServerUrls(); } }
-namespace IRSpeedyVPN.Models { internal class GlobalInfo { public string Username { get; set; } } }
+namespace IRSpeedyVPN.Interfaces {
+    internal interface IVPNService {
+        List<IRSpeedyVPN.Models.NewService.Url> GetServerUrls();
+        bool IsUrlTestSupported {get;} long UrlTestSpeed {get;}
+        IRSpeedyVPN.Models.NewService.Url SelectedServerUrl {get;set;}
+    }
+    internal interface ISmartFastConnection {bool IsSmartFast {get;}}
+}
+namespace IRSpeedyVPN.Models { internal class GlobalInfo { public string Username { get; set; } public IRSpeedyVPN.Interfaces.IVPNService CurrentService; } }
 namespace IRSpeedyVPN.Models.NewService {
     internal class Url { public string url; public object extra_field_2; public int status; public long latency,LastSuccessfulLatency; public DateTime latencychkTime,LastSuccessfulCheckTime; }
     internal class ServerEx { public int ID,status; public string Country; public List<Url> urls; }
@@ -15,11 +22,14 @@ namespace IRSpeedyVPN.Models.NewService {
 }
 namespace IRSpeedyVPN.Common { internal static class LogHelper { public static void WriteExLog(string message) {} } }
 namespace IRSpeedyVPN.Services {
-    internal class TunnelPlusService:IRSpeedyVPN.Interfaces.IVPNService {
+    internal class TunnelPlusService:IRSpeedyVPN.Interfaces.IVPNService,IRSpeedyVPN.Interfaces.ISmartFastConnection {
         readonly IRSpeedyVPN.Models.NewService.ServerEx server;
-        public string Name; public IRSpeedyVPN.Models.NewService.Url SelectedServerUrl;
+        public string Name; public IRSpeedyVPN.Models.NewService.Url SelectedServerUrl {get;set;}
+        public bool IsUrlTestSupported=>true; public long UrlTestSpeed=>0;
+        public bool IsSmartFast {get;private set;}
         public TunnelPlusService(IRSpeedyVPN.Models.NewService.ServerEx server, IRSpeedyVPN.Models.GlobalInfo global) { this.server=server; }
-        public void SetSmartFastUrls(string[] urls) {}
+        public void SetSmartFastUrls(string[] urls) {IsSmartFast=urls.Length>0;}
         public List<IRSpeedyVPN.Models.NewService.Url> GetServerUrls()=>server.urls;
     }
 }
+

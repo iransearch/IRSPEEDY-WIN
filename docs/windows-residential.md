@@ -1,4 +1,18 @@
-# Windows Residential (1.4.53)
+# Windows Residential (1.4.54)
+
+## 1.4.54 status page and row corrections
+
+Successful Residential connections now open the existing `UCUserInfo` status page,
+just like VPN. Remove the Residential-only navigation override that kept the
+chooser visible. Existing success/cancellation guards, four-second presentation,
+public IP lookup, status timer, disconnect and recovery flow are unchanged.
+The status page applies the same 0.7 Residential display factor as the list;
+underlying measured values and VPN display remain unchanged.
+
+Remove the fastest badge and its unused snapshot/ranking notifications. Country
+sorting, pinned star, selection and sweep behavior remain unchanged. The city/ISP
+line is right-aligned LTR so English city names, provider names and ASN parentheses
+are displayed in their original order, with ellipsis at the line's end.
 
 ## 1.4.53 loading correction
 
@@ -65,7 +79,7 @@ Both tabs instantiate the same `ServerCountryPicker`, `ServerListViewModel`,
 `ServerListSweepAnimator` and row template. Numeric row part IDs and the planner's
 cycle / completion / pinned-star rules are unchanged. Residential metadata travels
 in immutable snapshots with the name part of each sweep. Raw probe values and
-the VPN list remain unchanged; Residential text, ranking and fastest badges use
+the VPN list remain unchanged; Residential text and ranking use
 `round(measured * ResidentialPingDisplayFactor)` with factor 0.7 (Android rounding).
 
 Tab changes pause and drain tests, retain independent selections and search the
@@ -89,8 +103,7 @@ System reduced-motion settings and unloading stop clocks. The ring shows the
 remaining fraction clockwise from 12 o'clock; unlimited quota shows a full ring.
 
 Actual connection kind, independent of selected tab, controls the green badge.
-Residential remains on the chooser after success so its quota and green
-Disconnect button are available. VPN retains its existing connection-info view.
+Both Residential and VPN open the existing connection-info view after success.
 Both legacy and fast-startup event paths wire Disconnect. Existing four-second
 minimum Connecting presentation remains unchanged.
 

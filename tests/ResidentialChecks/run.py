@@ -21,7 +21,10 @@ with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     group=picker_source[picker_source.index('    internal class GroupItem'):picker_source.index('    #endregion',picker_source.index('    internal class GroupItem'))]
     sig=picker_source[picker_source.index('    internal static class Sig'):picker_source.index('    #endregion',picker_source.index('    internal static class Sig'))]
     (tmp/'GroupItem.cs').write_text('using System;using System.Collections.Generic;using System.Globalization;using System.Linq;using System.Windows.Input;using System.Windows.Media;using IRSpeedyVPN.Common;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Models.NewService;namespace IRSpeedyVPN.Components.ServerListControl{'+sig+group+'}')
-    compile_to(tmp/'state.dll', refs8, models+[base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs'),Path(__file__).with_name('StateBoundary.cs'),Path(__file__).with_name('StateChecks.cs'),Path(__file__).with_name('HttpChecks.cs'),tmp/'GroupItem.cs'])
+    status_source=(base/'UserControls/UCUserInfo.xaml.cs').read_text()
+    status_methods=status_source[status_source.index('        private void RefreshServerDetail()'):status_source.index('        private void UserControl_IsVisibleChanged(')]
+    (tmp/'StatusDetailProbe.cs').write_text('using System;using System.Collections.Generic;using System.Linq;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Models.NewService;class StatusDetailProbe{internal IRSpeedyVPN.Models.GlobalInfo globalInfo=new IRSpeedyVPN.Models.GlobalInfo();internal class Label{internal string Text;}internal Label txtServerDetail=new Label();private static string PersianDigits(string text)=>text;internal void Refresh()=>RefreshServerDetail();'+status_methods+'}')
+    compile_to(tmp/'state.dll', refs8, models+[base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs'),Path(__file__).with_name('StateBoundary.cs'),Path(__file__).with_name('StateChecks.cs'),Path(__file__).with_name('HttpChecks.cs'),tmp/'GroupItem.cs',tmp/'StatusDetailProbe.cs'])
     (tmp/'state.runtimeconfig.json').write_text((tmp/'checks.runtimeconfig.json').read_text())
     subprocess.run([dotnet,str(tmp/'state.dll')],check=True)
     compile_to(tmp/'residential-net48.dll', refs48, models + [base/'Residential/ResidentialTrafficBar.cs',base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs')])
@@ -37,7 +40,9 @@ xml=ET.fromstring(picker)
 parts=[v for e in xml.iter() for k,v in e.attrib.items() if k.endswith('ServerCometPart.Part')]
 assert sorted(parts)==['0','1','2','3','4']
 assert 'DisplayedServer.RowHeight' in picker and 'DisplayedServer.AutomationDescription' in picker
-assert 'IsFastest' in picker and 'Row_KeyDown' in picker
+assert 'IsFastest' not in picker and 'سریع‌ترین' not in picker and 'Row_KeyDown' in picker
+metadata=next(e for e in xml.iter() if e.tag.endswith('}TextBlock') and any('City' in child.attrib.get('Text','') for child in e))
+assert metadata.attrib['FlowDirection']=='LeftToRight' and metadata.attrib['TextAlignment']=='Right'
 uc=(base/'UserControls/UCServerList.xaml').read_text()
 assert 'ShowSmartCard="False"' in uc and 'ServiceTab_KeyDown' in uc
 for color in ['#1C2331','#2D3850','#3A5BC0','#2F4A9C','#A3ADC7']: assert color in uc
@@ -57,6 +62,8 @@ assert cached.index('serviceFactory.RenewServiceList(account.groups)') < cached.
 assert 'account.residential_vpn == null && account.UserAccount.residential_vpn == null' in cached
 assert 'ValidateSessionAndRefreshServerList();' in cached and '_ = Task.Run(' in cached
 print('PASS remembered-account startup configures Residential before showing the chooser; old cache refresh uses the gated API off the startup path')
-assert 'ShowControl(service is IRSpeedyVPN.Residential.ResidentialService ? (object)uCServerList : uCUserInfo);' in main
+success=main[main.index('uCServerList.MarkSuccessfulConnection(service);'):main.index('uCServerList.MarkSuccessfulConnection(service);')+200]
+assert 'ShowControl(uCUserInfo);' in success and 'ResidentialService' not in success
+print('PASS both successful connection kinds navigate to the status page; fastest badge removed and city/ISP direction corrected')
 print('PASS tabs, active connection identity, async picker ownership, shared row parts, keyboard/accessibility and existing 4-second loading wiring')
 

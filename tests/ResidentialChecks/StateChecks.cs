@@ -46,6 +46,10 @@ internal static class StateChecks
         var vpn=new IRSpeedyVPN.Services.TunnelPlusService(new ServerEx{urls=new System.Collections.Generic.List<Url>{raw}},new GlobalInfo());
         var vpnRow=new GroupItem{Service=vpn};vpnRow.RefreshSignals();
         Check(vpnRow.SignalText=="101 ms"&&vpnRow.SortKey==101,"actual production GroupItem retains unchanged VPN ping and order");
+        var status=new StatusDetailProbe();status.globalInfo.CurrentService=service;status.Refresh();
+        Check(status.txtServerDetail.Text.StartsWith("71 "),"production connected page uses the same Residential display factor as its row");
+        status.globalInfo.CurrentService=vpn;status.Refresh();
+        Check(status.txtServerDetail.Text.StartsWith("101 "),"production connected page preserves VPN latency display");
         Check(ResidentialService.IsPoolCompatible("vless://a@host:443") && ResidentialService.IsPoolCompatible("hy2://a@host:443")
             && !ResidentialService.IsPoolCompatible("anytls://a@host:443") && !ResidentialService.IsPoolCompatible("tuic://a@host:443"),"Residential never advertises native protocols unsupported by the existing Windows country pool");
         var androidCatalog = new ResidentialViewModel(new GlobalInfo(), (url,token)=>Task.FromResult(new ResidentialViewModel.Payload {
