@@ -155,6 +155,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
         public IVPNService Service { get; set; }
         public string CountryName { get; set; }
         public string CountryCode { get; set; }
+        public bool IsResidential => Service is IRSpeedyVPN.Residential.ResidentialService;
+        public string City => (Service as IRSpeedyVPN.Residential.ResidentialService)?.City ?? "";
+        public string Isp => (Service as IRSpeedyVPN.Residential.ResidentialService)?.Isp ?? "";
+        private bool fastest;
+        public bool IsFastest { get => fastest; set { if (fastest == value) return; fastest = value; On(); } }
+        private long DisplayLatency(long latency) => IsResidential ? IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(latency) : latency;
 
         public ImageSource FlagSource { get; private set; }
         public bool HasFlag => FlagSource != null;
@@ -218,7 +224,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (latency <= 0) return;
             IsSelectable = true;
             SignalToolTip = "نتیجهٔ اولیهٔ تست جاری؛ بررسی سایر سرورها ادامه دارد.";
-            Sig.FromLatency(latency, out var text);
+            Sig.FromLatency(DisplayLatency(latency), out var text);
             SignalText = text;
             SetSignalColor(latency);
             // SortKey remains the last completed result until RefreshSignals().
@@ -256,8 +262,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
             {
                 IsSelectable = true;
                 var best = positive.Min();
-                SortKey = best;
-                Sig.FromLatency(best, out var text);
+                SortKey = DisplayLatency(best);
+                Sig.FromLatency(SortKey, out var text);
                 SignalText = text;
                 SetSignalColor(best);
                 var checkedAt = urls.Where(u => u.latency == best).Max(u => u.latencychkTime);
@@ -277,7 +283,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             SignalText = "—";
             if (previous == null && allFresh) SignalToolTip = "تست ناموفق؛ مسیر سالمی تأیید نشد.";
             if (previous != null)
-                SignalToolTip = "آخرین تست موفق: " + previous.LastSuccessfulLatency.ToString(CultureInfo.InvariantCulture)
+                SignalToolTip = "آخرین تست موفق: " + DisplayLatency(previous.LastSuccessfulLatency).ToString(CultureInfo.InvariantCulture)
                     + " ms، " + previous.LastSuccessfulCheckTime.ToString("yyyy/MM/dd HH:mm")
                     + "؛ نتیجهٔ فعلی ناموفق است.";
             SetSignalColor(0);
@@ -296,6 +302,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
     /// </summary>
     public partial class ServerCountryPicker : UserControl
     {
+        public bool ShowSmartCard { get; set; } = true;
         private List<GroupItem> _groups = new List<GroupItem>();
         private List<GroupItem> _allGroups = new List<GroupItem>();
         private SmartItem _smart;
@@ -379,8 +386,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
             ObserveGroups();
 
-            _smart = _urlTest ? new SmartItem() : null;
-            SmartCardHost.Visibility = _urlTest ? Visibility.Visible : Visibility.Collapsed;
+            _smart = _urlTest && ShowSmartCard ? new SmartItem() : null;
+            SmartCardHost.Visibility = _urlTest && ShowSmartCard ? Visibility.Visible : Visibility.Collapsed;
 
             ApplyFilter();
 
@@ -426,7 +433,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _groups = string.IsNullOrWhiteSpace(_filter)
                 ? _allGroups
                 : _allGroups.Where(g => g.CountryName != null &&
-                    g.CountryName.IndexOf(_filter.Trim(), StringComparison.CurrentCultureIgnoreCase) >= 0).ToList();
+                    (g.CountryName + " " + g.City + " " + g.Isp).IndexOf(_filter.Trim(), StringComparison.CurrentCultureIgnoreCase) >= 0).ToList();
 
             QueueRowsUpdate();
             UpdateEmptyResultVisibility();
@@ -494,6 +501,10 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         private void ResortGroups()
         {
+            long best = _allGroups.Where(g => g.IsResidential && g.SortKey > 0 && g.SortKey < long.MaxValue)
+                .Select(g => g.SortKey).DefaultIfEmpty(long.MaxValue).Min();
+            foreach (var group in _allGroups)
+                group.IsFastest = group.IsResidential && best < long.MaxValue && group.SortKey == best;
             var ordered = ServerListRanking.Order(_allGroups, g => g.IsLastSuccessfulConnection,
                 g => g.SortKey, g => g.CountryName, g => g.Service?.ID ?? int.MaxValue).ToList();
 
@@ -563,6 +574,12 @@ namespace IRSpeedyVPN.Components.ServerListControl
             ServerSelected?.Invoke(null);
         }
 
+        private void Row_KeyDown(object sender, KeyEventArgs e)
+        {
+            if (e.Key != Key.Enter && e.Key != Key.Space) return;
+            Row_Click(sender, e); e.Handled = true;
+        }
+
         private void Row_Click(object sender, RoutedEventArgs e)
         {
             if (!(sender is FrameworkElement fe) || !(fe.DataContext is ServerDisplaySlot slot))
@@ -594,3 +611,4 @@ namespace IRSpeedyVPN.Components.ServerListControl
         #endregion
     }
 }
+

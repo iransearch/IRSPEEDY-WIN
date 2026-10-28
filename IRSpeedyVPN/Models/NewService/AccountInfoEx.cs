@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common.Json;
+using IRSpeedyVPN.Common.Json;
 using IRSpeedyVPN.Models.Services;
 using System;
 using System.Collections.Generic;
@@ -10,6 +10,7 @@ namespace IRSpeedyVPN.Models.NewService
     [JsonConvertible]
     public class AccountInfoEx
     {
+        public IRSpeedyVPN.Residential.ResidentialConfig residential_vpn { get; set; }
         public List<Group> groups { get; set; }
         [JsonProperty("user_data")]
         public UserAccount UserAccount  { get; set; }
@@ -23,3 +24,4 @@ namespace IRSpeedyVPN.Models.NewService
 
 
 }
+

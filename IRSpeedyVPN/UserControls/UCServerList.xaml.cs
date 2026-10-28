@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Components.ServerListControl;
 using IRSpeedyVPN.Events;
 using IRSpeedyVPN.Interfaces;
@@ -42,7 +42,9 @@ namespace IRSpeedyVPN.UserControls
         internal void MarkSuccessfulConnection(IVPNService service)
         {
             probeCache?.RecordConnectionResults(service);
-            countryPicker.MarkSuccessfulConnection(service);
+            (service is IRSpeedyVPN.Residential.ResidentialService ? residentialCountryPicker : vpnCountryPicker).MarkSuccessfulConnection(service);
+            RecordServiceKind(service);
+            UpdateConnectionState(service, false, true);
         }
         private string selectedProtocol;
         private string _selectedServiceName;
@@ -54,9 +56,11 @@ namespace IRSpeedyVPN.UserControls
         public UCServerList()
         {
             InitializeComponent();
-            countryPicker.ServerSelected += svc =>
+            InitializeResidential();
+            vpnCountryPicker.ServerSelected += svc =>
             {
-                selectedService = svc;
+                vpnSelection = svc;
+                if (!isResidentialTab) selectedService = svc;
                 UpdateHeaderIcons();
             };
         }
@@ -94,6 +98,7 @@ namespace IRSpeedyVPN.UserControls
         /// </summary>
         private void ResolveServiceAndProtocol()
         {
+            if (isResidentialTab) { RefreshCountry(null); return; }
             if (serviceFactory.Services == null || serviceFactory.Services.Count == 0)
             {
                 _selectedServiceName = null;
@@ -145,7 +150,7 @@ namespace IRSpeedyVPN.UserControls
 
         private void RefreshCountry(string protocol, bool preserveManualRefresh = false)
         {
-            var services = serviceFactory.Services
+            var services = isResidentialTab ? residential.Services : serviceFactory.Services
                 .Where(x => x.Name == _selectedServiceName && (protocol == null || x.Protocols.Contains(protocol)))
                 .OrderBy(x => x.Country).ToArray();
 
@@ -161,10 +166,11 @@ namespace IRSpeedyVPN.UserControls
             _urlTestCts?.Cancel();
             if (!preserveManualRefresh) CancelManualRefresh();
             _currentServices = services;
-            string context = (globalInfo?.Username ?? "") + "\n" + _selectedServiceName + "\n" + (protocol ?? "");
+            string scope = isResidentialTab ? "Residential" : _selectedServiceName;
+            string context = (globalInfo?.Username ?? "") + "\n" + scope + "\n" + (protocol ?? "");
             if (probeCache == null || probeCacheContext != context)
             {
-                probeCache = new ServerCheckCache(globalInfo?.Username ?? "", _selectedServiceName + "\n" + (protocol ?? ""));
+                probeCache = new ServerCheckCache(globalInfo?.Username ?? "", scope + "\n" + (protocol ?? ""));
                 probeCacheContext = context;
             }
             probeCache.Bind(services);
@@ -178,6 +184,8 @@ namespace IRSpeedyVPN.UserControls
             }
             countryPicker.Load(services, _isUrlTestSupported);
             countryPicker.SelectedService = selectedService;
+            countryPicker.SetFilter(txtSearch.Text);
+            UpdateResidentialVisuals();
 
             RunBackgroundUrlTests(services);
 
@@ -339,9 +347,10 @@ namespace IRSpeedyVPN.UserControls
         private async Task<bool> CheckServerAsync(IVPNService[] services, IVPNService service,
             ServerCheckCache cache, CancellationToken token)
         {
+            var picker = countryPicker;
             if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
             int acceptingProgress = 1;
-            countryPicker.SetGroupChecking(service, true);
+            picker.SetGroupChecking(service, true);
             try
             {
                 await Task.Run(() =>
@@ -363,7 +372,7 @@ namespace IRSpeedyVPN.UserControls
                                         && !UrlTestCoordinator.AbortRequested
                                         && ReferenceEquals(services, _currentServices)
                                         && globalInfo?.CurrentService == null)
-                                        countryPicker.ShowGroupProgress(service, latency);
+                                        picker.ShowGroupProgress(service, latency);
                                 }), System.Windows.Threading.DispatcherPriority.Background);
                             }) : null, () => token.IsCancellationRequested, token,
                                 prioritizeFailed: cache.PrioritizeFailedServers,
@@ -391,14 +400,14 @@ namespace IRSpeedyVPN.UserControls
             finally
             {
                 // Always stop the indicator, including cancellation and cache/write errors.
-                countryPicker.SetGroupChecking(service, false);
+                picker.SetGroupChecking(service, false);
             }
 
             // This continuation runs on the UI thread. Apply the committed result
             // (or restored cache on cancellation) before advancing/draining the worker.
             // Cancellation must not discard this refresh as it did in the queued path.
             if (ReferenceEquals(services, _currentServices))
-                countryPicker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);
+                picker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);
             if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
             await Task.Run(() =>
             {
@@ -414,7 +423,15 @@ namespace IRSpeedyVPN.UserControls
 
         private void btnConnect_Click(object sender, RoutedEventArgs e)
         {
+            if (connectionConnected || connectionConnecting) { OnDisconnectRequest?.Invoke(this, EventArgs.Empty); return; }
             if (OnConnectRequest == null) return;
+            if (isResidentialTab)
+            {
+                if (selectedService == null || !residential.CanConnect) return;
+                residential.Refresh();
+                OnConnectRequest.Invoke(this, selectedService, null, null);
+                return;
+            }
 
             if (selectedService != null)
             {
@@ -537,3 +554,4 @@ namespace IRSpeedyVPN.UserControls
         #endregion
     }
 }
+

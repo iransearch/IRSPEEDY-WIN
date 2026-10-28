@@ -36,6 +36,7 @@ namespace IRSpeedyVPN.UserControls
 
         private async Task RefreshServerResultsAsync(IVPNService[] services, ServerCheckCache cache)
         {
+            var picker = countryPicker;
             // Stop/drain first. A canceled country test must restore its old
             // committed results before the explicit refresh clears those results.
             probesPaused = true;
@@ -56,7 +57,7 @@ namespace IRSpeedyVPN.UserControls
                 // Fetch and bind the latest API snapshot while this round owns
                 // the pause. A failed fetch tests the old list without erasing
                 // its committed results; cancellation still stops the round.
-                bool listRefreshed = RefreshServerListRequest != null && await RefreshServerListRequest(current, token);
+                bool listRefreshed = !isResidentialTab && RefreshServerListRequest != null && await RefreshServerListRequest(current, token);
                 if (listRefreshed)
                 {
                     services = _currentServices;
@@ -75,9 +76,9 @@ namespace IRSpeedyVPN.UserControls
                 if (listRefreshed)
                 {
                     foreach (var service in services.OfType<TunnelPlusService>()) service.ResetListTestResult();
-                    countryPicker.ResetTestResults();
+                    picker.ResetTestResults();
                 }
-                countryPicker.EndCheckCycleSetup();
+                picker.EndCheckCycleSetup();
                 var plan = new ServerRefreshPlan(services);
                 var finishedRows = new ConcurrentDictionary<IVPNService, bool>();
                 var bestByRow = new ConcurrentDictionary<IVPNService, long>();
@@ -87,7 +88,7 @@ namespace IRSpeedyVPN.UserControls
                 {
                     var batch = plan.TakeBatch();
                     foreach (var row in batch.SelectMany(c => c.Owners).Select(o => o.Service).Distinct())
-                        countryPicker.SetGroupChecking(row, true);
+                        picker.SetGroupChecking(row, true);
                     await Task.Run(() =>
                     {
                         if (!current()) return;
@@ -112,7 +113,7 @@ namespace IRSpeedyVPN.UserControls
                                 {
                                     long best;
                                     if (current() && !finishedRows.ContainsKey(owner) && bestByRow.TryGetValue(owner, out best))
-                                        countryPicker.ShowGroupProgress(owner, best);
+                                        picker.ShowGroupProgress(owner, best);
                                 }), System.Windows.Threading.DispatcherPriority.Background);
                             }
                         };
@@ -133,8 +134,8 @@ namespace IRSpeedyVPN.UserControls
                                     (row as TunnelPlusService)?.UpdateListTestResult();
                                 foreach (var row in rowsDone)
                                 {
-                                    countryPicker.SetGroupChecking(row, false);
-                                    countryPicker.RefreshGroup(row);
+                                    picker.SetGroupChecking(row, false);
+                                    picker.RefreshGroup(row);
                                 }
                             }));
                         };
@@ -159,8 +160,8 @@ namespace IRSpeedyVPN.UserControls
                 {
                     foreach (var service in services)
                     {
-                        countryPicker.SetGroupChecking(service, false);
-                        countryPicker.RestoreTestProgress(service);
+                        picker.SetGroupChecking(service, false);
+                        picker.RestoreTestProgress(service);
                         (service as TunnelPlusService)?.UpdateListTestResult();
                     }
                 }
@@ -170,7 +171,7 @@ namespace IRSpeedyVPN.UserControls
                     probesPaused = false;
                 if (manualRefreshCancellation == cancellation) manualRefreshCancellation = null;
                 cancellation.Dispose();
-                countryPicker.EndCheckCycleSetup();
+                picker.EndCheckCycleSetup();
                 manualRefreshBusy = false;
                 UpdateHeaderIcons();
                 if (!ReferenceEquals(services, _currentServices) && !probesPaused) RunBackgroundUrlTests(_currentServices);
@@ -178,3 +179,4 @@ namespace IRSpeedyVPN.UserControls
         }
     }
 }
+

@@ -1,4 +1,4 @@
-﻿using IRSpeedyVPN.WebServices;
+using IRSpeedyVPN.WebServices;
 using IRSpeedyVPN.UserControls;
 using IRSpeedyVPN.Windows;
 using System;
@@ -208,6 +208,7 @@ namespace IRSpeedyVPN
             if (ExitCleanupStarted) return;
             ExitCleanupStarted = true;
             loginApplicationExit.Cancel();
+            uCServerList.ConfigureResidential(null);
             CurlHelper.ShutdownPendingCurlStops();
             VpnTimeZone.EndConnection();
             IsEnabled = false;
@@ -300,6 +301,7 @@ namespace IRSpeedyVPN
             {
                 //                Initialized = 1;
                 uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
+                uCServerList.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;
                 uCServerList.RefreshServerListRequest = RefreshServerListForManualCheckAsync;
                 uCServerList.OnLoadingRequest += OnLoadingRequest;
                 uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;
@@ -483,6 +485,7 @@ namespace IRSpeedyVPN
 
         private async void UCUserInfo_OnDisconnectRequest(object sender, EventArgs e)
         {
+            uCServerList.UpdateConnectionState(null, false, false);
             VpnTimeZone.EndConnection();
             // Accept the user's intent immediately, without exposing cleanup details.
             long version = Interlocked.Increment(ref connectionRequestVersion);
@@ -516,6 +519,7 @@ namespace IRSpeedyVPN
             VpnTimeZone.EndConnection();
             long version = Interlocked.Increment(ref connectionRequestVersion);
             uCServerList.PauseServerChecksForConnection();
+            uCServerList.UpdateConnectionState(service, true, false);
             if (gInfo.CurrentService is TunnelPlusService previousTunnel)
                 previousTunnel.CancelPendingConnection();
             UnRegiserVpnService();
@@ -554,6 +558,7 @@ namespace IRSpeedyVPN
                     return;
                 if (next == null)
                 {
+                    uCServerList.UpdateConnectionState(null, false, false);
                     HideLoading();
                     ShowControl(uCServerList);
                     ShowMessage("سرور یافت نشد");
@@ -561,6 +566,7 @@ namespace IRSpeedyVPN
                 }
 
                 gInfo.CurrentService = next;
+                uCServerList.UpdateConnectionState(next, true, false);
                 RegiserVpnService();
                 // Runtime validation and extraction can touch the disk. Neither belongs
                 // on the dispatcher while the Connecting view is being rendered.
@@ -576,6 +582,7 @@ namespace IRSpeedyVPN
                 LogHelper.WriteLog(ex);
                 if (version == Interlocked.Read(ref connectionRequestVersion))
                 {
+                    uCServerList.UpdateConnectionState(null, false, false);
                     UnRegiserVpnService();
                     HideLoading();
                     if (IsUserLogin) ShowControl(uCServerList);
@@ -657,7 +664,9 @@ namespace IRSpeedyVPN
                 gInfo.ConnectionTime = DateTime.Now;
                 VpnTimeZone.BeginConnection(service);
                 uCServerList.MarkSuccessfulConnection(service);
-                ShowControl(uCUserInfo);                
+                // Residential keeps its quota and Disconnect action on the chooser.
+                // Preserve the existing VPN connection-info screen.
+                ShowControl(service is IRSpeedyVPN.Residential.ResidentialService ? (object)uCServerList : uCUserInfo);
 
             }
             else
@@ -1202,6 +1211,7 @@ namespace IRSpeedyVPN
                     IsUserLogin = true;
                     //serviceFactory.RenewServiceList(acc.Servers);
                     serviceFactory.RenewServiceList(acc.groups);
+                    uCServerList.ConfigureResidential(acc);
                     LogHelper.WriteExLog("[LoginPerformance] stage=services-ready processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
                     if (!onlyRenew &&!isUpdateAvailable)
                     {
@@ -1313,6 +1323,10 @@ namespace IRSpeedyVPN
         }
         private void DisconnectAll()
         {
+            uCServerList.UpdateConnectionState(null, false, false);
+            // Residential is intentionally outside the regular service factory.
+            if (gInfo.CurrentService is IRSpeedyVPN.Residential.ResidentialService residential)
+                residential.DisconnectAll();
             VpnTimeZone.EndConnection();
             Interlocked.Increment(ref connectionRequestVersion);
             UnRegiserVpnService();
@@ -1445,6 +1459,7 @@ namespace IRSpeedyVPN
         private void BeginPasswordChangeLogin(string username, string newPassword, bool remember)
         {
             if (!IsUserLogin || gInfo.Username != username || loginPresentationActive) return;
+            uCServerList.ConfigureResidential(null);
             // The password modal (and its settings owner) have already closed.
             IsUserLogin = false;
             Interlocked.Increment(ref connectionRequestVersion);
@@ -1506,6 +1521,7 @@ namespace IRSpeedyVPN
         }
         void Logout(string Message,bool resetInput=true)
         {
+            uCServerList.ConfigureResidential(null);
             VpnTimeZone.EndConnection();
             uCServerList.PauseServerChecks();
 
@@ -1567,4 +1583,5 @@ namespace IRSpeedyVPN
         }
     }
 }
+
 

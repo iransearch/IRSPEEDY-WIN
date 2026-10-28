@@ -12,6 +12,7 @@ namespace IRSpeedyVPN.Common
         internal static string Key(IVPNService service)
         {
             return service == null ? "" : service.GetType().FullName + ":"
+                + (service is IRSpeedyVPN.Residential.ResidentialService residential ? residential.AccountScope + ":" : "")
                 + service.ID.ToString(CultureInfo.InvariantCulture);
         }
 
@@ -36,3 +37,4 @@ namespace IRSpeedyVPN.Common
         }
     }
 }
+

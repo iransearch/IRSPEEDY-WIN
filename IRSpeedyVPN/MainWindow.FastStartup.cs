@@ -40,6 +40,7 @@ namespace IRSpeedyVPN
             Interlocked.Exchange(ref Initialized, 1);
 
             uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;
+            uCServerList.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;
             uCServerList.RefreshServerListRequest = RefreshServerListForManualCheckAsync;
             uCServerList.OnLoadingRequest += OnLoadingRequest;
             uCServerList.Loaded += FastStartup_ServerListLoaded;
@@ -546,6 +547,7 @@ namespace IRSpeedyVPN
                             gInfo.Import(account, password, localResource.TempPath);
                             gInfo.CurrentService = currentService;
                             gInfo.ServerResponse = response.ResponseData.DecryptedString;
+                            uCServerList.ConfigureResidential(account);
                             uCServerList.RefreshServicesFromFactory(preserveManualRefresh: canApply != null);
                             refreshed = true;
                         }
@@ -574,3 +576,4 @@ namespace IRSpeedyVPN
         }
     }
 }
+

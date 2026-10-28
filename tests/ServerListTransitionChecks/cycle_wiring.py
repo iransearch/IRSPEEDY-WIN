@@ -23,15 +23,15 @@ assert finished.index('group.RefreshSignals();') < finished.index('ResortGroups(
 assert 'completedIdentity: allowSortAnimation && !_checkCycleSetup ? LastSuccessfulServer.Key(group.Service) : null' in finished
 start = background.index('        private async Task<bool> CheckServerAsync(')
 check = background[start:background.index('        #endregion', start)]
-assert check.index('countryPicker.SetGroupChecking(service, true);') < check.index('await Task.Run(')
-assert check.index('countryPicker.SetGroupChecking(service, false);') < check.index('countryPicker.RefreshGroup(service,')
+assert check.index('picker.SetGroupChecking(service, true);') < check.index('await Task.Run(')
+assert check.index('picker.SetGroupChecking(service, false);') < check.index('picker.RefreshGroup(service,')
 assert 'allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested' in check
 progress = manual[manual.index('Action<Url, long> progress'):manual.index('Action<Url, long> complete')]
 assert 'RefreshGroup(' not in progress and 'ShowGroupProgress(' in progress
 complete = manual[manual.index('Action<Url, long> complete'):manual.index('TunnelPlusService.TestRefreshBatch(')]
 assert 'foreach (var row in rowsDone)' in complete
-assert complete.index('countryPicker.SetGroupChecking(row, false);') < complete.index('countryPicker.RefreshGroup(row);')
-assert manual.index('countryPicker.SetGroupChecking(row, true);') < manual.index('TunnelPlusService.TestRefreshBatch(')
+assert complete.index('picker.SetGroupChecking(row, false);') < complete.index('picker.RefreshGroup(row);')
+assert manual.index('picker.SetGroupChecking(row, true);') < manual.index('TunnelPlusService.TestRefreshBatch(')
 print('PASS checking precedes probes; only completed country results publish sorting eligibility; canceled/partial results do not')
 
 finish = animator[animator.index('        private void FinishPass('):animator.index('        private void StopIfIdle(')]
@@ -44,3 +44,4 @@ assert '_surfaces.Select(surface => surface.Centers).ToArray()' in animator
 frame = animator[animator.index('        private void Rendering('):animator.index('        private void Reveal(')]
 assert not any(token in frame for token in ('OrderBy', 'Task.', 'await ', 'Invoke(', 'File.', 'UrlTest', 'BitmapImage'))
 print('PASS every changed row gets its existing band; visible and offscreen Finish paths immediately plan queued work outside rendering')
+

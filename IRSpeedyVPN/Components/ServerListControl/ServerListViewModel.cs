@@ -14,6 +14,16 @@ namespace IRSpeedyVPN.Components.ServerListControl
     // of a reveal when another probe result arrives.
     public sealed class ServerItem
     {
+        public bool IsResidential { get; }
+        public string City { get; }
+        public string Isp { get; }
+        public bool IsFastest { get; }
+        public double RowHeight => IsResidential ? 66 : 52;
+        public double FlagSize => IsResidential ? 34 : 30;
+        public System.Windows.Point FlagCenter => new System.Windows.Point(FlagSize / 2, FlagSize / 2);
+        public double FlagRadius => FlagSize / 2;
+        public string AutomationDescription => CountryName + ", " + City + ", " + SignalText
+            + (IsSelectedCountry ? ", selected" : ", not selected");
         public string Identity { get; }
         public IVPNService Service { get; }
         public string CountryName { get; }
@@ -32,6 +42,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         internal ServerItem(GroupItem group)
         {
+            IsResidential = group.IsResidential; City = group.City; Isp = group.Isp; IsFastest = group.IsFastest;
             Identity = LastSuccessfulServer.Key(group.Service);
             Service = group.Service;
             CountryName = group.CountryName;
@@ -50,7 +61,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
 
         internal bool LooksLike(ServerItem other)
         {
-            return other != null && Identity == other.Identity && CountryName == other.CountryName
+            return other != null && IsResidential == other.IsResidential && City == other.City && Isp == other.Isp
+                && IsFastest == other.IsFastest && Identity == other.Identity && CountryName == other.CountryName
                 && ReferenceEquals(FlagSource, other.FlagSource) && Initials == other.Initials
                 && SignalText == other.SignalText && SignalToolTip == other.SignalToolTip
                 && ReferenceEquals(SignalBrush, other.SignalBrush) && IsSelectable == other.IsSelectable
@@ -256,3 +268,4 @@ namespace IRSpeedyVPN.Components.ServerListControl
         }
     }
 }
+

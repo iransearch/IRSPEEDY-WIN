@@ -22,6 +22,8 @@ namespace IRSpeedyVPN.UserControls
             if (!IsVisible || serviceFactory.Services == null)
                 return;
 
+            if (isResidentialTab) { RefreshCountry(null, preserveManualRefresh); return; }
+
             var previousServiceName = _selectedServiceName;
             var items = serviceFactory.Services
                 .OrderBy(y => y.Order)
@@ -57,3 +59,4 @@ namespace IRSpeedyVPN.UserControls
         }
     }
 }
+

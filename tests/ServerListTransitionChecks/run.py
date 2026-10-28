@@ -19,6 +19,7 @@ namespace System.Windows.Media {
  }
 }
 namespace System.Windows {
+ public struct Point { public Point(double x,double y) {} }
  public class PropertyMetadata { public object DefaultValue; public PropertyMetadata(object value){DefaultValue=value;} }
  public class DependencyProperty {
   public Type PropertyType; public PropertyMetadata DefaultMetadata;
@@ -43,6 +44,7 @@ namespace IRSpeedyVPN.Common {
 }
 namespace IRSpeedyVPN.Components.ServerListControl {
  class GroupItem {
+  public bool IsResidential,IsFastest; public string City="",Isp="";
   public IVPNService Service; public string CountryName,Initials,SignalText,SignalToolTip="";
   public System.Windows.Media.ImageSource FlagSource;
   public System.Windows.Media.Brush SignalBrush;
@@ -278,3 +280,4 @@ with tempfile.TemporaryDirectory(prefix='server-comet-') as directory:
         subprocess.run([dotnet, str(path/'checks.dll')], check=True)
     else:
         subprocess.run([sys.argv[1] if len(sys.argv)>1 else 'dotnet','run','--project',directory,'-v:q'],check=True)
+
