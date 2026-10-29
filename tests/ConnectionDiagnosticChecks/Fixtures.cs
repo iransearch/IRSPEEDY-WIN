@@ -1,5 +1,6 @@
 using System; using System.Diagnostics;
 namespace IRSpeedyVPN.Common { public static class LogHelper { public static Action<string> Sink; public static void WriteLog(string s) { if (LogPolicy.ShouldWrite(s)) Sink?.Invoke(s); } } }
+namespace IRSpeedyVPN.Common { internal static class ErrorReporting { internal static void Annotate(Exception exception,params string[] fields) { } } }
 namespace IRSpeedyVPN.Resource { public static class RegHelper { public static string Mode="0", Game="0"; public static string GetSettingValue(string k) { return k=="VGAURDVPNMode"?Mode:Game; } } }
 namespace IRSpeedyVPN.Services
 {
@@ -12,7 +13,7 @@ namespace IRSpeedyVPN.Services
         private bool IsConnected, lastVpnMode, useSystemProxy, coreOwned, suppressCoreExit, userCancelRequested;
         private int lastListenPort, ID, CountryIndex, ProxifierRuleType, reconnecting;
         private long connectionGeneration;
-        private Process coreProcess;
+        private Process coreProcess, recoveryCoreProcess;
         private static int CorePort = 19810;
 
         public static TunnelPlusService SampleFixture(int port)

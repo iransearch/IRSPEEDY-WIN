@@ -30,7 +30,11 @@ internal static class Program
         Require(clean.Tags["build.mvid"].Length == 32, "Build identity missing");
         Require(ErrorReporting.EndpointAlias("https://api1.greadia.app/private?token=SECRET") == "api1", "API alias failed");
         Require(ErrorReporting.EndpointAlias("https://private.invalid") == "other", "Unknown host exported");
-        Console.WriteLine("PASS: 13 reporting checks. No network requests were sent.");
+        CoreRpcChecks.Run().GetAwaiter().GetResult();
+#if CORE_RPC_OPERATION_CHECKS
+        OperationChecks.Run();
+#endif
+        Console.WriteLine("PASS: 13 existing reporting checks plus " + CoreRpcChecks.Checks + " Core RPC reporting checks. Sentry was never initialized and no events were sent.");
     }
 
     private static void Require(bool condition, string message)
@@ -41,9 +45,16 @@ internal static class Program
 
 namespace IRSpeedyVPN.Common
 {
-    internal static class LogHelper { internal static void WriteLog(string message) { } }
+    internal static class LogHelper {
+        internal static readonly System.Collections.Generic.List<SentryEvent> Captured=new System.Collections.Generic.List<SentryEvent>();
+        internal static void WriteLog(string message) { }
+        internal static void WriteLog(Exception exception) {Captured.Add(ErrorReporting.KeepSafeFields(ErrorReporting.PrepareException(exception,false)));}
+    }
     internal static class ConnectionDiagnostics
     {
+        internal static string Caller()=>"fixture";
+        internal static void RequestSnapshot(){}
+        internal static string Fingerprint(string value) => new string('a',16);
         internal static string SelectedMode => "Proxy";
         internal static string ObservedMode => "not-connected";
         internal static long ObservedModeAgeMs => 0;

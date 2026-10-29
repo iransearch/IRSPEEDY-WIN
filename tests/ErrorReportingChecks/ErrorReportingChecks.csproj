@@ -5,7 +5,14 @@
     <LangVersion>7.3</LangVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Remove="OperationChecks.cs" />
     <PackageReference Include="Sentry" Version="6.11.0" />
     <Compile Include="../../IRSpeedyVPN/Common/ErrorReporting.cs" Link="ErrorReporting.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="LibcoreProto.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreTraffic.cs" Link="LibcoreTraffic.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreAutoSelectors.cs" Link="LibcoreAutoSelectors.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="LibcoreMessages.cs" />
   </ItemGroup>
 </Project>

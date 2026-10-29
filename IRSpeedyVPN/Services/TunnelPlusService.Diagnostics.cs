@@ -4,6 +4,7 @@ using System;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Threading;
+using IRSpeedyVPN.Services.Libcore;
 
 namespace IRSpeedyVPN.Services
 {
@@ -17,6 +18,50 @@ namespace IRSpeedyVPN.Services
         private readonly Dictionary<string, int> diagnosticCategoryCounts = new Dictionary<string, int>();
         private readonly Queue<string> diagnosticTail = new Queue<string>();
         private readonly object diagnosticOutputLock = new object();
+
+        private string telemetryOutputCategory = "unknown", telemetryOutputReason = "unknown";
+        private long telemetryOutputAt, telemetryOutputGeneration = -1;
+
+        private void AnnotateCoreStartup(Exception failure, CoreRuntimeIdentity runtime, string config,
+            string xrayConfig, bool needXray, string stage)
+        {
+            try
+            {
+                var process = recoveryCoreProcess ?? coreProcess;
+                string state = "unknown", exit = "-1";
+                int processId = runtime.Pid;
+                try
+                {
+                    if (process != null)
+                    {
+                        processId = process.Id;
+                        state = process.HasExited ? "exited" : "alive";
+                        if (state == "exited") exit = process.ExitCode.ToString();
+                    }
+                }
+                catch { state = "unavailable"; }
+                ErrorReporting.Annotate(failure, "core.lifecycle_stage", stage,
+                    "core.config_id", ConnectionDiagnostics.Fingerprint(config),
+                    "core.xray_config_id", needXray ? ConnectionDiagnostics.Fingerprint(xrayConfig) : "none",
+                    "core.runtime_sha256", runtime.Sha256, "core.runtime_commit", runtime.Commit,
+                    "core.runtime_version", runtime.Version, "core.runtime_arch", runtime.Architecture,
+                    "core.process_state", state, "core.pid", processId.ToString(), "core.runtime_pid", runtime.Pid.ToString(),
+                    "core.runtime_matches_process", process == null || runtime.Pid < 1 ? "unknown" : processId == runtime.Pid ? "true" : "false",
+                    "core.exit_code", exit,
+                    "core.owned", coreOwned ? "true" : "false", "core.cancel_requested", userCancelRequested ? "true" : "false",
+                    "core.need_xray", needXray ? "true" : "false", "core.main_members", (autoSelectorPlan?.MainMembers ?? 0).ToString(),
+                    "core.ai_members", (autoSelectorPlan?.AiMembers ?? 0).ToString(),
+                    "core.connection_generation", Interlocked.Read(ref connectionGeneration).ToString(), "core.connection_id", diagnosticConnectionId);
+                lock (diagnosticOutputLock)
+                {
+                    if (telemetryOutputGeneration == Interlocked.Read(ref connectionGeneration))
+                        ErrorReporting.Annotate(failure, "core.last_output_category", telemetryOutputCategory,
+                            "core.last_output_reason", telemetryOutputReason,
+                            "core.last_output_age_ms", Math.Max(0, (Stopwatch.GetTimestamp() - telemetryOutputAt) / (Stopwatch.Frequency / 1000)).ToString());
+                }
+            }
+            catch { }
+        }
 
         internal string DiagnosticIdentity => "service=" + diagnosticServiceId + " connection=" + diagnosticConnectionId;
         private string ActiveDiagnosticState()
@@ -88,6 +133,17 @@ namespace IRSpeedyVPN.Services
                     : lower.Contains("tun") ? "tun" : "other";
                 if (category == null) return;
                 string failureReason = NetworkFailureDiagnostic.CoreReason(line);
+                if (category == "error" || category == "pool-selection-error" || category == "panic" || category == "fatal" || category == "warning")
+                {
+                    var active = gInfo?.CurrentService as TunnelPlusService;
+                    if (active != null && process != null && (ReferenceEquals(process, active.recoveryCoreProcess) || ReferenceEquals(process, active.coreProcess)))
+                        lock (active.diagnosticOutputLock)
+                        {
+                            active.telemetryOutputCategory = category; active.telemetryOutputReason = failureReason;
+                            active.telemetryOutputAt = Stopwatch.GetTimestamp();
+                            active.telemetryOutputGeneration = Interlocked.Read(ref active.connectionGeneration);
+                        }
+                }
                 if (category == "error" || category == "pool-selection-error")
                 {
                     // The process reader may be a separate test-service instance.

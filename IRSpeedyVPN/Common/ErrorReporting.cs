@@ -10,6 +10,7 @@ using System.ComponentModel;
 using System.Text.RegularExpressions;
 using Sentry;
 using Sentry.Protocol;
+using IRSpeedyVPN.Services.Libcore;
 
 namespace IRSpeedyVPN.Common
 {
@@ -32,7 +33,15 @@ namespace IRSpeedyVPN.Common
             "curl.elapsed_ms", "curl.failure_type", "curl.native_error", "curl.request_id",
             "api.request_id", "api.flow", "api.endpoint", "api.attempt", "api.elapsed_ms",
             "api.budget_ms", "api.attempt1", "api.attempt2", "api.attempt3", "api.attempt4", "network.start_seq", "network.end_seq",
-            "connection.selected", "connection.observed", "connection.observed_age_ms", "network.monitor_started"
+            "connection.selected", "connection.observed", "connection.observed_age_ms", "network.monitor_started",
+            "exception.handled", "core.rpc", "core.rpc_stage", "core.rpc_budget_ms", "core.rpc_elapsed_ms", "core.close_reason",
+            "core.operation", "core.operation_id", "core.lifecycle_stage", "core.outcome", "core.attempts",
+            "core.attempt1_ms", "core.attempt2_ms", "core.retry_prepare_ms", "core.total_ms",
+            "core.first_rpc_stage", "core.first_close_reason", "core.first_failure", "core.first_hresult", "core.first_socket_error", "core.first_native_error",
+            "core.config_id", "core.xray_config_id", "core.runtime_sha256", "core.runtime_commit", "core.runtime_version", "core.runtime_arch",
+            "core.process_state", "core.pid", "core.runtime_pid", "core.runtime_matches_process", "core.exit_code", "core.owned", "core.cancel_requested", "core.need_xray",
+            "core.main_members", "core.ai_members", "core.connection_generation", "core.connection_id",
+            "core.failure_reason", "core.last_output_category", "core.last_output_reason", "core.last_output_age_ms"
         };
 
         // Only our private dictionary is exported, never arbitrary Exception.Data.
@@ -44,7 +53,7 @@ namespace IRSpeedyVPN.Common
                 var values = exception.Data[DiagnosticKey] as Dictionary<string, string>;
                 if (values == null) exception.Data[DiagnosticKey] = values = new Dictionary<string, string>();
                 for (int i = 0; i + 1 < fields.Length; i += 2)
-                    if (DiagnosticTags.Contains(fields[i]) && SafeDiagnosticValue(fields[i + 1]))
+                    if (DiagnosticTags.Contains(fields[i]) && SafeField(fields[i], fields[i + 1]))
                         values[fields[i]] = fields[i + 1];
             }
             catch { }
@@ -52,6 +61,61 @@ namespace IRSpeedyVPN.Common
 
         private static bool SafeDiagnosticValue(string value)
             => value != null && value.Length <= 200 && Regex.IsMatch(value, @"\A[A-Za-z0-9_.:;=|,-]+\z");
+
+        private static bool OneOf(string value, string options) => options.Split('|').Contains(value);
+        private static bool SafeField(string key, string value)
+        {
+            if (value == null || value.Length > 200) return false;
+            if (key == "exception.handled") return OneOf(value, "true|false");
+            if (!key.StartsWith("core.", StringComparison.Ordinal)) return SafeDiagnosticValue(value);
+            switch (key)
+            {
+                case "core.rpc": return OneOf(value, "start|stop|test|stop-test|check-config|query-connections|query-selectors|query-url-test|selector-action|build-info|other");
+                case "core.operation": return OneOf(value, "start|test|other");
+                case "core.rpc_stage": case "core.first_rpc_stage": return OneOf(value, "connect|write-header|write-body|read-header|read-body|decode|server-error|complete|unknown");
+                case "core.lifecycle_stage": return OneOf(value, "ensure|stop-before-start|start|test|other");
+                case "core.close_reason": case "core.first_close_reason": return OneOf(value, "deadline|connect-timeout|transport|server-error|canceled|unknown");
+                case "core.outcome": return OneOf(value, "failed|retry-failed|retry-succeeded");
+                case "core.attempts": return OneOf(value, "1|2");
+                case "core.first_failure": return OneOf(value, "timeout|network_changed|socket_access_denied|dns|certificate|connection_closed|connection_refused|other");
+                case "core.process_state": return OneOf(value, "alive|exited|unavailable|unknown");
+                case "core.runtime_matches_process": return OneOf(value, "true|false|unknown");
+                case "core.owned": case "core.cancel_requested": case "core.need_xray": return OneOf(value, "true|false");
+                case "core.operation_id": return Regex.IsMatch(value, @"\A[a-f0-9]{32}\z");
+                case "core.connection_id": return value == "none" || Regex.IsMatch(value, @"\A[a-f0-9]{32}\z");
+                case "core.config_id": case "core.xray_config_id": return OneOf(value, "none|unknown") || Regex.IsMatch(value, @"\A[a-f0-9]{16}\z");
+                case "core.runtime_sha256": return value == "unknown" || Regex.IsMatch(value, @"\A[a-f0-9]{64}\z");
+                case "core.runtime_commit": return value == "unknown" || Regex.IsMatch(value, @"\A[a-fA-F0-9]{7,64}\z");
+                case "core.runtime_version": return value == "unknown" || value.Length <= 80 && Regex.IsMatch(value, @"\Av?[0-9]+(?:\.[0-9]+){1,3}(?:[-+][A-Za-z0-9.-]+)?\z");
+                case "core.runtime_arch": return OneOf(value, "unknown|amd64|386|arm64|windows/amd64|windows/386|windows/arm64");
+                case "core.first_socket_error":
+                    SocketError error;
+                    return Enum.TryParse(value, out error) && Enum.IsDefined(typeof(SocketError), error);
+                case "core.first_hresult": return Regex.IsMatch(value, @"\A[0-9A-Fa-f]{8}\z");
+                case "core.last_output_category": return OneOf(value, "unknown|error|warning|panic|fatal|network-changed|tun|interface|route|other|pool-selection-error");
+                case "core.failure_reason": case "core.last_output_reason": return OneOf(value, "unknown|none|unclassified|invalid-http-header|socket-access-denied|address-unavailable|no-healthy-outbound|connection-refused|network-unreachable|dns-failure|tls-failure|quic-idle-timeout|timeout|connection-reset|unexpected-eof|canceled");
+                default:
+                    if (!DiagnosticTags.Contains(key)) return false;
+                    long number;
+                    return Regex.IsMatch(value, @"\A-?[0-9]{1,15}\z") && long.TryParse(value, out number)
+                        && number >= (key == "core.exit_code" ? int.MinValue : key == "core.pid" || key == "core.runtime_pid" || key == "core.last_output_age_ms" ? -1 : 0)
+                        && number <= (key == "core.exit_code" ? int.MaxValue : 999999999999999L);
+            }
+        }
+
+        private static string Tag(SentryEvent report, string key, string fallback = "unknown")
+            => report.Tags.TryGetValue(key, out var value) && SafeField(key, value) ? value : fallback;
+        private static void DecorateCoreReport(SentryEvent report)
+        {
+            if (!report.Tags.ContainsKey("core.operation") && !report.Tags.ContainsKey("core.rpc")) return;
+            string operation = Tag(report, "core.operation", Tag(report, "core.rpc", "other"));
+            string stage = Tag(report, "core.lifecycle_stage", Tag(report, "core.rpc_stage"));
+            string outcome = Tag(report, "core.outcome", "failed");
+            report.Message = "Core " + operation + " RPC " + Tag(report, "core.rpc", operation) + " at " + Tag(report, "core.rpc_stage", stage) + ": " + outcome;
+            report.SetTag("diagnostic.schema", "core-rpc-v1");
+            report.Fingerprint = new[] { "core-rpc-v1", operation, Tag(report, "core.rpc", "other"), stage, Tag(report, "core.rpc_stage"), Tag(report, "error.kind", "other"), outcome };
+            if (report.Level != SentryLevel.Fatal && outcome == "retry-succeeded") report.Level = SentryLevel.Warning;
+        }
 
         internal static string EndpointAlias(string url)
         {
@@ -170,9 +234,10 @@ namespace IRSpeedyVPN.Common
             clean.SetTag("diagnostic.schema", "http-context-v2");
             foreach (var key in DiagnosticTags.Concat(new[] { "diagnostic.schema", "installation.id", "identity.scope",
                 "session.id", "build.mvid", "os.version", "clr.version", "web.status", "socket.error", "native.error" }))
-                if (input.Tags.TryGetValue(key, out var value) && SafeDiagnosticValue(value)) clean.SetTag(key, value);
+                if (input.Tags.TryGetValue(key, out var value) && SafeField(key, value)) clean.SetTag(key, value);
             // These exception objects are built by PrepareException, never from raw exceptions.
             if (kind == "exception") clean.SentryExceptions = input.SentryExceptions;
+            DecorateCoreReport(clean);
             return clean;
         }
 
@@ -208,6 +273,7 @@ namespace IRSpeedyVPN.Common
                 SentryExceptions = chain
             };
             result.SetTag("report.kind", "exception");
+            result.SetTag("exception.handled", fatal ? "false" : "true");
             result.SetTag("exception.type", exception.GetType().FullName);
             result.SetTag("exception.hresult", exception.HResult.ToString("X8"));
             result.SetTag("process.arch", Environment.Is64BitProcess ? "x64" : "x86");
@@ -230,8 +296,13 @@ namespace IRSpeedyVPN.Common
             foreach (var e in exceptions.AsEnumerable().Reverse())
             {
                 var values = e.Data[DiagnosticKey] as Dictionary<string, string>;
+                var rpc = CoreRpcTrace.Read(e);
+                if (rpc != null)
+                    foreach (var pair in rpc)
+                        if (DiagnosticTags.Contains(pair.Key) && SafeField(pair.Key, pair.Value)) result.SetTag(pair.Key, pair.Value);
                 if (values != null)
-                    foreach (var pair in values) result.SetTag(pair.Key, pair.Value);
+                    foreach (var pair in values)
+                        if (DiagnosticTags.Contains(pair.Key) && SafeField(pair.Key, pair.Value)) result.SetTag(pair.Key, pair.Value);
                 var web = e as WebException;
                 if (web != null) result.SetTag("web.status", web.Status.ToString());
                 var socket = e as SocketException;
@@ -239,18 +310,38 @@ namespace IRSpeedyVPN.Common
                 var native = e as Win32Exception;
                 if (native != null) result.SetTag("native.error", native.NativeErrorCode.ToString());
             }
+            DecorateCoreReport(result);
             return result;
         }
+
+        private static string GroupingField(Exception exception, string key)
+        {
+            // Outer annotations win, matching PrepareException. Read only the
+            // five grouping fields before admission, without building stacks.
+            int depth = 0;
+            for (var current = exception; current != null && depth++ < 8; current = current.InnerException)
+            {
+                var values = current.Data[DiagnosticKey] as IDictionary<string, string>;
+                if (values != null && values.TryGetValue(key, out var value) && SafeField(key, value)) return value;
+                var rpc = CoreRpcTrace.Read(current);
+                if (rpc != null && rpc.TryGetValue(key, out value) && SafeField(key, value)) return value;
+            }
+            return "unknown";
+        }
+        internal static string DeduplicationKey(Exception exception, bool fatal)
+            => exception.GetType().FullName + ":" + exception.HResult + ":" + exception.TargetSite?.Name + ":" + FailureCode(exception)
+                + ":" + GroupingField(exception, "core.operation") + ":" + GroupingField(exception, "core.rpc")
+                + ":" + GroupingField(exception, "core.rpc_stage") + ":" + GroupingField(exception, "core.lifecycle_stage")
+                + ":" + GroupingField(exception, "core.outcome") + (fatal ? ":fatal" : ":handled");
 
         internal static void Capture(Exception exception, bool fatal)
         {
             if (!ready || exception == null) return;
             try
             {
-                string key = exception.GetType().FullName + ":" + exception.HResult
-                    + ":" + exception.TargetSite?.Name + ":" + FailureCode(exception);
-                if (!Admit(key, false)) return;
-                SentrySdk.CaptureEvent(PrepareException(exception, fatal));
+                if (!Admit(DeduplicationKey(exception, fatal), false)) return;
+                var report = PrepareException(exception, fatal);
+                SentrySdk.CaptureEvent(report);
                 if (fatal) SentrySdk.FlushAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
             }
             catch { } // Never recurse through LogHelper on a telemetry failure.

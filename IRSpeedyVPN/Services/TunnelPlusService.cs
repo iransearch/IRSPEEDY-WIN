@@ -538,11 +538,19 @@ namespace IRSpeedyVPN.Services
             }
             var startupClock = Stopwatch.StartNew();
             Diagnostic("core-ensure-begin");
-            EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
+            try { EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned); }
+            catch (Exception failure)
+            {
+                ErrorReporting.Annotate(failure, "core.operation", "start", "core.operation_id", Guid.NewGuid().ToString("N"),
+                    "core.outcome", "failed", "core.attempts", "1", "core.total_ms", startupClock.ElapsedMilliseconds.ToString());
+                AnnotateCoreStartup(failure, new CoreRuntimeIdentity(), configData, xrayConfig, needXray, "ensure");
+                throw;
+            }
             Diagnostic("core-ensure-complete", "elapsedMs=" + startupClock.ElapsedMilliseconds);
             var rpcClock = new Stopwatch();
             var startupStage = "stop-before-start";
             ErrorResp startResp;
+            Exception recoveredRpcFailure = null;
             var runtimeIdentity = new CoreRuntimeIdentity();
             try
             {
@@ -556,12 +564,14 @@ namespace IRSpeedyVPN.Services
                 cancellation.ThrowIfCancellationRequested();
                 startResp = ExecuteCoreCall(client =>
                 {
-                    if (!SafeStopCore(client))
-                        throw new IOException("Core did not acknowledge Stop before Start.");
+                    startupStage = "stop-before-start"; rpcClock.Reset();
+                    Exception stopFailure;
+                    if (!SafeStopCore(client, out stopFailure))
+                        throw new IOException("Core did not acknowledge Stop before Start.", stopFailure);
                     cancellation.ThrowIfCancellationRequested();
                     Diagnostic("core-pre-start-stop-complete", "elapsedMs=" + startupClock.ElapsedMilliseconds);
                     startupStage = "start";
-                    rpcClock.Start();
+                    rpcClock.Restart();
                     Diagnostic("core-start-rpc-begin", "deadlineMs=" + CoreStartDeadlineMs);
                     return client.StartWithDeadline(new LoadConfigReq
                     {
@@ -577,15 +587,15 @@ namespace IRSpeedyVPN.Services
                         XrayConfig = xrayConfig ?? "",
                         XrayOutboundDnsStrategy = needXray ? xrayOutboundDnsStrategy : ""
                     }, CoreStartDeadlineMs, cancellation);
-                });
+                }, "start", failure => AnnotateCoreStartup(failure, runtimeIdentity, configData, xrayConfig, needXray, startupStage), recovered: failure => recoveredRpcFailure = failure);
             }
             catch (TimeoutException ex)
             {
-                LogHelper.WriteLog(ex);
                 Diagnostic("core-start-rpc-timeout", "stage=" + startupStage
                     + " elapsedMs=" + rpcClock.ElapsedMilliseconds + " deadlineMs=" + CoreStartDeadlineMs
                     + " " + NetworkFailureDiagnostic.ExceptionFields(ex));
                 DiagnosticStartFailure("core-start-error-details", ex.Message, startupStage);
+                LogHelper.WriteLog(ex);
                 error = runtimeIdentity.Failure("startup-timeout");
                 RecoverCoreAfterFailedStart();
                 return false;
@@ -602,6 +612,7 @@ namespace IRSpeedyVPN.Services
                 Diagnostic("core-start-rpc-failed", "stage=" + startupStage + " elapsedMs=" + rpcClock.ElapsedMilliseconds
                     + " " + NetworkFailureDiagnostic.ExceptionFields(ex));
                 DiagnosticStartFailure("core-start-error-details", ex.Message, startupStage);
+                LogHelper.WriteLog(ex);
                 error = runtimeIdentity.Failure("rpc-transport-failure");
                 RecoverCoreAfterFailedStart();
                 return false;
@@ -621,10 +632,21 @@ namespace IRSpeedyVPN.Services
             if (!string.IsNullOrEmpty(startResp.Error))
             {
                 DiagnosticStartFailure("core-start-config-error", startResp.Error, "start-response");
+                var report = recoveredRpcFailure ?? new InvalidOperationException("Core rejected the connection configuration.");
+                ErrorReporting.Annotate(report, "core.operation", "start", "core.rpc", "start", "core.rpc_stage", "server-error",
+                    "core.close_reason", "server-error", "core.lifecycle_stage", "start",
+                    "core.outcome", recoveredRpcFailure == null ? "failed" : "retry-failed",
+                    "core.rpc_budget_ms", CoreStartDeadlineMs.ToString(), "core.rpc_elapsed_ms", rpcClock.ElapsedMilliseconds.ToString(),
+                    "core.failure_reason", NetworkFailureDiagnostic.CoreReason(startResp.Error));
+                if (recoveredRpcFailure == null) ErrorReporting.Annotate(report, "core.attempts", "1", "core.operation_id", Guid.NewGuid().ToString("N"),
+                    "core.attempt1_ms", rpcClock.ElapsedMilliseconds.ToString(), "core.total_ms", rpcClock.ElapsedMilliseconds.ToString());
+                AnnotateCoreStartup(report, runtimeIdentity, configData, xrayConfig, needXray, "start");
+                LogHelper.WriteLog(report);
                 error = runtimeIdentity.Failure(startResp.Error);
                 TryStopCore();
                 return false;
             }
+            if (recoveredRpcFailure != null) LogHelper.WriteLog(recoveredRpcFailure);
             Traffic.TrafficUsageService.Instance.StartSession(timeout =>
                 new LibcoreServiceClient("127.0.0.1", CorePort, timeout).QueryConnections(timeout));
             return true;
@@ -1193,7 +1215,7 @@ namespace IRSpeedyVPN.Services
                                     {
                                         var response = ExecuteCoreCall(client =>
                                             client.TestWithProgress(request, progress == null && memberProgress == null ? null : report, isCancelled,
-                                                message => LogHelper.WriteExLog(message), cancellation));
+                                                message => LogHelper.WriteExLog(message), cancellation), "test");
                                         LogProbeAttempt(testId, diagnosticRequest, phase, request, response, tagToUrl,
                                             elapsed.ElapsedMilliseconds, null);
                                         return response;
@@ -1780,7 +1802,10 @@ namespace IRSpeedyVPN.Services
         }
 
         private bool SafeStopCore(LibcoreServiceClient client, bool sharingAlreadyPaused = false)
+            => SafeStopCore(client, out _, sharingAlreadyPaused);
+        private bool SafeStopCore(LibcoreServiceClient client, out Exception failure, bool sharingAlreadyPaused = false)
         {
+            failure = null;
             Traffic.TrafficUsageService.Instance.StopSession();
             if (!sharingAlreadyPaused)
                 PauseSharingBeforeCoreRestart();
@@ -1796,24 +1821,96 @@ namespace IRSpeedyVPN.Services
             }
             catch (Exception ex)
             {
+                failure = ex;
                 Diagnostic("core-stop-rpc-error", "exception=" + ex.GetType().Name);
                 return false;
             }
         }
 
-        private T ExecuteCoreCall<T>(Func<LibcoreServiceClient, T> call)
+        private T ExecuteCoreCall<T>(Func<LibcoreServiceClient, T> call,
+            string operation = "other", Action<Exception> annotate = null, Action<Exception> recovered = null)
         {
+            var total = Stopwatch.StartNew();
+            var attempt = Stopwatch.StartNew();
+            string operationId = Guid.NewGuid().ToString("N");
+            long firstMs = 0, secondMs = 0, prepareMs = 0;
+            long networkAtStart = ConnectionDiagnostics.EventSequence;
+            int attempts = 1;
+            TimeoutException firstFailure = null;
+            Action<Exception, string> details = (failure, outcome) =>
+            {
+                try
+                {
+                    ErrorReporting.Annotate(failure, "core.operation", operation, "core.operation_id", operationId,
+                        "core.lifecycle_stage", operation == "start" ? "start" : operation == "test" ? "test" : "other",
+                        "core.outcome", outcome, "core.attempts", attempts.ToString(),
+                        "core.attempt1_ms", firstMs.ToString(), "core.attempt2_ms", secondMs.ToString(),
+                        "core.retry_prepare_ms", prepareMs.ToString(), "core.total_ms", total.ElapsedMilliseconds.ToString(),
+                        "network.start_seq", networkAtStart.ToString());
+                    if (firstFailure != null)
+                    {
+                        ErrorReporting.Annotate(failure, "core.first_failure", ErrorReporting.Classify(firstFailure.ToString()),
+                            "core.first_hresult", firstFailure.HResult.ToString("X8"));
+                        Exception cause = firstFailure;
+                        for (int depth = 0; cause != null && depth < 8; depth++, cause = cause.InnerException)
+                            if (cause is System.Net.Sockets.SocketException socket)
+                            {
+                                ErrorReporting.Annotate(failure, "core.first_socket_error", socket.SocketErrorCode.ToString(),
+                                    "core.first_native_error", socket.NativeErrorCode.ToString());
+                                break;
+                            }
+                        var trace = CoreRpcTrace.Read(firstFailure);
+                        if (trace != null)
+                        {
+                            if (trace.TryGetValue("core.rpc_stage", out var stage)) ErrorReporting.Annotate(failure, "core.first_rpc_stage", stage);
+                            if (trace.TryGetValue("core.close_reason", out var reason)) ErrorReporting.Annotate(failure, "core.first_close_reason", reason);
+                        }
+                    }
+                    annotate?.Invoke(failure);
+                }
+                catch { /* Telemetry must never change the RPC result or retry policy. */ }
+            };
             try
             {
                 return call(new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs));
             }
             catch (TimeoutException ex)
             {
-                LogHelper.WriteLog(ex);
-                Diagnostic("core-rpc-timeout-retry", "delayMs=" + CoreConnectRetryDelayMs);
-                EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
-                Thread.Sleep(CoreConnectRetryDelayMs);
-                return call(new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs));
+                firstFailure = ex; firstMs = attempt.ElapsedMilliseconds;
+                // Do not send a premature error: the same operation may recover.
+                Diagnostic("core-rpc-timeout-retry", "delayMs=" + CoreConnectRetryDelayMs + " operation=" + operation
+                    + " operationId=" + operationId + " attempt=1 elapsedMs=" + firstMs);
+                var prepare = Stopwatch.StartNew();
+                try
+                {
+                    EnsureCoreRunning(CorePort, ref coreProcess, ref coreOwned);
+                    Thread.Sleep(CoreConnectRetryDelayMs);
+                    prepareMs = prepare.ElapsedMilliseconds;
+                    attempts = 2; attempt.Restart();
+                    var response = call(new LibcoreServiceClient("127.0.0.1", CorePort, CoreConnectTimeoutMs));
+                    secondMs = attempt.ElapsedMilliseconds;
+                    details(firstFailure, "retry-succeeded");
+                    Diagnostic("core-rpc-retry-complete", "operationId=" + operationId + " outcome=succeeded totalMs=" + total.ElapsedMilliseconds);
+                    if (recovered != null) { try { recovered(firstFailure); } catch { } }
+                    else LogHelper.WriteLog(firstFailure); // Report only after the retry outcome is known.
+                    return response;
+                }
+                catch (OperationCanceledException)
+                {
+                    Diagnostic("core-rpc-retry-canceled", "operationId=" + operationId + " attempts=" + attempts);
+                    throw;
+                }
+                catch (Exception failure)
+                {
+                    if (attempts == 1) prepareMs = prepare.ElapsedMilliseconds;
+                    else secondMs = attempt.ElapsedMilliseconds;
+                    details(failure, "retry-failed");
+                    throw; // The existing caller reports the final exception once.
+                }
+            }
+            catch (Exception failure)
+            {
+                firstMs = attempt.ElapsedMilliseconds; details(failure, "failed"); throw;
             }
         }
 

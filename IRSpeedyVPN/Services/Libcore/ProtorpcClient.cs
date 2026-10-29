@@ -1,5 +1,7 @@
 using System;
 using System.IO;
+using System.Collections.Generic;
+using System.Diagnostics;
 using System.Net.Sockets;
 using System.Threading;
 
@@ -10,6 +12,8 @@ namespace IRSpeedyVPN.Services.Libcore
         private readonly TcpClient _client;
         private readonly NetworkStream _stream;
         private long _nextId;
+        private int _deadlineMs;
+        private CoreRpcTrace _trace;
 
         private ProtorpcClient(TcpClient client)
         {
@@ -27,6 +31,7 @@ namespace IRSpeedyVPN.Services.Libcore
         {
             cancellation.ThrowIfCancellationRequested();
             var client = new TcpClient();
+            var trace = new CoreRpcTrace("other", timeoutMs); trace.Stage = "connect";
             try
             {
                 var ar = client.BeginConnect(host, port, null, null);
@@ -42,8 +47,9 @@ namespace IRSpeedyVPN.Services.Libcore
                 }
                 return new ProtorpcClient(client);
             }
-            catch
+            catch (Exception ex)
             {
+                trace.Attach(ex, ex is OperationCanceledException ? "canceled" : ex is TimeoutException ? "connect-timeout" : "transport");
                 client.Close();
                 throw;
             }
@@ -77,27 +83,31 @@ namespace IRSpeedyVPN.Services.Libcore
                 throw new ArgumentException("RPC method is required.", nameof(method));
             }
 
-            var headerBytes = LibcoreProto.EncodeRequestHeader(
-                (ulong)Interlocked.Increment(ref _nextId),
-                method,
-                (uint)(requestBody?.Length ?? 0));
-
-            WriteFrame(headerBytes);
-            WriteFrame(requestBody ?? Array.Empty<byte>());
-
-            var responseHeaderBytes = ReadFrame(0);
-            var responseHeader = LibcoreProto.DecodeResponseHeader(responseHeaderBytes);
-            if (!string.IsNullOrEmpty(responseHeader.Error))
+            var trace = _trace = new CoreRpcTrace(CoreRpcTrace.Alias(method), _deadlineMs);
+            try
             {
-                throw new InvalidOperationException(responseHeader.Error);
+                var headerBytes = LibcoreProto.EncodeRequestHeader(
+                    (ulong)Interlocked.Increment(ref _nextId), method, (uint)(requestBody?.Length ?? 0));
+                trace.Stage = "write-header"; WriteFrame(headerBytes);
+                trace.Stage = "write-body"; WriteFrame(requestBody ?? Array.Empty<byte>());
+                trace.Stage = "read-header";
+                var responseHeaderBytes = ReadFrame(0);
+                var responseHeader = LibcoreProto.DecodeResponseHeader(responseHeaderBytes);
+                if (!string.IsNullOrEmpty(responseHeader.Error))
+                {
+                    trace.Stage = "server-error";
+                    throw new InvalidOperationException(responseHeader.Error);
+                }
+                trace.Stage = "read-body";
+                var responseBody = ReadFrame(0);
+                if (responseHeader.RawResponseLen != (uint)responseBody.Length)
+                    throw new InvalidOperationException("protorpc: unexpected response length.");
+                trace.Stage = "decode";
+                var response = decode != null ? decode(responseBody) : default;
+                trace.Stage = "complete";
+                return response;
             }
-
-            var responseBody = ReadFrame(0);
-            if (responseHeader.RawResponseLen != (uint)responseBody.Length)
-            {
-                throw new InvalidOperationException("protorpc: unexpected response length.");
-            }
-            return decode != null ? decode(responseBody) : default;
+            catch (Exception ex) { trace.Attach(ex, "transport"); throw; }
         }
 
         // Queries are optional UI updates: close their dedicated connection at the
@@ -105,8 +115,25 @@ namespace IRSpeedyVPN.Services.Libcore
         public TResp CallWithDeadline<TResp>(string method, byte[] requestBody,
             Func<byte[], TResp> decode, int timeoutMs)
         {
-            using (var deadline = new Timer(_ => Dispose(), null, timeoutMs, Timeout.Infinite))
-                return Call(method, requestBody, decode);
+            _deadlineMs = timeoutMs;
+            int outcome = 0;
+            using (var deadline = new Timer(_ =>
+            {
+                if (Interlocked.CompareExchange(ref outcome, 3, 0) == 0) Dispose();
+            }, null, timeoutMs, Timeout.Infinite))
+            {
+                try
+                {
+                    var response = Call(method, requestBody, decode);
+                    Interlocked.CompareExchange(ref outcome, 1, 0);
+                    return response; // Preserve the legacy overload's response semantics.
+                }
+                catch (Exception ex)
+                {
+                    var winner = Interlocked.CompareExchange(ref outcome, 1, 0);
+                    _trace?.Attach(ex, winner == 3 ? "deadline" : "transport"); throw;
+                }
+            }
         }
 
         // The Start RPC has its own connection. Closing it releases a pending read
@@ -115,6 +142,7 @@ namespace IRSpeedyVPN.Services.Libcore
             Func<byte[], TResp> decode, int timeoutMs, CancellationToken cancellation, bool reportTimeout = false)
         {
             cancellation.ThrowIfCancellationRequested();
+            _deadlineMs = timeoutMs;
             // Only the winner may close the socket. A timer queued after a successful
             // response must not turn that response into a deadline failure.
             int outcome = 0; // pending=0, completed=1, canceled=2, timed out=3
@@ -131,11 +159,16 @@ namespace IRSpeedyVPN.Services.Libcore
                 {
                     var response = Call(method, requestBody, decode);
                     var winner = Interlocked.CompareExchange(ref outcome, 1, 0);
-                    if (winner == 2) throw new OperationCanceledException(cancellation);
+                    if (winner == 2)
+                    {
+                        var canceled = new OperationCanceledException(cancellation);
+                        _trace?.Attach(canceled, "canceled"); throw canceled;
+                    }
                     if (winner == 3)
                     {
-                        if (reportTimeout) throw new TimeoutException("Core Start RPC deadline exceeded.");
-                        throw new IOException("Core RPC deadline exceeded.");
+                        Exception failure = reportTimeout ? (Exception)new TimeoutException("Core Start RPC deadline exceeded.")
+                            : new IOException("Core RPC deadline exceeded.");
+                        _trace?.Attach(failure, "deadline"); throw failure;
                     }
                     return response;
                 }
@@ -143,9 +176,17 @@ namespace IRSpeedyVPN.Services.Libcore
                     || ex is SocketException)
                 {
                     var winner = Interlocked.CompareExchange(ref outcome, 1, 0);
-                    if (winner == 2) throw new OperationCanceledException(cancellation);
+                    if (winner == 2)
+                    {
+                        var canceled = new OperationCanceledException(cancellation);
+                        _trace?.Attach(canceled, "canceled"); throw canceled;
+                    }
                     if (winner == 3 && reportTimeout)
-                        throw new TimeoutException("Core Start RPC deadline exceeded.", ex);
+                    {
+                        var failure = new TimeoutException("Core Start RPC deadline exceeded.", ex);
+                        _trace?.Attach(failure, "deadline"); throw failure;
+                    }
+                    _trace?.Attach(ex, winner == 3 ? "deadline" : "transport");
                     throw;
                 }
             }
@@ -232,4 +273,51 @@ namespace IRSpeedyVPN.Services.Libcore
             try { _client?.Close(); } catch { }
         }
     }
+    // Only this private-key snapshot can supply low-level RPC metadata. No raw
+    // request/response, method argument, endpoint or exception message is stored.
+    internal sealed class CoreRpcTrace
+    {
+        private static readonly object Key = new object();
+        private readonly Stopwatch clock = Stopwatch.StartNew();
+        private readonly string rpc;
+        private readonly int budget;
+        internal string Stage = "connect";
+        internal CoreRpcTrace(string rpc, int budget) { this.rpc = rpc; this.budget = budget; }
+        internal void Attach(Exception exception, string reason)
+        {
+            try
+            {
+                exception.Data[Key] = new Dictionary<string, string>
+                {
+                    ["core.rpc"] = rpc, ["core.rpc_stage"] = Stage,
+                    ["core.rpc_budget_ms"] = Math.Max(0, budget).ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["core.rpc_elapsed_ms"] = clock.ElapsedMilliseconds.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                    ["core.close_reason"] = reason
+                };
+            }
+            catch { }
+        }
+        internal static IDictionary<string, string> Read(Exception exception)
+        {
+            try { return exception.Data[Key] as IDictionary<string, string>; } catch { return null; }
+        }
+        internal static string Alias(string method)
+        {
+            switch (method)
+            {
+                case "LibcoreService.Start": return "start";
+                case "LibcoreService.Stop": return "stop";
+                case "LibcoreService.Test": return "test";
+                case "LibcoreService.StopTest": return "stop-test";
+                case "LibcoreService.CheckConfig": return "check-config";
+                case "LibcoreService.QueryConnections": return "query-connections";
+                case "LibcoreService.QueryAutoSelectors": return "query-selectors";
+                case "LibcoreService.QueryURLTest": return "query-url-test";
+                case "LibcoreService.AutoSelectorAction": return "selector-action";
+                case "LibcoreService.IsPrivileged": return "build-info";
+                default: return "other";
+            }
+        }
+    }
+
 }
