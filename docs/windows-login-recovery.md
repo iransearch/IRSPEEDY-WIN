@@ -1,4 +1,4 @@
-# Windows login DNS and recovery (1.4.62)
+# Windows login DNS and recovery (1.4.63)
 
 The production login uses classic DNS first, matching the successful 1.4.50
 behavior. This cleanup removes experiment switches and obsolete login DoH
@@ -14,6 +14,11 @@ AdGuard default 94.140.14.14, and the additional resolvers 213.14.111.50,
 A truncated UDP reply uses TCP to the same server within the existing lookup
 clock. The three additional resolvers use address-based diagnostic names rather
 than an unverified provider label. The shared lookup budget remains five seconds.
+
+This login-only list is independent of the native VPN DNS configuration. In
+1.4.63 the three added addresses remain active here, while VPN/Residential use
+their original four providers to respect the deployed Core's primary-server
+limit. A larger login race does not require changing that native transport.
 
 The first valid public address set wins. Invalid, empty, failed and private-only
 answers cannot win. Losing sockets are canceled/closed immediately; workers are

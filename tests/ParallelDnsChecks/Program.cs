@@ -38,9 +38,11 @@ internal static class Program
                 Check((string)remote["type"] == "vpn-dns-race", "one native completion-order transport");
                 Check(servers.Count == ((JArray)before["dns"]["servers"]).Count, "providers remain inside the composite");
                 var primary = (JArray)remote["servers"];
+                // Throne-G aecfe86: core/server/internal/vpndns/transport.go, New.
+                // This is a native protocol limit, independent of the expected IP list.
+                Check(primary.Count >= 2 && primary.Count <= 4, "configuration respects deployed Core's 2..4 primary-server contract");
                 Check(primary.Select(s => (string)s["server"]).SequenceEqual(new[] {
-                    "8.8.8.8", "1.1.1.1", "77.88.8.8", "78.186.60.77",
-                    "213.14.111.50", "94.20.20.20", "217.218.127.127" }), "all seven providers configured");
+                    "8.8.8.8", "1.1.1.1", "77.88.8.8", "78.186.60.77" }), "all four Core-compatible providers configured");
                 Check(primary.Take(3).All(s => (string)s["type"] == "https" && (string)s["path"] == "/dns-query"
                     && (string)s["detour"] == "proxy" && (bool)s["tls"]["enabled"] && s["tls"]["insecure"] == null), "verified DoH through VPN");
                 Check(primary.Take(3).Select(s => (string)s["tls"]["server_name"]).SequenceEqual(
