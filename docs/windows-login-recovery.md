@@ -1,4 +1,4 @@
-# Windows login DNS and recovery (1.4.63)
+# Windows login DNS and recovery (1.4.64)
 
 The production login uses classic DNS first, matching the successful 1.4.50
 behavior. This cleanup removes experiment switches and obsolete login DoH
@@ -15,10 +15,10 @@ A truncated UDP reply uses TCP to the same server within the existing lookup
 clock. The three additional resolvers use address-based diagnostic names rather
 than an unverified provider label. The shared lookup budget remains five seconds.
 
-This login-only list is independent of the native VPN DNS configuration. In
-1.4.63 the three added addresses remain active here, while VPN/Residential use
-their original four providers to respect the deployed Core's primary-server
-limit. A larger login race does not require changing that native transport.
+This login-only list is independent of the native VPN DNS configuration. Windows
+1.4.64 also enables the three additional addresses inside VPN/Residential, paired
+with an updated Core supporting seven primaries. Login's implementation, cache,
+deadlines and fallback behavior are unchanged by that native transport update.
 
 The first valid public address set wins. Invalid, empty, failed and private-only
 answers cannot win. Losing sockets are canceled/closed immediately; workers are

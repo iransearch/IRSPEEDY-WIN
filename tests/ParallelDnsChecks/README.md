@@ -1,6 +1,6 @@
 # Android-style VPN DNS
 
-Windows 1.4.36 uses the app-owned native `vpn-dns-race` transport in the updated
+Windows uses the app-owned native `vpn-dns-race` transport introduced in 1.4.36's updated
 Throne-G Core. Reference Android commit:
 12f470f443f5f5217a4713f87f24469feacd44f9.
 
@@ -10,18 +10,20 @@ Throne-G Core. Reference Android commit:
 | Cloudflare | 1.1.1.1 | DoH /dns-query | cloudflare-dns.com |
 | Yandex Basic | 77.88.8.8 | DoH /dns-query | common.dot.dns.yandex.net |
 | Additional resolver | 78.186.60.77 | UDP/53 | — |
+| Additional resolver | 213.14.111.50 | UDP/53 | — |
+| Additional resolver | 94.20.20.20 | UDP/53 | — |
+| Additional resolver | 217.218.127.127 | UDP/53 | — |
 
-Windows 1.4.63 restores this four-provider configuration for TUN, Proxy and
-Residential. The deployed Core aecfe86f4cbec5c7cab2b7d7f76bee324444a875
-rejects more than four primary providers in `vpndns.New`:
-`vpn-dns-race requires 2 to 4 primary servers`. Version 1.4.62 incorrectly
-configured seven; Core rejected startup before binding the user proxy listener.
-The configuration suite now checks this native limit separately from the IP list.
+Windows 1.4.64 uses seven primary providers for TUN, Proxy and Residential.
+It requires the updated Throne-G Core accepting 2..7 primaries, with diagnostics
+covering all seven plus the TCP fallback. Login retains its separate seven-server
+classic DNS race. The native probe/test `https-race` is unchanged.
 
-213.14.111.50, 94.20.20.20 and 217.218.127.127 remain enabled in login's
-independent classic DNS race alongside Google, Yandex, Cloudflare and AdGuard.
-Using all seven inside the VPN requires a compatible Core change and rebuild;
-this hotfix works with the existing Core and does not modify its implementation.
+Do not package this app with Core aecfe86f4cbec5c7cab2b7d7f76bee324444a875:
+that Core rejects more than four primaries before binding the user proxy listener.
+Version 1.4.62 exposed this incompatibility; 1.4.63 temporarily restored four.
+The configuration suite checks the native limit separately from the expected IP
+list, and the native runner checks generated seven-provider profiles directly.
 
 All primary requests run concurrently through `proxy`, with an 8-second stage
 deadline. Valid replies enter a buffered completion queue: a later-listed
@@ -61,15 +63,25 @@ The transformation is idempotent, including already-native race profiles.
 Browser-owned DoH and applications that resolve before contacting the proxy
 are outside this destination-resolution policy.
 
-**Rebuild the updated Throne-G Core as well as Windows 1.4.36.** The old Core
-does not recognize the new transport. Use the existing branch
+**Rebuild the updated Throne-G Core as well as Windows 1.4.64.** The previous
+Core's four-provider limit is incompatible with this seven-provider profile.
+Use the existing branch
 `update/fc668b60-core-only-1.3.0-beta.1`. The local DNS engine is packaged in that
 repository; no dependency-pin or external builder override is required.
-Core implementation commit: aecfe86f4cbec5c7cab2b7d7f76bee324444a875.
+Required seven-provider Core commit:
+[21c9a2ccaacf02764c71b5c0238b8909ce1a8412](https://github.com/iransearch/Throne-G/commit/21c9a2ccaacf02764c71b5c0238b8909ce1a8412).
+Package the rebuilt modern and legacy Core payloads in `IRSpeedyVPN/Resources/Files.zip`
+before running the existing Windows single-file application build. Updating only
+the C# application does not replace the bundled Core. No dependency or external
+builder override is needed.
 
 Structured Core diagnostics now reach the normal report without Debug logging:
 `dns-race-created`, `dns-race-result`, `dns-race-summary`. Result `index` 0/1/2/3
-maps to Google/Cloudflare/Yandex/78.186.60.77; 4 is TCP fallback, -1 no winner.
+maps to Google/Cloudflare/Yandex/78.186.60.77; 4/5/6 map to
+213.14.111.50/94.20.20.20/217.218.127.127; 7 is TCP fallback, -1 no winner.
+With a legacy four-provider profile the new Core still uses fallback index 4.
+Windows 1.4.64 accepts `wins0` through `wins7` through the existing numeric
+diagnostic allowlist so the new result and summary lines are retained.
 `source` is `raw-network`, `ip-network`, or `ip-cache`; `elapsedMs` is the winning
 raw stage or complete IP lookup latency. Complete cumulative provider/cache/error
 counters survive sampling (first 32 results, every 128th, final summary).

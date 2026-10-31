@@ -168,6 +168,7 @@ namespace IRSpeedyVPN.Common
                     case "pid": case "seq": case "monoMs": case "box": case "dropped": case "outbound": case "index":
                     case "flags": case "test": case "count": case "timeoutMs": case "elapsedMs":
                     case "dns": case "fallbackTimeoutMs": case "wins0": case "wins1": case "wins2": case "wins3": case "wins4":
+                    case "wins5": case "wins6": case "wins7":
                     case "cached": case "failures":
                         long number; valid = long.TryParse(value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out number);
                         if (valid) value = number.ToString(CultureInfo.InvariantCulture);

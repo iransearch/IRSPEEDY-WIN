@@ -39,6 +39,9 @@ namespace IRSpeedyVPN.Services
             reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-result pid=7 seq=11 box=2 dns=8 count=1 wins0=0 wins1=0 wins2=1 wins3=0 wins4=0 cached=0 failures=0 index=2 source=ip-network elapsedMs=24 error=none");
             reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-result pid=7 seq=12 box=2 dns=8 count=2 wins0=0 wins1=0 wins2=2 wins3=0 wins4=0 cached=1 failures=0 index=2 source=ip-cache elapsedMs=0 error=none");
             reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-summary pid=7 seq=13 box=2 dns=8 count=2 wins0=0 wins1=0 wins2=2 wins3=0 wins4=0 cached=1 failures=0");
+            reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-created pid=7 seq=14 box=3 dns=9 count=7 timeoutMs=8000 fallbackTimeoutMs=4000 current=true");
+            reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-result pid=7 seq=15 box=3 dns=9 count=3 wins0=0 wins1=0 wins2=0 wins3=0 wins4=0 wins5=0 wins6=1 wins7=2 cached=1 failures=0 index=7 source=ip-network elapsedMs=24 error=none");
+            reader.ObserveCoreOutput(null, "stderr", "[CoreDiagnostic] schema=core-network-v2 event=dns-race-summary pid=7 seq=16 box=3 dns=9 count=3 wins0=0 wins1=0 wins2=0 wins3=0 wins4=0 wins5=0 wins6=1 wins7=2 cached=1 failures=0");
             s.DiagnosticStartFailure("core-start-config-error", "start inbound/mixed[PRIVATE_TAG]: listen tcp 127.0.0.1:10808: bind: An attempt was made to access a socket in a way forbidden by its access permissions. password=PRIVATE_VALUE https://private.example/", "start-response");
             s.EndConnection();
         }

@@ -13,6 +13,14 @@ copied from Core stdout/stderr. Existing unstructured output keeps its category
 and salted fingerprint; routine route/TUN/error output no longer requests an
 additional network snapshot.
 
+Windows 1.4.64 accepts numeric DNS counters `wins0` through `wins7`. The updated
+`vpn-dns-race` Core supports seven primaries plus a separate TCP fallback; result
+indices 0..6 are primary order and 7 is fallback for that profile. Smaller legacy
+profiles retain fallback index equal to their primary count. The schema name,
+privacy rules and event sampling remain unchanged.
+Required seven-provider Core source commit:
+[21c9a2ccaacf02764c71b5c0238b8909ce1a8412](https://github.com/iransearch/Throne-G/commit/21c9a2ccaacf02764c71b5c0238b8909ce1a8412).
+
 Use these joins when investigating a failed probe:
 
 | Windows field | Core field | Meaning |

@@ -20,6 +20,13 @@ internal static class Program
         const string dns = "[CoreDiagnostic] schema=core-network-v2 event=dns-race-result pid=7 seq=3 monoMs=41 box=2 dropped=0 dns=8 count=12 wins0=2 wins1=3 wins2=4 wins3=1 wins4=1 cached=2 failures=1 index=2 source=ip-network elapsedMs=24 error=none";
         Require(CoreDiagnosticMetadata.TryParse(dns, out safe) && safe.Contains("index=2") && safe.Contains("wins2=4"), "DNS winners must survive the production report filter.");
         Require(CoreDiagnosticMetadata.TryParse(dns.Replace("ip-network", "ip-cache"), out safe), "DNS cache winner metadata missing.");
+        string dnsSeven = dns.Replace("wins4=1", "wins4=1 wins5=2 wins6=3 wins7=4").Replace("index=2", "index=7");
+        Require(CoreDiagnosticMetadata.TryParse(dnsSeven, out safe) && safe.Contains("wins5=2")
+            && safe.Contains("wins6=3") && safe.Contains("wins7=4") && safe.Contains("index=7"),
+            "Seven-provider counters and the separate TCP fallback must survive Core diagnostic filtering.");
+        Require(!CoreDiagnosticMetadata.TryParse(dnsSeven + " wins8=1", out safe)
+            && !CoreDiagnosticMetadata.TryParse(dnsSeven.Replace("wins7=4", "wins7=private.example"), out safe),
+            "New DNS counters must remain an explicit numeric allowlist.");
         Require(CoreDiagnosticMetadata.TryParse("[CoreDiagnostic] schema=core-network-v2 event=dns-race-created pid=7 seq=4 box=2 dns=8 count=4 timeoutMs=8000 fallbackTimeoutMs=4000 current=true", out safe), "DNS race startup metadata missing.");
         Require(!CoreDiagnosticMetadata.TryParse(dns.Replace("ip-network", "private.example"), out safe)
             && !CoreDiagnosticMetadata.TryParse(dns + " domain=private.example", out safe), "DNS diagnostics disclosed browsing data.");
@@ -45,6 +52,8 @@ internal static class Program
         Require(output.Contains("event=dns-race-created") && output.Contains("source=ip-network")
             && output.Contains("source=ip-cache") && output.Contains("event=dns-race-summary")
             && output.Contains("wins2=2"), "Healthy DNS winner and final totals were filtered out of the actual report pipeline.");
+        Require(output.Contains("wins5=0 wins6=1 wins7=2") && output.Contains("index=7"),
+            "Seven-provider result and summary were dropped from the actual report pipeline.");
         Require(output.Contains("stage=core-start-config-error") && output.Contains("startupPhase=start-response")
             && output.Contains("component=inbound") && output.Contains("operation=bind")
             && output.Contains("network=tcp") && output.Contains("localPort=10808")
