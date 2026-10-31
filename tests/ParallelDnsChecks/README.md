@@ -10,6 +10,15 @@ Throne-G Core. Reference Android commit:
 | Cloudflare | 1.1.1.1 | DoH /dns-query | cloudflare-dns.com |
 | Yandex Basic | 77.88.8.8 | DoH /dns-query | common.dot.dns.yandex.net |
 | Additional resolver | 78.186.60.77 | UDP/53 | — |
+| Additional resolver | 213.14.111.50 | UDP/53 | — |
+| Additional resolver | 94.20.20.20 | UDP/53 | — |
+| Additional resolver | 217.218.127.127 | UDP/53 | — |
+
+Windows 1.4.62 adds the last three UDP resolvers to the same primary race in
+both TUN and Proxy mode, including Residential's shared connection path. They
+are also added to login's separate classic DNS race; its original Google,
+Yandex, Cloudflare and AdGuard entries remain. No Core rebuild is required for
+this provider-list update when the native race transport is already installed.
 
 All primary requests run concurrently through `proxy`, with an 8-second stage
 deadline. Valid replies enter a buffered completion queue: a later-listed
@@ -57,7 +66,9 @@ Core implementation commit: aecfe86f4cbec5c7cab2b7d7f76bee324444a875.
 
 Structured Core diagnostics now reach the normal report without Debug logging:
 `dns-race-created`, `dns-race-result`, `dns-race-summary`. Result `index` 0/1/2/3
-maps to Google/Cloudflare/Yandex/additional; 4 is TCP fallback, -1 no winner.
+maps to Google/Cloudflare/Yandex/78.186.60.77; 4/5/6 map to
+213.14.111.50/94.20.20.20/217.218.127.127; 7 is TCP fallback, -1 no winner.
+Before 1.4.62, index 4 was the TCP fallback.
 `source` is `raw-network`, `ip-network`, or `ip-cache`; `elapsedMs` is the winning
 raw stage or complete IP lookup latency. Complete cumulative provider/cache/error
 counters survive sampling (first 32 results, every 128th, final summary).

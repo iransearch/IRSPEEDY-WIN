@@ -38,13 +38,16 @@ internal static class Program
                 Check((string)remote["type"] == "vpn-dns-race", "one native completion-order transport");
                 Check(servers.Count == ((JArray)before["dns"]["servers"]).Count, "providers remain inside the composite");
                 var primary = (JArray)remote["servers"];
-                Check(primary.Select(s => (string)s["server"]).SequenceEqual(new[] { "8.8.8.8", "1.1.1.1", "77.88.8.8", "78.186.60.77" }), "all four providers preserved");
+                Check(primary.Select(s => (string)s["server"]).SequenceEqual(new[] {
+                    "8.8.8.8", "1.1.1.1", "77.88.8.8", "78.186.60.77",
+                    "213.14.111.50", "94.20.20.20", "217.218.127.127" }), "all seven providers configured");
                 Check(primary.Take(3).All(s => (string)s["type"] == "https" && (string)s["path"] == "/dns-query"
                     && (string)s["detour"] == "proxy" && (bool)s["tls"]["enabled"] && s["tls"]["insecure"] == null), "verified DoH through VPN");
                 Check(primary.Take(3).Select(s => (string)s["tls"]["server_name"]).SequenceEqual(
                     new[] { "dns.google", "cloudflare-dns.com", "common.dot.dns.yandex.net" }), "provider TLS names");
-                Check((string)primary[3]["type"] == "udp" && (int)primary[3]["server_port"] == 53
-                    && (string)primary[3]["detour"] == "proxy", "additional UDP resolver through VPN");
+                Check(primary.Skip(3).All(s => (string)s["type"] == "udp" && (int)s["server_port"] == 53
+                    && (string)s["detour"] == "proxy") && primary.Select(s => (string)s["tag"]).Distinct().Count() == primary.Count,
+                    "all additional UDP resolvers use port 53 through VPN with unique tags");
                 Check((string)remote["timeout"] == "8s" && (string)remote["fallback_timeout"] == "4s", "Android stage timeouts");
                 var fallback = remote["fallback"];
                 Check((string)fallback["type"] == "tcp" && (string)fallback["server"] == "1.1.1.1"

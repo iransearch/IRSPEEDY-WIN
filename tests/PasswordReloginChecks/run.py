@@ -28,6 +28,8 @@ class Controller {
 class TimerStub {public void Change(int a,int b){} }
 class LoginForm { public string User,Password; public bool Remember; public void SetUserPassword(string u,string p,bool r){User=u;Password=p;Remember=r;} public void HideRenewMessage(){} }
 class ServerList {
+ readonly System.Collections.Generic.HashSet<string> initializedProbeScopes=new System.Collections.Generic.HashSet<string>();
+ public void ConfigureResidential(object account){}
  public bool probesPaused=true;
  public bool probesRequireDisconnect=true,probeRestartRequested=true,probeLoginRoundRequested;
  PREPARE_METHOD

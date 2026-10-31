@@ -1,4 +1,4 @@
-# Windows login DNS and recovery (1.4.51)
+# Windows login DNS and recovery (1.4.62)
 
 The production login uses classic DNS first, matching the successful 1.4.50
 behavior. This cleanup removes experiment switches and obsolete login DoH
@@ -8,9 +8,12 @@ TLS verification, replay rules or the four-second minimum loading presentation.
 ## Production flow
 
 For an HTTPS hostname, resolve first through LoginPlainDns and its five-minute
-LoginDnsCache. Google 8.8.8.8, Yandex Basic 77.88.8.8, Cloudflare 1.1.1.1 and
-AdGuard default 94.140.14.14 race A and AAAA queries on UDP port 53. A truncated
-UDP reply uses TCP to the same server within the existing lookup clock.
+LoginDnsCache. Google 8.8.8.8, Yandex Basic 77.88.8.8, Cloudflare 1.1.1.1,
+AdGuard default 94.140.14.14, and the additional resolvers 213.14.111.50,
+94.20.20.20 and 217.218.127.127 race A and AAAA queries on UDP port 53.
+A truncated UDP reply uses TCP to the same server within the existing lookup
+clock. The three additional resolvers use address-based diagnostic names rather
+than an unverified provider label. The shared lookup budget remains five seconds.
 
 The first valid public address set wins. Invalid, empty, failed and private-only
 answers cannot win. Losing sockets are canceled/closed immediately; workers are

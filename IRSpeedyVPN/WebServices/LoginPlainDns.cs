@@ -12,8 +12,12 @@ namespace IRSpeedyVPN.WebServices
     // transaction, echoed question, owner chain and public RDATA are checked.
     internal static class LoginPlainDns
     {
-        internal static readonly string[] Addresses = { "8.8.8.8", "77.88.8.8", "1.1.1.1", "94.140.14.14" };
-        private static readonly string[] Names = { "google", "yandex", "cloudflare", "adguard" };
+        internal static readonly string[] Addresses = {
+            "8.8.8.8", "77.88.8.8", "1.1.1.1", "94.140.14.14",
+            "213.14.111.50", "94.20.20.20", "217.218.127.127" };
+        private static readonly string[] Names = {
+            "google", "yandex", "cloudflare", "adguard",
+            "resolver-213-14-111-50", "resolver-94-20-20-20", "resolver-217-218-127-127" };
         internal static string[] Resolve(string host, int timeoutMs, CancellationToken cancellation, Action<string> log)
         {
             string name = new System.Globalization.IdnMapping().GetAscii(host.TrimEnd('.')).ToLowerInvariant();

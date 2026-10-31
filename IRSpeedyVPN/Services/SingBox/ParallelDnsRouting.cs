@@ -44,8 +44,13 @@ namespace IRSpeedyVPN.Services.SingBox
                     ["path"] = "/dns-query", ["detour"] = "proxy",
                     ["tls"] = new JObject { ["enabled"] = true, ["server_name"] = endpoint[2] }
                 });
-            primary.Add(new JObject { ["type"] = "udp", ["tag"] = "additional",
-                ["server"] = "78.186.60.77", ["server_port"] = 53, ["detour"] = "proxy" });
+            foreach (var endpoint in new[] {
+                new[] { "additional", "78.186.60.77" },
+                new[] { "additional-213-14-111-50", "213.14.111.50" },
+                new[] { "additional-94-20-20-20", "94.20.20.20" },
+                new[] { "additional-217-218-127-127", "217.218.127.127" } })
+                primary.Add(new JObject { ["type"] = "udp", ["tag"] = endpoint[0],
+                    ["server"] = endpoint[1], ["server_port"] = 53, ["detour"] = "proxy" });
             remote.Replace(new JObject {
                 ["type"] = RaceType, ["tag"] = Remote, ["servers"] = primary,
                 ["timeout"] = "8s", ["fallback_timeout"] = "4s",
