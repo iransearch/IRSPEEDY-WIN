@@ -191,6 +191,8 @@ namespace IRSpeedyVPN.Services
 
         private void RunV2rayLocked(string goUrl, int port)
         {
+            var connectionTrace = new ConnectionAttemptDiagnostic(-1, "tunnel-start", () => DiagnosticIdentity);
+            connectionTrace.Step("pause-sharing");
             if (!PauseSharingBeforeCoreRestart())
             {
                 onConnectDisconnect?.Invoke(this, false, 0, "پاک‌سازی اشتراک‌گذاری مستقیم کامل نشد؛ ابتدا آن را متوقف کنید.");
@@ -198,8 +200,10 @@ namespace IRSpeedyVPN.Services
             }
             try
             {
+                connectionTrace.Step("read-settings");
                 bool isAiEnabled = Xray.SmartIpRouting.IsEnabled();
                 Diagnostic("ai-setting-read", "enabled=" + isAiEnabled + " inputMembers=" + GetAiLinks().Count);
+                connectionTrace.Step("permission-check");
                 if (serviceController.CheckUserPermission(gInfo.Username, gInfo.Password))
                 // if (ServiceHelper.CheckAvailabilty(gInfo.Username,gInfo.Password))
                 {
@@ -208,15 +212,18 @@ namespace IRSpeedyVPN.Services
                     // same core a few lines down, so the core-RPC half of the drain would
                     // just be undone immediately after; skip it there (see
                     // StopAndDrainUrlTests' comment).
+                    connectionTrace.Step("drain-tests");
                     StopAndDrainUrlTests(skipCoreRpc: goUrl != null);
                     if (goUrl == null)
                     {
+                        connectionTrace.Step("stop-previous");
                         KillAll();
 
                         // Pool members are tested in the background by Core; only a
                         // fixed-link connection needs this pre-connect selection test.
                         if (_smartFastUrls == null || _smartFastUrls.Length == 0)
                         {
+                            connectionTrace.Step("fixed-server-test");
                             UrlTest(SelectedServerUrl != null ? new[] { SelectedServerUrl } : null, true);
 
                             if (urlTestSpeed < 0)
@@ -238,6 +245,7 @@ namespace IRSpeedyVPN.Services
                      vprocess = ShellExecute.ShellexecAndReturnProcess(v2rayPath, "-c " + configPath); */
                     //vprocess.StandardInput.Write(configData);
                     //vprocess.StandardInput.Close();
+                    connectionTrace.Step("prepare-config");
                     bool vpnmode =  (RegHelper.GetSettingValue("VGAURDVPNMode") != "0");
                     // Game Mode routes only DNS/AI through the tunnel and everything else
                     // direct. It only makes sense over TUN, so it forces VPN mode on.
@@ -260,13 +268,17 @@ namespace IRSpeedyVPN.Services
                     if (goUrl != null && IsConnected)
                         TryStopCore();
 
+                    connectionTrace.Step("listen-port");
                     port = ResolveListenPort(port);
                     lastListenPort = port;
                     lastVpnMode = vpnmode;
                     Diagnostic("config-mode", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy") + " gameForcesTun=" + gameMode);
+                    connectionTrace.Step("shield-files");
                     var shieldFiles = GetShieldFiles();
                     var isSmartFast = _smartFastUrls != null && _smartFastUrls.Length > 0;
+                    connectionTrace.Step("sni-runtime");
                     var sniRuntime = isSmartFast ? null : GetSniRuntime(lastLink, serviceSniServers, true);
+                    connectionTrace.Step("chain-config");
                     var chainLink = isSmartFast ? null : GetChainLink(lastLink);
                     var defaultChainLink = GetDefaultChainLink();
                     bool needXray = false;
@@ -292,6 +304,7 @@ namespace IRSpeedyVPN.Services
                         // Stop/rebuild owns the bridge ports for this connection generation.
                         ReleaseAutoSelectorPlan();
                         needXray = true;
+                        connectionTrace.Step("prepare-pool");
                         autoSelectorPlan = Xray.AutoSelectorPoolPlan.Create(smartUrls, GetAiLinks(),
                             isAiEnabled, FreePortManager.Dequeue, FreePortManager.Enqueue);
                         if (autoSelectorPlan == null)
@@ -318,6 +331,7 @@ namespace IRSpeedyVPN.Services
                         var authPass = Guid.NewGuid().ToString("N");
 
                         // Generate Xray config
+                        connectionTrace.Step("prepare-xray");
                         xrayConfig = Xray.ConfigGenerator.GetConfig(lastLink, _xraySocksPort, authUser, authPass);
 
                         string address = JObject.Parse(xrayConfig)?["outbounds"]?[0]?["settings"]?["address"]?.ToString();
@@ -349,6 +363,7 @@ namespace IRSpeedyVPN.Services
                     // replace its primary outbound with the independent groups.
                     if (string.IsNullOrWhiteSpace(configData))
                     {
+                        connectionTrace.Step("build-shell");
                         configData = SingBox.ConfigGenerator.GetConfig(
                             singboxLink,  // Either lastLink or SOCKS URL
                             port,
@@ -365,6 +380,7 @@ namespace IRSpeedyVPN.Services
                         );
                     }
 
+                    connectionTrace.Step("apply-pool");
                     if (isSmartFast)
                         configData = autoSelectorPlan.Apply(configData);
                     if (userCancelRequested)
@@ -372,9 +388,11 @@ namespace IRSpeedyVPN.Services
                         ReleaseAutoSelectorPlan();
                         return;
                     }
+                    connectionTrace.Step("start-core");
                     if (!TryStartCoreWithConfig(configData, out var startError, needXray, xrayConfig,
                         isSmartFast ? Xray.SmartIpRouting.OutboundDnsStrategy : ""))
                     {
+                        connectionTrace.Step("start-core", "failed", startError);
                         LogHelper.WriteExLog(
                             "Core failed to start; connection dropped."
                             + " share=" + IsShareActive
@@ -398,8 +416,11 @@ namespace IRSpeedyVPN.Services
                         return;
                     }
                     IsConnected = true;
+                    connectionTrace.Step("start-recovery");
                     BeginNetworkRecoverySession();
+                    connectionTrace.Step("ai-recheck");
                     RecheckAiPoolAfterStart();
+                    connectionTrace.Step("resume-sharing");
                     ResumeSharingAfterCoreStart();
                     Diagnostic("connection-established", "effectiveMode=" + (vpnmode ? "TUN" : "Proxy"));
                     ConnectionDiagnostics.RequestSnapshot();
@@ -410,27 +431,35 @@ namespace IRSpeedyVPN.Services
                     }
                     else if (useSystemProxy)
                     {
+                        connectionTrace.Step("apply-system-proxy");
                         WinINet.SetIEProxy(true, true, $"http://127.0.0.1:{port}", null);
                     }
                     isUsingProxifire = !vpnmode && ProxifierRuleType != ProxifierType.None;
                     if (onConnectDisconnect != null)
                     {
+                        connectionTrace.Step("notify-ui", "ok");
                         onConnectDisconnect.Invoke(this, true, port, "");
 
                     }
                 }
                 else
                 {
+                    connectionTrace.Step("permission-check", "failed");
                     onConnectDisconnect.Invoke(this, false, 0, "تعداد اتصالات بیش از حد مجاز است");
                 }
             }
             catch (Exception ex)
             {
+                connectionTrace.Failure(ex, capture: true);
+                connectionTrace.Step("failure-cleanup");
                 StopSniServers(serviceSniServers);
                 TryStopCore();
                 ReleaseAutoSelectorPlan();
                 if (onConnectDisconnect != null)
+                {
+                    connectionTrace.Step("notify-ui", "failed", ex.Message);
                     onConnectDisconnect.Invoke(this, false, 0, ex.Message);
+                }
             }
         }
 

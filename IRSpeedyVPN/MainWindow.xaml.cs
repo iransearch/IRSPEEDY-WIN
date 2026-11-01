@@ -460,6 +460,9 @@ namespace IRSpeedyVPN
 
         private void Proxifier_onResult(bool connected, string message)
         {
+            var connectionTrace = new ConnectionAttemptDiagnostic(Interlocked.Read(ref connectionRequestVersion), "proxifier-result",
+                () => (gInfo.CurrentService as TunnelPlusService)?.DiagnosticIdentity);
+            connectionTrace.Step("proxifier-notify", connected ? "ok" : "failed", message);
             Dispatcher.Invoke((Action)(() =>
            {
                ProcessConnectionResult(connected, message);
@@ -518,6 +521,8 @@ namespace IRSpeedyVPN
 
             VpnTimeZone.EndConnection();
             long version = Interlocked.Increment(ref connectionRequestVersion);
+            new ConnectionAttemptDiagnostic(version, "ui-request", () => (service as TunnelPlusService)?.DiagnosticIdentity)
+                .Step("connect-click", "received");
             uCServerList.PauseServerChecksForConnection();
             uCServerList.UpdateConnectionState(service, true, false);
             if (gInfo.CurrentService is TunnelPlusService previousTunnel)
@@ -532,25 +537,35 @@ namespace IRSpeedyVPN
         private async Task ApplyConnectionRequestAsync(IVPNService next, string protocol, long version,
             Func<IVPNService> prepareService = null, bool restartServerChecks = false)
         {
+            var connectionTrace = new ConnectionAttemptDiagnostic(version, "ui-request",
+                () => (next as TunnelPlusService)?.DiagnosticIdentity);
+            connectionTrace.Step("begin");
             uCServerList.PauseServerChecks();
             pendingConnectionRequests++;
+            connectionTrace.Step("wait-gate");
             await connectionRequestGate.WaitAsync();
             try
             {
                 if (version != Interlocked.Read(ref connectionRequestVersion)) return;
+                connectionTrace.Step("drain-tests");
                 await uCServerList.DrainServerChecksAsync();
                 if (version != Interlocked.Read(ref connectionRequestVersion)) return;
                 if (prepareService != null)
+                {
+                    connectionTrace.Step("prepare-service");
                     next = await Task.Run(prepareService);
+                }
                 if (version != Interlocked.Read(ref connectionRequestVersion)) return;
                 var previous = gInfo.CurrentService;
                 if (previous != null)
                 {
+                    connectionTrace.Step("disconnect-previous");
                     // Disconnect drains the previous startup too, not just its current Core.
                     await Task.Run(() => previous.Disconnect());
                     if (ReferenceEquals(gInfo.CurrentService, previous))
                         gInfo.CurrentService = null;
                 }
+                connectionTrace.Step("detach-proxifier");
                 await Task.Run(() => proxifier.Detach());
 
                 // Several clicks may arrive during cleanup. Only the latest one starts.
@@ -558,6 +573,7 @@ namespace IRSpeedyVPN
                     return;
                 if (next == null)
                 {
+                    connectionTrace.Step("prepare-service", "skipped");
                     uCServerList.UpdateConnectionState(null, false, false);
                     HideLoading();
                     ShowControl(uCServerList);
@@ -568,6 +584,7 @@ namespace IRSpeedyVPN
                 gInfo.CurrentService = next;
                 uCServerList.UpdateConnectionState(next, true, false);
                 RegiserVpnService();
+                connectionTrace.Step("validate-runtime");
                 // Runtime validation and extraction can touch the disk. Neither belongs
                 // on the dispatcher while the Connecting view is being rendered.
                 await Task.Run(() =>
@@ -575,10 +592,13 @@ namespace IRSpeedyVPN
                     if (!next.IsRequirementAvailable()) localResource.ExtractResource(true);
                 });
                 if (version != Interlocked.Read(ref connectionRequestVersion)) return;
+                connectionTrace.Step("invoke-connect");
                 await Task.Run(() => next.Connect(protocol));
+                connectionTrace.Step("connect-dispatched", "dispatched");
             }
             catch (Exception ex)
             {
+                connectionTrace.Failure(ex);
                 LogHelper.WriteLog(ex);
                 if (version == Interlocked.Read(ref connectionRequestVersion))
                 {
@@ -593,6 +613,7 @@ namespace IRSpeedyVPN
             {
                 pendingConnectionRequests--;
                 connectionRequestGate.Release();
+                connectionTrace.Step("request-release", "ok");
                 if (version == Interlocked.Read(ref connectionRequestVersion) && gInfo.CurrentService == null && IsUserLogin)
                     uCServerList.ResumeServerChecksAfterCleanup(restartServerChecks);
             }
@@ -614,12 +635,16 @@ namespace IRSpeedyVPN
         {
             string diagnosticSource = (service as TunnelPlusService)?.DiagnosticIdentity ?? "service=other";
             var diagnosticQueue = System.Diagnostics.Stopwatch.StartNew();
+            var connectionTrace = new ConnectionAttemptDiagnostic(version, "ui-callback",
+                () => (service as TunnelPlusService)?.DiagnosticIdentity);
+            connectionTrace.Step("service-callback", connected ? "ok" : "failed", message);
             ConnectionDiagnostics.Write("ui-connection-callback", diagnosticSource + " connected=" + connected
                 + " requestVersion=" + version + " currentVersion=" + Interlocked.Read(ref connectionRequestVersion)
                 + " currentServiceMatches=" + ReferenceEquals(service, gInfo.CurrentService)
                 + " messageId=" + ConnectionDiagnostics.Fingerprint(message));
             Dispatcher.BeginInvoke(new Action(() =>
             {
+                connectionTrace.Step("ui-dispatch", "received", message);
                 ConnectionDiagnostics.Write("ui-connection-dispatch", diagnosticSource + " connected=" + connected
                     + " queuedMs=" + diagnosticQueue.ElapsedMilliseconds + " requestVersion=" + version
                     + " currentVersion=" + Interlocked.Read(ref connectionRequestVersion)
@@ -629,10 +654,13 @@ namespace IRSpeedyVPN
                     !ReferenceEquals(service, gInfo.CurrentService))
                     return;
                 if (connected && service.IsUsingProxifire)
+                {
+                    connectionTrace.Step("proxifier-attach");
                     proxifier.Attach("127.0.0.1", listenPort,
                         service.ProxifierWithPassword ? gInfo.Username : null,
                         service.ProxifierWithPassword ? gInfo.Password : null,
                         service.ProxyType, service.ProxifierRuleType);
+                }
                 else
                     ProcessConnectionResult(connected, message);
             }));
@@ -646,9 +674,13 @@ namespace IRSpeedyVPN
             long result = ++connectionPresentationResult;
             long version = Interlocked.Read(ref connectionRequestVersion);
             var service = gInfo.CurrentService;
+            var connectionTrace = new ConnectionAttemptDiagnostic(version, "ui-result",
+                () => (service as TunnelPlusService)?.DiagnosticIdentity);
+            connectionTrace.Step("process-result", connected ? "ok" : "failed", Message);
             var presentation = connectingPresentationTime;
             if (connected && presentation != null)
             {
+                connectionTrace.Step("presentation-delay");
                 int remaining = (int)Math.Max(0L, 4000L - presentation.ElapsedMilliseconds);
                 if (remaining > 0) await Task.Delay(remaining);
                 // A cancellation, disconnect or newer result must win over delayed success.
@@ -657,27 +689,36 @@ namespace IRSpeedyVPN
                     !ReferenceEquals(service, gInfo.CurrentService) ||
                     !ReferenceEquals(presentation, connectingPresentationTime)) return;
             }
+            connectionTrace.Step("hide-loading");
             HideLoading();
             if (connected)
             {
+                connectionTrace.Step("success-message");
                 ShowMessage("");
                 gInfo.ConnectionTime = DateTime.Now;
+                connectionTrace.Step("connection-clock");
                 VpnTimeZone.BeginConnection(service);
+                connectionTrace.Step("mark-success");
                 uCServerList.MarkSuccessfulConnection(service);
+                connectionTrace.Step("show-status");
                 ShowControl(uCUserInfo);
 
             }
             else
             {
+                connectionTrace.Step("disconnect-cleanup");
                 UnRegiserVpnService();
                 await ApplyConnectionRequestAsync(null, null, version);
                 if (version != Interlocked.Read(ref connectionRequestVersion)) return;
                 if (IsUserLogin)
                 {
+                    connectionTrace.Step("show-list");
                     ShowControl(uCServerList);
+                    connectionTrace.Step("failure-message", "failed", Message);
                     ShowMessage(CoreRuntimeIdentity.UserConnectionError(Message));
                 }
             }
+            connectionTrace.Step("complete", connected ? "ok" : "failed");
         }
         void ShowControl(object ctrl)
         {
@@ -855,6 +896,9 @@ namespace IRSpeedyVPN
                         LogHelper.WriteLog(Message);
                     }
                     lblErrorMessage.Visibility = Visibility.Visible;
+                    new ConnectionAttemptDiagnostic(Interlocked.Read(ref connectionRequestVersion), "ui-banner",
+                        () => (gInfo.CurrentService as TunnelPlusService)?.DiagnosticIdentity)
+                        .Step("show-message", "displayed", Message);
                 }
                 else
                 {

@@ -1,6 +1,6 @@
 using System; using System.Diagnostics;
 namespace IRSpeedyVPN.Common { public static class LogHelper { public static Action<string> Sink; public static void WriteLog(string s) { if (LogPolicy.ShouldWrite(s)) Sink?.Invoke(s); } } }
-namespace IRSpeedyVPN.Common { internal static class ErrorReporting { internal static void Annotate(Exception exception,params string[] fields) { } } }
+namespace IRSpeedyVPN.Common { internal static class ErrorReporting { internal static void Annotate(Exception exception,params string[] fields) { } internal static int TestCaptures; internal static bool TestThrow; internal static void Capture(Exception exception,bool fatal=false) { TestCaptures++; if(TestThrow) throw new InvalidOperationException("test sink unavailable"); } } }
 namespace IRSpeedyVPN.Resource { public static class RegHelper { public static string Mode="0", Game="0"; public static string GetSettingValue(string k) { return k=="VGAURDVPNMode"?Mode:Game; } } }
 namespace IRSpeedyVPN.Services
 {

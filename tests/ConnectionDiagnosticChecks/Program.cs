@@ -8,6 +8,7 @@ internal static class Program
 {
     private static void Main()
     {
+        ConnectionAttemptChecks.Run();
         string safe;
         const string core = "[CoreDiagnostic] schema=core-network-v2 event=hy2-reset pid=7 seq=1 box=2 reason=interface-update";
         Require(CoreDiagnosticMetadata.TryParse(core, out safe) && safe.Contains("reason=interface-update"), "Structured Core reset metadata missing.");

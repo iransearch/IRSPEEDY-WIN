@@ -40,6 +40,8 @@ namespace IRSpeedyVPN.Services
             ProxyType proxyType, ProxifierType route, long version, SynchronizationContext context)
         {
             string error = null;
+            var connectionTrace = new ConnectionAttemptDiagnostic(-1, "proxifier-start");
+            connectionTrace.Step("begin");
             lock (lifecycleGate)
             {
                 // Detach invalidates queued starts, so a cancelled connection cannot add filters later.
@@ -48,6 +50,7 @@ namespace IRSpeedyVPN.Services
                 routeType = route;
                 try
                 {
+                    connectionTrace.Step("write-profile");
                     string profile = route == ProxifierType.Telegram ? profileTelegram : profileNoraml;
                     string current = string.Format(profile, proxyType == Common.ProxyType.SOCKS ? "SOCKS5" : "HTTPS",
                         ip, port, (!string.IsNullOrEmpty(username)).ToString().ToLowerInvariant(), username, password);
@@ -56,9 +59,11 @@ namespace IRSpeedyVPN.Services
                     if (ProxifierBrowserQuic.AppliesTo(route))
                     {
                         browserQuic = new ProxifierBrowserQuic();
+                        connectionTrace.Step("quic-filter");
                         try { browserQuic.Start(); }
                         catch (Exception ex)
                         {
+                            connectionTrace.Failure(ex);
                             // BFE/service/permission failures must not prevent ordinary TCP proxying.
                             browserQuic.Dispose();
                             browserQuic = null;
@@ -66,8 +71,10 @@ namespace IRSpeedyVPN.Services
                         }
                     }
 
+                    connectionTrace.Step("launch-proxifier");
                     pr = ShellExecute.ShellexecAndReturnProcess(Path.Combine(globalInfo.TempPath, "Proxifier/Proxifier.exe"), "");
                     var launched = pr;
+                    connectionTrace.Step("watch-proxifier");
                     launched.Exited += (sender, args) => ProxifierExited(launched, version, context);
                     launched.EnableRaisingEvents = true;
                     if (launched.HasExited) throw new InvalidOperationException("Proxifier exited during startup.");
@@ -75,10 +82,12 @@ namespace IRSpeedyVPN.Services
                 }
                 catch (Exception ex)
                 {
+                    connectionTrace.Failure(ex, capture: true);
                     StopLocked();
                     error = ex.Message;
                 }
             }
+            connectionTrace.Step("proxifier-notify", error == null ? "ok" : "failed", error);
             Notify(version, error == null, error, context);
         }
 

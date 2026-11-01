@@ -16,6 +16,13 @@ namespace IRSpeedyVPN
 }
 namespace IRSpeedyVPN.Common
 {
+    // Logging is exercised with the real implementation in ConnectionDiagnosticChecks.
+    internal sealed class ConnectionAttemptDiagnostic
+    {
+        internal ConnectionAttemptDiagnostic(long version, string origin, Func<string> identity = null) { }
+        internal void Step(string phase, string outcome = "start", string message = null) { }
+        internal void Failure(Exception exception, bool capture = false) { }
+    }
     internal static class LogHelper { public static void WriteLog(string message) { } }
     internal static class ShellExecute
     {

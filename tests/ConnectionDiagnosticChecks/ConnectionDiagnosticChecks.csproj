@@ -5,6 +5,7 @@
   <Compile Include="../../IRSpeedyVPN/Common/LogPolicy.cs" Link="LogPolicy.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/CoreDiagnosticMetadata.cs" Link="CoreDiagnosticMetadata.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/ConnectionDiagnostics.cs" Link="ConnectionDiagnostics.cs"/>
+  <Compile Include="../../IRSpeedyVPN/Common/ConnectionAttemptDiagnostic.cs" Link="ConnectionAttemptDiagnostic.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/CoreRoutingSignal.cs" Link="CoreRoutingSignal.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/NetworkFailureDiagnostic.cs" Link="NetworkFailureDiagnostic.cs"/>
   <Compile Include="../../IRSpeedyVPN/Common/CoreStartFailureDiagnostic.cs" Link="CoreStartFailureDiagnostic.cs"/>
