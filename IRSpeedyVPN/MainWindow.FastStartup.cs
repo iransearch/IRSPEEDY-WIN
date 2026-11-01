@@ -468,7 +468,7 @@ namespace IRSpeedyVPN
                 token.ThrowIfCancellationRequested();
                 bool refreshed = await refresh;
                 if (!refreshed && current() && IsUserLogin)
-                    ShowMessage("دریافت لیست ناموفق بود؛ بررسی لیست قبلی آغاز می‌شود.");
+                    LogHelper.WriteExLog("[ServerListRefresh] outcome=failed action=check-cached-list");
                 return refreshed;
             }
         }
