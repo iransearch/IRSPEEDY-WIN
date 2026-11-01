@@ -63,12 +63,17 @@ The transformation is idempotent, including already-native race profiles.
 Browser-owned DoH and applications that resolve before contacting the proxy
 are outside this destination-resolution policy.
 
-Since Windows 1.4.66, Proxy profiles without a TUN inbound use `ipv4_only`
-on these main/AI destination resolve actions and reject literal IPv6 destinations
-on the user proxy inbound tags. TUN profiles, including their mixed listeners,
-retain their existing dual-family configuration. All seven race providers and
-the existing direct/bootstrap/Shield/Split Tunnel scopes remain unchanged.
-See `docs/proxy-ipv4-only.md` for scope and validation.
+Since Windows 1.4.67, Proxy profiles without a TUN inbound use Core's
+`prefer_ipv4` on these main/AI destination resolve actions. The existing
+`route.default_domain_resolver` keeps `dns-direct` and `prefer_ipv4`. These are
+the native JSON settings produced by Throne's Resolve Domain Strategy and
+Default Domain Strategy controls. The generated literal-IPv6 block from 1.4.66
+is removed; IPv6-only destinations remain usable. TUN profiles, including their
+mixed listeners, retain their existing configuration. All seven race providers
+and the existing direct/bootstrap/Shield/Split Tunnel scopes remain unchanged.
+`prefer_ipv4` permits AAAA-only answers when they win the existing first-positive
+family race; it does not disable IPv6 or wait for a slower A answer.
+See `docs/proxy-domain-strategy.md` for scope and validation.
 This configuration policy works with Core 141a42f; no additional native rebuild
 or source/dependency change is required.
 
@@ -110,9 +115,10 @@ python tests/ParallelDnsChecks/run-core.py /path/to/Throne-G /absolute/path/to/f
 ```
 
 The runner additionally loads `proxy_ipv4_native_test.go` as a test-only overlay
-against the unchanged Core checkout. It checks actual HTTP/SOCKS A-only lookups,
-old AAAA cache isolation, literal IPv6 rejection and retained TUN-profile IPv6
-behavior. `tun-proxy-behavior.json` is emitted by the current C# fixture generator.
+against the unchanged Core checkout. It checks actual HTTP/SOCKS lookups, A-only
+and AAAA-only names, reuse of an existing AAAA cache answer, literal IPv6 access
+and retained TUN-profile behavior. `tun-proxy-behavior.json` is emitted by the
+current C# fixture generator.
 
 The runner uses `go test -race` on the real local DNS engine, transport and
 CLI/Check parser. Native tests cover completion order, each provider, real local
