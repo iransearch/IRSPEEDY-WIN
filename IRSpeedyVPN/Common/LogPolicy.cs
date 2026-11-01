@@ -45,6 +45,7 @@ namespace IRSpeedyVPN.Common
                 var coreEvent = Field(fields, "event");
                 return coreEvent == "default-interface" || coreEvent == "hy2-reset"
                     || coreEvent == "pool-probes-ready"
+                    || (coreEvent.StartsWith("hostkey-", StringComparison.Ordinal) && Field(fields, "target") == "hostkey")
                     // Core already bounds DNS result sampling. Preserve healthy
                     // results and summaries too, or provider totals are biased.
                     || coreEvent == "dns-race-created" || coreEvent == "dns-race-result"

@@ -141,6 +141,7 @@ namespace IRSpeedyVPN.Common
         }
         internal static bool TryParse(string line, out string safe)
         {
+            if (HostkeyDiagnosticMetadata.TryParse(line, out safe)) return true;
             safe = null;
             const string prefix = "[CoreDiagnostic] ";
             if (line == null || line.Length > 1024 || !line.StartsWith(prefix, StringComparison.Ordinal)) return false;

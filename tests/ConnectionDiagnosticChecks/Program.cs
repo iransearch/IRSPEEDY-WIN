@@ -8,6 +8,7 @@ internal static class Program
 {
     private static void Main()
     {
+        HostkeyChecks.Run();
         ConnectionAttemptChecks.Run();
         string safe;
         const string core = "[CoreDiagnostic] schema=core-network-v2 event=hy2-reset pid=7 seq=1 box=2 reason=interface-update";
