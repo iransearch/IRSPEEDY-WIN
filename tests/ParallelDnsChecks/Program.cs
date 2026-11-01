@@ -57,9 +57,15 @@ internal static class Program
                     && (int)fallback["server_port"] == 53 && (string)fallback["detour"] == "proxy", "Android TCP fallback stays inside VPN");
                 var routeWithoutResolve = (JObject)after["route"].DeepClone();
                 foreach (var added in ((JArray)routeWithoutResolve["rules"]).OfType<JObject>()
-                    .Where(r => (string)r["action"] == "resolve").ToArray()) added.Remove();
+                    .Where(r => (string)r["action"] == "resolve" || (!tun && (int?)r["ip_version"] == 6
+                        && (string)r["action"] == "reject" && (bool?)r["no_drop"] == true)).ToArray()) added.Remove();
                 Check(JToken.DeepEquals(before["route"], routeWithoutResolve) && JToken.DeepEquals(before["outbounds"], after["outbounds"])
                     && JToken.DeepEquals(before["inbounds"], after["inbounds"]), "existing routing and TUN preserved around scoped Proxy resolution");
+                Check(after["route"]["rules"].OfType<JObject>().Where(r => (string)r["action"] == "resolve")
+                    .All(r => tun ? r["strategy"] == null : (string)r["strategy"] == "ipv4_only"),
+                    "IPv4-only applies in Proxy mode; mixed listeners in TUN keep their existing strategy");
+                Check(after["route"]["rules"].OfType<JObject>().Count(r => (int?)r["ip_version"] == 6) == (tun ? 0 : 1),
+                    "literal IPv6 rejection is installed only in Proxy mode");
                 foreach (var direct in before["dns"]["servers"].Where(s => (string)s["tag"] != "dns-remote"))
                     Check(JToken.DeepEquals(direct, servers.Single(s => (string)s["tag"] == (string)direct["tag"])), "direct DNS transport preserved");
                 var rules = after["dns"]["rules"].OfType<JObject>().ToArray();

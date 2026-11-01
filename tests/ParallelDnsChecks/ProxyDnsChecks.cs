@@ -52,6 +52,8 @@ internal static class ProxyDnsChecks
             after["dns"]["rules"].Single(r => (string)r["domain"] == "bootstrap.example.org")), "bootstrap direct DNS remains unchanged");
         check(JToken.DeepEquals(after, JObject.Parse(ParallelDnsRouting.Apply(after.ToString()))), "Proxy and Shield rule bundles are idempotent");
         check(JToken.DeepEquals(config["inbounds"], after["inbounds"]) && JToken.DeepEquals(config["outbounds"], after["outbounds"]), "inbounds and Pool members are unchanged");
+        check(resolves.All(r => r["strategy"] == null) && !routes.OfType<JObject>().Any(r => (int?)r["ip_version"] == 6),
+            "TUN profile including local HTTP/SOCKS listeners retains dual-family routing");
         var splitRule = routes.OfType<JObject>().First(r => (string)r["outbound"] == "split-direct");
         check(routes.IndexOf(splitRule) < routes.IndexOf(resolves[0]), "direct app bypass retains precedence");
 
@@ -68,6 +70,26 @@ internal static class ProxyDnsChecks
         var updated = JObject.Parse(ParallelDnsRouting.Apply(already.ToString()));
         check(updated["route"]["rules"].OfType<JObject>().Count(r => (string)r["action"] == "resolve") == 3,
             "existing native race profiles also receive subsequently added VPN rules");
+        var proxyOnly = (JObject)config.DeepClone();
+        foreach (var tun in ((JArray)proxyOnly["inbounds"]).OfType<JObject>().Where(i => (string)i["type"] == "tun").ToArray()) tun.Remove();
+        var proxyAfter = JObject.Parse(ParallelDnsRouting.Apply(proxyOnly.ToString()));
+        var proxyRules = (JArray)proxyAfter["route"]["rules"];
+        var reject = proxyRules[0];
+        check((string)reject["action"] == "reject" && (int)reject["ip_version"] == 6
+            && (bool)reject["no_drop"] && reject["inbound"].Values<string>().SequenceEqual(new[] { "mixed-in", "http-in", "socks-in" }),
+            "literal IPv6 is rejected before sniff/direct routing only for user proxy listeners");
+        check(proxyRules.OfType<JObject>().Where(r => (string)r["action"] == "resolve").Count() == 3
+            && proxyRules.OfType<JObject>().Where(r => (string)r["action"] == "resolve").All(r => (string)r["strategy"] == "ipv4_only"),
+            "main, AI and final Proxy destinations request only A records");
+        check(JToken.DeepEquals(after["dns"], proxyAfter["dns"]) && JToken.DeepEquals(after["outbounds"], proxyAfter["outbounds"]),
+            "IPv4-only leaves all seven DNS providers, detours, TLS and Pool members unchanged");
+        check(JToken.DeepEquals(proxyAfter, JObject.Parse(ParallelDnsRouting.Apply(proxyAfter.ToString()))),
+            "Proxy IPv4 strategy, literal block and Shield bundles remain idempotent");
+        var legacyProxy = (JObject)proxyAfter.DeepClone();
+        foreach (var resolve in ((JArray)legacyProxy["route"]["rules"]).OfType<JObject>().Where(r => (string)r["action"] == "resolve")) resolve.Remove("strategy");
+        ((JArray)legacyProxy["route"]["rules"]).RemoveAt(0);
+        check(JToken.DeepEquals(proxyAfter, JObject.Parse(ParallelDnsRouting.Apply(legacyProxy.ToString()))),
+            "existing dual-family native-race Proxy profiles upgrade without an earlier unrestricted lookup");
         if (!string.IsNullOrEmpty(output))
         {
             File.WriteAllText(Path.Combine(output, "proxy-shield-ai.json"), after.ToString());
@@ -86,6 +108,8 @@ internal static class ProxyDnsChecks
             ((JArray)behavior["dns"]["rules"]).Insert(2, new JObject { ["domain"] = "dns-blocked.example",
                 ["action"] = "predefined", ["rcode"] = "NXDOMAIN" });
             File.WriteAllText(Path.Combine(output, "proxy-behavior.json"), ParallelDnsRouting.Apply(behavior.ToString()));
+            ((JArray)behavior["inbounds"]).Add(JObject.Parse(Samples.sg_vpnInbound));
+            File.WriteAllText(Path.Combine(output, "tun-proxy-behavior.json"), ParallelDnsRouting.Apply(behavior.ToString()));
         }
     }
 }

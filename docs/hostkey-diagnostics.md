@@ -6,6 +6,11 @@ an HTTP request, resolve an additional name, alter cache entries, change routing
 prefer an address family, retry a request, or change TLS validation.
 There is no notification or additional UI.
 
+Windows 1.4.66 adds a separate [Proxy IPv4-only destination policy](proxy-ipv4-only.md).
+The instrumentation itself remains observational. Compare new Proxy A-only
+results with TUN's retained dual-family behavior; the Core diagnostics and
+required Core commit below remain unchanged.
+
 Rebuild the updated Throne-G branch and package its modern/legacy Core payloads
 in `IRSpeedyVPN/Resources/Files.zip`, then build the Windows branch normally.
 An application-only rebuild with an old Core cannot produce these new events.

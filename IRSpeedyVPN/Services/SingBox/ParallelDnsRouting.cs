@@ -76,25 +76,54 @@ namespace IRSpeedyVPN.Services.SingBox
         // TUN already supplies DNS packets; internal probes have no user inbound.
         private static void ResolveProxyDestinations(JObject config)
         {
-            var tags = (config["inbounds"] as JArray)?.OfType<JObject>()
-                .Where(i => new[] { "mixed", "http", "socks" }.Contains((string)i["type"]))
+            var inbounds = (config["inbounds"] as JArray)?.OfType<JObject>().ToArray();
+            var tags = inbounds?.Where(i => new[] { "mixed", "http", "socks" }.Contains((string)i["type"]))
                 .Select(i => (string)i["tag"]).Where(t => !string.IsNullOrEmpty(t)).ToArray();
             var route = config["route"] as JObject;
             var rules = route?["rules"] as JArray;
             if (tags == null || tags.Length == 0 || rules == null) return;
+            if (!IsVpnOutbound((string)route["final"]) && !rules.OfType<JObject>().Any(r => IsVpnOutbound((string)r["outbound"])
+                && (string.IsNullOrEmpty((string)r["action"]) || (string)r["action"] == "route"))) return;
 
+            // A TUN profile also has a mixed listener. Presence of that listener
+            // alone must not change TUN mode's existing dual-family policy.
+            bool ipv4Only = !inbounds.Any(i => (string)i["type"] == "tun");
+            var ipv6Reject = new JObject { ["inbound"] = new JArray(tags), ["ip_version"] = 6,
+                ["action"] = "reject", ["method"] = "default", ["no_drop"] = true };
             var ordered = new JArray();
             foreach (var rule in rules)
             {
+                if (ipv4Only && JToken.DeepEquals(rule, ipv6Reject)) continue;
                 var target = rule as JObject;
+                // Upgrade generated resolve rules from a previous application
+                // pass too, rather than leaving a dual-family lookup ahead of us.
+                if (ipv4Only && IsProxyResolve(target, tags))
+                {
+                    var upgraded = (JObject)target.DeepClone();
+                    upgraded["strategy"] = "ipv4_only";
+                    ordered.Add(upgraded);
+                    continue;
+                }
                 if (target != null && IsVpnOutbound((string)target["outbound"])
                     && (string.IsNullOrEmpty((string)target["action"]) || (string)target["action"] == "route"))
-                    AddResolve(ordered, ProxyResolve(tags, RouteMatcher(target)), tags);
+                    AddResolve(ordered, ProxyResolve(tags, RouteMatcher(target), ipv4Only), tags);
                 ordered.Add(rule.DeepClone());
             }
             if (IsVpnOutbound((string)route["final"]))
-                AddResolve(ordered, ProxyResolve(tags, null), tags);
+                AddResolve(ordered, ProxyResolve(tags, null, ipv4Only), tags);
+            // Resolve acts only on hostnames; literal IPv6 destinations must be
+            // rejected explicitly. Core-owned DNS/Pool sockets have no user inbound.
+            if (ipv4Only) ordered.Insert(0, ipv6Reject);
             route["rules"] = ordered;
+        }
+
+        private static bool IsProxyResolve(JObject rule, string[] tags)
+        {
+            if (rule == null || (string)rule["action"] != "resolve" || rule["server"] != null
+                || (string)rule["timeout"] != "12s") return false;
+            var scope = (string)rule["type"] == "logical" && (string)rule["mode"] == "and"
+                && rule["rules"] is JArray && rule["rules"].Count() == 2 ? rule["rules"][0] : rule;
+            return JToken.DeepEquals(scope?["inbound"], new JArray(tags));
         }
 
         private static JObject RouteMatcher(JObject route)
@@ -109,13 +138,14 @@ namespace IRSpeedyVPN.Services.SingBox
             return matcher.Properties().Any(p => p.Name != "type") ? matcher : null;
         }
 
-        private static JObject ProxyResolve(string[] tags, JObject matcher)
+        private static JObject ProxyResolve(string[] tags, JObject matcher, bool ipv4Only)
         {
             var scope = new JObject { ["inbound"] = new JArray(tags) };
             var rule = matcher == null ? scope : new JObject { ["type"] = "logical", ["mode"] = "and",
                 ["rules"] = new JArray(scope, matcher) };
             rule["action"] = "resolve";
             rule["timeout"] = "12s";
+            if (ipv4Only) rule["strategy"] = "ipv4_only";
             // Do not force server=dns-remote: normal DNS routing preserves Shield,
             // localhost, bootstrap and scoped direct DNS. Its VPN final is the race.
             return rule;

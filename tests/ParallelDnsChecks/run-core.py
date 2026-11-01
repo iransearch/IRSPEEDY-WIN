@@ -18,3 +18,4 @@ assert all((fixtures / (name + ".json")).is_file()
 subprocess.run([os.environ.get("GO", "go"), "test", "-race", "./internal/dnsengine", "./internal/vpndns", "./internal/boxmain",
                 "./internal/boxbox", "./internal/netdiag", "./internal/hostkeydiag", "./internal/autoselector", "-count=1"], cwd=server,
                env={**os.environ, "IRSPEEDY_DNS_FIXTURES": str(fixtures)}, check=True)
+subprocess.run([sys.executable, str(Path(__file__).with_name("run-proxy-ipv4.py")), str(core), str(fixtures)], check=True)

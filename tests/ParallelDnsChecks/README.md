@@ -63,6 +63,15 @@ The transformation is idempotent, including already-native race profiles.
 Browser-owned DoH and applications that resolve before contacting the proxy
 are outside this destination-resolution policy.
 
+Since Windows 1.4.66, Proxy profiles without a TUN inbound use `ipv4_only`
+on these main/AI destination resolve actions and reject literal IPv6 destinations
+on the user proxy inbound tags. TUN profiles, including their mixed listeners,
+retain their existing dual-family configuration. All seven race providers and
+the existing direct/bootstrap/Shield/Split Tunnel scopes remain unchanged.
+See `docs/proxy-ipv4-only.md` for scope and validation.
+This configuration policy works with Core 141a42f; no additional native rebuild
+or source/dependency change is required.
+
 **Rebuild the updated Throne-G Core as well as Windows 1.4.64.** The previous
 Core's four-provider limit is incompatible with this seven-provider profile.
 Use the existing branch
@@ -99,6 +108,11 @@ Generate and verify Windows configuration fixtures:
 IRSPEEDY_DNS_FIXTURES=/absolute/path/to/fixtures dotnet run --project tests/ParallelDnsChecks
 python tests/ParallelDnsChecks/run-core.py /path/to/Throne-G /absolute/path/to/fixtures
 ```
+
+The runner additionally loads `proxy_ipv4_native_test.go` as a test-only overlay
+against the unchanged Core checkout. It checks actual HTTP/SOCKS A-only lookups,
+old AAAA cache isolation, literal IPv6 rejection and retained TUN-profile IPv6
+behavior. `tun-proxy-behavior.json` is emitted by the current C# fixture generator.
 
 The runner uses `go test -race` on the real local DNS engine, transport and
 CLI/Check parser. Native tests cover completion order, each provider, real local
