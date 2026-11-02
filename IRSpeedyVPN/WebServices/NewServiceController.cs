@@ -124,6 +124,7 @@ namespace IRSpeedyVPN.WebServices
                     || res.StatusCode == HttpStatusCode.NotAcceptable)) return res;
 
                 bool validResponse = IsValidEncryptedServerListResponse(res, guid);
+                if (res != null) res.VerifiedServerList = validResponse;
                 LogHelper.WriteExLog("[StartupAuth] stage=validate-response requestId=" + requestId
                     + " endpoint=" + GetBaseUrl(service) + " valid-guid=" + validResponse
                     + " status=" + GetResponseStatus(res)

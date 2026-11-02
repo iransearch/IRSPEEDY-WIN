@@ -135,8 +135,10 @@ assert 'uCServerList.ConfigureResidential(account);' in fast
 cached=fast[fast.index('private async Task<bool> TryApplyCachedAccountAsync('):fast.index('private async Task<bool> TryApplyCachedAccountAsync(')+6000]
 assert cached.index('serviceFactory.RenewServiceList(account.groups)') < cached.index('uCServerList.ConfigureResidential(account);') < cached.index('ShowLoginServerList();')
 assert 'account.residential_vpn == null && account.UserAccount.residential_vpn == null' in cached
-assert 'ValidateSessionAndRefreshServerList();' in cached and '_ = Task.Run(' in cached
-print('PASS remembered-account startup configures Residential before showing the chooser; old cache refresh uses the gated API off the startup path')
+assert 'BeginAccountSession(verified: false);' in cached
+assert cached.index('ShowLoginServerList();') < cached.index('BeginAccountSession(verified: false);') < cached.index('StartSessionMaintenance();')
+assert '_ = Task.Run(' not in cached[:cached.index('return true;')]
+print('PASS remembered-account startup configures Residential before showing the chooser; one immediate scheduled account validation refreshes old metadata off the startup path')
 success=main[main.index('uCServerList.MarkSuccessfulConnection(service);'):main.index('uCServerList.MarkSuccessfulConnection(service);')+200]
 assert 'ShowControl(uCUserInfo);' in success and 'ResidentialService' not in success
 assert 'TabKeyboardFocus' in uc and 'TargetName="TabFocus"' not in uc

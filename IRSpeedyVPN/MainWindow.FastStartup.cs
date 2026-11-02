@@ -1,4 +1,5 @@
 using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Resource;
 using Shadowsocks.Controller;
@@ -17,12 +18,10 @@ namespace IRSpeedyVPN
         private int deferredAutoLoginVisible;
         private System.Diagnostics.Stopwatch startupPresentationTime;
         private Timer sessionMaintenanceTimer;
-        private int sessionMaintenanceTick;
+        private readonly object sessionMaintenanceTimerGate = new object();
+        private readonly AccountSessionMaintenance accountSessionMaintenance = new AccountSessionMaintenance();
+        private Task pendingSessionLogout = Task.CompletedTask;
         private readonly SemaphoreSlim serverRefreshGate = new SemaphoreSlim(1, 1);
-        private string sessionMaintenanceUser;
-
-        private const int SessionMaintenancePeriodMs = 30 * 60 * 1000;
-        private const int ServerRefreshTicks = 1; // one maintenance pass every 30 minutes
 
         /// <summary>
         /// Installs the minimum UI/event wiring required for the first Login frame and
@@ -145,8 +144,8 @@ namespace IRSpeedyVPN
         /// <summary>
         /// A valid remembered account is trusted at startup. No Login2/GetSettings call is
         /// made on the critical startup path; the encrypted cached groups/settings are used
-        /// immediately and credentials/session are validated by the 30-minute maintenance
-        /// task. Manual login behavior is unchanged.
+        /// immediately; the first maintenance validation runs in the background without
+        /// delaying cached presentation. Manual login behavior is unchanged.
         /// </summary>
         private async Task<bool> TryApplyCachedAccountAsync(AccountInfoEx account, string password)
         {
@@ -201,17 +200,12 @@ namespace IRSpeedyVPN
                 txtUsername.Text = gInfo.Username;
                 ShowMessage("");
                 ShowLoginServerList();
-                StartSessionMaintenance();
-                // Older cached payloads predate residential_vpn. Refresh using the
-                // existing authenticated, gated API path without delaying startup.
+                BeginAccountSession(verified: false);
+                // All cached accounts get the same immediate background validation;
+                // this also refreshes older payloads missing Residential metadata.
                 if (!LoadLocal && account.residential_vpn == null && account.UserAccount.residential_vpn == null)
-                {
                     LogHelper.WriteExLog("[Residential] stage=cached-config-missing action=background-account-refresh");
-                    _ = Task.Run(() =>
-                    {
-                        if (IsUserLogin && !ExitCleanupStarted) ValidateSessionAndRefreshServerList();
-                    });
-                }
+                StartSessionMaintenance();
                 return true;
             }
             catch (Exception ex)
@@ -337,15 +331,27 @@ namespace IRSpeedyVPN
             if (IsUserLogin)
                 return;
 
-            sessionMaintenanceUser = null;
-            Interlocked.Exchange(ref sessionMaintenanceTick, 0);
-            try
+            EndAccountSession();
+        }
+
+        private void BeginAccountSession(bool verified)
+        {
+            long generation = accountSessionMaintenance.Begin(verified);
+            LogHelper.WriteExLog("[SessionMaintenance] stage=begin generation=" + generation + " verified=" + verified);
+        }
+
+        private long EndAccountSession()
+        {
+            long generation = accountSessionMaintenance.End();
+            lock (sessionMaintenanceTimerGate)
             {
-                sessionMaintenanceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                if (generation == accountSessionMaintenance.Generation)
+                {
+                    try { sessionMaintenanceTimer?.Change(Timeout.Infinite, Timeout.Infinite); }
+                    catch (ObjectDisposedException) { }
+                }
             }
-            catch
-            {
-            }
+            return generation;
         }
 
         private void StartSessionMaintenance()
@@ -360,46 +366,43 @@ namespace IRSpeedyVPN
             {
             }
 
-            var username = gInfo?.Username ?? string.Empty;
-            if (!string.Equals(sessionMaintenanceUser, username, StringComparison.Ordinal))
-            {
-                sessionMaintenanceUser = username;
-                Interlocked.Exchange(ref sessionMaintenanceTick, 0);
-            }
+            ScheduleSessionMaintenance();
+        }
 
-            if (sessionMaintenanceTimer == null)
+        private void ScheduleSessionMaintenance(bool retryIfDue = false, long? expectedSession = null)
+        {
+            lock (sessionMaintenanceTimerGate)
             {
-                sessionMaintenanceTimer = new Timer(
-                    SessionMaintenanceCallback,
-                    null,
-                    SessionMaintenancePeriodMs,
-                    SessionMaintenancePeriodMs);
-            }
-            else
-            {
-                sessionMaintenanceTimer.Change(
-                    SessionMaintenancePeriodMs,
-                    SessionMaintenancePeriodMs);
+                if (!IsUserLogin || LoadLocal || ExitCleanupStarted || loginApplicationExit.IsCancellationRequested) return;
+                if (expectedSession.HasValue && expectedSession.Value != accountSessionMaintenance.Generation) return;
+                int delay = accountSessionMaintenance.DelayMilliseconds(retryIfDue);
+                try
+                {
+                    if (sessionMaintenanceTimer == null)
+                        sessionMaintenanceTimer = new Timer(SessionMaintenanceCallback, null, delay, Timeout.Infinite);
+                    else sessionMaintenanceTimer.Change(delay, Timeout.Infinite);
+                }
+                catch (ObjectDisposedException) { }
             }
         }
 
         private void SessionMaintenanceCallback(object state)
         {
-            if (!IsUserLogin || LoadLocal)
+            if (!IsUserLogin || LoadLocal || ExitCleanupStarted || loginApplicationExit.IsCancellationRequested)
                 return;
 
+            long generation = accountSessionMaintenance.Generation;
             try
             {
-                if (Interlocked.Increment(ref sessionMaintenanceTick) < ServerRefreshTicks)
+                if (accountSessionMaintenance.DelayMilliseconds() != 0)
                     return;
-
-                Interlocked.Exchange(ref sessionMaintenanceTick, 0);
-                ValidateSessionAndRefreshServerList();
+                ValidateSessionAndRefreshServerList(generation);
             }
             catch (Exception ex)
             {
                 LogHelper.WriteLog(ex);
             }
+            finally { ScheduleSessionMaintenance(retryIfDue: true, expectedSession: generation); }
         }
 
         private static bool IsExplicitSessionFailure(HttpStatusCode statusCode)
@@ -409,24 +412,56 @@ namespace IRSpeedyVPN
                 || statusCode == HttpStatusCode.NotAcceptable;
         }
 
-        private void LogoutInvalidSession(string message)
+        private void LogoutInvalidSession(string message, bool expired = false)
         {
             if (!IsUserLogin)
                 return;
+            var service = gInfo.CurrentService;
+            string username = gInfo.Username, password = gInfo.Password;
+            IsUserLogin = false;
+            long generation = EndAccountSession();
+            Interlocked.Increment(ref connectionRequestVersion);
+            UnRegiserVpnService();
+            try { uCServerList.PauseServerChecks(); }
+            catch (Exception ex) { LogHelper.WriteLog(ex); }
+            try { if (service is IRSpeedyVPN.Services.TunnelPlusService tunnel) tunnel.CancelPendingConnection(); }
+            catch (Exception ex) { LogHelper.WriteLog(ex); }
+            LogHelper.WriteExLog("[SessionMaintenance] stage=invalid action=end-session expired=" + expired);
+            pendingSessionLogout = CompleteInvalidSessionLogoutAsync(service, generation, username, password, message, expired);
+        }
 
+        private async Task CompleteInvalidSessionLogoutAsync(IVPNService service, long generation,
+            string username, string password, string message, bool expired)
+        {
             try
             {
-                sessionMaintenanceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-            }
-            catch
-            {
-            }
+                try { await uCServerList.DrainServerChecksAsync(); }
+                catch (Exception ex) { LogHelper.WriteLog(ex); }
+                await connectionRequestGate.WaitAsync();
+                try
+                {
+                    if (generation != accountSessionMaintenance.Generation || IsUserLogin || ExitCleanupStarted) return;
+                    // Keep the dispatcher free while an in-flight Core startup drains.
+                    // The existing connection gate prevents a new Core start during cleanup.
+                    try { if (service != null) await Task.Run(() => service.Disconnect()); }
+                    catch (Exception ex) { LogHelper.WriteLog(ex); }
+                    try { await Task.Run(() => proxifier.Detach()); }
+                    catch (Exception ex) { LogHelper.WriteLog(ex); }
+                }
+                finally { connectionRequestGate.Release(); }
 
-            Logout(
-                string.IsNullOrWhiteSpace(message)
-                    ? "نشست کاربری معتبر نیست، لطفاً دوباره وارد شوید"
-                    : message,
-                false);
+                if (generation != accountSessionMaintenance.Generation || IsUserLogin || ExitCleanupStarted
+                    || gInfo.Username != username || gInfo.Password != password) return;
+                if (ReferenceEquals(gInfo.CurrentService, service)) gInfo.CurrentService = null;
+                if (expired)
+                {
+                    try { RechareLogout(false); }
+                    catch (Exception ex) { LogHelper.WriteLog(ex); Logout(message, false); }
+                }
+                else Logout(string.IsNullOrWhiteSpace(message)
+                    ? "نشست کاربری معتبر نیست، لطفاً دوباره وارد شوید" : message, false);
+            }
+            catch (Exception ex) { LogHelper.WriteLog(ex); }
         }
 
         /// <summary>
@@ -436,10 +471,10 @@ namespace IRSpeedyVPN
         /// never cause a false logout. A valid response refreshes the server list without
         /// disconnecting the live VPN session.
         /// </summary>
-        private void ValidateSessionAndRefreshServerList()
+        private void ValidateSessionAndRefreshServerList(long? expectedSession = null)
         {
             if (!serverRefreshGate.Wait(0)) return;
-            try { RefreshAuthenticatedServerList(); }
+            try { RefreshAuthenticatedServerList(expectedSession: expectedSession); }
             finally { serverRefreshGate.Release(); }
         }
 
@@ -474,7 +509,7 @@ namespace IRSpeedyVPN
         }
 
         private bool RefreshAuthenticatedServerList(Func<bool> canApply = null,
-            CancellationToken cancellation = default(CancellationToken))
+            CancellationToken cancellation = default(CancellationToken), long? expectedSession = null)
         {
             bool refreshed = false;
             try
@@ -482,23 +517,29 @@ namespace IRSpeedyVPN
                 if (canApply != null && !canApply()) return false;
                 var username = gInfo?.Username;
                 var password = gInfo?.Password;
-                long sessionVersion = Interlocked.Read(ref connectionRequestVersion);
+                long sessionVersion = accountSessionMaintenance.Generation;
+                long connectionVersion = Interlocked.Read(ref connectionRequestVersion);
+                if (expectedSession.HasValue && expectedSession.Value != sessionVersion) return false;
+                if (!IsUserLogin || !accountSessionMaintenance.IsCurrent(sessionVersion)) return false;
                 if (string.IsNullOrWhiteSpace(username) || string.IsNullOrEmpty(password))
                 {
-                    LogoutInvalidSession("نشست کاربری معتبر نیست، لطفاً دوباره وارد شوید");
+                    LogHelper.WriteExLog("[SessionMaintenance] stage=unavailable reason=missing-credentials");
                     return false;
                 }
 
                 using (var linked = CancellationTokenSource.CreateLinkedTokenSource(cancellation, loginApplicationExit.Token))
                 {
+                    linked.Token.ThrowIfCancellationRequested();
+                    if (!accountSessionMaintenance.RequestStarted(sessionVersion)) return false;
+                    ScheduleSessionMaintenance();
+                    LogHelper.WriteExLog("[SessionMaintenance] stage=request generation=" + sessionVersion);
                     var response = serviceController.Login2(username, password, linked.Token);
                     // Apply refresh results on the UI thread atomically with password re-login.
                     // An old in-flight refresh must never log out or restore the previous password.
                     Dispatcher.Invoke((Action)(() =>
                     {
                         if (!IsUserLogin || gInfo.Username != username || gInfo.Password != password
-                            || sessionVersion != Interlocked.Read(ref connectionRequestVersion)
-                            || (canApply != null && !canApply())) return;
+                            || !accountSessionMaintenance.IsCurrent(sessionVersion) || ExitCleanupStarted) return;
                         if (response == null)
                             return;
 
@@ -507,35 +548,40 @@ namespace IRSpeedyVPN
                             // Do not log out on timeouts, endpoint outages, 5xx responses, etc.
                             // Only statuses that explicitly mean authentication/session rejection
                             // terminate the local login session.
-                            if (IsExplicitSessionFailure(response.StatusCode))
-                                LogoutInvalidSession(response.ResponseData?.message);
+                            // A parsed API message distinguishes a rejection from an
+                            // HTML/empty gateway error, matching Android's recognition gate.
+                            if (IsExplicitSessionFailure(response.StatusCode) && response.ResponseData?.message != null)
+                                LogoutInvalidSession(null);
                             return;
                         }
 
+                        if (!response.VerifiedServerList)
+                        {
+                            LogHelper.WriteExLog("[SessionMaintenance] stage=unavailable reason=unverified-payload");
+                            return;
+                        }
                         var account = response.ResponseData?.Decrypted;
                         if (account?.UserAccount == null || account.groups == null)
                             return;
 
                         account.UserAccount.Username = username;
 
+                        // An authentication-service outage is not an account rejection.
+                        if (account.UserAccount.Status == "AuthServerError") return;
+
                         if (account.UserAccount.ExpiryDate != null
                             && account.UserAccount.ExpiryDate.Value < VpnTimeZone.AccountNow)
                         {
-                            RechareLogout(false);
+                            LogoutInvalidSession("اعتبار اکانت شما پایان یافته است لطفا تمدید نمایید", expired: true);
                             return;
                         }
 
                         var status = account.UserAccount.Status;
                         if (status == "Expired")
                         {
-                            RechareLogout(false);
+                            LogoutInvalidSession("اعتبار اکانت شما پایان یافته است لطفا تمدید نمایید", expired: true);
                             return;
                         }
-
-                        // AuthServerError means the validation service itself is unavailable;
-                        // it is not proof that the user's credentials/session are invalid.
-                        if (status == "AuthServerError")
-                            return;
 
                         var validStatus = status == "OK" || status == "FirstUse" || status == null;
                         if (!validStatus)
@@ -543,6 +589,11 @@ namespace IRSpeedyVPN
                             LogoutInvalidSession("نام کاربری یا رمز عبور صحیح نیست");
                             return;
                         }
+
+                        // Only publishing data is tied to the requesting connection/view.
+                        // Definitive rejection above belongs to the account, even after a switch.
+                        if (connectionVersion != Interlocked.Read(ref connectionRequestVersion)
+                            || (canApply != null && !canApply())) return;
 
                         // Login2 may not carry the separate settings payload. Keep the currently
                         // active settings so the cache remains complete without a GetSettings call.

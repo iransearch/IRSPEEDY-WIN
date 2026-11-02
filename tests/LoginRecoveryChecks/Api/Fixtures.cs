@@ -35,7 +35,8 @@ namespace IRSpeedyVPN.WebServices
 {
     class NewServiceDecryptor
     {
-        internal T DecryptFromBase64<T>(string value) => default(T);
+        internal T DecryptFromBase64<T>(string value) => typeof(T) == typeof(AccountInfoEx)
+            ? (T)(object)new AccountInfoEx { id = value } : default(T);
         internal string DecryptFromBase64String(string value) => "";
     }
     class ChangePasswordResult { }

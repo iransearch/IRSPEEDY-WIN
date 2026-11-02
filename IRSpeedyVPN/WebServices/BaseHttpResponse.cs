@@ -7,6 +7,8 @@ namespace IRSpeedyVPN.WebServices
         public T ResponseData { get; set; }
         public HttpStatusCode StatusCode { get; set; }
         public string Response { get; set; }
+        // Set only by the authenticated server-list controller after request-ID validation.
+        internal bool VerifiedServerList { get; set; }
     }
 }
-    
+

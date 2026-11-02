@@ -31,6 +31,24 @@ class ApiProgram
         if (ReferenceEquals(contexts[0], contexts[1]) || !contexts[0].BeginRecovery("same.test") || !contexts[1].BeginRecovery("same.test"))
             throw new Exception("Login2 shared recovery state");
         Console.WriteLine("PASS complete production Login2 allocates independent per-login state");
+        foreach (bool matchingId in new[] { false, true })
+        {
+            int calls = 0;
+            RestHelper.Handler = (host, payload, context) =>
+            {
+                calls++;
+                string id = (string)payload.GetType().GetProperty("id").GetValue(payload, null);
+                return new BaseHttpResponse<DefaultEncryptedResponse<AccountInfoEx>> {
+                    StatusCode = HttpStatusCode.OK,
+                    ResponseData = new DefaultEncryptedResponse<AccountInfoEx> {
+                        data = matchingId ? id : "previous-request", message = "api message" }
+                };
+            };
+            var response = controller.Login2("test", "test");
+            if (response.VerifiedServerList != matchingId || calls != 1)
+                throw new Exception("server-list request-ID verification flag or POST count changed");
+            Console.WriteLine("PASS production Login2 marks only matching encrypted request IDs as verified; no POST replay");
+        }
         using (var canceled = new CancellationTokenSource())
         {
             canceled.Cancel(); int calls = 0;

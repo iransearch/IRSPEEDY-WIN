@@ -208,6 +208,7 @@ namespace IRSpeedyVPN
             if (ExitCleanupStarted) return;
             ExitCleanupStarted = true;
             loginApplicationExit.Cancel();
+            EndAccountSession();
             uCServerList.ConfigureResidential(null);
             CurlHelper.ShutdownPendingCurlStops();
             VpnTimeZone.EndConnection();
@@ -1074,6 +1075,7 @@ namespace IRSpeedyVPN
             var loginStopwatch = Stopwatch.StartNew();
             try
             {
+                if (!onlyRenew) EndAccountSession();
                 IsRememberChecked = Remember;
                 lastLoginUsername = username;
                 lastLoginPassword = password;
@@ -1092,7 +1094,7 @@ namespace IRSpeedyVPN
                     var acc = res.ResponseData.Decrypted;
                     if (acc.UserAccount != null)
                         acc.UserAccount.Username = username;
-                    if (ProcessInfo(acc, password, onlyRenew))
+                    if (ProcessInfo(acc, password, onlyRenew, sessionValidated: true))
                     {
                         gInfo.ServerResponse = res.ResponseData.DecryptedString;
 
@@ -1220,7 +1222,7 @@ namespace IRSpeedyVPN
             }
             return null;
         }
-        private bool ProcessInfo(AccountInfoEx acc, string password, bool onlyRenew = false)
+        private bool ProcessInfo(AccountInfoEx acc, string password, bool onlyRenew = false, bool sessionValidated = false)
         {
             if (!onlyRenew) SetLoginStage(1);
             var processStopwatch = Stopwatch.StartNew();
@@ -1250,6 +1252,7 @@ namespace IRSpeedyVPN
                     //acc.Servers.Add(server);
                     /////////
                     if (!onlyRenew) SetLoginStage(2);
+                    if (!onlyRenew) BeginAccountSession(verified: sessionValidated);
                     IsUserLogin = true;
                     //serviceFactory.RenewServiceList(acc.Servers);
                     serviceFactory.RenewServiceList(acc.groups);
@@ -1266,6 +1269,7 @@ namespace IRSpeedyVPN
                             txtUsername.Text = gInfo.Username;
                             ShowMessage("");                            
                             ShowLoginServerList();
+                            StartSessionMaintenance();
                             LogHelper.WriteExLog("[LoginPerformance] stage=list-ready-for-presentation processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
                         }));
                         /*
@@ -1320,7 +1324,7 @@ namespace IRSpeedyVPN
 
             DisconnectAll();
             proxifier.Detach();
-            var rechargeUrl = gInfo.settings.setting.shop_url;
+            var rechargeUrl = gInfo?.settings?.setting?.shop_url;
 #if !_RESELLER
             if (!string.IsNullOrEmpty(rechargeUrl))
             {
@@ -1504,10 +1508,10 @@ namespace IRSpeedyVPN
             uCServerList.ConfigureResidential(null);
             // The password modal (and its settings owner) have already closed.
             IsUserLogin = false;
+            EndAccountSession();
             Interlocked.Increment(ref connectionRequestVersion);
             UnRegiserVpnService();
             mainTimer.Change(Timeout.Infinite, Timeout.Infinite);
-            sessionMaintenanceTimer?.Change(Timeout.Infinite, Timeout.Infinite);
             uCServerList.PauseServerChecks();
             uCLogin.SetUserPassword(username, newPassword, remember);
             uCLogin.HideRenewMessage();
@@ -1563,6 +1567,7 @@ namespace IRSpeedyVPN
         }
         void Logout(string Message,bool resetInput=true)
         {
+            EndAccountSession();
             uCServerList.ConfigureResidential(null);
             VpnTimeZone.EndConnection();
             uCServerList.PauseServerChecks();
