@@ -6,8 +6,8 @@ an HTTP request, resolve an additional name, alter cache entries, change routing
 prefer an address family, retry a request, or change TLS validation.
 There is no notification or additional UI.
 
-Windows 1.4.67 uses Core's [Proxy domain strategy options](proxy-domain-strategy.md),
-superseding the IPv4-only policy introduced in 1.4.66.
+Windows 1.4.68 restores the [Proxy IPv4-only destination policy](proxy-ipv4-only.md)
+from the confirmed working 1.4.66 commit `2c26451`.
 The instrumentation itself remains observational. Compare new Proxy A-only
 results with TUN's retained dual-family behavior; the Core diagnostics and
 required Core commit below remain unchanged.

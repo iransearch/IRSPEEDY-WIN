@@ -1,8 +1,9 @@
-# Proxy destination IPv4 policy (1.4.66)
+# Proxy destination IPv4 policy (1.4.66, restored in 1.4.68)
 
-Historical behavior only. Version 1.4.67 replaces this policy with the approved
-native `prefer_ipv4` settings and restores IPv6 access in Proxy mode. See
-[Proxy domain strategies](proxy-domain-strategy.md) for current behavior.
+Version 1.4.68 restores the application logic and checks from the confirmed
+working commit `2c264512c80f3d67d37a543c316129bd75a815f3`. It reverts 1.4.67's
+`prefer_ipv4` Proxy change and restores the generated literal-IPv6 rejection.
+The existing default resolver remains `dns-direct` with `prefer_ipv4`.
 
 Normal Windows Proxy profiles now request `ipv4_only` in their existing scoped
 HTTP/SOCKS `resolve` actions before main/AI VPN routes. The existing seven-provider

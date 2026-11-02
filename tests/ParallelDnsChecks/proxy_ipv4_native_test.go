@@ -80,7 +80,7 @@ func TestWindowsProxyIPv4Policy(t *testing.T) {
 						r.Rcode = mdns.RcodeServerFailure
 					} else if question.Qtype == mdns.TypeA && question.Name != "v6only.example." {
 						r.Answer = []mdns.RR{&mdns.A{Hdr: mdns.RR_Header{Name: question.Name, Rrtype: mdns.TypeA, Class: mdns.ClassINET, Ttl: 60}, A: net.IPv4(192, 0, 2, 9)}}
-					} else if question.Qtype == mdns.TypeAAAA && question.Name != "v4only.example." {
+					} else if question.Qtype == mdns.TypeAAAA {
 						r.Answer = []mdns.RR{&mdns.AAAA{Hdr: mdns.RR_Header{Name: question.Name, Rrtype: mdns.TypeAAAA, Class: mdns.ClassINET, Ttl: 60}, AAAA: net.ParseIP("2001:db8::9")}}
 					}
 					_ = w.WriteMsg(r)
@@ -142,8 +142,7 @@ func TestWindowsProxyIPv4Policy(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			// A prefer_ipv4 lookup must still accept an existing IPv6-only cache
-			// answer, following the unchanged Core's first-positive-family policy.
+			// Reproduce a previous IPv6-only cache entry before the current Proxy lookup.
 			ips, err := box.dnsRouter.Lookup(box.ctx, "cached.example", adapter.DNSQueryOptions{Strategy: C.DomainStrategyIPv6Only})
 			if err != nil || len(ips) != 1 || !ips[0].Is6() {
 				t.Fatalf("IPv6 cache seed: %v %v", ips, err)
@@ -180,8 +179,9 @@ func TestWindowsProxyIPv4Policy(t *testing.T) {
 				return c, nil
 			}
 			for _, protocol := range []string{"http", "socks"} {
-				for _, target := range []string{"invapi.hostkey.com", "chat.ai.example", "cached.example", "v4only.example", "v6only.example", "2001:db8::9"} {
+				for _, target := range []string{"invapi.hostkey.com", "chat.ai.example", "cached.example", "v6only.example", "2001:db8::9"} {
 					t.Run(protocol+"/"+target, func(t *testing.T) {
+						blocked := mode == "proxy" && (target == "v6only.example" || target == "2001:db8::9")
 						c, err := dial(protocol, target)
 						if err == nil {
 							defer c.Close()
@@ -195,6 +195,17 @@ func TestWindowsProxyIPv4Policy(t *testing.T) {
 								}
 							}
 						}
+						if blocked {
+							if err == nil {
+								t.Fatal("IPv6-only target carried application data")
+							}
+							select {
+							case got := <-dials:
+								t.Fatalf("IPv6 target reached outbound: %+v", got)
+							default:
+							}
+							return
+						}
 						if err != nil {
 							t.Fatal(err)
 						}
@@ -207,14 +218,11 @@ func TestWindowsProxyIPv4Policy(t *testing.T) {
 							if got.tag != want {
 								t.Fatalf("route changed: %+v", got)
 							}
-							if !got.destination.IsIP() {
-								t.Fatalf("destination was not resolved: %+v", got)
+							if !got.destination.IsIP() || (mode == "proxy" && !got.destination.Addr.Is4()) {
+								t.Fatalf("Proxy destination is not IPv4: %+v", got)
 							}
-							if (target == "cached.example" || target == "v6only.example" || target == "2001:db8::9") && !got.destination.Addr.Is6() {
-								t.Fatalf("%s lost IPv6: %+v", mode, got)
-							}
-							if target == "v4only.example" && !got.destination.Addr.Is4() {
-								t.Fatalf("IPv4-only name did not use IPv4: %+v", got)
+							if mode == "tun" && (target == "v6only.example" || target == "2001:db8::9") && !got.destination.Addr.Is6() {
+								t.Fatal("TUN lost IPv6")
 							}
 						case <-time.After(time.Second):
 							t.Fatal("outbound was not called")
@@ -222,8 +230,8 @@ func TestWindowsProxyIPv4Policy(t *testing.T) {
 					})
 				}
 			}
-			if aaaa.Load() <= beforeAAAA {
-				t.Fatalf("%s did not exercise AAAA lookups: before=%d after=%d", mode, beforeAAAA, aaaa.Load())
+			if mode == "proxy" && aaaa.Load() != beforeAAAA {
+				t.Fatalf("Proxy sent AAAA queries: before=%d after=%d", beforeAAAA, aaaa.Load())
 			}
 			if a.Load() == 0 {
 				t.Fatal("A queries were not exercised")

@@ -74,33 +74,22 @@ internal static class ProxyDnsChecks
         foreach (var tun in ((JArray)proxyOnly["inbounds"]).OfType<JObject>().Where(i => (string)i["type"] == "tun").ToArray()) tun.Remove();
         var proxyAfter = JObject.Parse(ParallelDnsRouting.Apply(proxyOnly.ToString()));
         var proxyRules = (JArray)proxyAfter["route"]["rules"];
-        check(!proxyRules.OfType<JObject>().Any(r => (int?)r["ip_version"] == 6),
-            "Proxy leaves literal IPv6 destinations available to existing routing");
+        var reject = proxyRules[0];
+        check((string)reject["action"] == "reject" && (int)reject["ip_version"] == 6
+            && (bool)reject["no_drop"] && reject["inbound"].Values<string>().SequenceEqual(new[] { "mixed-in", "http-in", "socks-in" }),
+            "literal IPv6 is rejected before sniff/direct routing only for user proxy listeners");
         check(proxyRules.OfType<JObject>().Where(r => (string)r["action"] == "resolve").Count() == 3
-            && proxyRules.OfType<JObject>().Where(r => (string)r["action"] == "resolve").All(r => (string)r["strategy"] == "prefer_ipv4"),
-            "main, AI and final Proxy resolve actions use Core's prefer_ipv4 option");
+            && proxyRules.OfType<JObject>().Where(r => (string)r["action"] == "resolve").All(r => (string)r["strategy"] == "ipv4_only"),
+            "main, AI and final Proxy destinations request only A records");
         check(JToken.DeepEquals(after["dns"], proxyAfter["dns"]) && JToken.DeepEquals(after["outbounds"], proxyAfter["outbounds"]),
-            "domain strategy leaves all seven DNS providers, detours, TLS and Pool members unchanged");
+            "IPv4-only leaves all seven DNS providers, detours, TLS and Pool members unchanged");
         check(JToken.DeepEquals(proxyAfter, JObject.Parse(ParallelDnsRouting.Apply(proxyAfter.ToString()))),
-            "Proxy strategy and Shield bundles remain idempotent");
+            "Proxy IPv4 strategy, literal block and Shield bundles remain idempotent");
         var legacyProxy = (JObject)proxyAfter.DeepClone();
         foreach (var resolve in ((JArray)legacyProxy["route"]["rules"]).OfType<JObject>().Where(r => (string)r["action"] == "resolve")) resolve.Remove("strategy");
+        ((JArray)legacyProxy["route"]["rules"]).RemoveAt(0);
         check(JToken.DeepEquals(proxyAfter, JObject.Parse(ParallelDnsRouting.Apply(legacyProxy.ToString()))),
-            "older native-race Proxy profiles upgrade without an earlier unrestricted lookup");
-        var oldIpv4Only = (JObject)proxyAfter.DeepClone();
-        foreach (var resolve in ((JArray)oldIpv4Only["route"]["rules"]).OfType<JObject>().Where(r => (string)r["action"] == "resolve")) resolve["strategy"] = "ipv4_only";
-        ((JArray)oldIpv4Only["route"]["rules"]).Insert(0, new JObject {
-            ["inbound"] = new JArray("mixed-in", "http-in", "socks-in"), ["ip_version"] = 6,
-            ["action"] = "reject", ["method"] = "default", ["no_drop"] = true });
-        check(JToken.DeepEquals(proxyAfter, JObject.Parse(ParallelDnsRouting.Apply(oldIpv4Only.ToString()))),
-            "1.4.66 profiles lose only the generated IPv6 blocker and upgrade every resolve strategy");
-        var customIpv6Shield = (JObject)proxyAfter.DeepClone();
-        var scopedIpv6Shield = new JObject { ["inbound"] = new JArray("http-in"), ["ip_version"] = 6,
-            ["domain_suffix"] = "blocked.example", ["action"] = "reject" };
-        ((JArray)customIpv6Shield["route"]["rules"]).Add(scopedIpv6Shield);
-        var customIpv6After = JObject.Parse(ParallelDnsRouting.Apply(customIpv6Shield.ToString()));
-        check(customIpv6After["route"]["rules"].Any(r => JToken.DeepEquals(r, scopedIpv6Shield)),
-            "custom IPv6 Shield reject rule is retained");
+            "existing dual-family native-race Proxy profiles upgrade without an earlier unrestricted lookup");
         if (!string.IsNullOrEmpty(output))
         {
             File.WriteAllText(Path.Combine(output, "proxy-shield-ai.json"), after.ToString());
