@@ -1,4 +1,63 @@
-# Windows Residential (1.4.60)
+# Windows Residential (1.4.69)
+
+## 1.4.69: flat tabs and single-row traffic card
+
+The attached `IRSPEEDY Windows – flat tabs + Android-style card(1).html` is the
+current approved visual reference for these two sections. Earlier numbered
+sections document superseded appearances. Server rows, search, connection,
+quota fetching, retry/cache policy and the existing Proxy IPv4-only policy are
+unchanged by this UI update.
+
+Tabs are two independent flat 36-DIP radio buttons with 8-DIP corners and a
+6-DIP gap, without a shared shell, gradient, border or shadow. A two-column LTR
+Grid fixes VPN on the physical left and RESIDENTIAL on the right inside the RTL
+window. Inactive buttons use #1C2331/#A3ADC7 and Medium 14-point text; checked
+buttons use solid #3A5BC0, white and SemiBold. Existing shield/home icons and
+native RadioButton selected-state automation remain. Names are VPN/RESIDENTIAL;
+Tab order follows that physical order. Left selects VPN, Right selects
+RESIDENTIAL, and Enter/Space activate the focused tab. The existing keyboard-only
+1.5-DIP #AAB4FF focus visual and its two-DIP offset are retained.
+
+The LTR traffic card is a single 70-DIP row, with 14/12-DIP horizontal/vertical
+padding, one-DIP #2D3850 border, 12-DIP corners and solid #202838 background.
+The requested 68-DIP minimum is respected; 70 DIPs are necessary to fit the
+44-DIP ring plus 24 DIPs of padding and two border pixels without clipping.
+The ring has a 5-DIP rounded stroke, #1FFFFFFF track and a yellow #F2C53D
+remaining arc starting at twelve o'clock clockwise. The existing MakeArc
+algorithm is unchanged, including the two arcs for a complete circle. The
+remaining percentage is centered inside the ring in white 11-point SemiBold.
+
+After a 14-DIP gap, three star columns (1.3*, *, *) show LEFT, USED and TOTAL.
+Labels are English uppercase 11-point Medium #A3ADC7; LEFT is 20-point Bold,
+USED/TOTAL 15-point SemiBold. One-DIP #2D3850 separators and 12-DIP column
+padding match the reference, without initial left padding. All text is LTR,
+single-line and ellipsizes only when the available width is exhausted.
+RemainingText and the shared byte formatter are retained. New UsedText/TotalText
+properties use that same one-decimal MB/GB formatter independently; values below
+1 GiB use MB. Unlimited quota retains a full ring and infinity, including TOTAL.
+
+Above 15% remaining, the arc is yellow and LEFT white. At or below the separate
+LOW_TRAFFIC_THRESHOLD = 0.15, nonzero remaining traffic uses #FB923C for both.
+At exhaustion/over-quota the empty arc accompanies red #EF5D6A `0 MB` and `0%`.
+A positive fraction rounding to zero displays `<1%`; its screen-reader name
+says "Less than 1 percent of traffic left". The ring's normal name is
+"82 percent of traffic left" with the actual value. The card name describes
+all three actual values: "920.8 MB left, 204.8 MB used of 1.1 GB".
+
+An actual Residential connection changes the border to #8C3FCF8E and shows a
+seven-DIP #3FCF8E dot six DIPs before LEFT. The old in-use badge, horizontal
+usage bar, separate consumption percentage, storage glyph, info icon and glow
+are removed with their dead width-animation code. There is no card refresh
+button; the existing header refresh remains unchanged.
+
+Valid-data visibility, initial immediate display, subsequent 250ms fade/height
+transition and six-DIP translation, rapid-state cancellation, reduced-motion
+handling and unload cleanup are retained. No new timer or fetch action is added.
+Offline checks execute the production formatting/color helpers and tab key
+handler with inert input types, preserve all repository/row/planner tests, and
+compile the production control and UCServerList flows against .NET 4.8/WPF
+references. Actual WPF rendering, BAML, scaling and input remain Windows smoke
+checks; the Linux runner does not present a rendered Windows preview.
 
 ## 1.4.60: shared recovery policy and English traffic card
 
@@ -244,7 +303,8 @@ hidden bar reserves no space and the list does not jump on later entrances.
 System reduced-motion settings and unloading stop clocks. The ring shows the
 remaining fraction clockwise from 12 o'clock; unlimited quota shows a full ring.
 
-Actual connection kind, independent of selected tab, controls the green badge.
+Actual connection kind, independent of selected tab, controls the green border
+and dot beside LEFT.
 Both Residential and VPN open the existing connection-info view after success.
 Both legacy and fast-startup event paths wire Disconnect. Existing four-second
 minimum Connecting presentation remains unchanged.
@@ -253,7 +313,8 @@ minimum Connecting presentation remains unchanged.
 
 `tests/ResidentialChecks/run.py DOTNET CSC NET8_REFS NET48_REFS` runs offline:
 
-- 29 subscription, quota, formatting, endpoint validation and ECO model checks,
+- 44 subscription, quota, formatting, endpoint validation, traffic-state, tab-key
+  and ECO model checks,
   including BOM-prefixed plain/Base64 and the exact Android private-tag fixture.
 - Repository/ping checks: account cancellation, late results, shared cache,
   retained selection objects, logout, ECO, hidden failure, timer retry, real
@@ -284,9 +345,13 @@ The Linux checks do not compile BAML, render WPF, exercise the packaged Core or
 prove a live authenticated subscription connection.
 
 1. At the existing 420×700 design size and supported scale factors, inspect both
-   tabs, selection, 34-DIP flags, city/ISP truncation, ring and status badge.
+   tabs, selection, 34-DIP flags, city/ISP truncation, ring and connected dot.
+   Confirm the physical VPN/RESIDENTIAL order, three-column card and complete
+   ring at 100/125/150/200% scaling; test 82%, 15%, <1%, zero and unlimited quota.
 2. Test Tab/Enter/Space and visible keyboard focus; inspect Automation names for
-   both tabs, selected rows and remaining percentage. Verify RTL and LTR runs.
+   both tabs, selected rows, all three traffic amounts and remaining percentage.
+   Verify physical Left/Right selection, VPN-then-RESIDENTIAL Tab order, mouse
+   clicks without a focus border, keyboard focus ring and RTL/LTR boundaries.
 3. Test successful/failed/cancelled Residential connects in proxy and TUN modes,
    switch tabs during a live session, and disconnect through the chooser. Confirm
    Shield and ordinary VPN/Smart connections still behave as before.
@@ -300,6 +365,6 @@ prove a live authenticated subscription connection.
    animations both enabled and disabled; confirm no reserved blank space, list
    jump, stale animation or timer after logout/exit.
 
-The authenticated visual reference could not be inspected without signing in.
-The implementation follows the user's approved textual sizes, colors and behavior.
+The current attached HTML reference was inspected locally. The earlier external
+authenticated reference is superseded for the tabs and traffic card only.
 

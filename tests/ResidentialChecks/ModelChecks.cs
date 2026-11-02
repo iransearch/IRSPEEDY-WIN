@@ -17,6 +17,38 @@ internal static class ModelChecks
         Check(t.Used == 30 && t.Remaining == 70 && Math.Abs(t.Ratio - .7) < .001, "traffic sums uploads/downloads and shows remaining");
         Check(ResidentialTraffic.Parse("upload=9223372036854775807; download=20; total=100").Exhausted, "overflow saturates and exhausted quota clamps");
         Check(ResidentialTraffic.Parse("upload=0; download=1; total=0").RemainingText == "∞", "Android unlimited quota contract");
+        var quota = ResidentialTraffic.Parse("upload=214748365;download=0;total=1181116006");
+        Check(quota.UsedText == "204.8 MB" && quota.TotalText == "1.1 GB" && quota.RemainingText == ResidentialPresentation.FormatBytes(quota.Remaining), "separate card amounts reuse the existing MB/GB formatter");
+        quota = ResidentialTraffic.Parse("upload=0;download=0;total=1073741824");
+        Check(quota.UsedText == "0.0 MB" && quota.TotalText == "1.0 GB", "separate amount unit boundary and one decimal");
+        quota = ResidentialTraffic.Parse("upload=1800;download=0;total=10000");
+        Check(TrafficCardProbe.RemainingPercentage(quota) == "82%" && TrafficCardProbe.RemainingColor(quota) == "#FFFFFF", "card percentage measures remaining traffic");
+        quota = ResidentialTraffic.Parse("upload=8499;download=0;total=10000");
+        Check(TrafficCardProbe.RemainingColor(quota) == "#FFFFFF", "above fifteen percent keeps normal remaining color");
+        quota = ResidentialTraffic.Parse("upload=8500;download=0;total=10000");
+        Check(TrafficCardProbe.RemainingColor(quota) == "#FB923C" && TrafficCardProbe.RemainingPercentage(quota) == "15%", "fifteen percent is the low-traffic boundary");
+        quota = ResidentialTraffic.Parse("upload=9999;download=0;total=10000");
+        Check(TrafficCardProbe.RemainingColor(quota) == "#FB923C" && TrafficCardProbe.RemainingPercentage(quota) == "<1%", "nonzero rounded percentage never falsely shows zero");
+        foreach (string used in new[] { "10000", "20000" })
+        {
+            quota = ResidentialTraffic.Parse("upload=" + used + ";download=0;total=10000");
+            Check(TrafficCardProbe.RemainingColor(quota) == "#EF5D6A" && TrafficCardProbe.RemainingPercentage(quota) == "0%" && TrafficCardProbe.RemainingLabel(quota) == "0 MB", "exhausted and over-quota values clamp to the red zero state");
+        }
+        quota = ResidentialTraffic.Parse("upload=1048576;download=0;total=0");
+        Check(quota.TotalText == "∞" && quota.UsedText == "1.0 MB" && TrafficCardProbe.RemainingPercentage(quota) == "∞"
+            && TrafficCardProbe.RemainingLabel(quota) == "∞" && TrafficCardProbe.RemainingColor(quota) == "#FFFFFF", "unlimited traffic retains infinity and normal color");
+        var tabs = new TabInputProbe();
+        Check(tabs.Press(true, System.Windows.Input.Key.Left) && tabs.vpnTab.IsChecked == true && tabs.vpnTab.Focused, "Left selects and focuses the physical VPN tab");
+        tabs = new TabInputProbe();
+        Check(tabs.Press(false, System.Windows.Input.Key.Right) && tabs.residentialTab.IsChecked == true && tabs.residentialTab.Focused, "Right selects and focuses the physical Residential tab");
+        tabs = new TabInputProbe();
+        Check(tabs.Press(true, System.Windows.Input.Key.Enter) && tabs.residentialTab.IsChecked == true, "Enter retains activation of the focused tab");
+        tabs = new TabInputProbe();
+        Check(tabs.Press(false, System.Windows.Input.Key.Space) && tabs.vpnTab.IsChecked == true, "Space retains activation of the focused tab");
+        tabs = new TabInputProbe();
+        Check(!tabs.Press(false, System.Windows.Input.Key.Tab) && tabs.vpnTab.IsChecked == null && tabs.residentialTab.IsChecked == null, "Tab remains with WPF focus navigation");
+        tabs = new TabInputProbe(); tabs.vpnTab.IsChecked = true; tabs.residentialTab.IsEnabled = false;
+        Check(tabs.Press(false, System.Windows.Input.Key.Right) && tabs.vpnTab.IsChecked == true && tabs.residentialTab.IsChecked == null && !tabs.residentialTab.Focused, "direction keys preserve selection when the destination tab is disabled");
         foreach (var header in new[] { "", "upload=1;total=2", "upload=-1;download=0;total=2", "upload=1;upload=2;download=0;total=3", "upload=x;download=0;total=3" })
             Check(ResidentialTraffic.Parse(header) == null, "invalid traffic remains hidden");
         Check(ResidentialPresentation.IsEco("39", "VIP") && ResidentialPresentation.IsEco(null, "اکو – سرویس") && ResidentialPresentation.IsEco(null, "eco plus")

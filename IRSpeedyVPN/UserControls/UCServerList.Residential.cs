@@ -104,8 +104,17 @@ namespace IRSpeedyVPN.UserControls
         }
         private void ServiceTab_KeyDown(object sender, KeyEventArgs e)
         {
-            if (e.Key != Key.Enter && e.Key != Key.Space) return;
-            ((RadioButton)sender).IsChecked = true; e.Handled = true;
+            RadioButton target;
+            switch (e.Key)
+            {
+                case Key.Left: target = vpnTab; break;
+                case Key.Right: target = residentialTab; break;
+                case Key.Enter:
+                case Key.Space: target = (RadioButton)sender; break;
+                default: return;
+            }
+            if (target.IsEnabled) { target.Focus(); target.IsChecked = true; }
+            e.Handled = true;
         }
         private void UpdateResidentialVisuals()
         {

@@ -72,6 +72,8 @@ namespace IRSpeedyVPN.Residential
         internal double Ratio => Total == 0 ? 1 : Math.Max(0, Math.Min(1, (double)Remaining / Total));
         internal bool Exhausted => Total > 0 && Used >= Total;
         internal string RemainingText => Total == 0 ? "∞" : ResidentialPresentation.FormatBytes(Remaining);
+        internal string UsedText => ResidentialPresentation.FormatBytes(Used);
+        internal string TotalText => Total == 0 ? "∞" : ResidentialPresentation.FormatBytes(Total);
         internal string UsageText => ResidentialPresentation.Usage(Used, Total);
         internal static ResidentialTraffic Parse(string header)
         {

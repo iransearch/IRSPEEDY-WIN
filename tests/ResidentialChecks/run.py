@@ -4,7 +4,7 @@ Usage: run.py DOTNET CSC NET8_REFS NET48_REFS
 No live subscription, credentials, network or installed WPF desktop is used.
 """
 from pathlib import Path
-import json, shutil, subprocess, sys, tempfile, xml.etree.ElementTree as ET
+import json, re, shutil, subprocess, sys, tempfile, xml.etree.ElementTree as ET
 root = Path(__file__).resolve().parents[2]
 dotnet, csc, refs8, refs48 = sys.argv[1:]
 base = root / 'IRSpeedyVPN'
@@ -14,7 +14,25 @@ def compile_to(output, refs, sources, extra_refs=()):
         + ['-r:'+str(p) for p in Path(refs).glob('*.dll') if p.name not in ['System.EnterpriseServices.Wrapper.dll','System.EnterpriseServices.Thunk.dll']] + ['-r:'+str(p) for p in extra_refs] + [str(p) for p in sources], check=True)
 with tempfile.TemporaryDirectory(prefix='residential-checks-') as tmp:
     tmp=Path(tmp)
-    compile_to(tmp/'checks.dll', refs8, models+[Path(__file__).with_name('ModelChecks.cs')])
+    # Execute the production card's pure formatting/color decisions without a WPF desktop.
+    traffic_source=(base/'Residential/ResidentialTrafficBar.cs').read_text()
+    threshold=re.search(r'private const double LOW_TRAFFIC_THRESHOLD = [^;]+;',traffic_source).group()
+    methods=[]
+    for name in ['RemainingLabel','RemainingColor','RemainingPercentage']:
+        start=traffic_source.index('        private static string '+name+'(')
+        end=traffic_source.index('\n        private ',start+1)
+        methods.append(traffic_source[start:end].replace('private static','internal static'))
+    (tmp/'TrafficCardProbe.cs').write_text('using System;using System.Globalization;using IRSpeedyVPN.Residential;internal static class TrafficCardProbe{'+threshold+''.join(methods)+'}')
+    tab_source=(base/'UserControls/UCServerList.Residential.cs').read_text()
+    start=tab_source.index('        private void ServiceTab_KeyDown(')
+    tab_handler=tab_source[start:tab_source.index('        private void UpdateResidentialVisuals()',start)]
+    (tmp/'TabInputProbe.cs').write_text('''using System.Windows.Controls;using System.Windows.Input;
+namespace System.Windows.Input {internal enum Key {Left,Right,Enter,Space,Tab}internal class KeyEventArgs {internal Key Key;internal bool Handled;}}
+namespace System.Windows.Controls {internal class RadioButton {internal bool IsEnabled=true,Focused;internal bool? IsChecked;internal bool Focus(){Focused=true;return true;}}}
+internal class TabInputProbe {internal readonly RadioButton vpnTab=new RadioButton(),residentialTab=new RadioButton();
+internal bool Press(bool residential,Key key){var e=new KeyEventArgs{Key=key};ServiceTab_KeyDown(residential?residentialTab:vpnTab,e);return e.Handled;}
+'''+tab_handler+'}')
+    compile_to(tmp/'checks.dll', refs8, models+[Path(__file__).with_name('ModelChecks.cs'),tmp/'TrafficCardProbe.cs',tmp/'TabInputProbe.cs'])
     (tmp/'checks.runtimeconfig.json').write_text(json.dumps({'runtimeOptions':{'tfm':'net8.0','framework':{'name':'Microsoft.NETCore.App','version':'8.0.0'}}}))
     subprocess.run([dotnet,str(tmp/'checks.dll')],check=True)
     picker_source=(base/'Components/ServerListControl/ServerCountryPicker.xaml.cs').read_text()
@@ -73,7 +91,36 @@ print('PASS contiguous right-aligned LTR LocationLine: full city in Auto, only I
 assert 'More locations are coming soon.' in picker and 'Signal_Retry' not in picker and 'PreviewMouseLeftButtonDown' not in picker
 uc=(base/'UserControls/UCServerList.xaml').read_text()
 assert 'ShowSmartCard="False"' in uc and 'ServiceTab_KeyDown' in uc
-for color in ['#1C2331','#2D3850','#3A5BC0','#2F4A9C','#A3ADC7']: assert color in uc
+ns='{http://schemas.microsoft.com/winfx/2006/xaml/presentation}'
+xns='{http://schemas.microsoft.com/winfx/2006/xaml}'
+ucxml=ET.fromstring(uc)
+tab_style=next(e for e in ucxml.iter(ns+'Style') if e.attrib.get(xns+'Key')=='ServiceTab')
+setters={e.attrib['Property']:e.attrib.get('Value') for e in tab_style.findall(ns+'Setter')}
+assert setters['Height']=='36' and setters['FontSize']=='14' and setters['FontWeight']=='Medium'
+assert setters['Background']=='#1C2331' and setters['Foreground']=='#A3ADC7' and setters['BorderThickness']=='0'
+assert not list(tab_style.iter(ns+'LinearGradientBrush')) and not list(tab_style.iter(ns+'DropShadowEffect'))
+surface=next(e for e in tab_style.iter(ns+'Border') if e.attrib.get(xns+'Name')=='TabSurface')
+assert surface.attrib['CornerRadius']=='8'
+checked=next(e for e in tab_style.iter(ns+'Trigger') if e.attrib.get('Property')=='IsChecked')
+assert checked.attrib['Value']=='True'
+assert any(e.attrib.get('TargetName')=='TabSurface' and e.attrib.get('Value')=='#3A5BC0' for e in checked)
+assert any(e.attrib.get('Property')=='FontWeight' and e.attrib.get('Value')=='SemiBold' for e in checked)
+tabs=next(e for e in ucxml.iter(ns+'Grid') if any(c.attrib.get(xns+'Name')=='vpnTab' for c in e))
+assert tabs.attrib['FlowDirection']=='LeftToRight' and tabs.attrib['Height']=='36'
+assert tabs.attrib['KeyboardNavigation.TabNavigation']=='Local' and len(tabs.find(ns+'Grid.ColumnDefinitions'))==2
+assert not tabs.findall(ns+'Border')
+vpn_tab=next(e for e in tabs if e.attrib.get(xns+'Name')=='vpnTab')
+res_tab=next(e for e in tabs if e.attrib.get(xns+'Name')=='residentialTab')
+for tab,column,label in [(vpn_tab,'0','VPN'),(res_tab,'1','RESIDENTIAL')]:
+    assert tab.attrib['Grid.Column']==column and tab.attrib['TabIndex']==column and tab.attrib['IsTabStop']=='True'
+    assert tab.attrib['AutomationProperties.Name']==label and any(e.attrib.get('Text')==label for e in tab.iter(ns+'TextBlock'))
+    assert tab.attrib['PreviewKeyDown']=='ServiceTab_KeyDown' and tab.attrib['GroupName']=='ServiceKind'
+assert float(vpn_tab.attrib['Margin'].split(',')[2])+float(res_tab.attrib['Margin'].split(',')[0])==6
+focus=next(e for e in ucxml.iter(ns+'Style') if e.attrib.get(xns+'Key')=='TabKeyboardFocus')
+focus_border=next(focus.iter(ns+'Border'))
+assert focus_border.attrib['BorderThickness']=='1.5' and focus_border.attrib['BorderBrush']=='#AAB4FF' and focus_border.attrib['Margin']=='-2'
+assert setters['FocusVisualStyle']=='{StaticResource TabKeyboardFocus}'
+print('PASS flat independent LTR tabs: fixed positions, six-DIP gap, native selected state, keyboard-only focus and Tab order')
 controller=(base/'UserControls/UCServerList.Residential.cs').read_text()
 assert 'await DrainServerChecksAsync()' in controller and 'Disconnect()' not in controller
 assert 'residentialConnected = connected && service is ResidentialService' in controller
@@ -96,25 +143,35 @@ assert 'TabKeyboardFocus' in uc and 'TargetName="TabFocus"' not in uc
 assert 'Value="0.55"' in uc and 'TargetName="ConnectSurface" Property="Effect" Value="{x:Null}"' in uc
 assert 'initializedProbeScopes.Contains(context)' in (base/'UserControls/UCServerList.xaml.cs').read_text()
 traffic=(base/'Residential/ResidentialTrafficBar.cs').read_text()
-# Card/ring geometry from the supplied image, with clearance inside both bounds.
-assert 'CardHeight = 100' in traffic and 'ExpandedHeight = CardHeight + EntranceGap' in traffic
-assert 'Padding = new Thickness(16, 12, 16, 12)' in traffic and 100-2-12*2>=58
-assert 'RingSize = 58' in traffic and 'RingRadius = 25' in traffic and 'RingStroke = 5' in traffic
-assert 58/2-25-5/2>0 and 58/2+25+5/2<58
+# The reference's 44-DIP ring + 12-DIP vertical padding + border needs 70 DIPs.
+assert 'CardHeight = 70' in traffic and 'MinHeight = 68' in traffic and 'ExpandedHeight = CardHeight + EntranceGap' in traffic
+assert 'Padding = new Thickness(14, 12, 14, 12)' in traffic and 70-2-12*2>=44
+assert 'RingSize = 44' in traffic and 'RingRadius = 19' in traffic and 'RingStroke = 5' in traffic
+assert 44/2-19-5/2>0 and 44/2+19+5/2<44
 assert 'Width = RingSize, Height = RingSize' in traffic and 'new Size(RingRadius, RingRadius)' in traffic
-assert 'usedFraction = traffic.Total == 0 ? 0 : 1 - traffic.Ratio' in traffic
-assert 'Math.Max(0, usageTrack.ActualWidth) * usedFraction' in traffic
-assert 'remainingValue.Text = traffic.RemainingText;' in traffic and 'traffic.UsageText.Replace(" / ", " of ")' in traffic
-assert 'usageTrack.SizeChanged +=' in traffic and 'usageFill.BeginAnimation(WidthProperty, null)' in traffic
-assert all(label in traffic for label in [' left',' used','In use'])
+assert 'LOW_TRAFFIC_THRESHOLD = 0.15' in traffic and 'arc.Data = MakeArc(traffic.Ratio)' in traffic
+assert 'RemainingLabel(traffic)' in traffic and 'usedValue.Text = traffic.UsedText' in traffic and 'totalValue.Text = traffic.TotalText' in traffic
+assert 'new GridLength(1.3, GridUnitType.Star)' in traffic and traffic.count('stats.ColumnDefinitions.Add(')==3
+assert all('Stat("'+label+'"' in traffic for label in ['LEFT','USED','TOTAL'])
+assert 'new Thickness(0, 0, 14, 0)' in traffic and 'new Thickness(12, 0, 12, 0)' in traffic
+assert 'new Thickness(1, 0, 0, 0)' in traffic and 'new Thickness(0, 0, 12, 0)' in traffic
+assert 'Grid.SetColumn(ring, 0)' in traffic and 'Grid.SetColumn(stats, 1)' in traffic
+assert 'ring.Children.Add(percentage)' in traffic and 'percentage = Text("", 11, Brushes.White)' in traffic
+assert 'Stroke = Color("#1FFFFFFF")' in traffic and 'Stroke = Color("#F2C53D")' in traffic
+assert 'Background = Color("#202838")' in traffic and 'CornerRadius = new CornerRadius(12)' in traffic
+assert 'connectionDot = new Ellipse { Width = 7, Height = 7' in traffic and 'new Thickness(0, 0, 6, 0)' in traffic
+assert 'connectionDot.Visibility = connected ? Visibility.Visible : Visibility.Collapsed' in traffic
+assert 'Color(connected ? "#8C3FCF8E" : "#2D3850")' in traffic
+assert 'percent of traffic left' in traffic and 'AutomationProperties.SetName(ring, description)' in traffic
+assert '" left, " + traffic.UsedText + " used of " + traffic.TotalText' in traffic
+assert not any(dead in traffic for dead in ['badge','usageTrack','usageFill','usedFraction','arcGlow','YellowGradient','CardBackground','DropShadowEffect','LinearGradientBrush','new Button','In use','infoText'])
 assert not any('\u0600'<=c<='\u06ff' for c in traffic)
 assert '650' not in traffic and 'TimeSpan.FromMilliseconds(250)' in traffic
-assert 'info.Visibility = connected ? Visibility.Collapsed : Visibility.Visible' in traffic
+assert 'Animation(-6, 0)' in traffic and 'SystemParameters.ClientAreaAnimation' in traffic and 'bool show = traffic != null && activeTab' in traffic
 assert '250ms' in (root/'docs/windows-residential.md').read_text().replace('250 ms','250ms')
 signal=next(e for e in xml.iter() if e.attrib.get('DataContext')=='{Binding SignalServer, Mode=OneWay}')
 assert signal.attrib['VerticalAlignment']=='Center' and not list(signal.iter('{http://schemas.microsoft.com/winfx/2006/xaml/presentation}TranslateTransform'))
-print('PASS reference traffic card: ring fits, actual usage drives the resize-safe fill and percentage, existing entrance lifecycle is preserved')
-assert 'Grid.SetColumn(ring, 0)' in traffic and 'Grid.SetColumn(side, 2)' in traffic and 'percentage.Text' in traffic
+print('PASS single-row flat traffic card: left remaining ring, LEFT/USED/TOTAL, no badge/bar/refresh/glow, existing entrance lifecycle preserved')
 assert 'ReferenceEquals(TransitionBox.Content, uCServerList) ? ""' in main
 assert 'RetryRequested' not in controller and 'residentialChecksConsumed' not in controller
 assert 'HasSuccessfulTest' not in (base/'Components/ServerListControl/ServerListViewModel.cs').read_text()

@@ -20,6 +20,14 @@ The cache checks execute production `ServerCheckCache` with the .NET SDK's bundl
 independent scopes, stopped queue restart, cancellation rollback, fragment-only
 metadata changes and migration of previous persisted fingerprints.
 
+The 1.4.69 checks execute the production card's pure percentage/color/label
+helpers and tab key handler with inert input types. They cover the 15% boundary,
+nonzero rounded-to-zero, exhausted/over-quota and unlimited traffic, shared MB/GB
+formatting, physical Left/Right selection, Enter/Space and ordinary Tab handling.
+XML contracts cover the independent flat tabs, LTR positions, six-DIP gap,
+native selected-state automation and unchanged keyboard-only focus. Card checks
+cover ring bounds, LEFT/USED/TOTAL columns and removed badge/bar/refresh/glow.
+
 The HTTPS fixture creates a temporary CA in the current test user's Root store,
 serves a local gzip/BOM subscription and removes that CA in `finally`. It never
 disables TLS validation. Use an isolated test user/container as with other local
