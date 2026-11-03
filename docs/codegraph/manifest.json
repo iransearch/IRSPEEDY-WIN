@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "9edc46309b896bb24ede5f811be4525f64941179",
-  "base_tree": "0c192b12f19b4bb057643c6705f25f043b25d99f",
-  "generated_at": "2026-11-03T21:48:16Z",
+  "base_commit": "f35a15bd2fd22f263fa305305fbf9f1133abd1fd",
+  "base_tree": "402ee736018f18350bd67e9de7b3857088cc97e0",
+  "generated_at": "2026-11-03T22:14:57Z",
   "validity": {
     "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,7 +13,7 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-03T21:48:16Z"
+    "validated_at": "2026-11-03T22:14:57Z"
   },
   "counts": {
     "inventory_files": 995,
@@ -3254,7 +3254,7 @@
     "tools/Test-HotspotPayload.ps1": "9f5bb5632cb34a78514eca3e1057bc5b176ab13c",
     "tools/validate-ui-handoff.py": "193b13d88816e69ae98fad7c355810d1991d3fbb",
     ".github/workflows/codegraph.yml": "5cd8b8978e99c64ee36788439f8947513892498e",
-    "AGENTS.md": "617f02c684656393a50b5a9088279168df1add61",
+    "AGENTS.md": "87e32a0ef36b88108139a8f7ff2eebb7a2b99911",
     "tests/CodegraphChecks/test_publish.py": "d41b0b0a94d2bd03528b07cd6bbc67ccd1674e65",
     "tests/CodegraphChecks/test_update.py": "530dd63015f7e4cff223c578e33adef926676ed2",
     "tools/codegraph/publish.py": "9dd707817c506682de4ebdb64c184a8068e42014",
@@ -3264,7 +3264,7 @@
     ".github/workflows/codegraph-snapshot-pr.yml": "f6ebf683bb1469e4f249c1c0d53829c547af0e74",
     ".github/workflows/regression-guard.yml": "3d83a09e97dbf8d913f8080cc741069c2bcdb11a",
     "docs/regression-guard-phase1.md": "7b9a5bc0e364008c5582605a92ba11ad4e263079",
-    "tests/CodegraphChecks/test_reviewed_snapshot_pr.py": "4218804ea9bb36091c2b91cad2966588a35efcb0",
+    "tests/CodegraphChecks/test_reviewed_snapshot_pr.py": "e33ed725973f2365093b4f6518a18ce7f41fe06d",
     "tests/CodegraphChecks/test_workflow_safety.py": "e836172d2a835f251959bdddc9919c2b680ab37a",
     "tools/regression/run_fast.py": "309321d3a14f5c190080dc8636852c24f9521626"
   },
@@ -3282,5 +3282,5 @@
   },
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "b0f784a59e1f4b8d20765d27db85a3e92160e148ab6419e98f7be841fe2ccec2"
+  "validation_digest": "eeb501b9cb6ce5067b9997b08219570e35d1022890b2b8a5b450e1b7fbc32721"
 }
