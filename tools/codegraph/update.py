@@ -13,9 +13,10 @@ import re
 import subprocess
 import sys
 import xml.etree.ElementTree as ET
+import ui
 
 BRANCH = 'agent/core-startup-diagnostics-fix'
-OUTPUTS = ('docs/codegraph/manifest.json', 'docs/codegraph/dependencies.md', 'docs/codegraph/status.md')
+OUTPUTS = ('docs/codegraph/manifest.json', 'docs/codegraph/dependencies.md', 'docs/codegraph/status.md', 'docs/codegraph/ui-index.json')
 BUILD_KINDS = {'solution_member', 'includes_source', 'project_reference', 'imports_project', 'package_reference'}
 
 
@@ -336,7 +337,7 @@ def render(m, report):
 
 def summary(report):
     return '\n'.join(['### Codegraph incremental run','',f"- Target: `{report.get('target_commit','unknown')}`",f"- Validity: **{report.get('validity','failed')}**"]+
-       [f'- {key}: {report.get(key,0)}' for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','stale_relations']])+ '\n'
+       [f'- {key}: {report.get(key,0)}' for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','stale_relations','ui_files_read','ui_xaml_reparsed','ui_components','ui_pending_review']])+ '\n'
 
 
 def main():
@@ -353,8 +354,19 @@ def main():
         if os.environ.get('GITHUB_REPOSITORY') and old['repository'] != os.environ['GITHUB_REPOSITORY']:
             raise ValueError('Graph repository does not match the workflow repository')
         m,report=update(git,old,args.target);report['dry_run']=args.dry_run
+        ui_path=git.root/OUTPUTS[3]
+        prior_ui=json.loads(ui_path.read_text()) if ui_path.exists() else None
+        target=git.commit(args.target)
+        ui_graph,ui_report=ui.synchronize(git,prior_ui,m['file_inventory'],target)
+        report.update(ui_report)
+        # UI output is part of the same reviewed/published snapshot as the codegraph.
+        ui_modified=(prior_ui != ui_graph)
+        if ui_modified:
+            report['noop']=False
         if not report['noop'] and not args.dry_run:
-            for path,text in render(m,report).items():
+            outputs=render(m,report)
+            outputs[OUTPUTS[3]]=ui.render(ui_graph)
+            for path,text in outputs.items():
                 dest=git.root/path;dest.parent.mkdir(parents=True,exist_ok=True)
                 tmp=dest.with_suffix(dest.suffix+'.tmp');tmp.write_text(text);os.replace(tmp,dest)
         print(summary(report))
