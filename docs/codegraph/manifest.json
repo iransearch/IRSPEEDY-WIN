@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "f35a15bd2fd22f263fa305305fbf9f1133abd1fd",
-  "base_tree": "402ee736018f18350bd67e9de7b3857088cc97e0",
-  "generated_at": "2026-11-03T22:14:57Z",
+  "base_commit": "b3385720da3c5b08fa6785f68ab0390c0f76609b",
+  "base_tree": "f6b08f68da331214f4ec5b41a19bf757757bbb8a",
+  "generated_at": "2026-11-03T22:23:07Z",
   "validity": {
     "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,21 +13,21 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-03T22:14:57Z"
+    "validated_at": "2026-11-03T22:23:07Z"
   },
   "counts": {
-    "inventory_files": 995,
-    "csharp_files": 382,
+    "inventory_files": 996,
+    "csharp_files": 383,
     "xaml_files": 55,
     "solutions": 2,
     "projects": 24,
     "test_projects": 20,
     "python_run_py_files": 19,
     "requested_modules": 6,
-    "primary_paths_mapped": 4,
-    "verified_relations": 73,
+    "primary_paths_mapped": 2,
+    "verified_relations": 67,
     "relation_evidence_files": 32,
-    "stale_relations": 7,
+    "stale_relations": 13,
     "total_relations": 80
   },
   "graph_files": [
@@ -45,7 +45,7 @@
     {
       "id": "login",
       "name": "Login",
-      "status": "primary-path-mapped",
+      "status": "needs-review",
       "entrypoints": [
         "IRSpeedyVPN/MainWindow.xaml.cs",
         "IRSpeedyVPN/WebServices/NewServiceController.cs"
@@ -106,7 +106,7 @@
     {
       "id": "dns-recovery",
       "name": "DNS Recovery",
-      "status": "primary-path-mapped",
+      "status": "needs-review",
       "entrypoints": [
         "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
         "IRSpeedyVPN/WebServices/LoginRecovery.cs",
@@ -913,10 +913,11 @@
         "blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
       "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R018",
@@ -979,10 +980,11 @@
       },
       "note": "LoginResolutionOrder is ResolverFirst in this file.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763",
       "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R021",
@@ -1000,10 +1002,11 @@
         "blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763",
       "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R022",
@@ -1022,10 +1025,11 @@
       },
       "note": "Only ResolverFirst, HTTPS and a non-literal hostname enter this branch.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
       "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R023",
@@ -1108,10 +1112,11 @@
       },
       "note": "Interface dispatch through ILoginResolver; production resolver is the LoginDnsCache supplied by CurlHelper. This is not a DoH race.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
       "target_blob": "74468fc63fbfb2fab9988b002dde67520dfd0d83",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R027",
@@ -1130,10 +1135,11 @@
       },
       "note": "System-DNS fallback uses allowRecovery:false and is gated by the earlier unsent proof.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
       "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R028",
@@ -2415,7 +2421,7 @@
     "IRSpeedyVPN/Models/Services/Setting.cs": "cda177f45a3f88f3dbccad0603ed7d108e3cbe15",
     "IRSpeedyVPN/Models/Services/UserAccount.cs": "a9b959a4e55d52128b8f6898c86a5228689c3d2c",
     "IRSpeedyVPN/Program.cs": "7b777be52d04adcc910678247d0b19ac73f7132a",
-    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "a3fe165aaebf790b49ff2c0380896d7c7175a584",
+    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "5461d357d877ee3edafc971e9ab25fb56a9a5615",
     "IRSpeedyVPN/Properties/Resources.Designer.cs": "7c0cb8a594732898f58208b4e884920b61557b25",
     "IRSpeedyVPN/Properties/Resources.resx": "1af7de150c99c12dd67a509fe57c10d63e4eeb04",
     "IRSpeedyVPN/Properties/Settings.Designer.cs": "8c14afa6f6e9f405ceba916e27cb4fcac6da06f3",
@@ -2951,7 +2957,7 @@
     "IRSpeedyVPN/WebServices/LoginDnsRace.cs": "41b0b1773a15f4a8bacf72b47744c7427bd9e3fb",
     "IRSpeedyVPN/WebServices/LoginPlainDns.cs": "7a92ba30c8163e76ac8451168592a6e7451b8725",
     "IRSpeedyVPN/WebServices/LoginPrefetch.cs": "be3d1a0334b82f9b949191a00a203cc72fafa260",
-    "IRSpeedyVPN/WebServices/LoginRecovery.cs": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+    "IRSpeedyVPN/WebServices/LoginRecovery.cs": "74492bdd94b0d1c4f04a00d0c4832c67f43ff6de",
     "IRSpeedyVPN/WebServices/NewServiceController.cs": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
     "IRSpeedyVPN/WebServices/NewServiceDecryptor.cs": "03a3e7d4743ebf55f6894dbde8ecb4c81b0198bd",
     "IRSpeedyVPN/WebServices/PasswordChangeClient.cs": "7499f95a994b2c8026790a7178f9dd673576ee6c",
@@ -3077,7 +3083,7 @@
     "docs/traffic-stats.md": "e34222d1587cce863e9a304ce44a61cb5ba012ab",
     "docs/versioning.md": "bd18c2df08072a53eca8417723be805182cea300",
     "docs/vpn-time-zone.md": "ddaa0c0af2e0bd20ef3313f672b7f75abf7dd437",
-    "docs/windows-login-recovery.md": "e67c0b72651a56464c083a49f6c770dc46af3d97",
+    "docs/windows-login-recovery.md": "208deb4ae11e4ee72cd19cefc855f621b3af7ac2",
     "docs/windows-residential.md": "8244b25274d67754faff16e9a6634684f4e66315",
     "docs/windows-session-maintenance.md": "cd5327cbce378bae24e86743ee110924b3f99f3d",
     "tests/AiStartupChecks/run.py": "9e552b21bd8a108512f4648cf921cf803f2afba3",
@@ -3142,14 +3148,14 @@
     "tests/LoginRecoveryChecks/Api/Fixtures.cs": "13dc66948ecfeeab91bf8dd6e051967f4d703de8",
     "tests/LoginRecoveryChecks/Api/Program.cs": "978dc2d85aabfb89eadd8a76ed9868da93e3f952",
     "tests/LoginRecoveryChecks/CompletionChecks.cs": "ddbe58e583eaee14b444b92b0086d8a5987b2370",
-    "tests/LoginRecoveryChecks/DnsFailureChecks.cs": "6b163663b711d47b7140ddb87e78b64acbbece5e",
+    "tests/LoginRecoveryChecks/DnsFailureChecks.cs": "eedd113bb0cf4e0b3fb4a85ead47b9783f00cfbb",
     "tests/LoginRecoveryChecks/Fixtures.cs": "17a97e4b17d719741e0d10b182930a8e3e9bdcc3",
     "tests/LoginRecoveryChecks/ImprovementChecks.cs": "76927974034680ad9a8bd093ea11b92b873e7fa3",
     "tests/LoginRecoveryChecks/Loopback.cs": "33c59ded0a5473909573e52dc789f0b4affc8a6e",
     "tests/LoginRecoveryChecks/PendingStopChecks.cs": "f06be13f36797ed57c12a07b52a074f774040a57",
     "tests/LoginRecoveryChecks/PlainDnsChecks.cs": "2a867622a91b55904c477cdfd8ef5080595e6ddd",
     "tests/LoginRecoveryChecks/PrefetchChecks.cs": "b3231642068fb13fa106eb5f2467c7139f69d697",
-    "tests/LoginRecoveryChecks/Program.cs": "77b57c432f9ea1c9ab955f2123023c2aa12d06d3",
+    "tests/LoginRecoveryChecks/Program.cs": "4ea8024ea8771cb9044a46eda00cddc7a786bf8f",
     "tests/LoginRecoveryChecks/README.md": "26dc02bf77dc7b791856d445810ae34422ca8d3f",
     "tests/LoginRecoveryChecks/RegressionChecks.cs": "b5c32623a75a0d583021322b7cd5463f1e984682",
     "tests/LoginRecoveryChecks/ResolverFirstChecks.cs": "8c39ce6f7311315b116c8bd489bcea23a8c9fcf3",
@@ -3266,7 +3272,8 @@
     "docs/regression-guard-phase1.md": "7b9a5bc0e364008c5582605a92ba11ad4e263079",
     "tests/CodegraphChecks/test_reviewed_snapshot_pr.py": "e33ed725973f2365093b4f6518a18ce7f41fe06d",
     "tests/CodegraphChecks/test_workflow_safety.py": "e836172d2a835f251959bdddc9919c2b680ab37a",
-    "tools/regression/run_fast.py": "309321d3a14f5c190080dc8636852c24f9521626"
+    "tools/regression/run_fast.py": "309321d3a14f5c190080dc8636852c24f9521626",
+    "tests/LoginRecoveryChecks/ConnectFailureChecks.cs": "0a1d7b99b0ad618199e2f9c349d2cc1e00702328"
   },
   "bootstrap_manual_review": {
     "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
@@ -3278,9 +3285,13 @@
     "IRSpeedyVPN/UserControls/UCServerList.Residential.cs": "runtime-or-ui-source-needs-review",
     "IRSpeedyVPN/UserControls/UCServerList.xaml": "runtime-or-ui-source-needs-review",
     "tests/ResidentialChecks/ModelChecks.cs": "runtime-or-ui-source-needs-review",
-    "tests/ResidentialChecks/StateChecks.cs": "runtime-or-ui-source-needs-review"
+    "tests/ResidentialChecks/StateChecks.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/WebServices/LoginRecovery.cs": "runtime-or-ui-source-needs-review",
+    "tests/LoginRecoveryChecks/ConnectFailureChecks.cs": "runtime-or-ui-source-needs-review",
+    "tests/LoginRecoveryChecks/DnsFailureChecks.cs": "runtime-or-ui-source-needs-review",
+    "tests/LoginRecoveryChecks/Program.cs": "runtime-or-ui-source-needs-review"
   },
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "eeb501b9cb6ce5067b9997b08219570e35d1022890b2b8a5b450e1b7fbc32721"
+  "validation_digest": "fdbbde5695f888537411e58a8b276adcfec9c827909b7fda82bce1dfd5d211f9"
 }
