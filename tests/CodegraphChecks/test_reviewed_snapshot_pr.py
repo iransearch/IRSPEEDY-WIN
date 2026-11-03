@@ -39,6 +39,18 @@ class ReviewedCodegraphPRTests(unittest.TestCase):
         for filename in ('manifest.json','dependencies.md','status.md','ui-index.json'):
             self.assertIn('docs/codegraph/'+filename,y)
 
+    def test_needs_review_is_publishable_without_upgrading_stale_relations(self):
+        y=self.yml
+        # The updater enforces schema/provenance invariants; publishing must
+        # reject failed snapshots, not reject a valid needs-review inventory.
+        self.assertIn("report.get('validity')=='failed'",y)
+        self.assertIn("report.get('dry_run')",y)
+        self.assertNotIn("report.get('validity')!='validated-for-analyzed-commit'",y)
+        self.assertIn("if paths-allowed:",y)
+        docs=(ROOT/'docs/codegraph/automation.md').read_text(encoding='utf-8')
+        self.assertIn('A generated snapshot with global validity **`needs-review` is persistable**',docs)
+        self.assertIn('no stale witness is represented as presently verified',docs)
+
     def test_required_check_explicitly_dispatched_after_pr_update(self):
         y=self.yml
         self.assertIn('workflow_dispatch',y)
