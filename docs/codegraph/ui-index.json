@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "analyzed_commit": "a3652fe1a0218f206eb0aa5c67b99057e9c3a764",
+  "analyzed_commit": "9edc46309b896bb24ede5f811be4525f64941179",
   "scope": "XAML declarations, name/event/resource-key references and matching partial class; not runtime behavior",
   "components": {
     "IRSpeedyVPN/App.xaml": {
@@ -14827,7 +14827,7 @@
     },
     "IRSpeedyVPN/UserControls/UCServerList.xaml": {
       "path": "IRSpeedyVPN/UserControls/UCServerList.xaml",
-      "blob_sha": "c9e2858c7a4d3f3ab182579cfdc301eebfa2438e",
+      "blob_sha": "097ee52602f4b58def5756b51177b9fe3944f0d4",
       "status": "verified-declarations",
       "x_class": "IRSpeedyVPN.UserControls.UCServerList",
       "evidence": {
@@ -14849,7 +14849,7 @@
           "name": "txtSearch",
           "tag": "TextBox",
           "evidence": {
-            "line": 36,
+            "line": 37,
             "text": "<TextBox x:Name=\"txtSearch\" Grid.Column=\"1\" Background=\"{DynamicResource Theme.SurfaceBrush}\" BorderThickness=\"0\" FlowDirection=\"LeftToRight\" FontFamily=\"{StaticResource AppFontFamily}\" FontSize=\"{StaticResource FontSizeBody}\" Foreground=\"{DynamicResource TextBodyBrush}\" VerticalContentAlignment=\"Center\" HorizontalContentAlignment=\"Stretch\" TextAlignment=\"Right\" TextChanged=\"txtSearch_TextChanged\" Language=\"fa-IR\" AutomationProperties.Name=\"جستجوی سرورها\" CaretBrush=\"{DynamicResource TextPrimaryBrush}\"/>"
           }
         },
@@ -14857,7 +14857,7 @@
           "name": "vpnTab",
           "tag": "RadioButton",
           "evidence": {
-            "line": 56,
+            "line": 57,
             "text": "<RadioButton x:Name=\"vpnTab\" Grid.Column=\"0\" Margin=\"0,0,3,0\" TabIndex=\"0\" IsTabStop=\"True\" GroupName=\"ServiceKind\" IsChecked=\"True\" Style=\"{StaticResource ServiceTab}\" Checked=\"ServiceTab_Checked\" PreviewKeyDown=\"ServiceTab_KeyDown\" AutomationProperties.Name=\"VPN\">"
           }
         },
@@ -14865,15 +14865,15 @@
           "name": "residentialTab",
           "tag": "RadioButton",
           "evidence": {
-            "line": 59,
-            "text": "<RadioButton x:Name=\"residentialTab\" Grid.Column=\"1\" Margin=\"3,0,0,0\" TabIndex=\"1\" IsTabStop=\"True\" GroupName=\"ServiceKind\" Style=\"{StaticResource ServiceTab}\" Checked=\"ServiceTab_Checked\" PreviewKeyDown=\"ServiceTab_KeyDown\" AutomationProperties.Name=\"RESIDENTIAL\">"
+            "line": 60,
+            "text": "<RadioButton x:Name=\"residentialTab\" Grid.Column=\"1\" Margin=\"3,0,0,0\" TabIndex=\"1\" IsTabStop=\"True\" GroupName=\"ServiceKind\" IsEnabled=\"False\" Style=\"{StaticResource ServiceTab}\" Checked=\"ServiceTab_Checked\" PreviewKeyDown=\"ServiceTab_KeyDown\" AutomationProperties.Name=\"RESIDENTIAL\">"
           }
         },
         {
           "name": "trafficBar",
           "tag": "ResidentialTrafficBar",
           "evidence": {
-            "line": 63,
+            "line": 64,
             "text": "<res:ResidentialTrafficBar x:Name=\"trafficBar\" Grid.Row=\"2\"/>"
           }
         },
@@ -14881,7 +14881,7 @@
           "name": "vpnCountryPicker",
           "tag": "ServerCountryPicker",
           "evidence": {
-            "line": 65,
+            "line": 66,
             "text": "<local:ServerCountryPicker x:Name=\"vpnCountryPicker\"/>"
           }
         },
@@ -14889,7 +14889,7 @@
           "name": "residentialCountryPicker",
           "tag": "ServerCountryPicker",
           "evidence": {
-            "line": 66,
+            "line": 67,
             "text": "<local:ServerCountryPicker x:Name=\"residentialCountryPicker\" ShowSmartCard=\"False\" Visibility=\"Collapsed\"/>"
           }
         },
@@ -14897,7 +14897,7 @@
           "name": "btnConnect",
           "tag": "Button",
           "evidence": {
-            "line": 69,
+            "line": 70,
             "text": "<Button x:Name=\"btnConnect\" ToolTipService.ShowOnDisabled=\"True\" Grid.Row=\"4\" Content=\"اتصال\" Background=\"{DynamicResource AccentGradientBrush}\" Height=\"56\" Margin=\"0,12,0,0\" Click=\"btnConnect_Click\" Cursor=\"Hand\" AutomationProperties.Name=\"اتصال\">"
           }
         },
@@ -14905,7 +14905,7 @@
           "name": "bd",
           "tag": "Grid",
           "evidence": {
-            "line": 72,
+            "line": 73,
             "text": "<Grid x:Name=\"bd\">"
           }
         },
@@ -14913,7 +14913,7 @@
           "name": "ConnectSurface",
           "tag": "Border",
           "evidence": {
-            "line": 74,
+            "line": 75,
             "text": "<Border x:Name=\"ConnectSurface\" CornerRadius=\"{StaticResource ConnectButtonCornerRadius}\" Background=\"{TemplateBinding Background}\">"
           }
         },
@@ -14921,7 +14921,7 @@
           "name": "ConnectShadow",
           "tag": "DropShadowEffect",
           "evidence": {
-            "line": 76,
+            "line": 77,
             "text": "<DropShadowEffect x:Name=\"ConnectShadow\" Color=\"{DynamicResource AccentColor}\" Opacity=\"0.5\" BlurRadius=\"22\" ShadowDepth=\"10\" Direction=\"270\"/>"
           }
         }
@@ -14950,7 +14950,7 @@
           "handler": "txtSearch_TextChanged",
           "status": "xaml-declaration-only",
           "evidence": {
-            "line": 36,
+            "line": 37,
             "text": "<TextBox x:Name=\"txtSearch\" Grid.Column=\"1\" Background=\"{DynamicResource Theme.SurfaceBrush}\" BorderThickness=\"0\" FlowDirection=\"LeftToRight\" FontFamily=\"{StaticResource AppFontFamily}\" FontSize=\"{StaticResource FontSizeBody}\" Foreground=\"{DynamicResource TextBodyBrush}\" VerticalContentAlignment=\"Center\" HorizontalContentAlignment=\"Stretch\" TextAlignment=\"Right\" TextChanged=\"txtSearch_TextChanged\" Language=\"fa-IR\" AutomationProperties.Name=\"جستجوی سرورها\" CaretBrush=\"{DynamicResource TextPrimaryBrush}\"/>"
           }
         },
@@ -14959,7 +14959,7 @@
           "handler": "ServiceTab_Checked",
           "status": "xaml-declaration-only",
           "evidence": {
-            "line": 56,
+            "line": 57,
             "text": "<RadioButton x:Name=\"vpnTab\" Grid.Column=\"0\" Margin=\"0,0,3,0\" TabIndex=\"0\" IsTabStop=\"True\" GroupName=\"ServiceKind\" IsChecked=\"True\" Style=\"{StaticResource ServiceTab}\" Checked=\"ServiceTab_Checked\" PreviewKeyDown=\"ServiceTab_KeyDown\" AutomationProperties.Name=\"VPN\">"
           }
         },
@@ -14968,7 +14968,7 @@
           "handler": "ServiceTab_KeyDown",
           "status": "xaml-declaration-only",
           "evidence": {
-            "line": 56,
+            "line": 57,
             "text": "<RadioButton x:Name=\"vpnTab\" Grid.Column=\"0\" Margin=\"0,0,3,0\" TabIndex=\"0\" IsTabStop=\"True\" GroupName=\"ServiceKind\" IsChecked=\"True\" Style=\"{StaticResource ServiceTab}\" Checked=\"ServiceTab_Checked\" PreviewKeyDown=\"ServiceTab_KeyDown\" AutomationProperties.Name=\"VPN\">"
           }
         },
@@ -14977,7 +14977,7 @@
           "handler": "btnConnect_Click",
           "status": "xaml-declaration-only",
           "evidence": {
-            "line": 69,
+            "line": 70,
             "text": "<Button x:Name=\"btnConnect\" ToolTipService.ShowOnDisabled=\"True\" Grid.Row=\"4\" Content=\"اتصال\" Background=\"{DynamicResource AccentGradientBrush}\" Height=\"56\" Margin=\"0,12,0,0\" Click=\"btnConnect_Click\" Cursor=\"Hand\" AutomationProperties.Name=\"اتصال\">"
           }
         }
@@ -15015,7 +15015,7 @@
           "key": "Theme.SurfaceBrush",
           "status": "key-reference-only",
           "evidence": {
-            "line": 29,
+            "line": 30,
             "text": "<Border Grid.Row=\"0\" Height=\"46\" CornerRadius=\"12\" Background=\"{DynamicResource Theme.SurfaceBrush}\" BorderBrush=\"{DynamicResource SearchBorderBrush}\" BorderThickness=\"1\">"
           }
         },
@@ -15024,7 +15024,7 @@
           "key": "SearchBorderBrush",
           "status": "key-reference-only",
           "evidence": {
-            "line": 29,
+            "line": 30,
             "text": "<Border Grid.Row=\"0\" Height=\"46\" CornerRadius=\"12\" Background=\"{DynamicResource Theme.SurfaceBrush}\" BorderBrush=\"{DynamicResource SearchBorderBrush}\" BorderThickness=\"1\">"
           }
         },
@@ -15033,7 +15033,7 @@
           "key": "FontSizeBody",
           "status": "key-reference-only",
           "evidence": {
-            "line": 36,
+            "line": 37,
             "text": "<TextBox x:Name=\"txtSearch\" Grid.Column=\"1\" Background=\"{DynamicResource Theme.SurfaceBrush}\" BorderThickness=\"0\" FlowDirection=\"LeftToRight\" FontFamily=\"{StaticResource AppFontFamily}\" FontSize=\"{StaticResource FontSizeBody}\" Foreground=\"{DynamicResource TextBodyBrush}\" VerticalContentAlignment=\"Center\" HorizontalContentAlignment=\"Stretch\" TextAlignment=\"Right\" TextChanged=\"txtSearch_TextChanged\" Language=\"fa-IR\" AutomationProperties.Name=\"جستجوی سرورها\" CaretBrush=\"{DynamicResource TextPrimaryBrush}\"/>"
           }
         },
@@ -15042,7 +15042,7 @@
           "key": "TextPrimaryBrush",
           "status": "key-reference-only",
           "evidence": {
-            "line": 36,
+            "line": 37,
             "text": "<TextBox x:Name=\"txtSearch\" Grid.Column=\"1\" Background=\"{DynamicResource Theme.SurfaceBrush}\" BorderThickness=\"0\" FlowDirection=\"LeftToRight\" FontFamily=\"{StaticResource AppFontFamily}\" FontSize=\"{StaticResource FontSizeBody}\" Foreground=\"{DynamicResource TextBodyBrush}\" VerticalContentAlignment=\"Center\" HorizontalContentAlignment=\"Stretch\" TextAlignment=\"Right\" TextChanged=\"txtSearch_TextChanged\" Language=\"fa-IR\" AutomationProperties.Name=\"جستجوی سرورها\" CaretBrush=\"{DynamicResource TextPrimaryBrush}\"/>"
           }
         },
@@ -15051,7 +15051,7 @@
           "key": "TextSecondaryBrush",
           "status": "key-reference-only",
           "evidence": {
-            "line": 37,
+            "line": 38,
             "text": "<TextBlock Grid.Column=\"1\" FontFamily=\"{StaticResource AppFontFamily}\" FlowDirection=\"LeftToRight\" HorizontalAlignment=\"Stretch\" FontSize=\"{StaticResource FontSizeBody}\" Foreground=\"{DynamicResource TextSecondaryBrush}\" TextAlignment=\"Right\" VerticalAlignment=\"Center\" IsHitTestVisible=\"False\">"
           }
         },
@@ -15060,7 +15060,7 @@
           "key": "IconSearch",
           "status": "key-reference-only",
           "evidence": {
-            "line": 50,
+            "line": 51,
             "text": "<Path Grid.Column=\"0\" Data=\"{StaticResource IconSearch}\" Stretch=\"Uniform\" Width=\"16\" Height=\"16\" Stroke=\"{DynamicResource TextSecondaryBrush}\" StrokeThickness=\"1.5\" VerticalAlignment=\"Center\" Margin=\"0,0,10,0\" FlowDirection=\"LeftToRight\"/>"
           }
         },
@@ -15069,7 +15069,7 @@
           "key": "ServiceTab",
           "status": "key-reference-only",
           "evidence": {
-            "line": 56,
+            "line": 57,
             "text": "<RadioButton x:Name=\"vpnTab\" Grid.Column=\"0\" Margin=\"0,0,3,0\" TabIndex=\"0\" IsTabStop=\"True\" GroupName=\"ServiceKind\" IsChecked=\"True\" Style=\"{StaticResource ServiceTab}\" Checked=\"ServiceTab_Checked\" PreviewKeyDown=\"ServiceTab_KeyDown\" AutomationProperties.Name=\"VPN\">"
           }
         },
@@ -15078,7 +15078,7 @@
           "key": "AccentGradientBrush",
           "status": "key-reference-only",
           "evidence": {
-            "line": 69,
+            "line": 70,
             "text": "<Button x:Name=\"btnConnect\" ToolTipService.ShowOnDisabled=\"True\" Grid.Row=\"4\" Content=\"اتصال\" Background=\"{DynamicResource AccentGradientBrush}\" Height=\"56\" Margin=\"0,12,0,0\" Click=\"btnConnect_Click\" Cursor=\"Hand\" AutomationProperties.Name=\"اتصال\">"
           }
         },
@@ -15087,7 +15087,7 @@
           "key": "ConnectButtonCornerRadius",
           "status": "key-reference-only",
           "evidence": {
-            "line": 74,
+            "line": 75,
             "text": "<Border x:Name=\"ConnectSurface\" CornerRadius=\"{StaticResource ConnectButtonCornerRadius}\" Background=\"{TemplateBinding Background}\">"
           }
         },
@@ -15096,7 +15096,7 @@
           "key": "AccentColor",
           "status": "key-reference-only",
           "evidence": {
-            "line": 76,
+            "line": 77,
             "text": "<DropShadowEffect x:Name=\"ConnectShadow\" Color=\"{DynamicResource AccentColor}\" Opacity=\"0.5\" BlurRadius=\"22\" ShadowDepth=\"10\" Direction=\"270\"/>"
           }
         },
@@ -15105,7 +15105,7 @@
           "key": "IconArrowLeft",
           "status": "key-reference-only",
           "evidence": {
-            "line": 80,
+            "line": 81,
             "text": "<Path Data=\"{StaticResource IconArrowLeft}\" Stretch=\"Uniform\" Width=\"16\" Height=\"16\" Stroke=\"White\" StrokeThickness=\"1.8\" VerticalAlignment=\"Center\" Margin=\"0,0,10,0\"/>"
           }
         },
@@ -15114,7 +15114,7 @@
           "key": "FontSizeTitle",
           "status": "key-reference-only",
           "evidence": {
-            "line": 81,
+            "line": 82,
             "text": "<TextBlock Text=\"{TemplateBinding Content}\" FlowDirection=\"RightToLeft\" FontFamily=\"{StaticResource AppFontFamily}\" FontWeight=\"Bold\" FontSize=\"{StaticResource FontSizeTitle}\" Foreground=\"White\" VerticalAlignment=\"Center\"/>"
           }
         }
