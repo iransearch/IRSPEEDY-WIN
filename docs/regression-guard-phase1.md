@@ -18,7 +18,6 @@ Source branch: `agent/core-startup-diagnostics-fix`. This inventory groups the *
 | `ConnectedLatencyChecks` | NOT RUN | Candidate offline suite; verify prerequisites |
 | `ConnectionTlsChecks` | NOT RUN | Loopback TLS fixtures; privileged-port and CA behavior requires an isolated runner review |
 | `ErrorReportingChecks` | NOT RUN | Offline error and RPC harnesses; validate prerequisites |
-| `LastSuccessfulServerChecks` | RUN | See above |
 | `LoggingChecks` | NOT RUN | Log-retention fixture; ensure output isolation |
 | `LoginPresentationChecks` | RUN indirectly | Invoked by LoginRecovery harness, not a standalone CI job |
 | `PasswordReloginChecks` | RUN indirectly | Invoked by LoginRecovery harness, not a standalone CI job |
@@ -27,6 +26,7 @@ Source branch: `agent/core-startup-diagnostics-fix`. This inventory groups the *
 | `ServerStarGlowChecks` | NOT RUN | Python portion candidate; native WPF portion deferred |
 | `SharingUiChecks` | NOT RUN | UI contract checks; prerequisite verification required |
 | `ThemeChecks` | NOT RUN | Python theme contracts candidate; native WPF part deferred |
+| `SharingMotionChecks` | NOT RUN | Motion/animation fixtures; native WPF behavior separately deferred |
 | `UrlTestRetryChecks` | NOT RUN | C# retry checks, candidate for next CI tier |
 | `XhttpHeaderChecks` | NOT RUN | Production XHTTP parser fixture; validate NuGet and dependencies |
 | `TimeZoneChecks` | NOT RUN | .NET test project, environment review |
@@ -57,7 +57,6 @@ Source branch: `agent/core-startup-diagnostics-fix`. This inventory groups the *
 | `ParallelDnsChecks` | NOT RUN | Includes native DNS/Core probe variants |
 | `ProxifierQuicChecks` | NOT RUN | Native WFP/QUIC behavior |
 | `ResidentialChecks` | NOT RUN | Multi-component net48/WPF and HTTPS fixture; isolated runner required |
-| `ServerListTransitionChecks` | Offline runner only | Windows native WPF/BAML separate and NOT RUN |
 
 ## Execution policy
 
