@@ -23,6 +23,7 @@ class ReviewedCodegraphPRTests(unittest.TestCase):
         y=self.yml
         self.assertIn('permissions:\n  contents: write\n  pull-requests: write\n  actions: write',y)
         self.assertIn('persist-credentials: false',y)
+        self.assertIn("PYTHONDONTWRITEBYTECODE: '1'",y)
         self.assertIn('token: ${{ github.token }}',y)
         self.assertNotIn('CODEGRAPH_APP_',y)
         self.assertNotIn('create-github-app-token',y)
