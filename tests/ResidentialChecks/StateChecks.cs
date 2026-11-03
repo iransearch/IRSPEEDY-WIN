@@ -33,6 +33,28 @@ internal static class StateChecks
         Check(vm.Services.Length==0&&vm.VisibleTraffic==null&&!vm.CanConnect,"logout clears account-scoped catalog and quota");
         var eco=Account("eco");eco.UserAccount.GroupID=39;vm.Configure(eco);
         Check(!vm.IsAllowed&&calls==3,"ECO account never starts a Residential fetch");
+        int transferCalls=0;
+        var transferPending=new TaskCompletionSource<ResidentialViewModel.Payload>();
+        CancellationToken transferToken=default(CancellationToken);
+        var transfer=new ResidentialViewModel(new GlobalInfo(),(url,token)=>{transferCalls++;transferToken=token;return transferPending.Task;});
+        var plus=Account("same-subscription");plus.UserAccount.GroupID=4;transfer.Configure(plus);
+        Check(transfer.IsAllowed,"PLUS keeps Residential permission with usable subscription metadata");
+        var movedToEco=Account("same-subscription");movedToEco.UserAccount.group_id="39";transfer.Configure(movedToEco);
+        Check(!transfer.IsAllowed&&!transfer.CanConnect&&transferToken.IsCancellationRequested&&transferCalls==1,
+            "transfer to group 39 revokes Residential and cancels the pending fetch even with the same subscription");
+        transferPending.SetResult(Payload("Old PLUS"));
+        Check(transfer.Services.Length==0&&transfer.VisibleTraffic==null,"late PLUS subscription cannot restore ECO access");
+        var restrictedAccounts=new[] {Account("id"),Account("pid"),Account("name")};
+        restrictedAccounts[0].UserAccount.GroupID="39";
+        restrictedAccounts[1].UserAccount.pid=39;
+        restrictedAccounts[2].UserAccount.GroupName="اکو";
+        foreach(var restricted in restrictedAccounts)
+        {
+            transfer.Configure(restricted);
+            Check(!transfer.IsAllowed&&transferCalls==1,"ECO metadata aliases never launch subscription requests");
+        }
+        transfer.Configure(plus);
+        Check(transfer.IsAllowed&&transferCalls==2,"moving back to PLUS restores the existing Residential permission");
         int attempts=0;
         var retry=new ResidentialViewModel(new GlobalInfo(),(url,token)=>++attempts==1?Task.FromException<ResidentialViewModel.Payload>(new TimeoutException()):Task.FromResult(Payload()));
         retry.Configure(Account("retry"));

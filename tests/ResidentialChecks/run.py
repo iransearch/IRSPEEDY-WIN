@@ -122,6 +122,16 @@ assert focus_border.attrib['BorderThickness']=='1.5' and focus_border.attrib['Bo
 assert setters['FocusVisualStyle']=='{StaticResource TabKeyboardFocus}'
 print('PASS flat independent LTR tabs: fixed positions, six-DIP gap, native selected state, keyboard-only focus and Tab order')
 controller=(base/'UserControls/UCServerList.Residential.cs').read_text()
+assert res_tab.attrib.get('IsEnabled')=='False', 'Residential starts disabled before account configuration'
+disabled=next(e for e in tab_style.iter(ns+'Trigger') if e.attrib.get('Property')=='IsEnabled')
+assert disabled.attrib['Value']=='False' and any(e.attrib.get('Property')=='Opacity' and e.attrib.get('Value')=='0.45' for e in disabled)
+assert 'residentialTab.IsEnabled = residential.IsAllowed;' in controller, 'Residential tab follows the existing ECO/account permission'
+configure=controller[controller.index('        internal void ConfigureResidential('):controller.index('        private async void ServiceTab_Checked(')]
+assert configure.index('residential.Configure(account);') < configure.index('!residential.IsAllowed) tabGeneration++;')
+checked_handler=controller[controller.index('        private async void ServiceTab_Checked('):controller.index('        private void ServiceTab_KeyDown(')]
+assert checked_handler.index('if (next && !residential.IsAllowed)') < checked_handler.index('await DrainServerChecksAsync();')
+assert 'version != tabGeneration || (next && !residential.IsAllowed)' in checked_handler
+print('PASS Residential account gate controls native tab access, disabled appearance and stale tab transitions')
 assert 'await DrainServerChecksAsync()' in controller and 'Disconnect()' not in controller
 assert 'residentialConnected = connected && service is ResidentialService' in controller
 for source in ['UCServerList.xaml.cs','UCServerList.ServerResultsRefresh.cs']:

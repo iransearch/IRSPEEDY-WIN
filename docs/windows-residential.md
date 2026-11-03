@@ -1,4 +1,15 @@
-# Windows Residential (1.4.69)
+# Windows Residential (1.4.71)
+
+## 1.4.71: ECO tab access
+
+The RESIDENTIAL tab starts disabled and follows `ResidentialViewModel.IsAllowed`.
+The existing group-39/ECO check takes precedence over enabled subscription metadata,
+including cached login and authenticated account refresh. Disabled tabs are dimmed
+and cannot be activated by mouse, keyboard or a queued tab transition. Revoking
+permission cancels pending tab selection and returns the chooser to VPN; changing
+back to an eligible account restores tab access. Subscription fetch cancellation
+and late-response protection continue to use the existing account generation.
+This change does not restart or disconnect an existing VPN connection.
 
 ## 1.4.69: flat tabs and single-row traffic card
 

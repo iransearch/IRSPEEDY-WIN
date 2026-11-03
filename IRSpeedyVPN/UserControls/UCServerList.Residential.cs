@@ -56,8 +56,8 @@ namespace IRSpeedyVPN.UserControls
             string nextAccount = account == null ? "" : ServiceKindSetting;
             bool changedAccount = configuredAccount != nextAccount;
             configuredAccount = nextAccount;
-            if (changedAccount || account == null) tabGeneration++;
             residential.Configure(account);
+            if (changedAccount || account == null || !residential.IsAllowed) tabGeneration++;
             bool restore = account != null && residential.IsAllowed && (changedAccount
                 ? RegHelper.GetSettingValue(ServiceKindSetting) == "Residential" : isResidentialTab);
             settingTab = true;
@@ -80,6 +80,13 @@ namespace IRSpeedyVPN.UserControls
         {
             if (settingTab || residential == null) return;
             bool next = ReferenceEquals(sender, residentialTab);
+            if (next && !residential.IsAllowed)
+            {
+                settingTab = true;
+                residentialTab.IsChecked = false; vpnTab.IsChecked = true;
+                settingTab = false;
+                return;
+            }
             long version = ++tabGeneration;
             if (next == isResidentialTab)
             {
@@ -91,7 +98,7 @@ namespace IRSpeedyVPN.UserControls
             {
                 PauseServerChecks();
                 await DrainServerChecksAsync();
-                if (version != tabGeneration) return;
+                if (version != tabGeneration || (next && !residential.IsAllowed)) return;
                 if (isResidentialTab) residentialSelection = selectedService; else vpnSelection = selectedService;
                 isResidentialTab = next;
                 selectedService = next ? residentialSelection : vpnSelection;
@@ -119,6 +126,7 @@ namespace IRSpeedyVPN.UserControls
         private void UpdateResidentialVisuals()
         {
             if (residential == null) return;
+            residentialTab.IsEnabled = residential.IsAllowed;
             vpnCountryPicker.Visibility = isResidentialTab ? Visibility.Collapsed : Visibility.Visible;
             residentialCountryPicker.Visibility = isResidentialTab ? Visibility.Visible : Visibility.Collapsed;
             trafficBar.Update(residential.VisibleTraffic, residentialConnected, isResidentialTab);
