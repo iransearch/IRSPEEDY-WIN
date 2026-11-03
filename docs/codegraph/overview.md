@@ -75,3 +75,7 @@ Never mark `analysis_complete` or `runtime_validated` true merely because an ind
 Current gaps: exhaustive callers/async interleavings; protocol-specific Pool/Xray paths; native Core
 DNS/routing internals outside this repository; other adapters and settings; full WPF binding/input
 coverage; live API/subscription behavior. See each module's `gaps` in the manifest.
+
+## WPF UI navigation index
+
+For UI/layout/theme/interaction work, begin with [UI Component Map](ui-components.md), a source-checked six-component starter. Its code-behind pairings are verified for the recorded source checkpoint; the prose page is manually reviewed; the new `ui-index.json` is regenerated incrementally by the action. Check freshness and inspect the current XAML/C# before making changes. UI files not yet mapped are unknown, not absent.
