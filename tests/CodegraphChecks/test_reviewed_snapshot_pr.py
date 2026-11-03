@@ -17,7 +17,7 @@ class ReviewedCodegraphPRTests(unittest.TestCase):
         self.assertNotIn('branches: [main]',y)
         self.assertIn('ref: agent/core-startup-diagnostics-fix',y)
         self.assertIn('base: agent/core-startup-diagnostics-fix',y)
-        self.assertIn('git ls-remote origin refs/heads/agent/core-startup-diagnostics-fix',y)
+        self.assertIn('gh api repos/$GITHUB_REPOSITORY/git/ref/heads/agent/core-startup-diagnostics-fix',y)
 
     def test_no_app_or_secrets_or_direct_development_push(self):
         y=self.yml
