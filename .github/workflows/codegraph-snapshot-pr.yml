@@ -1,12 +1,14 @@
 name: Codegraph Snapshot Pull Request
 
-# Only trusted pushes to the protected development branch can access the app key.
+# Only trusted pushes to the development branch may propose snapshots.
 on:
   push:
     branches: [agent/core-startup-diagnostics-fix]
 
 permissions:
-  contents: read
+  contents: write
+  pull-requests: write
+  actions: write
 
 # One writer for the single managed snapshot branch, never cancel an active writer.
 concurrency:
@@ -77,36 +79,12 @@ jobs:
           print('Generated graph files changed:',len(paths),'of',len(allowed))
           PY
 
-      - name: Check dedicated GitHub App credentials are configured
-        if: steps.diff.outputs.changed == 'true'
-        shell: bash
-        env:
-          APP_CLIENT_ID: ${{ vars.CODEGRAPH_APP_CLIENT_ID }}
-          HAS_APP_KEY: ${{ secrets.CODEGRAPH_APP_PRIVATE_KEY != '' }}
-        run: |
-          set -euo pipefail
-          if [[ -z "$APP_CLIENT_ID" || "$HAS_APP_KEY" != "true" ]]; then
-            echo "::error::Configure CODEGRAPH_APP_CLIENT_ID repository variable and CODEGRAPH_APP_PRIVATE_KEY secret for a repository-scoped GitHub App (Contents and Pull requests: read/write)."
-            exit 1
-          fi
-
-      - name: Mint repository-scoped GitHub App token
-        if: steps.diff.outputs.changed == 'true'
-        id: app-token
-        uses: actions/create-github-app-token@v3
-        with:
-          client-id: ${{ vars.CODEGRAPH_APP_CLIENT_ID }}
-          private-key: ${{ secrets.CODEGRAPH_APP_PRIVATE_KEY }}
-          permission-contents: write
-          permission-pull-requests: write
-
       - name: Create or update one reviewable snapshot PR
         if: steps.diff.outputs.changed == 'true'
         id: snapshot-pr
         uses: peter-evans/create-pull-request@v8
         with:
-          token: ${{ steps.app-token.outputs.token }}
-          branch-token: ${{ steps.app-token.outputs.token }}
+          token: ${{ github.token }}
           base: agent/core-startup-diagnostics-fix
           branch: automation/codegraph-reviewed-snapshot
           delete-branch: true
@@ -119,13 +97,33 @@ jobs:
           title: "docs(codegraph): refresh generated snapshot"
           draft: true
           body: |
-            Automatically generated Codegraph snapshot for source commit \`${{ github.sha }}\`.
+            Automatically generated Codegraph snapshot for source commit `${{ github.sha }}`.
 
             - Only machine-generated Codegraph outputs are included.
             - Review source witnesses, validity and stale/pending relationships before marking ready.
             - The required **Fast offline regression (Linux .NET 8)** check must pass.
             - No direct push or automatic merge to the development branch.
             - `main` is not a target.
+
+      # Pushes/PRs made with GITHUB_TOKEN do not trigger pull_request CI.
+      # workflow_dispatch is explicitly exempt from this recursion suppression.
+      # Dispatch regression on the exact snapshot branch, after the PR action
+      # has pushed its new commit. This creates a real GitHub Actions check
+      # on the PR HEAD required by the protected development branch.
+      - name: Trigger required Regression Guard on snapshot branch
+        if: steps.snapshot-pr.outputs.pull-request-operation == 'created' || steps.snapshot-pr.outputs.pull-request-operation == 'updated'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_HEAD_SHA: ${{ steps.snapshot-pr.outputs.pull-request-head-sha }}
+        run: |
+          set -euo pipefail
+          test -n "$PR_HEAD_SHA"
+          ACTUAL_SHA="$(git ls-remote origin refs/heads/automation/codegraph-reviewed-snapshot | cut -f1)"
+          test "$ACTUAL_SHA" = "$PR_HEAD_SHA"
+          gh workflow run regression-guard.yml \
+            --ref automation/codegraph-reviewed-snapshot
+          echo "Dispatched required Regression Guard on proposal head: $PR_HEAD_SHA" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Summarize proposal status
         if: success()
