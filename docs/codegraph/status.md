@@ -1,10 +1,16 @@
 # Current Codegraph status
 
-Validity: **pending-validation**.
+Analyzed commit: `bf4d2a5ae2c483adec8366ac2b89cdbf20f0a30f`. Validity: **validated-for-analyzed-commit**.
 
-The source-reviewed seed is `a57db82d05d3182eba7d98db5a47cf28d4d42f66` (1.4.70).
-This automation is proposed in PR #3; the future merge/push commit has not been validated yet.
-The first successful workflow will replace this page with the exact analyzed checkpoint and counts.
+Only this status/manifest describe the current snapshot. Other narrative pages are manually reviewed baseline notes.
 
-The local read-only trial is recorded in [dry-run.md](dry-run.md). It does not certify a future commit
-or prove Windows/VPN runtime behavior. See [automation.md](automation.md) for per-edge validity rules.
+- files_changed: 6
+- files_examined: 0
+- content_files_read: 32
+- relationships_changed: 80
+- new_verified_relations: 0
+- stale_relations: 0
+
+Pending source review:
+
+None.

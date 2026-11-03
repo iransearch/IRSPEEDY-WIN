@@ -1,21 +1,22 @@
 {
-  "schema_version": "1.0.0",
+  "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
-  "base_tree": "eb2c8269781f5e8829a3fe6e3ec1ba08ca4fef88",
-  "generated_at": "2026-11-03T15:36:20Z",
+  "base_commit": "bf4d2a5ae2c483adec8366ac2b89cdbf20f0a30f",
+  "base_tree": "b7c08cf1484f9f5b0ad19a28309a690773e3d6c7",
+  "generated_at": "2026-11-03T18:25:18Z",
   "validity": {
-    "status": "pending-validation",
-    "assurance": "targeted-static-source-review",
+    "status": "validated-for-analyzed-commit",
+    "assurance": "incremental-blob-pins-and-literal-build-declarations",
     "analysis_complete": false,
     "runtime_validated": false,
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
-    "inventory_scope": "All tracked blob entries at base_commit; the six new graph documents are excluded because they do not exist at the baseline.",
-    "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence."
+    "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
+    "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
+    "validated_at": "2026-11-03T18:25:18Z"
   },
   "counts": {
-    "inventory_files": 981,
+    "inventory_files": 987,
     "csharp_files": 382,
     "xaml_files": 55,
     "solutions": 2,
@@ -25,7 +26,9 @@
     "requested_modules": 6,
     "primary_paths_mapped": 6,
     "verified_relations": 80,
-    "relation_evidence_files": 32
+    "relation_evidence_files": 32,
+    "stale_relations": 0,
+    "total_relations": 80
   },
   "graph_files": [
     "AGENTS.md",
@@ -568,8 +571,15 @@
       "evidence": {
         "path": "IRSpeedyVPN.sln",
         "line": 6,
-        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"IRSpeedyVPN\", \"IRSpeedyVPN\\IRSpeedyVPN.csproj\", \"{52423534-CAF4-431C-9FAD-CC3342D45827}\""
-      }
+        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"IRSpeedyVPN\", \"IRSpeedyVPN\\IRSpeedyVPN.csproj\", \"{52423534-CAF4-431C-9FAD-CC3342D45827}\"",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "c702bd8353c0e1c640c094364215b776708f4a4b"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "c702bd8353c0e1c640c094364215b776708f4a4b",
+      "target_blob": "16174ee90227c78e225b201c3628966c722eebc6",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R002",
@@ -582,8 +592,15 @@
       "evidence": {
         "path": "IRSpeedyVPN.sln",
         "line": 8,
-        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"UpdateHelper\", \"UpdateHelper\\UpdateHelper.csproj\", \"{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}\""
-      }
+        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"UpdateHelper\", \"UpdateHelper\\UpdateHelper.csproj\", \"{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}\"",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "c702bd8353c0e1c640c094364215b776708f4a4b"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "c702bd8353c0e1c640c094364215b776708f4a4b",
+      "target_blob": "4e71984d96c359d1bdb08bf1b779a96ac3adaf71",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R003",
@@ -596,8 +613,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/IRSpeedyVPN.sln",
         "line": 5,
-        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"IRSpeedyVPN\", \"IRSpeedyVPN.csproj\", \"{63BFDB34-1A19-FDE2-DC70-7E8DC58BE38F}\""
-      }
+        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"IRSpeedyVPN\", \"IRSpeedyVPN.csproj\", \"{63BFDB34-1A19-FDE2-DC70-7E8DC58BE38F}\"",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "e323d0a973dadd2eb0d0ba2f404602b2dbd5f7ef"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "e323d0a973dadd2eb0d0ba2f404602b2dbd5f7ef",
+      "target_blob": "16174ee90227c78e225b201c3628966c722eebc6",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R004",
@@ -610,8 +634,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/IRSpeedyVPN.sln",
         "line": 7,
-        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Throne\", \"..\\Throne\\Throne.csproj\", \"{B2C3D4E5-F6A7-8901-BCDE-F12345678901}\""
-      }
+        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Throne\", \"..\\Throne\\Throne.csproj\", \"{B2C3D4E5-F6A7-8901-BCDE-F12345678901}\"",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "e323d0a973dadd2eb0d0ba2f404602b2dbd5f7ef"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "e323d0a973dadd2eb0d0ba2f404602b2dbd5f7ef",
+      "target_blob": "8d55d284dcdde2c0f1ea84937b8bea46e2b1e2db",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R005",
@@ -624,8 +655,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/IRSpeedyVPN.csproj",
         "line": 10,
-        "text": "<StartupObject>IRSpeedyVPN.Program</StartupObject>"
-      }
+        "text": "<StartupObject>IRSpeedyVPN.Program</StartupObject>",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "16174ee90227c78e225b201c3628966c722eebc6"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "16174ee90227c78e225b201c3628966c722eebc6",
+      "target_blob": "7b777be52d04adcc910678247d0b19ac73f7132a",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R006",
@@ -638,8 +676,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Program.cs",
         "line": 73,
-        "text": "AppServices.InitializeFast();"
-      }
+        "text": "AppServices.InitializeFast();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "7b777be52d04adcc910678247d0b19ac73f7132a"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "7b777be52d04adcc910678247d0b19ac73f7132a",
+      "target_blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R007",
@@ -652,8 +697,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Program.cs",
         "line": 221,
-        "text": "var mainWindow = new MainWindow();"
-      }
+        "text": "var mainWindow = new MainWindow();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "7b777be52d04adcc910678247d0b19ac73f7132a"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "7b777be52d04adcc910678247d0b19ac73f7132a",
+      "target_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R008",
@@ -666,9 +718,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/Program.cs",
         "line": 225,
-        "text": "mainWindow.PrepareFastStartup();"
+        "text": "mainWindow.PrepareFastStartup();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "7b777be52d04adcc910678247d0b19ac73f7132a"
       },
-      "note": "Normal startup suppresses the legacy Activated-time initialization path."
+      "note": "Normal startup suppresses the legacy Activated-time initialization path.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "7b777be52d04adcc910678247d0b19ac73f7132a",
+      "target_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R009",
@@ -681,8 +740,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/AppServices.cs",
         "line": 106,
-        "text": "NewServiceController = new NewServiceController();"
-      }
+        "text": "NewServiceController = new NewServiceController();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195",
+      "target_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R010",
@@ -695,8 +761,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/AppServices.cs",
         "line": 108,
-        "text": "ServiceFactory = new ServiceFactory();"
-      }
+        "text": "ServiceFactory = new ServiceFactory();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195",
+      "target_blob": "5843a7996f12164aa34b53f222ab7c9b89fc200b",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R011",
@@ -709,8 +782,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/AppServices.cs",
         "line": 113,
-        "text": "UCServerList = new UCServerList();"
-      }
+        "text": "UCServerList = new UCServerList();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195",
+      "target_blob": "bfde1369efe64f98b5b544545041d51d7734027e",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R012",
@@ -723,8 +803,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 46,
-        "text": "uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;"
-      }
+        "text": "uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R013",
@@ -737,8 +824,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/UserControls/UCLogin.xaml.cs",
         "line": 84,
-        "text": "OnCredentialEntered.Invoke(this, txtUsername.Text, txtPassword.Password,chkRemember.IsChecked.Value);"
-      }
+        "text": "OnCredentialEntered.Invoke(this, txtUsername.Text, txtPassword.Password,chkRemember.IsChecked.Value);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "972688b62d4c4452b3a7549288c38e4e1a41b188"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "972688b62d4c4452b3a7549288c38e4e1a41b188",
+      "target_blob": "972688b62d4c4452b3a7549288c38e4e1a41b188",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R014",
@@ -751,8 +845,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.xaml.cs",
         "line": 1069,
-        "text": "Login(username, password, Remember);"
-      }
+        "text": "Login(username, password, Remember);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "target_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R015",
@@ -765,8 +866,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.xaml.cs",
         "line": 1082,
-        "text": "var res = serviceController.Login2(username, password, loginApplicationExit.Token);"
-      }
+        "text": "var res = serviceController.Login2(username, password, loginApplicationExit.Token);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "target_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R016",
@@ -779,8 +887,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/NewServiceController.cs",
         "line": 69,
-        "text": "=> getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString(), cancellation);"
-      }
+        "text": "=> getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString(), cancellation);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "target_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R017",
@@ -793,8 +908,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/NewServiceController.cs",
         "line": 106,
-        "text": "var loginContext = new LoginNetworkContext(cancellation, SlowNetworkLoginBudgetSeconds * 1000);"
-      }
+        "text": "var loginContext = new LoginNetworkContext(cancellation, SlowNetworkLoginBudgetSeconds * 1000);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R018",
@@ -807,9 +929,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/NewServiceController.cs",
         "line": 116,
-        "text": "var res = service.SendRequest<DefaultEncryptedResponse<AccountInfoEx>>("
+        "text": "var res = service.SendRequest<DefaultEncryptedResponse<AccountInfoEx>>(",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c"
       },
-      "note": "The next source line is api/server/list/all; this path supplies loginContext and skipDoh:true."
+      "note": "The next source line is api/server/list/all; this path supplies loginContext and skipDoh:true.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "target_blob": "4c1f7a9d43281daab27fa5d6afbcffb7019a1f4e",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R019",
@@ -822,9 +951,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/RestHelper.cs",
         "line": 120,
-        "text": ": _curl.SendLogin(url, method, headers.ToString(), body,"
+        "text": ": _curl.SendLogin(url, method, headers.ToString(), body,",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "4c1f7a9d43281daab27fa5d6afbcffb7019a1f4e"
       },
-      "note": "Conditional on non-null loginContext; other requests use CurlHelper.Send."
+      "note": "Conditional on non-null loginContext; other requests use CurlHelper.Send.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "4c1f7a9d43281daab27fa5d6afbcffb7019a1f4e",
+      "target_blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R020",
@@ -837,9 +973,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
         "line": 21,
-        "text": "var recovery = new LoginRecovery(new LoginTransport(this), LoginDns, LogHelper.WriteExLog,"
+        "text": "var recovery = new LoginRecovery(new LoginTransport(this), LoginDns, LogHelper.WriteExLog,",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763"
       },
-      "note": "LoginResolutionOrder is ResolverFirst in this file."
+      "note": "LoginResolutionOrder is ResolverFirst in this file.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763",
+      "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R021",
@@ -852,8 +995,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
         "line": 23,
-        "text": "var result = recovery.Send(url, method, headers, body, timeoutMs, context);"
-      }
+        "text": "var result = recovery.Send(url, method, headers, body, timeoutMs, context);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763",
+      "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R022",
@@ -866,9 +1016,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
         "line": 175,
-        "text": "return SendResolverFirst(url, method, headers, body, context, target, deadline);"
+        "text": "return SendResolverFirst(url, method, headers, body, context, target, deadline);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f"
       },
-      "note": "Only ResolverFirst, HTTPS and a non-literal hostname enter this branch."
+      "note": "Only ResolverFirst, HTTPS and a non-literal hostname enter this branch.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+      "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R023",
@@ -881,8 +1038,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
         "line": 15,
-        "text": "private static readonly LoginDnsCache LoginDns = new LoginDnsCache(FetchLoginAddresses);"
-      }
+        "text": "private static readonly LoginDnsCache LoginDns = new LoginDnsCache(FetchLoginAddresses);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763",
+      "target_blob": "74468fc63fbfb2fab9988b002dde67520dfd0d83",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R024",
@@ -895,8 +1059,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
         "line": 155,
-        "text": "=> LoginPlainDns.Resolve(host, timeoutMs, cancellation, LogHelper.WriteExLog);"
-      }
+        "text": "=> LoginPlainDns.Resolve(host, timeoutMs, cancellation, LogHelper.WriteExLog);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763",
+      "target_blob": "7a92ba30c8163e76ac8451168592a6e7451b8725",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R025",
@@ -909,9 +1080,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/LoginPlainDns.cs",
         "line": 27,
-        "text": "return LoginDnsRace.Resolve(name, timeoutMs, cancellation, (endpoint, ms, token) =>"
+        "text": "return LoginDnsRace.Resolve(name, timeoutMs, cancellation, (endpoint, ms, token) =>",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "7a92ba30c8163e76ac8451168592a6e7451b8725"
       },
-      "note": "Only DNS queries race; this does not create credential POSTs."
+      "note": "Only DNS queries race; this does not create credential POSTs.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "7a92ba30c8163e76ac8451168592a6e7451b8725",
+      "target_blob": "41b0b1773a15f4a8bacf72b47744c7427bd9e3fb",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R026",
@@ -924,9 +1102,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
         "line": 262,
-        "text": "var answer = resolver.Resolve(host, budget, context.Cancellation, refresh);"
+        "text": "var answer = resolver.Resolve(host, budget, context.Cancellation, refresh);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f"
       },
-      "note": "Interface dispatch through ILoginResolver; production resolver is the LoginDnsCache supplied by CurlHelper. This is not a DoH race."
+      "note": "Interface dispatch through ILoginResolver; production resolver is the LoginDnsCache supplied by CurlHelper. This is not a DoH race.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+      "target_blob": "74468fc63fbfb2fab9988b002dde67520dfd0d83",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R027",
@@ -939,9 +1124,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
         "line": 238,
-        "text": "var system = SendCore(url, method, headers, body, context, target, deadline,"
+        "text": "var system = SendCore(url, method, headers, body, context, target, deadline,",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f"
       },
-      "note": "System-DNS fallback uses allowRecovery:false and is gated by the earlier unsent proof."
+      "note": "System-DNS fallback uses allowRecovery:false and is gated by the earlier unsent proof.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+      "target_blob": "09a1bb40dfa3d0e1ec5a44c0881b18baa398804f",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R028",
@@ -954,8 +1146,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
         "line": 39,
-        "text": "var response = HttpFallback.Send(url, method, headers, body, null, timeoutMs, cancellation, loginRequest: true);"
-      }
+        "text": "var response = HttpFallback.Send(url, method, headers, body, null, timeoutMs, cancellation, loginRequest: true);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "a3f477e47c57e4e0c3a6aa03437226d1c01a5763",
+      "target_blob": "d703adf07f44a3f07eeeda4ca125d3a89208358a",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R029",
@@ -968,9 +1167,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/RestHelper.cs",
         "line": 107,
-        "text": "var ip = DohResolver.Resolve(uri.Host);"
+        "text": "var ip = DohResolver.Resolve(uri.Host);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "4c1f7a9d43281daab27fa5d6afbcffb7019a1f4e"
       },
-      "note": "Only loginContext==null, !skipDoh and available curl; excluded from the current credential login path."
+      "note": "Only loginContext==null, !skipDoh and available curl; excluded from the current credential login path.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "4c1f7a9d43281daab27fa5d6afbcffb7019a1f4e",
+      "target_blob": "009a8fc12e4dcd06532c7458bf78c065b326feed",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R030",
@@ -983,8 +1189,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 339,
-        "text": "long generation = accountSessionMaintenance.Begin(verified);"
-      }
+        "text": "long generation = accountSessionMaintenance.Begin(verified);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "0e73a08e2f1a4618f8ea791c4d140ec008edad47",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R031",
@@ -997,8 +1210,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 378,
-        "text": "int delay = accountSessionMaintenance.DelayMilliseconds(retryIfDue);"
-      }
+        "text": "int delay = accountSessionMaintenance.DelayMilliseconds(retryIfDue);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "0e73a08e2f1a4618f8ea791c4d140ec008edad47",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R032",
@@ -1011,8 +1231,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 399,
-        "text": "ValidateSessionAndRefreshServerList(generation);"
-      }
+        "text": "ValidateSessionAndRefreshServerList(generation);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R033",
@@ -1025,8 +1252,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 477,
-        "text": "try { RefreshAuthenticatedServerList(expectedSession: expectedSession); }"
-      }
+        "text": "try { RefreshAuthenticatedServerList(expectedSession: expectedSession); }",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R034",
@@ -1039,8 +1273,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 536,
-        "text": "var response = serviceController.Login2(username, password, linked.Token);"
-      }
+        "text": "var response = serviceController.Login2(username, password, linked.Token);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R035",
@@ -1053,9 +1294,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 554,
-        "text": "LogoutInvalidSession(null);"
+        "text": "LogoutInvalidSession(null);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
       },
-      "note": "Only recognized rejection; account-generation guard precedes application, and connection/view guards follow rejection handling."
+      "note": "Only recognized rejection; account-generation guard precedes application, and connection/view guards follow rejection handling.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R036",
@@ -1068,8 +1316,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 430,
-        "text": "pendingSessionLogout = CompleteInvalidSessionLogoutAsync(service, generation, username, password, message, expired);"
-      }
+        "text": "pendingSessionLogout = CompleteInvalidSessionLogoutAsync(service, generation, username, password, message, expired);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R037",
@@ -1082,8 +1337,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 446,
-        "text": "try { if (service != null) await Task.Run(() => service.Disconnect()); }"
-      }
+        "text": "try { if (service != null) await Task.Run(() => service.Disconnect()); }",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "a72f2e5a3012bb59204200ede01c4f08ad0b875b",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R038",
@@ -1096,9 +1358,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/WebServices/NewServiceController.cs",
         "line": 175,
-        "text": "return service.SendRequest<object>(url, null, null, null, null, timeoutSeconds, skipDoh: true);"
+        "text": "return service.SendRequest<object>(url, null, null, null, null, timeoutSeconds, skipDoh: true);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c"
       },
-      "note": "Endpoint surface only. No active maintenance caller is asserted for CheckToken."
+      "note": "Endpoint surface only. No active maintenance caller is asserted for CheckToken.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "target_blob": "4c1f7a9d43281daab27fa5d6afbcffb7019a1f4e",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R039",
@@ -1111,8 +1380,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.xaml.cs",
         "line": 1258,
-        "text": "serviceFactory.RenewServiceList(acc.groups);"
-      }
+        "text": "serviceFactory.RenewServiceList(acc.groups);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "target_blob": "5843a7996f12164aa34b53f222ab7c9b89fc200b",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R040",
@@ -1125,9 +1401,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/ServiceFactory.cs",
         "line": 56,
-        "text": "vpnervice = new TunnelPlusService(s, globalInfo);"
+        "text": "vpnervice = new TunnelPlusService(s, globalInfo);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "5843a7996f12164aa34b53f222ab7c9b89fc200b"
       },
-      "note": "The group overload also has a Cisco branch; other adapter graphs remain unexpanded."
+      "note": "The group overload also has a Cisco branch; other adapter graphs remain unexpanded.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "5843a7996f12164aa34b53f222ab7c9b89fc200b",
+      "target_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R041",
@@ -1140,8 +1423,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
         "line": 35,
-        "text": "partial class TunnelPlusService : IVPNService, ISmartFastConnection"
-      }
+        "text": "partial class TunnelPlusService : IVPNService, ISmartFastConnection",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "target_blob": "a72f2e5a3012bb59204200ede01c4f08ad0b875b",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R042",
@@ -1154,8 +1444,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 41,
-        "text": "uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;"
-      }
+        "text": "uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R043",
@@ -1168,8 +1465,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.xaml.cs",
         "line": 535,
-        "text": "await ApplyConnectionRequestAsync(service, protocol, version, prepareService);"
-      }
+        "text": "await ApplyConnectionRequestAsync(service, protocol, version, prepareService);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "target_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R044",
@@ -1182,9 +1486,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.xaml.cs",
         "line": 597,
-        "text": "await Task.Run(() => next.Connect(protocol));"
+        "text": "await Task.Run(() => next.Connect(protocol));",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2"
       },
-      "note": "Serialized by connectionRequestGate after draining probes and disconnecting the previous service."
+      "note": "Serialized by connectionRequestGate after draining probes and disconnecting the previous service.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "target_blob": "a72f2e5a3012bb59204200ede01c4f08ad0b875b",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R045",
@@ -1197,8 +1508,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
         "line": 166,
-        "text": "Task.Run(() => RunV2ray(generation: generation));"
-      }
+        "text": "Task.Run(() => RunV2ray(generation: generation));",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "target_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R046",
@@ -1211,9 +1529,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
         "line": 367,
-        "text": "configData = SingBox.ConfigGenerator.GetConfig("
+        "text": "configData = SingBox.ConfigGenerator.GetConfig(",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
       },
-      "note": "One config-building branch; Xray/Pool/Shield branches are not exhaustively expanded."
+      "note": "One config-building branch; Xray/Pool/Shield branches are not exhaustively expanded.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "target_blob": "b702cee1fca7228bae3402c0d02b27babac121ec",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R047",
@@ -1226,9 +1551,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
         "line": 521,
-        "text": "configData = SingBox.ParallelDnsRouting.Apply(configData);"
+        "text": "configData = SingBox.ParallelDnsRouting.Apply(configData);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
       },
-      "note": "VPN DNS configuration is separate from login resolver-first DNS."
+      "note": "VPN DNS configuration is separate from login resolver-first DNS.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "target_blob": "ab5dadcb55878e1915567ba89cf57accc3114435",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R048",
@@ -1241,8 +1573,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
         "line": 605,
-        "text": "return client.StartWithDeadline(new LoadConfigReq"
-      }
+        "text": "return client.StartWithDeadline(new LoadConfigReq",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "target_blob": "97fa5ed521ffa64066afb6efa132eb0e85f39494",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R049",
@@ -1255,8 +1594,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs",
         "line": 52,
-        "text": "using (var client = ProtorpcClient.Connect(_host, _port, Math.Min(_timeoutMs, timeoutMs), cancellation))"
-      }
+        "text": "using (var client = ProtorpcClient.Connect(_host, _port, Math.Min(_timeoutMs, timeoutMs), cancellation))",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "97fa5ed521ffa64066afb6efa132eb0e85f39494"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "97fa5ed521ffa64066afb6efa132eb0e85f39494",
+      "target_blob": "a671eb030d5105693955b9367bfec6b425222b4e",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R050",
@@ -1269,8 +1615,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs",
         "line": 89,
-        "text": "var headerBytes = LibcoreProto.EncodeRequestHeader("
-      }
+        "text": "var headerBytes = LibcoreProto.EncodeRequestHeader(",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "a671eb030d5105693955b9367bfec6b425222b4e"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "a671eb030d5105693955b9367bfec6b425222b4e",
+      "target_blob": "eadffb4f170f155ffe007f00e23f7d103342e81b",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R051",
@@ -1283,8 +1636,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
         "line": 420,
-        "text": "BeginNetworkRecoverySession();"
-      }
+        "text": "BeginNetworkRecoverySession();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "target_blob": "161bd23c637c504b1701e224fa0895838da8ae46",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R052",
@@ -1297,9 +1657,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs",
         "line": 55,
-        "text": "var session = new NetworkRecoverySession(async token =>"
+        "text": "var session = new NetworkRecoverySession(async token =>",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "161bd23c637c504b1701e224fa0895838da8ae46"
       },
-      "note": "ResidentialService inherits this shared pipeline; no Residential-only retry is asserted."
+      "note": "ResidentialService inherits this shared pipeline; no Residential-only retry is asserted.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "161bd23c637c504b1701e224fa0895838da8ae46",
+      "target_blob": "2b13a06f1dc9d6288e741e0e613c9ac127563c9b",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R053",
@@ -1312,8 +1679,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Models/NewService/AccountInfoEx.cs",
         "line": 14,
-        "text": "public IRSpeedyVPN.Residential.ResidentialConfig residential_vpn { get; set; }"
-      }
+        "text": "public IRSpeedyVPN.Residential.ResidentialConfig residential_vpn { get; set; }",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "3df9f860fd54eea282ac0d691e4e2ae4800df049"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "3df9f860fd54eea282ac0d691e4e2ae4800df049",
+      "target_blob": "1c3c4121e6fdbc7933ce0e097e069753c914b560",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R054",
@@ -1326,8 +1700,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.xaml.cs",
         "line": 1259,
-        "text": "uCServerList.ConfigureResidential(acc);"
-      }
+        "text": "uCServerList.ConfigureResidential(acc);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+      "target_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R055",
@@ -1340,9 +1721,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
         "line": 194,
-        "text": "uCServerList.ConfigureResidential(account);"
+        "text": "uCServerList.ConfigureResidential(account);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "37e9712259ee6240ff3e676d5ce53212b192c413"
       },
-      "note": "Cached-startup path configures Residential before showing the chooser."
+      "note": "Cached-startup path configures Residential before showing the chooser.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
+      "target_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R056",
@@ -1355,8 +1743,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
         "line": 29,
-        "text": "residential = new ResidentialViewModel(globalInfo);"
-      }
+        "text": "residential = new ResidentialViewModel(globalInfo);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
+      "target_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R057",
@@ -1369,8 +1764,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
         "line": 60,
-        "text": "residential.Configure(account);"
-      }
+        "text": "residential.Configure(account);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
+      "target_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R058",
@@ -1383,9 +1785,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
         "line": 40,
-        "text": "this.fetch = fetch ?? DownloadAsync;"
+        "text": "this.fetch = fetch ?? DownloadAsync;",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb"
       },
-      "note": "Default downloader; tests may inject a fetch delegate."
+      "note": "Default downloader; tests may inject a fetch delegate.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
+      "target_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R059",
@@ -1398,8 +1807,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
         "line": 103,
-        "text": "var catalog = ResidentialSubscription.Parse(payload.Body);"
-      }
+        "text": "var catalog = ResidentialSubscription.Parse(payload.Body);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
+      "target_blob": "be096690c28a1b5c7ae6f0447e7a4f7ec763258b",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R060",
@@ -1412,8 +1828,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
         "line": 113,
-        "text": "Services = catalog.Select(c => (IVPNService)new ResidentialService(c, global, key)).ToArray();"
-      }
+        "text": "Services = catalog.Select(c => (IVPNService)new ResidentialService(c, global, key)).ToArray();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
+      "target_blob": "9c89001cde2d931dfc418f55a903159604631a68",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R061",
@@ -1426,8 +1849,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
         "line": 116,
-        "text": "Traffic = ResidentialTraffic.Parse(payload.TrafficHeader);"
-      }
+        "text": "Traffic = ResidentialTraffic.Parse(payload.TrafficHeader);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
+      "target_blob": "1c3c4121e6fdbc7933ce0e097e069753c914b560",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R062",
@@ -1440,8 +1870,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Residential/ResidentialService.cs",
         "line": 10,
-        "text": "internal sealed class ResidentialService : TunnelPlusService"
-      }
+        "text": "internal sealed class ResidentialService : TunnelPlusService",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "9c89001cde2d931dfc418f55a903159604631a68"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "9c89001cde2d931dfc418f55a903159604631a68",
+      "target_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R063",
@@ -1454,8 +1891,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
         "line": 124,
-        "text": "trafficBar.Update(residential.VisibleTraffic, residentialConnected, isResidentialTab);"
-      }
+        "text": "trafficBar.Update(residential.VisibleTraffic, residentialConnected, isResidentialTab);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
+      "target_blob": "48ab57e561b0c8a6670be31c1c44d1d70eb56221",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R064",
@@ -1468,8 +1912,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.xaml",
         "line": 63,
-        "text": "<res:ResidentialTrafficBar x:Name=\"trafficBar\" Grid.Row=\"2\"/>"
-      }
+        "text": "<res:ResidentialTrafficBar x:Name=\"trafficBar\" Grid.Row=\"2\"/>",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "c9e2858c7a4d3f3ab182579cfdc301eebfa2438e"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "c9e2858c7a4d3f3ab182579cfdc301eebfa2438e",
+      "target_blob": "48ab57e561b0c8a6670be31c1c44d1d70eb56221",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R065",
@@ -1482,9 +1933,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
         "line": 187,
-        "text": "countryPicker.Load(services, _isUrlTestSupported);"
+        "text": "countryPicker.Load(services, _isUrlTestSupported);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "bfde1369efe64f98b5b544545041d51d7734027e"
       },
-      "note": "countryPicker selects the active scope; both tabs reuse the picker implementation."
+      "note": "countryPicker selects the active scope; both tabs reuse the picker implementation.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "bfde1369efe64f98b5b544545041d51d7734027e",
+      "target_blob": "99351bde81910efd40ce1a484446165e580af3a2",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R066",
@@ -1497,9 +1955,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
         "line": 174,
-        "text": "probeCaches[context] = probeCache = new ServerCheckCache(globalInfo?.Username ?? \"\", scope + \"\\n\" + (protocol ?? \"\"));"
+        "text": "probeCaches[context] = probeCache = new ServerCheckCache(globalInfo?.Username ?? \"\", scope + \"\\n\" + (protocol ?? \"\"));",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "bfde1369efe64f98b5b544545041d51d7734027e"
       },
-      "note": "Separate account/service/protocol cache contexts are retained."
+      "note": "Separate account/service/protocol cache contexts are retained.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "bfde1369efe64f98b5b544545041d51d7734027e",
+      "target_blob": "7bc851bcf414059fd738347fc9f035d267d42f43",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R067",
@@ -1512,9 +1977,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
         "line": 431,
-        "text": "picker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);"
+        "text": "picker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "bfde1369efe64f98b5b544545041d51d7734027e"
       },
-      "note": "Committed or rollback result is applied before continuing the queue."
+      "note": "Committed or rollback result is applied before continuing the queue.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "bfde1369efe64f98b5b544545041d51d7734027e",
+      "target_blob": "99351bde81910efd40ce1a484446165e580af3a2",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R068",
@@ -1527,8 +1999,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
         "line": 510,
-        "text": "var ordered = ServerListRanking.Order(_allGroups, g => g.IsLastSuccessfulConnection,"
-      }
+        "text": "var ordered = ServerListRanking.Order(_allGroups, g => g.IsLastSuccessfulConnection,",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "99351bde81910efd40ce1a484446165e580af3a2"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "99351bde81910efd40ce1a484446165e580af3a2",
+      "target_blob": "ae29a310ca4e6230eba82547f88a95463907ee09",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R069",
@@ -1541,9 +2020,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
         "line": 167,
-        "text": "private long DisplayLatency(long latency) => IsResidential ? IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(latency) : latency;"
+        "text": "private long DisplayLatency(long latency) => IsResidential ? IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(latency) : latency;",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "99351bde81910efd40ce1a484446165e580af3a2"
       },
-      "note": "Residential-only factor; VPN keeps measured latency."
+      "note": "Residential-only factor; VPN keeps measured latency.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "99351bde81910efd40ce1a484446165e580af3a2",
+      "target_blob": "1c3c4121e6fdbc7933ce0e097e069753c914b560",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R070",
@@ -1556,8 +2042,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
         "line": 354,
-        "text": "_serverList = new ServerListViewModel();"
-      }
+        "text": "_serverList = new ServerListViewModel();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "99351bde81910efd40ce1a484446165e580af3a2"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "99351bde81910efd40ce1a484446165e580af3a2",
+      "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R071",
@@ -1570,8 +2063,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
         "line": 356,
-        "text": "_sweepAnimator = new ServerListSweepAnimator(_serverList, icCountries, ServerScroller, CometOverlay);"
-      }
+        "text": "_sweepAnimator = new ServerListSweepAnimator(_serverList, icCountries, ServerScroller, CometOverlay);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "99351bde81910efd40ce1a484446165e580af3a2"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "99351bde81910efd40ce1a484446165e580af3a2",
+      "target_blob": "d977a0334d1a09cd6475efd36a4f887793756ce1",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R072",
@@ -1584,8 +2084,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs",
         "line": 18,
-        "text": "_serverList.BeginCheckCycle();"
-      }
+        "text": "_serverList.BeginCheckCycle();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "11d21db858a7cab807d63eaafac93b95a55d517e"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "11d21db858a7cab807d63eaafac93b95a55d517e",
+      "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R073",
@@ -1598,8 +2105,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs",
         "line": 65,
-        "text": "_serverList.Publish(_groups.Select(group => new ServerItem(group)), animate, allowReorder || instant, completedIdentity);"
-      }
+        "text": "_serverList.Publish(_groups.Select(group => new ServerItem(group)), animate, allowReorder || instant, completedIdentity);",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "11d21db858a7cab807d63eaafac93b95a55d517e"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "11d21db858a7cab807d63eaafac93b95a55d517e",
+      "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R074",
@@ -1612,8 +2126,15 @@
       "evidence": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs",
         "line": 69,
-        "text": "while ((_pass = _model.TryBeginPass()) != null)"
-      }
+        "text": "while ((_pass = _model.TryBeginPass()) != null)",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "d977a0334d1a09cd6475efd36a4f887793756ce1"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "d977a0334d1a09cd6475efd36a4f887793756ce1",
+      "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R075",
@@ -1626,9 +2147,16 @@
       "evidence": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs",
         "line": 161,
-        "text": "_model.Finish(_pass); _pass = null; _timeline = null; _surfaces.Clear();"
+        "text": "_model.Finish(_pass); _pass = null; _timeline = null; _surfaces.Clear();",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "d977a0334d1a09cd6475efd36a4f887793756ce1"
       },
-      "note": "FinishPass queues Prepare again; model Finish also resynchronizes frozen rows from current Servers."
+      "note": "FinishPass queues Prepare again; model Finish also resynchronizes frozen rows from current Servers.",
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "d977a0334d1a09cd6475efd36a4f887793756ce1",
+      "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R076",
@@ -1641,8 +2169,15 @@
       "evidence": {
         "path": "tests/ParallelDnsChecks/ParallelDnsChecks.csproj",
         "line": 8,
-        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs\" Link=\"ParallelDnsRouting.cs\" />"
-      }
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs\" Link=\"ParallelDnsRouting.cs\" />",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "d413790ca97a643e5089adb9c5bb7919f4791bcd"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "d413790ca97a643e5089adb9c5bb7919f4791bcd",
+      "target_blob": "ab5dadcb55878e1915567ba89cf57accc3114435",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R077",
@@ -1655,8 +2190,15 @@
       "evidence": {
         "path": "tests/NetworkRecoveryChecks/NetworkRecoveryChecks.csproj",
         "line": 7,
-        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs\" Link=\"TunnelPlusService.NetworkRecovery.cs\" />"
-      }
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs\" Link=\"TunnelPlusService.NetworkRecovery.cs\" />",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "acfdeafb3c14bd5927037c9b9d68807f6500f2b4"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "acfdeafb3c14bd5927037c9b9d68807f6500f2b4",
+      "target_blob": "161bd23c637c504b1701e224fa0895838da8ae46",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R078",
@@ -1669,8 +2211,15 @@
       "evidence": {
         "path": "tests/PasswordReloginChecks/run.py",
         "line": 15,
-        "text": "maintenance = root/'IRSpeedyVPN/Common/AccountSessionMaintenance.cs'"
-      }
+        "text": "maintenance = root/'IRSpeedyVPN/Common/AccountSessionMaintenance.cs'",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "6ca6ffdb13db22fb9dcfe210ab75434b2b9c8107"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "6ca6ffdb13db22fb9dcfe210ab75434b2b9c8107",
+      "target_blob": "0e73a08e2f1a4618f8ea791c4d140ec008edad47",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R079",
@@ -1683,8 +2232,15 @@
       "evidence": {
         "path": "tests/ResidentialChecks/run.py",
         "line": 18,
-        "text": "traffic_source=(base/'Residential/ResidentialTrafficBar.cs').read_text()"
-      }
+        "text": "traffic_source=(base/'Residential/ResidentialTrafficBar.cs').read_text()",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "5c79f2457d9b918bcb4ee5767049393bb7c2090b"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "5c79f2457d9b918bcb4ee5767049393bb7c2090b",
+      "target_blob": "48ab57e561b0c8a6670be31c1c44d1d70eb56221",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     },
     {
       "id": "R080",
@@ -1697,8 +2253,15 @@
       "evidence": {
         "path": "tests/LoginRecoveryChecks/run.py",
         "line": 27,
-        "text": "controller = (source/'NewServiceController.cs').read_text(encoding='utf-8-sig')"
-      }
+        "text": "controller = (source/'NewServiceController.cs').read_text(encoding='utf-8-sig')",
+        "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+        "blob": "c2bbc43964d8ffbd8ac9668b6d441bfd68d8891b"
+      },
+      "origin": "manual",
+      "status": "verified",
+      "source_blob": "c2bbc43964d8ffbd8ac9668b6d441bfd68d8891b",
+      "target_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
     }
   ],
   "file_inventory": {
@@ -2682,11 +3245,21 @@
     "tools/IRSpeedyHotspotHelper/WindowsBackend.cs": "8e173de69c81a584cb9c86c9c5b556e9561e548d",
     "tools/IRSpeedyHotspotHelper/app.manifest": "76333e9576822bf68bc6b2fe1df85670d9be2b81",
     "tools/Test-HotspotPayload.ps1": "9f5bb5632cb34a78514eca3e1057bc5b176ab13c",
-    "tools/validate-ui-handoff.py": "193b13d88816e69ae98fad7c355810d1991d3fbb"
+    "tools/validate-ui-handoff.py": "193b13d88816e69ae98fad7c355810d1991d3fbb",
+    ".github/workflows/codegraph.yml": "2c2336b058d7c486b0c2de9d30788055fa2ca6da",
+    "AGENTS.md": "7e7768f371f5f5928cb129c868ea2618d0ce8e08",
+    "tests/CodegraphChecks/test_publish.py": "d41b0b0a94d2bd03528b07cd6bbc67ccd1674e65",
+    "tests/CodegraphChecks/test_update.py": "530dd63015f7e4cff223c578e33adef926676ed2",
+    "tools/codegraph/publish.py": "9dd707817c506682de4ebdb64c184a8068e42014",
+    "tools/codegraph/update.py": "f64866e3d9f16ace4eaf36cf71b3f6c4c090a6e4"
   },
   "bootstrap_manual_review": {
     "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
     "previous_status": "verified-for-base-commit",
     "note": "Prior manual review retained as seed provenance; the first automated pass must recheck all existing witnesses."
-  }
+  },
+  "pending_review_files": {},
+  "external_nodes": {},
+  "unresolved_build_items": {},
+  "validation_digest": "eef4c8313880f81b640cd789c94494bf9e81c6b3a274c88bc60675442c75fd2d"
 }
