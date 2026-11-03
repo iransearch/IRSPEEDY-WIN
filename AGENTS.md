@@ -35,3 +35,5 @@ The workflow updates graph outputs only. For changes to the updater/workflow, ru
 Runtime relations touched by a source/dependency change remain stale until a real source/caller/test
 review supplies an updated witness. Do not change statuses or recompute validation digests just to
 make the graph green. New automatic edges are limited to literal build declarations.
+
+For WPF UI changes, first inspect `docs/codegraph/ui-components.md` as a navigation index; verify its pinned checkpoint and current XAML/code-behind rather than assuming it is auto-refreshed. The UI index currently covers six verified XAML/partial-class pairs only. Do not infer missing event handlers, template resources, or service dependencies. Changed XAML is tracked in the main graph as pending review; this does not automatically refresh the UI index.
