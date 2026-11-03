@@ -35,5 +35,11 @@ The read-only Codegraph workflow computes downloadable graph artifacts. A separa
 Runtime relations touched by a source/dependency change remain stale until a real source/caller/test
 review supplies an updated witness. Do not change statuses or recompute validation digests just to
 make the graph green. New automatic edges are limited to literal build declarations.
+A structurally validated generated snapshot labeled `needs-review` may be persisted through a
+normal protected-branch PR while retaining all stale relations and pending-review entries; this
+updates the recorded inventory, NOT the verification level of those edges. Require an exact
+source baseline, intact schema/digest/provenance, four generated files only and genuine passing
+`pull_request` checks before merge (a green `workflow_dispatch` alone is insufficient). Never
+merge `failed` or `pending-validation` graphs or erase uncertainty to satisfy publication.
 
 For WPF UI changes, first inspect `docs/codegraph/ui-components.md` as a navigation index; verify its pinned checkpoint and current XAML/code-behind rather than assuming it is auto-refreshed. The UI index currently covers six verified XAML/partial-class pairs only. Do not infer missing event handlers, template resources, or service dependencies. Changed XAML is tracked in the main graph as pending review. The machine-readable `docs/codegraph/ui-index.json` is regenerated incrementally by the workflow; the manually reviewed `ui-components.md` is not. Event names, resource keys and merged dictionary URIs are declarations only: do not infer runtime dependencies from them.
