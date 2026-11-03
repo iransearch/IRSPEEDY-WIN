@@ -1,0 +1,53 @@
+name: IRSPEEDY Regression Guard - Phase 1
+
+on:
+  pull_request:
+    branches: [agent/core-startup-diagnostics-fix]
+  push:
+    branches: [agent/core-startup-diagnostics-fix]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: regression-phase1-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  fast-offline:
+    name: Fast offline regression (Linux .NET 8)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - name: Checkout target source without stored credentials
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Install .NET 8 SDK for offline harnesses
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Verify test prerequisites
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 --version
+          dotnet --list-sdks
+          command -v cc
+          command -v curl
+          command -v openssl
+      - name: Run regression harnesses (fail closed)
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tools/regression/run_fast.py --timeout 180 \
+            --report "${{ runner.temp }}/regression-phase1-report.json" \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: Publish evidence report even after failure
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: regression-phase1-${{ github.run_id }}
+          path: ${{ runner.temp }}/regression-phase1-report.json
+          if-no-files-found: warn
