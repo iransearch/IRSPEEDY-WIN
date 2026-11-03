@@ -32,7 +32,22 @@ namespace System.Windows.Controls {internal class RadioButton {internal bool IsE
 internal class TabInputProbe {internal readonly RadioButton vpnTab=new RadioButton(),residentialTab=new RadioButton();
 internal bool Press(bool residential,Key key){var e=new KeyEventArgs{Key=key};ServiceTab_KeyDown(residential?residentialTab:vpnTab,e);return e.Handled;}
 '''+tab_handler+'}')
-    compile_to(tmp/'checks.dll', refs8, models+[Path(__file__).with_name('ModelChecks.cs'),tmp/'TrafficCardProbe.cs',tmp/'TabInputProbe.cs'])
+    start=tab_source.index('        private async void ServiceTab_Checked(')
+    checked_handler=tab_source[start:tab_source.index('        private void ServiceTab_KeyDown(',start)].replace('private async void','private async Task')
+    (tmp/'TabAccessProbe.cs').write_text('''using System;using System.Threading.Tasks;using System.Windows.Controls;
+class RoutedEventArgs {} static class LogHelper {internal static void WriteLog(Exception e){throw e;}}
+internal class TabAccessProbe {
+ internal class Gate {internal bool IsAllowed=true;internal void SetVisible(bool value){}}
+ internal readonly Gate residential=new Gate();internal readonly RadioButton vpnTab=new RadioButton(),residentialTab=new RadioButton();
+ internal bool settingTab,isResidentialTab,connectionConnecting,connectionConnected,probesRequireDisconnect,probesPaused,_isLoading;
+ long tabGeneration;object selectedService,vpnSelection,residentialSelection;
+ internal int Resumes,Refreshes;internal readonly TaskCompletionSource<bool> Drain=new TaskCompletionSource<bool>();
+ internal Task Press()=>ServiceTab_Checked(residentialTab,null);
+ void PauseServerChecks(){probesPaused=true;}Task DrainServerChecksAsync()=>Drain.Task;
+ void ResumeServerChecksAfterCleanup(){Resumes++;probesPaused=false;}
+ void RefreshCountry(object value){Refreshes++;}void ResolveServiceAndProtocol(){}void UpdateResidentialVisuals(){}void UpdateHeaderIcons(){}
+'''+checked_handler+'}')
+    compile_to(tmp/'checks.dll', refs8, models+[Path(__file__).with_name('ModelChecks.cs'),tmp/'TrafficCardProbe.cs',tmp/'TabInputProbe.cs',tmp/'TabAccessProbe.cs'])
     (tmp/'checks.runtimeconfig.json').write_text(json.dumps({'runtimeOptions':{'tfm':'net8.0','framework':{'name':'Microsoft.NETCore.App','version':'8.0.0'}}}))
     subprocess.run([dotnet,str(tmp/'checks.dll')],check=True)
     picker_source=(base/'Components/ServerListControl/ServerCountryPicker.xaml.cs').read_text()
@@ -127,10 +142,10 @@ disabled=next(e for e in tab_style.iter(ns+'Trigger') if e.attrib.get('Property'
 assert disabled.attrib['Value']=='False' and any(e.attrib.get('Property')=='Opacity' and e.attrib.get('Value')=='0.45' for e in disabled)
 assert 'residentialTab.IsEnabled = residential.IsAllowed;' in controller, 'Residential tab follows the existing ECO/account permission'
 configure=controller[controller.index('        internal void ConfigureResidential('):controller.index('        private async void ServiceTab_Checked(')]
-assert configure.index('residential.Configure(account);') < configure.index('!residential.IsAllowed) tabGeneration++;')
+assert 'if (changedAccount || account == null) tabGeneration++;' in configure
 checked_handler=controller[controller.index('        private async void ServiceTab_Checked('):controller.index('        private void ServiceTab_KeyDown(')]
 assert checked_handler.index('if (next && !residential.IsAllowed)') < checked_handler.index('await DrainServerChecksAsync();')
-assert 'version != tabGeneration || (next && !residential.IsAllowed)' in checked_handler
+assert checked_handler.index('if (version != tabGeneration) return;') < checked_handler.rindex('if (next && !residential.IsAllowed)')
 print('PASS Residential account gate controls native tab access, disabled appearance and stale tab transitions')
 assert 'await DrainServerChecksAsync()' in controller and 'Disconnect()' not in controller
 assert 'residentialConnected = connected && service is ResidentialService' in controller
