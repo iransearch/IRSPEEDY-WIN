@@ -73,8 +73,10 @@ This upload does **not** update the branch or refresh the repository's tracked c
 The source baseline can therefore grow older after later pushes. The updater diffs from
 the last *reviewed, committed* checkpoint and may read multiple accumulated changed
 blobs. It never silently claims that a stale repository snapshot is fresh.
-For a persistent refresh, download/check the artifact, confirm the analyzed source
-commit and graph validity, apply the generated files through a separate ordinary PR
+For a persistent refresh, use a **push-triggered** artifact from the actual development
+branch (not a PR merge-ref artifact, whose synthetic commit may not be in the eventual
+branch history). Download/check that artifact, confirm the analyzed source
+commit is an ancestor of the target branch and graph validity, then apply the generated files through a separate ordinary PR
 targeting `agent/core-startup-diagnostics-fix`, run required checks and merge.
 No direct commits to the protected branch or status-check bypass are needed.
 
