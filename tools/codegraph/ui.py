@@ -69,6 +69,7 @@ def check_codebehind(git, node, inventory, cache):
         return
     if path not in inventory:
         node['codebehind']={'path':path,'status':'missing'}
+        node['status']='needs-review'
         return
     sha=inventory[path]
     if path not in cache:
@@ -102,7 +103,7 @@ def synchronize(git, previous, inventory, target):
             if is_xaml(path) and path not in paths:
                 nodes.pop(path,None)
         modified_xaml={p for p in paths if is_xaml(p)}
-        modified_cs={p for p in paths if p.endswith('.xaml.cs')}
+        modified_cs={p for p in (paths | old_paths) if p.endswith('.xaml.cs')}
         # Rename/copy may preserve blobs, but their path references must change.
         for change in changes:
             if change['status'].startswith(('R','C')) and is_xaml(change['old_path']):
@@ -110,6 +111,10 @@ def synchronize(git, previous, inventory, target):
     else:
         modified_xaml={p for p in inventory if is_xaml(p)}
         modified_cs=set()
+    if previous and not modified_xaml and not modified_cs:
+        return previous,{'ui_files_read':0,'ui_xaml_reparsed':0,
+                         'ui_components':len(nodes),
+                         'ui_pending_review':len(previous.get('pending_review',[]))}
     reads_before=len(git.reads)
     cache={}
     for path in sorted(modified_xaml):
