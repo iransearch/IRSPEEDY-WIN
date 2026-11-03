@@ -13,6 +13,7 @@
         <Grid><Border x:Name="TabSurface" Background="{TemplateBinding Background}" CornerRadius="8"/><ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/></Grid>
         <ControlTemplate.Triggers>
           <Trigger Property="IsChecked" Value="True"><Setter Property="Foreground" Value="White"/><Setter Property="FontWeight" Value="SemiBold"/><Setter TargetName="TabSurface" Property="Background" Value="#3A5BC0"/></Trigger>
+          <Trigger Property="IsEnabled" Value="False"><Setter Property="Opacity" Value="0.45"/><Setter Property="Cursor" Value="Arrow"/></Trigger>
         </ControlTemplate.Triggers>
       </ControlTemplate></Setter.Value></Setter>
     </Style>
@@ -56,7 +57,7 @@
         <RadioButton x:Name="vpnTab" Grid.Column="0" Margin="0,0,3,0" TabIndex="0" IsTabStop="True" GroupName="ServiceKind" IsChecked="True" Style="{StaticResource ServiceTab}" Checked="ServiceTab_Checked" PreviewKeyDown="ServiceTab_KeyDown" AutomationProperties.Name="VPN">
           <StackPanel Orientation="Horizontal"><Path Width="17" Height="18" Margin="0,0,7,0" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.6" Data="M9,1 L16,4 V10 C16,14 12,17 9,19 C6,17 2,14 2,10 V4 Z"/><TextBlock Text="VPN"/></StackPanel>
         </RadioButton>
-        <RadioButton x:Name="residentialTab" Grid.Column="1" Margin="3,0,0,0" TabIndex="1" IsTabStop="True" GroupName="ServiceKind" Style="{StaticResource ServiceTab}" Checked="ServiceTab_Checked" PreviewKeyDown="ServiceTab_KeyDown" AutomationProperties.Name="RESIDENTIAL">
+        <RadioButton x:Name="residentialTab" Grid.Column="1" Margin="3,0,0,0" TabIndex="1" IsTabStop="True" GroupName="ServiceKind" IsEnabled="False" Style="{StaticResource ServiceTab}" Checked="ServiceTab_Checked" PreviewKeyDown="ServiceTab_KeyDown" AutomationProperties.Name="RESIDENTIAL">
           <StackPanel Orientation="Horizontal"><Path Width="18" Height="18" Margin="0,0,7,0" Stretch="Uniform" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.6" Data="M1,9 L10,1 19,9 M4,7 V19 H8 V12 H12 V19 H16 V7"/><TextBlock Text="RESIDENTIAL"/></StackPanel>
         </RadioButton>
     </Grid>

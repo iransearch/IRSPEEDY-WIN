@@ -49,6 +49,15 @@ internal static class ModelChecks
         Check(!tabs.Press(false, System.Windows.Input.Key.Tab) && tabs.vpnTab.IsChecked == null && tabs.residentialTab.IsChecked == null, "Tab remains with WPF focus navigation");
         tabs = new TabInputProbe(); tabs.vpnTab.IsChecked = true; tabs.residentialTab.IsEnabled = false;
         Check(tabs.Press(false, System.Windows.Input.Key.Right) && tabs.vpnTab.IsChecked == true && tabs.residentialTab.IsChecked == null && !tabs.residentialTab.Focused, "direction keys preserve selection when the destination tab is disabled");
+        var denied=new TabAccessProbe();denied.residential.IsAllowed=false;denied.Press().GetAwaiter().GetResult();
+        Check(!denied.isResidentialTab&&!denied.probesPaused&&denied.vpnTab.IsChecked==true&&denied.residentialTab.IsChecked==false,
+            "unauthorized Checked event restores VPN without pausing its checks");
+        var revoked=new TabAccessProbe();var switching=revoked.Press();revoked.residential.IsAllowed=false;revoked.Drain.SetResult(true);switching.GetAwaiter().GetResult();
+        Check(!revoked.isResidentialTab&&!revoked.probesPaused&&revoked.Resumes==1&&revoked.Refreshes==0,
+            "permission revoked during tab drain resumes VPN checks without entering Residential");
+        var connecting=new TabAccessProbe();switching=connecting.Press();connecting.residential.IsAllowed=false;connecting.probesRequireDisconnect=true;connecting.Drain.SetResult(true);switching.GetAwaiter().GetResult();
+        Check(connecting.probesPaused&&connecting.Resumes==0&&!connecting.isResidentialTab,
+            "revoked tab transition preserves a connection-owned probe pause");
         foreach (var header in new[] { "", "upload=1;total=2", "upload=-1;download=0;total=2", "upload=1;upload=2;download=0;total=3", "upload=x;download=0;total=3" })
             Check(ResidentialTraffic.Parse(header) == null, "invalid traffic remains hidden");
         Check(ResidentialPresentation.IsEco("39", "VIP") && ResidentialPresentation.IsEco(null, "اکو – سرویس") && ResidentialPresentation.IsEco(null, "eco plus")
