@@ -4,7 +4,6 @@ name: Codegraph Snapshot Pull Request
 on:
   push:
     branches: [agent/core-startup-diagnostics-fix]
-  workflow_dispatch:
 
 permissions:
   contents: read
