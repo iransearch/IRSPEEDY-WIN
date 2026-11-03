@@ -1,13 +1,13 @@
 # Current Codegraph status
 
-Analyzed commit: `9edc46309b896bb24ede5f811be4525f64941179`. Validity: **needs-review**.
+Analyzed commit: `f35a15bd2fd22f263fa305305fbf9f1133abd1fd`. Validity: **needs-review**.
 
 Only this status/manifest describe the current snapshot. Other narrative pages are manually reviewed baseline notes.
 
-- files_changed: 7
-- files_examined: 5
-- content_files_read: 5
-- relationships_changed: 7
+- files_changed: 2
+- files_examined: 0
+- content_files_read: 0
+- relationships_changed: 0
 - new_verified_relations: 0
 - stale_relations: 7
 
