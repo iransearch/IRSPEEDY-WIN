@@ -31,10 +31,12 @@ jobs:
       - name: Detect superseded source commit
         id: current
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           if [[ "$(git rev-parse HEAD)" != "$GITHUB_SHA" ]] ||
-             [[ "$(git ls-remote origin refs/heads/agent/core-startup-diagnostics-fix | cut -f1)" != "$GITHUB_SHA" ]]; then
+             [[ "$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/agent/core-startup-diagnostics-fix --jq .object.sha)" != "$GITHUB_SHA" ]]; then
             echo "current=false" >> "$GITHUB_OUTPUT"
             echo "Superseded push; the latest push will propose the snapshot." >> "$GITHUB_STEP_SUMMARY"
           else
@@ -119,7 +121,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$PR_HEAD_SHA"
-          ACTUAL_SHA="$(git ls-remote origin refs/heads/automation/codegraph-reviewed-snapshot | cut -f1)"
+          ACTUAL_SHA="$(gh api repos/$GITHUB_REPOSITORY/git/ref/heads/automation/codegraph-reviewed-snapshot --jq .object.sha)"
           test "$ACTUAL_SHA" = "$PR_HEAD_SHA"
           gh workflow run regression-guard.yml \
             --ref automation/codegraph-reviewed-snapshot
