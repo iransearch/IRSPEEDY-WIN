@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "bf4d2a5ae2c483adec8366ac2b89cdbf20f0a30f",
-  "base_tree": "b7c08cf1484f9f5b0ad19a28309a690773e3d6c7",
-  "generated_at": "2026-11-03T18:25:18Z",
+  "base_commit": "a3652fe1a0218f206eb0aa5c67b99057e9c3a764",
+  "base_tree": "b4ec642e3a9f8ef2e7faf5b9b3b4e41c4bf646f1",
+  "generated_at": "2026-11-03T18:59:19Z",
   "validity": {
     "status": "validated-for-analyzed-commit",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,10 +13,10 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-03T18:25:18Z"
+    "validated_at": "2026-11-03T18:59:19Z"
   },
   "counts": {
-    "inventory_files": 987,
+    "inventory_files": 989,
     "csharp_files": 382,
     "xaml_files": 55,
     "solutions": 2,
@@ -3247,11 +3247,13 @@
     "tools/Test-HotspotPayload.ps1": "9f5bb5632cb34a78514eca3e1057bc5b176ab13c",
     "tools/validate-ui-handoff.py": "193b13d88816e69ae98fad7c355810d1991d3fbb",
     ".github/workflows/codegraph.yml": "2c2336b058d7c486b0c2de9d30788055fa2ca6da",
-    "AGENTS.md": "7e7768f371f5f5928cb129c868ea2618d0ce8e08",
+    "AGENTS.md": "0bf428ebbe55218a757a54db2fd27be7232811d1",
     "tests/CodegraphChecks/test_publish.py": "d41b0b0a94d2bd03528b07cd6bbc67ccd1674e65",
     "tests/CodegraphChecks/test_update.py": "530dd63015f7e4cff223c578e33adef926676ed2",
     "tools/codegraph/publish.py": "9dd707817c506682de4ebdb64c184a8068e42014",
-    "tools/codegraph/update.py": "f64866e3d9f16ace4eaf36cf71b3f6c4c090a6e4"
+    "tools/codegraph/update.py": "8371e85d150b532ab93ea4d5a37eafa745cd5b03",
+    "tests/CodegraphChecks/test_ui.py": "4bb03e79b5cffca827b19c2f51ae1f860269818e",
+    "tools/codegraph/ui.py": "c0ca04ae5c3fa4f03e15d04ed0f7bf637e1134b9"
   },
   "bootstrap_manual_review": {
     "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
@@ -3261,5 +3263,5 @@
   "pending_review_files": {},
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "eef4c8313880f81b640cd789c94494bf9e81c6b3a274c88bc60675442c75fd2d"
+  "validation_digest": "6e7e64c6341ae07cf77983e79edd89c540997dc2fec0291496f36c80d6379a3c"
 }
