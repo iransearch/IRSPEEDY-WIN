@@ -7,7 +7,7 @@ No workflow writes to `main`, the protected development branch, VPN application 
 
 The initial graph and this automation are proposed together in PR #3. Nothing is merged by this task.
 PR checks run tests plus a read-only trial. After merge, each push to the development branch and each pull request runs checks and generates a scoped graph snapshot **as a build artifact**. An independent, **push-only** reviewed-snapshot workflow also proposes generated graph changes on a dedicated PR branch using the built-in GITHUB_TOKEN without any additional secrets. It never pushes directly to the protected development branch. See [reviewed-snapshot-pr.md](reviewed-snapshot-pr.md).
-The artifact-generation job remains read-only. The separate proposal job uses the built-in GITHUB_TOKEN to update **only the proposal branch** and create/update one draft PR; no App or secrets are needed. Since GITHUB_TOKEN-created PRs do not normally trigger workflows, the job explicitly requests a workflow_dispatch of Regression Guard on the PR branch; if this cannot run or satisfy the required check, the PR remains blocked and requires manual investigation. There is no bypass or auto-merge. Reviewers must merge a verified snapshot PR before claiming the repository's checked-in graph is current.
+The artifact-generation job remains read-only. The separate proposal job uses the built-in GITHUB_TOKEN to update **only the proposal branch** and create/update one draft PR; no App or secrets are needed. Since GITHUB_TOKEN-created PRs do not normally trigger workflows, the job explicitly requests a workflow_dispatch of Regression Guard on the PR branch; if this cannot run or satisfy the required check, the PR remains blocked and requires manual investigation. There is no bypass or automatic merge by the GitHub workflow. A scheduled reviewer/agent or human may merge a structurally valid snapshot PR after the real required PR check succeeds, including snapshots honestly labeled `needs-review`. Never claim stale relationships are current verified facts.
 
 ```sh
 python3 -m unittest discover -s tests/CodegraphChecks -p 'test_*.py' -v
@@ -57,6 +57,17 @@ No full-scan fallback runs when history is missing or rewritten: fetch history o
 Global status becomes `validated-for-analyzed-commit` only after validation and with no stale/pending items.
 Otherwise it is `needs-review`; any infrastructure/invariant error reports `failed` and publishes nothing.
 `analysis_complete` and `runtime_validated` stay false. This remains a partial code map.
+
+### Persistence policy is separate from relation verification
+
+A generated snapshot with global validity **`needs-review` is persistable** on the protected development branch through a normal PR, **without** upgrading any stale relation or clearing any pending-review entry, provided all of these hold:
+
+- The incremental updater completed successfully (not `failed` or `pending-validation`), and the manifest schema, per-edge evidence/status consistency, source-blob inventory and `validation_digest` pass its integrity checks.
+- The PR is limited to the generated allowlist (`manifest.json`, `dependencies.md`, `status.md`, `ui-index.json`), and the analyzed source commit/tree corresponds to the current development source HEAD; graph-only commits do not themselves create a new source baseline.
+- Counts and stale/pending reasons are preserved, prominently reported and available for later *real* source review; no stale witness is represented as presently verified and no unsupported new relation is introduced.
+- The required `Fast offline regression (Linux .NET 8)` GitHub Actions check succeeds for the **actual pull-request head** in a normal `pull_request` or other GitHub-approved branch-protection context. A `workflow_dispatch` success by itself does **not** satisfy this requirement. The Codegraph PR checks must pass as well. Never disable branch rules or fabricate CI status.
+
+**Persisted** means the repository's graph snapshot is up to date as an *inventory of known and explicitly uncertain relationships*; it does **not** mean the `needs-review` relations were re-verified. A `failed`, unvalidated, stale-target, or structurally inconsistent snapshot must not be merged. A follow-up source review can reverify and repin stale edges in a separate audited change.
 
 An unchanged line of C# is **not** semantic proof that receiver resolution, scope, overloads, conditional
 compilation or surrounding behavior stayed the same. Changed runtime endpoints and affected project
