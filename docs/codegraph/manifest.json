@@ -6,11 +6,11 @@
   "base_tree": "eb2c8269781f5e8829a3fe6e3ec1ba08ca4fef88",
   "generated_at": "2026-11-03T15:36:20Z",
   "validity": {
-    "status": "verified-for-base-commit",
+    "status": "pending-validation",
     "assurance": "targeted-static-source-review",
     "analysis_complete": false,
     "runtime_validated": false,
-    "freshness": "Recheck Git changes against base_commit and local worktree before use; the documentation commit is intentionally newer than the source baseline.",
+    "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "All tracked blob entries at base_commit; the six new graph documents are excluded because they do not exist at the baseline.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence."
   },
@@ -33,7 +33,10 @@
     "docs/codegraph/modules.md",
     "docs/codegraph/entrypoints.md",
     "docs/codegraph/dependencies.md",
-    "docs/codegraph/manifest.json"
+    "docs/codegraph/manifest.json",
+    "docs/codegraph/automation.md",
+    "docs/codegraph/status.md",
+    "docs/codegraph/dry-run.md"
   ],
   "modules": [
     {
@@ -554,86 +557,1149 @@
     }
   ],
   "relationships": [
-    {"id": "R001", "module": "build", "kind": "solution_member", "from": "IRSpeedyVPN.sln", "to": "IRSpeedyVPN/IRSpeedyVPN.csproj", "source_symbol": null, "target_symbol": null, "evidence": {"path": "IRSpeedyVPN.sln", "line": 6, "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"IRSpeedyVPN\", \"IRSpeedyVPN\\IRSpeedyVPN.csproj\", \"{52423534-CAF4-431C-9FAD-CC3342D45827}\""}},
-    {"id": "R002", "module": "build", "kind": "solution_member", "from": "IRSpeedyVPN.sln", "to": "UpdateHelper/UpdateHelper.csproj", "source_symbol": null, "target_symbol": null, "evidence": {"path": "IRSpeedyVPN.sln", "line": 8, "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"UpdateHelper\", \"UpdateHelper\\UpdateHelper.csproj\", \"{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}\""}},
-    {"id": "R003", "module": "build", "kind": "solution_member", "from": "IRSpeedyVPN/IRSpeedyVPN.sln", "to": "IRSpeedyVPN/IRSpeedyVPN.csproj", "source_symbol": null, "target_symbol": null, "evidence": {"path": "IRSpeedyVPN/IRSpeedyVPN.sln", "line": 5, "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"IRSpeedyVPN\", \"IRSpeedyVPN.csproj\", \"{63BFDB34-1A19-FDE2-DC70-7E8DC58BE38F}\""}},
-    {"id": "R004", "module": "build", "kind": "solution_member", "from": "IRSpeedyVPN/IRSpeedyVPN.sln", "to": "Throne/Throne.csproj", "source_symbol": null, "target_symbol": null, "evidence": {"path": "IRSpeedyVPN/IRSpeedyVPN.sln", "line": 7, "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Throne\", \"..\\Throne\\Throne.csproj\", \"{B2C3D4E5-F6A7-8901-BCDE-F12345678901}\""}},
-    {"id": "R005", "module": "build", "kind": "startup_type", "from": "IRSpeedyVPN/IRSpeedyVPN.csproj", "to": "IRSpeedyVPN/Program.cs", "source_symbol": "StartupObject", "target_symbol": "Program", "evidence": {"path": "IRSpeedyVPN/IRSpeedyVPN.csproj", "line": 10, "text": "<StartupObject>IRSpeedyVPN.Program</StartupObject>"}},
-    {"id": "R006", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/Program.cs", "to": "IRSpeedyVPN/AppServices.cs", "source_symbol": "Program.Main", "target_symbol": "AppServices.InitializeFast", "evidence": {"path": "IRSpeedyVPN/Program.cs", "line": 73, "text": "AppServices.InitializeFast();"}},
-    {"id": "R007", "module": "ui", "kind": "constructs", "from": "IRSpeedyVPN/Program.cs", "to": "IRSpeedyVPN/MainWindow.xaml.cs", "source_symbol": "Program.RunApplication", "target_symbol": "MainWindow", "evidence": {"path": "IRSpeedyVPN/Program.cs", "line": 221, "text": "var mainWindow = new MainWindow();"}},
-    {"id": "R008", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/Program.cs", "to": "IRSpeedyVPN/MainWindow.FastStartup.cs", "source_symbol": "Program.RunApplication", "target_symbol": "MainWindow.PrepareFastStartup", "evidence": {"path": "IRSpeedyVPN/Program.cs", "line": 225, "text": "mainWindow.PrepareFastStartup();"}, "note": "Normal startup suppresses the legacy Activated-time initialization path."},
-    {"id": "R009", "module": "login", "kind": "constructs", "from": "IRSpeedyVPN/AppServices.cs", "to": "IRSpeedyVPN/WebServices/NewServiceController.cs", "source_symbol": "AppServices.InitializeFast", "target_symbol": "NewServiceController", "evidence": {"path": "IRSpeedyVPN/AppServices.cs", "line": 106, "text": "NewServiceController = new NewServiceController();"}},
-    {"id": "R010", "module": "vpn-connection", "kind": "constructs", "from": "IRSpeedyVPN/AppServices.cs", "to": "IRSpeedyVPN/Services/ServiceFactory.cs", "source_symbol": "AppServices.InitializeFast", "target_symbol": "ServiceFactory", "evidence": {"path": "IRSpeedyVPN/AppServices.cs", "line": 108, "text": "ServiceFactory = new ServiceFactory();"}},
-    {"id": "R011", "module": "ui", "kind": "constructs", "from": "IRSpeedyVPN/AppServices.cs", "to": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs", "source_symbol": "AppServices.InitializeFast", "target_symbol": "UCServerList", "evidence": {"path": "IRSpeedyVPN/AppServices.cs", "line": 113, "text": "UCServerList = new UCServerList();"}},
-    {"id": "R012", "module": "login", "kind": "subscribes", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/MainWindow.xaml.cs", "source_symbol": "MainWindow.PrepareFastStartup", "target_symbol": "MainWindow.UCLogin_OnCredentialEntered", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 46, "text": "uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;"}},
-    {"id": "R013", "module": "login", "kind": "raises_event", "from": "IRSpeedyVPN/UserControls/UCLogin.xaml.cs", "to": "IRSpeedyVPN/UserControls/UCLogin.xaml.cs", "source_symbol": "UCLogin.btnLogin_Click", "target_symbol": "UCLogin.OnCredentialEntered", "evidence": {"path": "IRSpeedyVPN/UserControls/UCLogin.xaml.cs", "line": 84, "text": "OnCredentialEntered.Invoke(this, txtUsername.Text, txtPassword.Password,chkRemember.IsChecked.Value);"}},
-    {"id": "R014", "module": "login", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.xaml.cs", "to": "IRSpeedyVPN/MainWindow.xaml.cs", "source_symbol": "MainWindow.UCLogin_OnCredentialEntered", "target_symbol": "MainWindow.Login", "evidence": {"path": "IRSpeedyVPN/MainWindow.xaml.cs", "line": 1069, "text": "Login(username, password, Remember);"}},
-    {"id": "R015", "module": "login", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.xaml.cs", "to": "IRSpeedyVPN/WebServices/NewServiceController.cs", "source_symbol": "MainWindow.Login", "target_symbol": "NewServiceController.Login2", "evidence": {"path": "IRSpeedyVPN/MainWindow.xaml.cs", "line": 1082, "text": "var res = serviceController.Login2(username, password, loginApplicationExit.Token);"}},
-    {"id": "R016", "module": "login", "kind": "calls", "from": "IRSpeedyVPN/WebServices/NewServiceController.cs", "to": "IRSpeedyVPN/WebServices/NewServiceController.cs", "source_symbol": "NewServiceController.Login2", "target_symbol": "NewServiceController.getServerList", "evidence": {"path": "IRSpeedyVPN/WebServices/NewServiceController.cs", "line": 69, "text": "=> getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString(), cancellation);"}},
-    {"id": "R017", "module": "login", "kind": "constructs", "from": "IRSpeedyVPN/WebServices/NewServiceController.cs", "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "source_symbol": "NewServiceController.getServerList", "target_symbol": "LoginNetworkContext", "evidence": {"path": "IRSpeedyVPN/WebServices/NewServiceController.cs", "line": 106, "text": "var loginContext = new LoginNetworkContext(cancellation, SlowNetworkLoginBudgetSeconds * 1000);"}},
-    {"id": "R018", "module": "login", "kind": "calls", "from": "IRSpeedyVPN/WebServices/NewServiceController.cs", "to": "IRSpeedyVPN/WebServices/RestHelper.cs", "source_symbol": "NewServiceController.getServerList", "target_symbol": "RestHelper.SendRequest", "evidence": {"path": "IRSpeedyVPN/WebServices/NewServiceController.cs", "line": 116, "text": "var res = service.SendRequest<DefaultEncryptedResponse<AccountInfoEx>>("}, "note": "The next source line is api/server/list/all; this path supplies loginContext and skipDoh:true."},
-    {"id": "R019", "module": "login", "kind": "calls", "from": "IRSpeedyVPN/WebServices/RestHelper.cs", "to": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "source_symbol": "RestHelper.SendRequest", "target_symbol": "CurlHelper.SendLogin", "evidence": {"path": "IRSpeedyVPN/WebServices/RestHelper.cs", "line": 120, "text": ": _curl.SendLogin(url, method, headers.ToString(), body,"}, "note": "Conditional on non-null loginContext; other requests use CurlHelper.Send."},
-    {"id": "R020", "module": "dns-recovery", "kind": "constructs", "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "source_symbol": "CurlHelper.SendLogin", "target_symbol": "LoginRecovery", "evidence": {"path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "line": 21, "text": "var recovery = new LoginRecovery(new LoginTransport(this), LoginDns, LogHelper.WriteExLog,"}, "note": "LoginResolutionOrder is ResolverFirst in this file."},
-    {"id": "R021", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "source_symbol": "CurlHelper.SendLogin", "target_symbol": "LoginRecovery.Send", "evidence": {"path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "line": 23, "text": "var result = recovery.Send(url, method, headers, body, timeoutMs, context);"}},
-    {"id": "R022", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "source_symbol": "LoginRecovery.Send", "target_symbol": "LoginRecovery.SendResolverFirst", "evidence": {"path": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "line": 175, "text": "return SendResolverFirst(url, method, headers, body, context, target, deadline);"}, "note": "Only ResolverFirst, HTTPS and a non-literal hostname enter this branch."},
-    {"id": "R023", "module": "dns-recovery", "kind": "constructs", "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "to": "IRSpeedyVPN/WebServices/LoginDnsCache.cs", "source_symbol": "CurlHelper.LoginDns", "target_symbol": "LoginDnsCache", "evidence": {"path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "line": 15, "text": "private static readonly LoginDnsCache LoginDns = new LoginDnsCache(FetchLoginAddresses);"}},
-    {"id": "R024", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "to": "IRSpeedyVPN/WebServices/LoginPlainDns.cs", "source_symbol": "CurlHelper.FetchLoginAddresses", "target_symbol": "LoginPlainDns.Resolve", "evidence": {"path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "line": 155, "text": "=> LoginPlainDns.Resolve(host, timeoutMs, cancellation, LogHelper.WriteExLog);"}},
-    {"id": "R025", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/WebServices/LoginPlainDns.cs", "to": "IRSpeedyVPN/WebServices/LoginDnsRace.cs", "source_symbol": "LoginPlainDns.Resolve", "target_symbol": "LoginDnsRace.Resolve", "evidence": {"path": "IRSpeedyVPN/WebServices/LoginPlainDns.cs", "line": 27, "text": "return LoginDnsRace.Resolve(name, timeoutMs, cancellation, (endpoint, ms, token) =>"}, "note": "Only DNS queries race; this does not create credential POSTs."},
-    {"id": "R026", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "to": "IRSpeedyVPN/WebServices/LoginDnsCache.cs", "source_symbol": "LoginRecovery.LookupResolverFirst", "target_symbol": "LoginDnsCache.Resolve", "evidence": {"path": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "line": 262, "text": "var answer = resolver.Resolve(host, budget, context.Cancellation, refresh);"}, "note": "Interface dispatch through ILoginResolver; production resolver is the LoginDnsCache supplied by CurlHelper. This is not a DoH race."},
-    {"id": "R027", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "source_symbol": "LoginRecovery.SendResolverFirst", "target_symbol": "LoginRecovery.SendCore", "evidence": {"path": "IRSpeedyVPN/WebServices/LoginRecovery.cs", "line": 238, "text": "var system = SendCore(url, method, headers, body, context, target, deadline,"}, "note": "System-DNS fallback uses allowRecovery:false and is gated by the earlier unsent proof."},
-    {"id": "R028", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "to": "IRSpeedyVPN/WebServices/HttpFallback.cs", "source_symbol": "CurlHelper.LoginTransport.Managed", "target_symbol": "HttpFallback.Send", "evidence": {"path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs", "line": 39, "text": "var response = HttpFallback.Send(url, method, headers, body, null, timeoutMs, cancellation, loginRequest: true);"}},
-    {"id": "R029", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/WebServices/RestHelper.cs", "to": "IRSpeedyVPN/WebServices/DohResolver.cs", "source_symbol": "RestHelper.SendRequest", "target_symbol": "DohResolver.Resolve", "evidence": {"path": "IRSpeedyVPN/WebServices/RestHelper.cs", "line": 107, "text": "var ip = DohResolver.Resolve(uri.Host);"}, "note": "Only loginContext==null, !skipDoh and available curl; excluded from the current credential login path."},
-    {"id": "R030", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/Common/AccountSessionMaintenance.cs", "source_symbol": "MainWindow.BeginAccountSession", "target_symbol": "AccountSessionMaintenance.Begin", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 339, "text": "long generation = accountSessionMaintenance.Begin(verified);"}},
-    {"id": "R031", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/Common/AccountSessionMaintenance.cs", "source_symbol": "MainWindow.ScheduleSessionMaintenance", "target_symbol": "AccountSessionMaintenance.DelayMilliseconds", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 378, "text": "int delay = accountSessionMaintenance.DelayMilliseconds(retryIfDue);"}},
-    {"id": "R032", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/MainWindow.FastStartup.cs", "source_symbol": "MainWindow.SessionMaintenanceCallback", "target_symbol": "MainWindow.ValidateSessionAndRefreshServerList", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 399, "text": "ValidateSessionAndRefreshServerList(generation);"}},
-    {"id": "R033", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/MainWindow.FastStartup.cs", "source_symbol": "MainWindow.ValidateSessionAndRefreshServerList", "target_symbol": "MainWindow.RefreshAuthenticatedServerList", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 477, "text": "try { RefreshAuthenticatedServerList(expectedSession: expectedSession); }"}},
-    {"id": "R034", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/WebServices/NewServiceController.cs", "source_symbol": "MainWindow.RefreshAuthenticatedServerList", "target_symbol": "NewServiceController.Login2", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 536, "text": "var response = serviceController.Login2(username, password, linked.Token);"}},
-    {"id": "R035", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/MainWindow.FastStartup.cs", "source_symbol": "MainWindow.RefreshAuthenticatedServerList", "target_symbol": "MainWindow.LogoutInvalidSession", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 554, "text": "LogoutInvalidSession(null);"}, "note": "Only recognized rejection; account-generation guard precedes application, and connection/view guards follow rejection handling."},
-    {"id": "R036", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/MainWindow.FastStartup.cs", "source_symbol": "MainWindow.LogoutInvalidSession", "target_symbol": "MainWindow.CompleteInvalidSessionLogoutAsync", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 430, "text": "pendingSessionLogout = CompleteInvalidSessionLogoutAsync(service, generation, username, password, message, expired);"}},
-    {"id": "R037", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/Interfaces/IVPNService.cs", "source_symbol": "MainWindow.CompleteInvalidSessionLogoutAsync", "target_symbol": "IVPNService.Disconnect", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 446, "text": "try { if (service != null) await Task.Run(() => service.Disconnect()); }"}},
-    {"id": "R038", "module": "token-validation", "kind": "calls", "from": "IRSpeedyVPN/WebServices/NewServiceController.cs", "to": "IRSpeedyVPN/WebServices/RestHelper.cs", "source_symbol": "NewServiceController.CheckToken", "target_symbol": "RestHelper.SendRequest", "evidence": {"path": "IRSpeedyVPN/WebServices/NewServiceController.cs", "line": 175, "text": "return service.SendRequest<object>(url, null, null, null, null, timeoutSeconds, skipDoh: true);"}, "note": "Endpoint surface only. No active maintenance caller is asserted for CheckToken."},
-    {"id": "R039", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.xaml.cs", "to": "IRSpeedyVPN/Services/ServiceFactory.cs", "source_symbol": "MainWindow.ProcessInfo", "target_symbol": "ServiceFactory.RenewServiceList", "evidence": {"path": "IRSpeedyVPN/MainWindow.xaml.cs", "line": 1258, "text": "serviceFactory.RenewServiceList(acc.groups);"}},
-    {"id": "R040", "module": "vpn-connection", "kind": "constructs", "from": "IRSpeedyVPN/Services/ServiceFactory.cs", "to": "IRSpeedyVPN/Services/TunnelPlusService.cs", "source_symbol": "ServiceFactory.RenewServiceList(List<Group>)", "target_symbol": "TunnelPlusService", "evidence": {"path": "IRSpeedyVPN/Services/ServiceFactory.cs", "line": 56, "text": "vpnervice = new TunnelPlusService(s, globalInfo);"}, "note": "The group overload also has a Cisco branch; other adapter graphs remain unexpanded."},
-    {"id": "R041", "module": "vpn-connection", "kind": "implements", "from": "IRSpeedyVPN/Services/TunnelPlusService.cs", "to": "IRSpeedyVPN/Interfaces/IVPNService.cs", "source_symbol": "TunnelPlusService", "target_symbol": "IVPNService", "evidence": {"path": "IRSpeedyVPN/Services/TunnelPlusService.cs", "line": 35, "text": "partial class TunnelPlusService : IVPNService, ISmartFastConnection"}},
-    {"id": "R042", "module": "vpn-connection", "kind": "subscribes", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/MainWindow.xaml.cs", "source_symbol": "MainWindow.PrepareFastStartup", "target_symbol": "MainWindow.UCServerList_OnConnectRequest", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 41, "text": "uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;"}},
-    {"id": "R043", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.xaml.cs", "to": "IRSpeedyVPN/MainWindow.xaml.cs", "source_symbol": "MainWindow.UCServerList_OnConnectRequest", "target_symbol": "MainWindow.ApplyConnectionRequestAsync", "evidence": {"path": "IRSpeedyVPN/MainWindow.xaml.cs", "line": 535, "text": "await ApplyConnectionRequestAsync(service, protocol, version, prepareService);"}},
-    {"id": "R044", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.xaml.cs", "to": "IRSpeedyVPN/Interfaces/IVPNService.cs", "source_symbol": "MainWindow.ApplyConnectionRequestAsync", "target_symbol": "IVPNService.Connect", "evidence": {"path": "IRSpeedyVPN/MainWindow.xaml.cs", "line": 597, "text": "await Task.Run(() => next.Connect(protocol));"}, "note": "Serialized by connectionRequestGate after draining probes and disconnecting the previous service."},
-    {"id": "R045", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/Services/TunnelPlusService.cs", "to": "IRSpeedyVPN/Services/TunnelPlusService.cs", "source_symbol": "TunnelPlusService.Connect", "target_symbol": "TunnelPlusService.RunV2ray", "evidence": {"path": "IRSpeedyVPN/Services/TunnelPlusService.cs", "line": 166, "text": "Task.Run(() => RunV2ray(generation: generation));"}},
-    {"id": "R046", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/Services/TunnelPlusService.cs", "to": "IRSpeedyVPN/Services/SingBox/ConfigGenerator.cs", "source_symbol": "TunnelPlusService.RunV2ray", "target_symbol": "SingBox.ConfigGenerator.GetConfig", "evidence": {"path": "IRSpeedyVPN/Services/TunnelPlusService.cs", "line": 367, "text": "configData = SingBox.ConfigGenerator.GetConfig("}, "note": "One config-building branch; Xray/Pool/Shield branches are not exhaustively expanded."},
-    {"id": "R047", "module": "dns-recovery", "kind": "calls", "from": "IRSpeedyVPN/Services/TunnelPlusService.cs", "to": "IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs", "source_symbol": "TunnelPlusService.TryStartCoreWithConfig", "target_symbol": "ParallelDnsRouting.Apply", "evidence": {"path": "IRSpeedyVPN/Services/TunnelPlusService.cs", "line": 521, "text": "configData = SingBox.ParallelDnsRouting.Apply(configData);"}, "note": "VPN DNS configuration is separate from login resolver-first DNS."},
-    {"id": "R048", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/Services/TunnelPlusService.cs", "to": "IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs", "source_symbol": "TunnelPlusService.TryStartCoreWithConfig", "target_symbol": "LibcoreServiceClient.StartWithDeadline", "evidence": {"path": "IRSpeedyVPN/Services/TunnelPlusService.cs", "line": 605, "text": "return client.StartWithDeadline(new LoadConfigReq"}},
-    {"id": "R049", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs", "to": "IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs", "source_symbol": "LibcoreServiceClient.StartWithDeadline", "target_symbol": "ProtorpcClient.Connect", "evidence": {"path": "IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs", "line": 52, "text": "using (var client = ProtorpcClient.Connect(_host, _port, Math.Min(_timeoutMs, timeoutMs), cancellation))"}},
-    {"id": "R050", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs", "to": "IRSpeedyVPN/Services/Libcore/LibcoreProto.cs", "source_symbol": "ProtorpcClient.Call", "target_symbol": "LibcoreProto.EncodeRequestHeader", "evidence": {"path": "IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs", "line": 89, "text": "var headerBytes = LibcoreProto.EncodeRequestHeader("}},
-    {"id": "R051", "module": "vpn-connection", "kind": "calls", "from": "IRSpeedyVPN/Services/TunnelPlusService.cs", "to": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs", "source_symbol": "TunnelPlusService.RunV2ray", "target_symbol": "TunnelPlusService.BeginNetworkRecoverySession", "evidence": {"path": "IRSpeedyVPN/Services/TunnelPlusService.cs", "line": 420, "text": "BeginNetworkRecoverySession();"}},
-    {"id": "R052", "module": "vpn-connection", "kind": "constructs", "from": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs", "to": "IRSpeedyVPN/Services/NetworkRecoverySession.cs", "source_symbol": "TunnelPlusService.BeginNetworkRecoverySession", "target_symbol": "NetworkRecoverySession", "evidence": {"path": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs", "line": 55, "text": "var session = new NetworkRecoverySession(async token =>"}, "note": "ResidentialService inherits this shared pipeline; no Residential-only retry is asserted."},
-    {"id": "R053", "module": "residential-vpn", "kind": "declares_type", "from": "IRSpeedyVPN/Models/NewService/AccountInfoEx.cs", "to": "IRSpeedyVPN/Residential/ResidentialModels.cs", "source_symbol": "AccountInfoEx.residential_vpn", "target_symbol": "ResidentialConfig", "evidence": {"path": "IRSpeedyVPN/Models/NewService/AccountInfoEx.cs", "line": 14, "text": "public IRSpeedyVPN.Residential.ResidentialConfig residential_vpn { get; set; }"}},
-    {"id": "R054", "module": "residential-vpn", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.xaml.cs", "to": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs", "source_symbol": "MainWindow.ProcessInfo", "target_symbol": "UCServerList.ConfigureResidential", "evidence": {"path": "IRSpeedyVPN/MainWindow.xaml.cs", "line": 1259, "text": "uCServerList.ConfigureResidential(acc);"}},
-    {"id": "R055", "module": "residential-vpn", "kind": "calls", "from": "IRSpeedyVPN/MainWindow.FastStartup.cs", "to": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs", "source_symbol": "MainWindow.TryApplyCachedAccountAsync", "target_symbol": "UCServerList.ConfigureResidential", "evidence": {"path": "IRSpeedyVPN/MainWindow.FastStartup.cs", "line": 194, "text": "uCServerList.ConfigureResidential(account);"}, "note": "Cached-startup path configures Residential before showing the chooser."},
-    {"id": "R056", "module": "residential-vpn", "kind": "constructs", "from": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs", "to": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "source_symbol": "UCServerList.InitializeResidential", "target_symbol": "ResidentialViewModel", "evidence": {"path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs", "line": 29, "text": "residential = new ResidentialViewModel(globalInfo);"}},
-    {"id": "R057", "module": "residential-vpn", "kind": "calls", "from": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs", "to": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "source_symbol": "UCServerList.ConfigureResidential", "target_symbol": "ResidentialViewModel.Configure", "evidence": {"path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs", "line": 60, "text": "residential.Configure(account);"}},
-    {"id": "R058", "module": "residential-vpn", "kind": "assigns_delegate", "from": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "to": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "source_symbol": "ResidentialViewModel.ResidentialViewModel", "target_symbol": "ResidentialViewModel.DownloadAsync", "evidence": {"path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "line": 40, "text": "this.fetch = fetch ?? DownloadAsync;"}, "note": "Default downloader; tests may inject a fetch delegate."},
-    {"id": "R059", "module": "residential-vpn", "kind": "calls", "from": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "to": "IRSpeedyVPN/Residential/ResidentialSubscription.cs", "source_symbol": "ResidentialViewModel.RefreshCoreAsync", "target_symbol": "ResidentialSubscription.Parse", "evidence": {"path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "line": 103, "text": "var catalog = ResidentialSubscription.Parse(payload.Body);"}},
-    {"id": "R060", "module": "residential-vpn", "kind": "constructs", "from": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "to": "IRSpeedyVPN/Residential/ResidentialService.cs", "source_symbol": "ResidentialViewModel.RefreshCoreAsync", "target_symbol": "ResidentialService", "evidence": {"path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "line": 113, "text": "Services = catalog.Select(c => (IVPNService)new ResidentialService(c, global, key)).ToArray();"}},
-    {"id": "R061", "module": "residential-vpn", "kind": "calls", "from": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "to": "IRSpeedyVPN/Residential/ResidentialModels.cs", "source_symbol": "ResidentialViewModel.RefreshCoreAsync", "target_symbol": "ResidentialTraffic.Parse", "evidence": {"path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs", "line": 116, "text": "Traffic = ResidentialTraffic.Parse(payload.TrafficHeader);"}},
-    {"id": "R062", "module": "residential-vpn", "kind": "inherits", "from": "IRSpeedyVPN/Residential/ResidentialService.cs", "to": "IRSpeedyVPN/Services/TunnelPlusService.cs", "source_symbol": "ResidentialService", "target_symbol": "TunnelPlusService", "evidence": {"path": "IRSpeedyVPN/Residential/ResidentialService.cs", "line": 10, "text": "internal sealed class ResidentialService : TunnelPlusService"}},
-    {"id": "R063", "module": "residential-vpn", "kind": "calls", "from": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs", "to": "IRSpeedyVPN/Residential/ResidentialTrafficBar.cs", "source_symbol": "UCServerList.UpdateResidentialVisuals", "target_symbol": "ResidentialTrafficBar.Update", "evidence": {"path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs", "line": 124, "text": "trafficBar.Update(residential.VisibleTraffic, residentialConnected, isResidentialTab);"}},
-    {"id": "R064", "module": "ui", "kind": "hosts_control", "from": "IRSpeedyVPN/UserControls/UCServerList.xaml", "to": "IRSpeedyVPN/Residential/ResidentialTrafficBar.cs", "source_symbol": "UCServerList", "target_symbol": "ResidentialTrafficBar", "evidence": {"path": "IRSpeedyVPN/UserControls/UCServerList.xaml", "line": 63, "text": "<res:ResidentialTrafficBar x:Name=\"trafficBar\" Grid.Row=\"2\"/>"}},
-    {"id": "R065", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "source_symbol": "UCServerList.RefreshCountry", "target_symbol": "ServerCountryPicker.Load", "evidence": {"path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs", "line": 187, "text": "countryPicker.Load(services, _isUrlTestSupported);"}, "note": "countryPicker selects the active scope; both tabs reuse the picker implementation."},
-    {"id": "R066", "module": "ui", "kind": "constructs", "from": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs", "to": "IRSpeedyVPN/Services/ServerCheckCache.cs", "source_symbol": "UCServerList.RefreshCountry", "target_symbol": "ServerCheckCache", "evidence": {"path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs", "line": 174, "text": "probeCaches[context] = probeCache = new ServerCheckCache(globalInfo?.Username ?? \"\", scope + \"\\n\" + (protocol ?? \"\"));"}, "note": "Separate account/service/protocol cache contexts are retained."},
-    {"id": "R067", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "source_symbol": "UCServerList.CheckServerAsync", "target_symbol": "ServerCountryPicker.RefreshGroup", "evidence": {"path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs", "line": 431, "text": "picker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);"}, "note": "Committed or rollback result is applied before continuing the queue."},
-    {"id": "R068", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerListRanking.cs", "source_symbol": "ServerCountryPicker.ResortGroups", "target_symbol": "ServerListRanking.Order", "evidence": {"path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "line": 510, "text": "var ordered = ServerListRanking.Order(_allGroups, g => g.IsLastSuccessfulConnection,"}},
-    {"id": "R069", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "to": "IRSpeedyVPN/Residential/ResidentialModels.cs", "source_symbol": "GroupItem.DisplayLatency", "target_symbol": "ResidentialPresentation.DisplayPing", "evidence": {"path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "line": 167, "text": "private long DisplayLatency(long latency) => IsResidential ? IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(latency) : latency;"}, "note": "Residential-only factor; VPN keeps measured latency."},
-    {"id": "R070", "module": "ui", "kind": "constructs", "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs", "source_symbol": "ServerCountryPicker.ServerCountryPicker", "target_symbol": "ServerListViewModel", "evidence": {"path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "line": 354, "text": "_serverList = new ServerListViewModel();"}},
-    {"id": "R071", "module": "ui", "kind": "constructs", "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs", "source_symbol": "ServerCountryPicker.ServerCountryPicker", "target_symbol": "ServerListSweepAnimator", "evidence": {"path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs", "line": 356, "text": "_sweepAnimator = new ServerListSweepAnimator(_serverList, icCountries, ServerScroller, CometOverlay);"}},
-    {"id": "R072", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs", "source_symbol": "ServerCountryPicker.BeginCheckCycle", "target_symbol": "ServerListViewModel.BeginCheckCycle", "evidence": {"path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs", "line": 18, "text": "_serverList.BeginCheckCycle();"}},
-    {"id": "R073", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs", "source_symbol": "ServerCountryPicker.RefreshDisplayedRows", "target_symbol": "ServerListViewModel.Publish", "evidence": {"path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs", "line": 65, "text": "_serverList.Publish(_groups.Select(group => new ServerItem(group)), animate, allowReorder || instant, completedIdentity);"}},
-    {"id": "R074", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs", "source_symbol": "ServerListSweepAnimator.Prepare", "target_symbol": "ServerListViewModel.TryBeginPass", "evidence": {"path": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs", "line": 69, "text": "while ((_pass = _model.TryBeginPass()) != null)"}},
-    {"id": "R075", "module": "ui", "kind": "calls", "from": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs", "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs", "source_symbol": "ServerListSweepAnimator.FinishPass", "target_symbol": "ServerListViewModel.Finish", "evidence": {"path": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs", "line": 161, "text": "_model.Finish(_pass); _pass = null; _timeline = null; _surfaces.Clear();"}, "note": "FinishPass queues Prepare again; model Finish also resynchronizes frozen rows from current Servers."},
-    {"id": "R076", "module": "tests", "kind": "includes_source", "from": "tests/ParallelDnsChecks/ParallelDnsChecks.csproj", "to": "IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs", "source_symbol": null, "target_symbol": null, "evidence": {"path": "tests/ParallelDnsChecks/ParallelDnsChecks.csproj", "line": 8, "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs\" Link=\"ParallelDnsRouting.cs\" />"}},
-    {"id": "R077", "module": "tests", "kind": "includes_source", "from": "tests/NetworkRecoveryChecks/NetworkRecoveryChecks.csproj", "to": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs", "source_symbol": null, "target_symbol": null, "evidence": {"path": "tests/NetworkRecoveryChecks/NetworkRecoveryChecks.csproj", "line": 7, "text": "<Compile Include=\"../../IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs\" Link=\"TunnelPlusService.NetworkRecovery.cs\" />"}},
-    {"id": "R078", "module": "tests", "kind": "reads_source", "from": "tests/PasswordReloginChecks/run.py", "to": "IRSpeedyVPN/Common/AccountSessionMaintenance.cs", "source_symbol": null, "target_symbol": null, "evidence": {"path": "tests/PasswordReloginChecks/run.py", "line": 15, "text": "maintenance = root/'IRSpeedyVPN/Common/AccountSessionMaintenance.cs'"}},
-    {"id": "R079", "module": "tests", "kind": "reads_source", "from": "tests/ResidentialChecks/run.py", "to": "IRSpeedyVPN/Residential/ResidentialTrafficBar.cs", "source_symbol": null, "target_symbol": null, "evidence": {"path": "tests/ResidentialChecks/run.py", "line": 18, "text": "traffic_source=(base/'Residential/ResidentialTrafficBar.cs').read_text()"}},
-    {"id": "R080", "module": "tests", "kind": "reads_source", "from": "tests/LoginRecoveryChecks/run.py", "to": "IRSpeedyVPN/WebServices/NewServiceController.cs", "source_symbol": null, "target_symbol": null, "evidence": {"path": "tests/LoginRecoveryChecks/run.py", "line": 27, "text": "controller = (source/'NewServiceController.cs').read_text(encoding='utf-8-sig')"}}
+    {
+      "id": "R001",
+      "module": "build",
+      "kind": "solution_member",
+      "from": "IRSpeedyVPN.sln",
+      "to": "IRSpeedyVPN/IRSpeedyVPN.csproj",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "IRSpeedyVPN.sln",
+        "line": 6,
+        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"IRSpeedyVPN\", \"IRSpeedyVPN\\IRSpeedyVPN.csproj\", \"{52423534-CAF4-431C-9FAD-CC3342D45827}\""
+      }
+    },
+    {
+      "id": "R002",
+      "module": "build",
+      "kind": "solution_member",
+      "from": "IRSpeedyVPN.sln",
+      "to": "UpdateHelper/UpdateHelper.csproj",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "IRSpeedyVPN.sln",
+        "line": 8,
+        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"UpdateHelper\", \"UpdateHelper\\UpdateHelper.csproj\", \"{4E3E16AD-736D-4E3B-B7D4-C16FAF44625F}\""
+      }
+    },
+    {
+      "id": "R003",
+      "module": "build",
+      "kind": "solution_member",
+      "from": "IRSpeedyVPN/IRSpeedyVPN.sln",
+      "to": "IRSpeedyVPN/IRSpeedyVPN.csproj",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "IRSpeedyVPN/IRSpeedyVPN.sln",
+        "line": 5,
+        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"IRSpeedyVPN\", \"IRSpeedyVPN.csproj\", \"{63BFDB34-1A19-FDE2-DC70-7E8DC58BE38F}\""
+      }
+    },
+    {
+      "id": "R004",
+      "module": "build",
+      "kind": "solution_member",
+      "from": "IRSpeedyVPN/IRSpeedyVPN.sln",
+      "to": "Throne/Throne.csproj",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "IRSpeedyVPN/IRSpeedyVPN.sln",
+        "line": 7,
+        "text": "Project(\"{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}\") = \"Throne\", \"..\\Throne\\Throne.csproj\", \"{B2C3D4E5-F6A7-8901-BCDE-F12345678901}\""
+      }
+    },
+    {
+      "id": "R005",
+      "module": "build",
+      "kind": "startup_type",
+      "from": "IRSpeedyVPN/IRSpeedyVPN.csproj",
+      "to": "IRSpeedyVPN/Program.cs",
+      "source_symbol": "StartupObject",
+      "target_symbol": "Program",
+      "evidence": {
+        "path": "IRSpeedyVPN/IRSpeedyVPN.csproj",
+        "line": 10,
+        "text": "<StartupObject>IRSpeedyVPN.Program</StartupObject>"
+      }
+    },
+    {
+      "id": "R006",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Program.cs",
+      "to": "IRSpeedyVPN/AppServices.cs",
+      "source_symbol": "Program.Main",
+      "target_symbol": "AppServices.InitializeFast",
+      "evidence": {
+        "path": "IRSpeedyVPN/Program.cs",
+        "line": 73,
+        "text": "AppServices.InitializeFast();"
+      }
+    },
+    {
+      "id": "R007",
+      "module": "ui",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/Program.cs",
+      "to": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "source_symbol": "Program.RunApplication",
+      "target_symbol": "MainWindow",
+      "evidence": {
+        "path": "IRSpeedyVPN/Program.cs",
+        "line": 221,
+        "text": "var mainWindow = new MainWindow();"
+      }
+    },
+    {
+      "id": "R008",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Program.cs",
+      "to": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "source_symbol": "Program.RunApplication",
+      "target_symbol": "MainWindow.PrepareFastStartup",
+      "evidence": {
+        "path": "IRSpeedyVPN/Program.cs",
+        "line": 225,
+        "text": "mainWindow.PrepareFastStartup();"
+      },
+      "note": "Normal startup suppresses the legacy Activated-time initialization path."
+    },
+    {
+      "id": "R009",
+      "module": "login",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/AppServices.cs",
+      "to": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "source_symbol": "AppServices.InitializeFast",
+      "target_symbol": "NewServiceController",
+      "evidence": {
+        "path": "IRSpeedyVPN/AppServices.cs",
+        "line": 106,
+        "text": "NewServiceController = new NewServiceController();"
+      }
+    },
+    {
+      "id": "R010",
+      "module": "vpn-connection",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/AppServices.cs",
+      "to": "IRSpeedyVPN/Services/ServiceFactory.cs",
+      "source_symbol": "AppServices.InitializeFast",
+      "target_symbol": "ServiceFactory",
+      "evidence": {
+        "path": "IRSpeedyVPN/AppServices.cs",
+        "line": 108,
+        "text": "ServiceFactory = new ServiceFactory();"
+      }
+    },
+    {
+      "id": "R011",
+      "module": "ui",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/AppServices.cs",
+      "to": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
+      "source_symbol": "AppServices.InitializeFast",
+      "target_symbol": "UCServerList",
+      "evidence": {
+        "path": "IRSpeedyVPN/AppServices.cs",
+        "line": 113,
+        "text": "UCServerList = new UCServerList();"
+      }
+    },
+    {
+      "id": "R012",
+      "module": "login",
+      "kind": "subscribes",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "source_symbol": "MainWindow.PrepareFastStartup",
+      "target_symbol": "MainWindow.UCLogin_OnCredentialEntered",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 46,
+        "text": "uCLogin.OnCredentialEntered += UCLogin_OnCredentialEntered;"
+      }
+    },
+    {
+      "id": "R013",
+      "module": "login",
+      "kind": "raises_event",
+      "from": "IRSpeedyVPN/UserControls/UCLogin.xaml.cs",
+      "to": "IRSpeedyVPN/UserControls/UCLogin.xaml.cs",
+      "source_symbol": "UCLogin.btnLogin_Click",
+      "target_symbol": "UCLogin.OnCredentialEntered",
+      "evidence": {
+        "path": "IRSpeedyVPN/UserControls/UCLogin.xaml.cs",
+        "line": 84,
+        "text": "OnCredentialEntered.Invoke(this, txtUsername.Text, txtPassword.Password,chkRemember.IsChecked.Value);"
+      }
+    },
+    {
+      "id": "R014",
+      "module": "login",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "to": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "source_symbol": "MainWindow.UCLogin_OnCredentialEntered",
+      "target_symbol": "MainWindow.Login",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.xaml.cs",
+        "line": 1069,
+        "text": "Login(username, password, Remember);"
+      }
+    },
+    {
+      "id": "R015",
+      "module": "login",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "to": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "source_symbol": "MainWindow.Login",
+      "target_symbol": "NewServiceController.Login2",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.xaml.cs",
+        "line": 1082,
+        "text": "var res = serviceController.Login2(username, password, loginApplicationExit.Token);"
+      }
+    },
+    {
+      "id": "R016",
+      "module": "login",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "to": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "source_symbol": "NewServiceController.Login2",
+      "target_symbol": "NewServiceController.getServerList",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+        "line": 69,
+        "text": "=> getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString(), cancellation);"
+      }
+    },
+    {
+      "id": "R017",
+      "module": "login",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+      "source_symbol": "NewServiceController.getServerList",
+      "target_symbol": "LoginNetworkContext",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+        "line": 106,
+        "text": "var loginContext = new LoginNetworkContext(cancellation, SlowNetworkLoginBudgetSeconds * 1000);"
+      }
+    },
+    {
+      "id": "R018",
+      "module": "login",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "to": "IRSpeedyVPN/WebServices/RestHelper.cs",
+      "source_symbol": "NewServiceController.getServerList",
+      "target_symbol": "RestHelper.SendRequest",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+        "line": 116,
+        "text": "var res = service.SendRequest<DefaultEncryptedResponse<AccountInfoEx>>("
+      },
+      "note": "The next source line is api/server/list/all; this path supplies loginContext and skipDoh:true."
+    },
+    {
+      "id": "R019",
+      "module": "login",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/RestHelper.cs",
+      "to": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+      "source_symbol": "RestHelper.SendRequest",
+      "target_symbol": "CurlHelper.SendLogin",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/RestHelper.cs",
+        "line": 120,
+        "text": ": _curl.SendLogin(url, method, headers.ToString(), body,"
+      },
+      "note": "Conditional on non-null loginContext; other requests use CurlHelper.Send."
+    },
+    {
+      "id": "R020",
+      "module": "dns-recovery",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+      "source_symbol": "CurlHelper.SendLogin",
+      "target_symbol": "LoginRecovery",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+        "line": 21,
+        "text": "var recovery = new LoginRecovery(new LoginTransport(this), LoginDns, LogHelper.WriteExLog,"
+      },
+      "note": "LoginResolutionOrder is ResolverFirst in this file."
+    },
+    {
+      "id": "R021",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+      "source_symbol": "CurlHelper.SendLogin",
+      "target_symbol": "LoginRecovery.Send",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+        "line": 23,
+        "text": "var result = recovery.Send(url, method, headers, body, timeoutMs, context);"
+      }
+    },
+    {
+      "id": "R022",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+      "source_symbol": "LoginRecovery.Send",
+      "target_symbol": "LoginRecovery.SendResolverFirst",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+        "line": 175,
+        "text": "return SendResolverFirst(url, method, headers, body, context, target, deadline);"
+      },
+      "note": "Only ResolverFirst, HTTPS and a non-literal hostname enter this branch."
+    },
+    {
+      "id": "R023",
+      "module": "dns-recovery",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginDnsCache.cs",
+      "source_symbol": "CurlHelper.LoginDns",
+      "target_symbol": "LoginDnsCache",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+        "line": 15,
+        "text": "private static readonly LoginDnsCache LoginDns = new LoginDnsCache(FetchLoginAddresses);"
+      }
+    },
+    {
+      "id": "R024",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginPlainDns.cs",
+      "source_symbol": "CurlHelper.FetchLoginAddresses",
+      "target_symbol": "LoginPlainDns.Resolve",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+        "line": 155,
+        "text": "=> LoginPlainDns.Resolve(host, timeoutMs, cancellation, LogHelper.WriteExLog);"
+      }
+    },
+    {
+      "id": "R025",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/LoginPlainDns.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginDnsRace.cs",
+      "source_symbol": "LoginPlainDns.Resolve",
+      "target_symbol": "LoginDnsRace.Resolve",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/LoginPlainDns.cs",
+        "line": 27,
+        "text": "return LoginDnsRace.Resolve(name, timeoutMs, cancellation, (endpoint, ms, token) =>"
+      },
+      "note": "Only DNS queries race; this does not create credential POSTs."
+    },
+    {
+      "id": "R026",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginDnsCache.cs",
+      "source_symbol": "LoginRecovery.LookupResolverFirst",
+      "target_symbol": "LoginDnsCache.Resolve",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+        "line": 262,
+        "text": "var answer = resolver.Resolve(host, budget, context.Cancellation, refresh);"
+      },
+      "note": "Interface dispatch through ILoginResolver; production resolver is the LoginDnsCache supplied by CurlHelper. This is not a DoH race."
+    },
+    {
+      "id": "R027",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+      "to": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+      "source_symbol": "LoginRecovery.SendResolverFirst",
+      "target_symbol": "LoginRecovery.SendCore",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/LoginRecovery.cs",
+        "line": 238,
+        "text": "var system = SendCore(url, method, headers, body, context, target, deadline,"
+      },
+      "note": "System-DNS fallback uses allowRecovery:false and is gated by the earlier unsent proof."
+    },
+    {
+      "id": "R028",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+      "to": "IRSpeedyVPN/WebServices/HttpFallback.cs",
+      "source_symbol": "CurlHelper.LoginTransport.Managed",
+      "target_symbol": "HttpFallback.Send",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/CurlHelper.Login.cs",
+        "line": 39,
+        "text": "var response = HttpFallback.Send(url, method, headers, body, null, timeoutMs, cancellation, loginRequest: true);"
+      }
+    },
+    {
+      "id": "R029",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/RestHelper.cs",
+      "to": "IRSpeedyVPN/WebServices/DohResolver.cs",
+      "source_symbol": "RestHelper.SendRequest",
+      "target_symbol": "DohResolver.Resolve",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/RestHelper.cs",
+        "line": 107,
+        "text": "var ip = DohResolver.Resolve(uri.Host);"
+      },
+      "note": "Only loginContext==null, !skipDoh and available curl; excluded from the current credential login path."
+    },
+    {
+      "id": "R030",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/Common/AccountSessionMaintenance.cs",
+      "source_symbol": "MainWindow.BeginAccountSession",
+      "target_symbol": "AccountSessionMaintenance.Begin",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 339,
+        "text": "long generation = accountSessionMaintenance.Begin(verified);"
+      }
+    },
+    {
+      "id": "R031",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/Common/AccountSessionMaintenance.cs",
+      "source_symbol": "MainWindow.ScheduleSessionMaintenance",
+      "target_symbol": "AccountSessionMaintenance.DelayMilliseconds",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 378,
+        "text": "int delay = accountSessionMaintenance.DelayMilliseconds(retryIfDue);"
+      }
+    },
+    {
+      "id": "R032",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "source_symbol": "MainWindow.SessionMaintenanceCallback",
+      "target_symbol": "MainWindow.ValidateSessionAndRefreshServerList",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 399,
+        "text": "ValidateSessionAndRefreshServerList(generation);"
+      }
+    },
+    {
+      "id": "R033",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "source_symbol": "MainWindow.ValidateSessionAndRefreshServerList",
+      "target_symbol": "MainWindow.RefreshAuthenticatedServerList",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 477,
+        "text": "try { RefreshAuthenticatedServerList(expectedSession: expectedSession); }"
+      }
+    },
+    {
+      "id": "R034",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "source_symbol": "MainWindow.RefreshAuthenticatedServerList",
+      "target_symbol": "NewServiceController.Login2",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 536,
+        "text": "var response = serviceController.Login2(username, password, linked.Token);"
+      }
+    },
+    {
+      "id": "R035",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "source_symbol": "MainWindow.RefreshAuthenticatedServerList",
+      "target_symbol": "MainWindow.LogoutInvalidSession",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 554,
+        "text": "LogoutInvalidSession(null);"
+      },
+      "note": "Only recognized rejection; account-generation guard precedes application, and connection/view guards follow rejection handling."
+    },
+    {
+      "id": "R036",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "source_symbol": "MainWindow.LogoutInvalidSession",
+      "target_symbol": "MainWindow.CompleteInvalidSessionLogoutAsync",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 430,
+        "text": "pendingSessionLogout = CompleteInvalidSessionLogoutAsync(service, generation, username, password, message, expired);"
+      }
+    },
+    {
+      "id": "R037",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/Interfaces/IVPNService.cs",
+      "source_symbol": "MainWindow.CompleteInvalidSessionLogoutAsync",
+      "target_symbol": "IVPNService.Disconnect",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 446,
+        "text": "try { if (service != null) await Task.Run(() => service.Disconnect()); }"
+      }
+    },
+    {
+      "id": "R038",
+      "module": "token-validation",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "to": "IRSpeedyVPN/WebServices/RestHelper.cs",
+      "source_symbol": "NewServiceController.CheckToken",
+      "target_symbol": "RestHelper.SendRequest",
+      "evidence": {
+        "path": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+        "line": 175,
+        "text": "return service.SendRequest<object>(url, null, null, null, null, timeoutSeconds, skipDoh: true);"
+      },
+      "note": "Endpoint surface only. No active maintenance caller is asserted for CheckToken."
+    },
+    {
+      "id": "R039",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "to": "IRSpeedyVPN/Services/ServiceFactory.cs",
+      "source_symbol": "MainWindow.ProcessInfo",
+      "target_symbol": "ServiceFactory.RenewServiceList",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.xaml.cs",
+        "line": 1258,
+        "text": "serviceFactory.RenewServiceList(acc.groups);"
+      }
+    },
+    {
+      "id": "R040",
+      "module": "vpn-connection",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/Services/ServiceFactory.cs",
+      "to": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "source_symbol": "ServiceFactory.RenewServiceList(List<Group>)",
+      "target_symbol": "TunnelPlusService",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/ServiceFactory.cs",
+        "line": 56,
+        "text": "vpnervice = new TunnelPlusService(s, globalInfo);"
+      },
+      "note": "The group overload also has a Cisco branch; other adapter graphs remain unexpanded."
+    },
+    {
+      "id": "R041",
+      "module": "vpn-connection",
+      "kind": "implements",
+      "from": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "to": "IRSpeedyVPN/Interfaces/IVPNService.cs",
+      "source_symbol": "TunnelPlusService",
+      "target_symbol": "IVPNService",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+        "line": 35,
+        "text": "partial class TunnelPlusService : IVPNService, ISmartFastConnection"
+      }
+    },
+    {
+      "id": "R042",
+      "module": "vpn-connection",
+      "kind": "subscribes",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "source_symbol": "MainWindow.PrepareFastStartup",
+      "target_symbol": "MainWindow.UCServerList_OnConnectRequest",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 41,
+        "text": "uCServerList.OnConnectRequest += UCServerList_OnConnectRequest;"
+      }
+    },
+    {
+      "id": "R043",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "to": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "source_symbol": "MainWindow.UCServerList_OnConnectRequest",
+      "target_symbol": "MainWindow.ApplyConnectionRequestAsync",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.xaml.cs",
+        "line": 535,
+        "text": "await ApplyConnectionRequestAsync(service, protocol, version, prepareService);"
+      }
+    },
+    {
+      "id": "R044",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "to": "IRSpeedyVPN/Interfaces/IVPNService.cs",
+      "source_symbol": "MainWindow.ApplyConnectionRequestAsync",
+      "target_symbol": "IVPNService.Connect",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.xaml.cs",
+        "line": 597,
+        "text": "await Task.Run(() => next.Connect(protocol));"
+      },
+      "note": "Serialized by connectionRequestGate after draining probes and disconnecting the previous service."
+    },
+    {
+      "id": "R045",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "to": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "source_symbol": "TunnelPlusService.Connect",
+      "target_symbol": "TunnelPlusService.RunV2ray",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+        "line": 166,
+        "text": "Task.Run(() => RunV2ray(generation: generation));"
+      }
+    },
+    {
+      "id": "R046",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "to": "IRSpeedyVPN/Services/SingBox/ConfigGenerator.cs",
+      "source_symbol": "TunnelPlusService.RunV2ray",
+      "target_symbol": "SingBox.ConfigGenerator.GetConfig",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+        "line": 367,
+        "text": "configData = SingBox.ConfigGenerator.GetConfig("
+      },
+      "note": "One config-building branch; Xray/Pool/Shield branches are not exhaustively expanded."
+    },
+    {
+      "id": "R047",
+      "module": "dns-recovery",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "to": "IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs",
+      "source_symbol": "TunnelPlusService.TryStartCoreWithConfig",
+      "target_symbol": "ParallelDnsRouting.Apply",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+        "line": 521,
+        "text": "configData = SingBox.ParallelDnsRouting.Apply(configData);"
+      },
+      "note": "VPN DNS configuration is separate from login resolver-first DNS."
+    },
+    {
+      "id": "R048",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "to": "IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs",
+      "source_symbol": "TunnelPlusService.TryStartCoreWithConfig",
+      "target_symbol": "LibcoreServiceClient.StartWithDeadline",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+        "line": 605,
+        "text": "return client.StartWithDeadline(new LoadConfigReq"
+      }
+    },
+    {
+      "id": "R049",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs",
+      "to": "IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs",
+      "source_symbol": "LibcoreServiceClient.StartWithDeadline",
+      "target_symbol": "ProtorpcClient.Connect",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs",
+        "line": 52,
+        "text": "using (var client = ProtorpcClient.Connect(_host, _port, Math.Min(_timeoutMs, timeoutMs), cancellation))"
+      }
+    },
+    {
+      "id": "R050",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs",
+      "to": "IRSpeedyVPN/Services/Libcore/LibcoreProto.cs",
+      "source_symbol": "ProtorpcClient.Call",
+      "target_symbol": "LibcoreProto.EncodeRequestHeader",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs",
+        "line": 89,
+        "text": "var headerBytes = LibcoreProto.EncodeRequestHeader("
+      }
+    },
+    {
+      "id": "R051",
+      "module": "vpn-connection",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "to": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs",
+      "source_symbol": "TunnelPlusService.RunV2ray",
+      "target_symbol": "TunnelPlusService.BeginNetworkRecoverySession",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+        "line": 420,
+        "text": "BeginNetworkRecoverySession();"
+      }
+    },
+    {
+      "id": "R052",
+      "module": "vpn-connection",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs",
+      "to": "IRSpeedyVPN/Services/NetworkRecoverySession.cs",
+      "source_symbol": "TunnelPlusService.BeginNetworkRecoverySession",
+      "target_symbol": "NetworkRecoverySession",
+      "evidence": {
+        "path": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs",
+        "line": 55,
+        "text": "var session = new NetworkRecoverySession(async token =>"
+      },
+      "note": "ResidentialService inherits this shared pipeline; no Residential-only retry is asserted."
+    },
+    {
+      "id": "R053",
+      "module": "residential-vpn",
+      "kind": "declares_type",
+      "from": "IRSpeedyVPN/Models/NewService/AccountInfoEx.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialModels.cs",
+      "source_symbol": "AccountInfoEx.residential_vpn",
+      "target_symbol": "ResidentialConfig",
+      "evidence": {
+        "path": "IRSpeedyVPN/Models/NewService/AccountInfoEx.cs",
+        "line": 14,
+        "text": "public IRSpeedyVPN.Residential.ResidentialConfig residential_vpn { get; set; }"
+      }
+    },
+    {
+      "id": "R054",
+      "module": "residential-vpn",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.xaml.cs",
+      "to": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
+      "source_symbol": "MainWindow.ProcessInfo",
+      "target_symbol": "UCServerList.ConfigureResidential",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.xaml.cs",
+        "line": 1259,
+        "text": "uCServerList.ConfigureResidential(acc);"
+      }
+    },
+    {
+      "id": "R055",
+      "module": "residential-vpn",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+      "to": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
+      "source_symbol": "MainWindow.TryApplyCachedAccountAsync",
+      "target_symbol": "UCServerList.ConfigureResidential",
+      "evidence": {
+        "path": "IRSpeedyVPN/MainWindow.FastStartup.cs",
+        "line": 194,
+        "text": "uCServerList.ConfigureResidential(account);"
+      },
+      "note": "Cached-startup path configures Residential before showing the chooser."
+    },
+    {
+      "id": "R056",
+      "module": "residential-vpn",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+      "source_symbol": "UCServerList.InitializeResidential",
+      "target_symbol": "ResidentialViewModel",
+      "evidence": {
+        "path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
+        "line": 29,
+        "text": "residential = new ResidentialViewModel(globalInfo);"
+      }
+    },
+    {
+      "id": "R057",
+      "module": "residential-vpn",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+      "source_symbol": "UCServerList.ConfigureResidential",
+      "target_symbol": "ResidentialViewModel.Configure",
+      "evidence": {
+        "path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
+        "line": 60,
+        "text": "residential.Configure(account);"
+      }
+    },
+    {
+      "id": "R058",
+      "module": "residential-vpn",
+      "kind": "assigns_delegate",
+      "from": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+      "source_symbol": "ResidentialViewModel.ResidentialViewModel",
+      "target_symbol": "ResidentialViewModel.DownloadAsync",
+      "evidence": {
+        "path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+        "line": 40,
+        "text": "this.fetch = fetch ?? DownloadAsync;"
+      },
+      "note": "Default downloader; tests may inject a fetch delegate."
+    },
+    {
+      "id": "R059",
+      "module": "residential-vpn",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialSubscription.cs",
+      "source_symbol": "ResidentialViewModel.RefreshCoreAsync",
+      "target_symbol": "ResidentialSubscription.Parse",
+      "evidence": {
+        "path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+        "line": 103,
+        "text": "var catalog = ResidentialSubscription.Parse(payload.Body);"
+      }
+    },
+    {
+      "id": "R060",
+      "module": "residential-vpn",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialService.cs",
+      "source_symbol": "ResidentialViewModel.RefreshCoreAsync",
+      "target_symbol": "ResidentialService",
+      "evidence": {
+        "path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+        "line": 113,
+        "text": "Services = catalog.Select(c => (IVPNService)new ResidentialService(c, global, key)).ToArray();"
+      }
+    },
+    {
+      "id": "R061",
+      "module": "residential-vpn",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialModels.cs",
+      "source_symbol": "ResidentialViewModel.RefreshCoreAsync",
+      "target_symbol": "ResidentialTraffic.Parse",
+      "evidence": {
+        "path": "IRSpeedyVPN/Residential/ResidentialViewModel.cs",
+        "line": 116,
+        "text": "Traffic = ResidentialTraffic.Parse(payload.TrafficHeader);"
+      }
+    },
+    {
+      "id": "R062",
+      "module": "residential-vpn",
+      "kind": "inherits",
+      "from": "IRSpeedyVPN/Residential/ResidentialService.cs",
+      "to": "IRSpeedyVPN/Services/TunnelPlusService.cs",
+      "source_symbol": "ResidentialService",
+      "target_symbol": "TunnelPlusService",
+      "evidence": {
+        "path": "IRSpeedyVPN/Residential/ResidentialService.cs",
+        "line": 10,
+        "text": "internal sealed class ResidentialService : TunnelPlusService"
+      }
+    },
+    {
+      "id": "R063",
+      "module": "residential-vpn",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialTrafficBar.cs",
+      "source_symbol": "UCServerList.UpdateResidentialVisuals",
+      "target_symbol": "ResidentialTrafficBar.Update",
+      "evidence": {
+        "path": "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
+        "line": 124,
+        "text": "trafficBar.Update(residential.VisibleTraffic, residentialConnected, isResidentialTab);"
+      }
+    },
+    {
+      "id": "R064",
+      "module": "ui",
+      "kind": "hosts_control",
+      "from": "IRSpeedyVPN/UserControls/UCServerList.xaml",
+      "to": "IRSpeedyVPN/Residential/ResidentialTrafficBar.cs",
+      "source_symbol": "UCServerList",
+      "target_symbol": "ResidentialTrafficBar",
+      "evidence": {
+        "path": "IRSpeedyVPN/UserControls/UCServerList.xaml",
+        "line": 63,
+        "text": "<res:ResidentialTrafficBar x:Name=\"trafficBar\" Grid.Row=\"2\"/>"
+      }
+    },
+    {
+      "id": "R065",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+      "source_symbol": "UCServerList.RefreshCountry",
+      "target_symbol": "ServerCountryPicker.Load",
+      "evidence": {
+        "path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
+        "line": 187,
+        "text": "countryPicker.Load(services, _isUrlTestSupported);"
+      },
+      "note": "countryPicker selects the active scope; both tabs reuse the picker implementation."
+    },
+    {
+      "id": "R066",
+      "module": "ui",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
+      "to": "IRSpeedyVPN/Services/ServerCheckCache.cs",
+      "source_symbol": "UCServerList.RefreshCountry",
+      "target_symbol": "ServerCheckCache",
+      "evidence": {
+        "path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
+        "line": 174,
+        "text": "probeCaches[context] = probeCache = new ServerCheckCache(globalInfo?.Username ?? \"\", scope + \"\\n\" + (protocol ?? \"\"));"
+      },
+      "note": "Separate account/service/protocol cache contexts are retained."
+    },
+    {
+      "id": "R067",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+      "source_symbol": "UCServerList.CheckServerAsync",
+      "target_symbol": "ServerCountryPicker.RefreshGroup",
+      "evidence": {
+        "path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
+        "line": 431,
+        "text": "picker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);"
+      },
+      "note": "Committed or rollback result is applied before continuing the queue."
+    },
+    {
+      "id": "R068",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerListRanking.cs",
+      "source_symbol": "ServerCountryPicker.ResortGroups",
+      "target_symbol": "ServerListRanking.Order",
+      "evidence": {
+        "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+        "line": 510,
+        "text": "var ordered = ServerListRanking.Order(_allGroups, g => g.IsLastSuccessfulConnection,"
+      }
+    },
+    {
+      "id": "R069",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+      "to": "IRSpeedyVPN/Residential/ResidentialModels.cs",
+      "source_symbol": "GroupItem.DisplayLatency",
+      "target_symbol": "ResidentialPresentation.DisplayPing",
+      "evidence": {
+        "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+        "line": 167,
+        "text": "private long DisplayLatency(long latency) => IsResidential ? IRSpeedyVPN.Residential.ResidentialPresentation.DisplayPing(latency) : latency;"
+      },
+      "note": "Residential-only factor; VPN keeps measured latency."
+    },
+    {
+      "id": "R070",
+      "module": "ui",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs",
+      "source_symbol": "ServerCountryPicker.ServerCountryPicker",
+      "target_symbol": "ServerListViewModel",
+      "evidence": {
+        "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+        "line": 354,
+        "text": "_serverList = new ServerListViewModel();"
+      }
+    },
+    {
+      "id": "R071",
+      "module": "ui",
+      "kind": "constructs",
+      "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs",
+      "source_symbol": "ServerCountryPicker.ServerCountryPicker",
+      "target_symbol": "ServerListSweepAnimator",
+      "evidence": {
+        "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
+        "line": 356,
+        "text": "_sweepAnimator = new ServerListSweepAnimator(_serverList, icCountries, ServerScroller, CometOverlay);"
+      }
+    },
+    {
+      "id": "R072",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs",
+      "source_symbol": "ServerCountryPicker.BeginCheckCycle",
+      "target_symbol": "ServerListViewModel.BeginCheckCycle",
+      "evidence": {
+        "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs",
+        "line": 18,
+        "text": "_serverList.BeginCheckCycle();"
+      }
+    },
+    {
+      "id": "R073",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs",
+      "source_symbol": "ServerCountryPicker.RefreshDisplayedRows",
+      "target_symbol": "ServerListViewModel.Publish",
+      "evidence": {
+        "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs",
+        "line": 65,
+        "text": "_serverList.Publish(_groups.Select(group => new ServerItem(group)), animate, allowReorder || instant, completedIdentity);"
+      }
+    },
+    {
+      "id": "R074",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs",
+      "source_symbol": "ServerListSweepAnimator.Prepare",
+      "target_symbol": "ServerListViewModel.TryBeginPass",
+      "evidence": {
+        "path": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs",
+        "line": 69,
+        "text": "while ((_pass = _model.TryBeginPass()) != null)"
+      }
+    },
+    {
+      "id": "R075",
+      "module": "ui",
+      "kind": "calls",
+      "from": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs",
+      "to": "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs",
+      "source_symbol": "ServerListSweepAnimator.FinishPass",
+      "target_symbol": "ServerListViewModel.Finish",
+      "evidence": {
+        "path": "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs",
+        "line": 161,
+        "text": "_model.Finish(_pass); _pass = null; _timeline = null; _surfaces.Clear();"
+      },
+      "note": "FinishPass queues Prepare again; model Finish also resynchronizes frozen rows from current Servers."
+    },
+    {
+      "id": "R076",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/ParallelDnsChecks/ParallelDnsChecks.csproj",
+      "to": "IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "tests/ParallelDnsChecks/ParallelDnsChecks.csproj",
+        "line": 8,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs\" Link=\"ParallelDnsRouting.cs\" />"
+      }
+    },
+    {
+      "id": "R077",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/NetworkRecoveryChecks/NetworkRecoveryChecks.csproj",
+      "to": "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "tests/NetworkRecoveryChecks/NetworkRecoveryChecks.csproj",
+        "line": 7,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs\" Link=\"TunnelPlusService.NetworkRecovery.cs\" />"
+      }
+    },
+    {
+      "id": "R078",
+      "module": "tests",
+      "kind": "reads_source",
+      "from": "tests/PasswordReloginChecks/run.py",
+      "to": "IRSpeedyVPN/Common/AccountSessionMaintenance.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "tests/PasswordReloginChecks/run.py",
+        "line": 15,
+        "text": "maintenance = root/'IRSpeedyVPN/Common/AccountSessionMaintenance.cs'"
+      }
+    },
+    {
+      "id": "R079",
+      "module": "tests",
+      "kind": "reads_source",
+      "from": "tests/ResidentialChecks/run.py",
+      "to": "IRSpeedyVPN/Residential/ResidentialTrafficBar.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "tests/ResidentialChecks/run.py",
+        "line": 18,
+        "text": "traffic_source=(base/'Residential/ResidentialTrafficBar.cs').read_text()"
+      }
+    },
+    {
+      "id": "R080",
+      "module": "tests",
+      "kind": "reads_source",
+      "from": "tests/LoginRecoveryChecks/run.py",
+      "to": "IRSpeedyVPN/WebServices/NewServiceController.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "evidence": {
+        "path": "tests/LoginRecoveryChecks/run.py",
+        "line": 27,
+        "text": "controller = (source/'NewServiceController.cs').read_text(encoding='utf-8-sig')"
+      }
+    }
   ],
   "file_inventory": {
     ".gitignore": "9ada019910cdbdfc504ee2ca2f61c23025805de3",
@@ -1617,5 +2683,10 @@
     "tools/IRSpeedyHotspotHelper/app.manifest": "76333e9576822bf68bc6b2fe1df85670d9be2b81",
     "tools/Test-HotspotPayload.ps1": "9f5bb5632cb34a78514eca3e1057bc5b176ab13c",
     "tools/validate-ui-handoff.py": "193b13d88816e69ae98fad7c355810d1991d3fbb"
+  },
+  "bootstrap_manual_review": {
+    "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+    "previous_status": "verified-for-base-commit",
+    "note": "Prior manual review retained as seed provenance; the first automated pass must recheck all existing witnesses."
   }
 }

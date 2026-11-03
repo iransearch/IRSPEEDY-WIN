@@ -1,5 +1,7 @@
 # Module map
 
+> Historical manually reviewed baseline notes. For current validity, stale edges and the analyzed commit, read [status.md](status.md), [automation.md](automation.md) and `manifest.json`.
+
 Baseline and validity: [overview.md](overview.md). Paths are repository-relative;
 each item is a navigation starting point, not a claim that every method in that file is covered.
 Canonical verified edges and their source lines are in [manifest.json](manifest.json).

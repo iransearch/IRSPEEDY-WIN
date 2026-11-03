@@ -1,5 +1,7 @@
 # Code Knowledge Graph: navigation first
 
+> Historical manually reviewed baseline notes. For current validity, stale edges and the analyzed commit, read [status.md](status.md), [automation.md](automation.md) and `manifest.json`.
+
 Source baseline: `a57db82d05d3182eba7d98db5a47cf28d4d42f66` on `agent/core-startup-diagnostics-fix` (assembly `1.4.70`).
 Generated: `2026-11-03T15:36:20Z`. Schema: `1.0.0`.
 Status: **verified for this source commit; targeted and incomplete; not runtime validation**.

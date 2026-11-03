@@ -1,5 +1,7 @@
 # Verified dependencies and relationships
 
+> Historical manually reviewed baseline notes. For current validity, stale edges and the analyzed commit, read [status.md](status.md), [automation.md](automation.md) and `manifest.json`.
+
 Only explicit source/build relationships are graph edges. Each row links to the exact baseline
 source line; the manifest also stores the witness text and full endpoint paths. `calls` describes
 a static call site, not proof that it ran. `subscribes`, `constructs`, `inherits`, `implements`,

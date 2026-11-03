@@ -1,5 +1,7 @@
 # Entrypoints and primary flows
 
+> Historical manually reviewed baseline notes. For current validity, stale edges and the analyzed commit, read [status.md](status.md), [automation.md](automation.md) and `manifest.json`.
+
 All paths refer to `a57db82d05d3182eba7d98db5a47cf28d4d42f66`. These are verified static routes, not runtime traces.
 Use the relation IDs / source witnesses in [dependencies.md](dependencies.md) and the manifest
 before expanding a flow. Unlisted callers and branches remain unknown.
