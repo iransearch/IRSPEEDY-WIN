@@ -29,7 +29,7 @@ Do not add credentials, tokens, keys, raw subscriptions, customer logs, or specu
 Graph maintenance must not silently modify runtime files, security settings or release versions.
 
 Development stays on `agent/core-startup-diagnostics-fix`; do not retarget maintenance to `main`.
-The workflow updates graph outputs only. For changes to the updater/workflow, run
+The workflow computes graph outputs only as downloadable artifacts and never pushes to the protected branch. Checked-in graph metadata may lag the source; compare the analyzed commit with the actual checkout and use a reviewed PR to apply artifact snapshots. For changes to the updater/workflow, run
 `python3 -m unittest discover -s tests/CodegraphChecks -p 'test_*.py' -v`, then run
 `python3 tools/codegraph/update.py --dry-run --report /tmp/codegraph-trial.json` before publication.
 Runtime relations touched by a source/dependency change remain stale until a real source/caller/test
