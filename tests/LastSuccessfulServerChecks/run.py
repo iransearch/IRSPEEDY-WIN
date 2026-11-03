@@ -22,6 +22,10 @@ namespace IRSpeedyVPN.Resource {
  }
 }
 namespace IRSpeedyVPN.Common {internal static class LogHelper {internal static void WriteLog(Exception ex){}}}
+// Inert boundary for the production Residential service type referenced by the key algorithm.
+namespace IRSpeedyVPN.Residential { class ResidentialService : IRSpeedyVPN.Interfaces.IVPNService {
+ public string AccountScope {get;set;} public int ID {get;set;} public object SelectedServerUrl {get;set;}=new object();
+} }
 class Service:IVPNService,ISmartFastConnection {
  public int ID {get;set;} public bool IsSmartFast {get;set;} public object SelectedServerUrl {get;set;}=new object();
 }
@@ -65,6 +69,9 @@ class Program {
   reloaded.Filter="Germany";reloaded.Selected=chosen;reloaded.Reorder();reloaded.Reload();
   Check(reloaded.Visible.All(g=>g.CountryName.Contains("Germany"))&&ReferenceEquals(reloaded.Selected,chosen),"pinning preserves search filtering and current selection");
   Check(LastSuccessfulServer.Key(new OtherService{ID=3})!=LastSuccessfulServer.Key(new Service{ID=3}),"same numeric ID in another service type does not inherit the star");
+  Check(LastSuccessfulServer.Key(new IRSpeedyVPN.Residential.ResidentialService{ID=3,AccountScope="user-a"}) !=
+        LastSuccessfulServer.Key(new IRSpeedyVPN.Residential.ResidentialService{ID=3,AccountScope="user-b"}),
+        "Residential accounts with same server ID have isolated persisted keys");
   var missing=NewPicker();missing._allGroups.RemoveAll(g=>g.Service.ID==3);missing.Reload();
   Check(!missing._allGroups.Any(g=>g.IsLastSuccessfulConnection)&&missing._allGroups[0].Service.ID==1,"removed server creates no phantom starred row");
   IRSpeedyVPN.Resource.RegHelper.FailWrite=true;
