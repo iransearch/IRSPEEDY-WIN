@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Incremental, conservative WPF UI declaration index. No runtime-edge inference."""
-import hashlib
 import json
+import posixpath
 import re
 import subprocess
 import xml.etree.ElementTree as ET
@@ -35,7 +35,8 @@ def parse_xaml(text, path, sha):
     lines = text.splitlines()
     result = {'path':path, 'blob_sha':sha, 'status':'verified-declarations',
               'x_class':cls, 'evidence':{}, 'names':[], 'events':[],
-              'resource_references':[], 'codebehind':None}
+              'resource_references':[], 'resource_definitions':[],
+              'merged_dictionaries':[], 'codebehind':None}
     if cls:
         result['evidence']['x_class'] = witness(lines, 'x:Class="'+cls+'"')
     for el in root.iter():
@@ -43,20 +44,27 @@ def parse_xaml(text, path, sha):
         if named:
             result['names'].append({'name':named, 'tag':el.tag.split('}')[-1],
                 'evidence':witness(lines, 'x:Name="'+named+'"')})
+        definition = el.attrib.get(XAML_NS+'Key')
+        if definition:
+            result['resource_definitions'].append({'key':definition,
+                'evidence':witness(lines, 'x:Key="'+definition+'"')})
         for attr, val in el.attrib.items():
             field = attr.split('}')[-1]
+            if el.tag.split('}')[-1] == 'ResourceDictionary' and field == 'Source':
+                result['merged_dictionaries'].append({'uri':val, 'status':'literal-uri-only',
+                    'evidence':witness(lines, val)})
             if field in EVENTS and re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', val or ''):
                 result['events'].append({'event':field, 'handler':val,
                     'status':'xaml-declaration-only', 'evidence':witness(lines,val)})
             for kind, key in RESOURCE.findall(val or ''):
                 result['resource_references'].append({'kind':kind, 'key':key,
                     'status':'key-reference-only', 'evidence':witness(lines,kind+' '+key)})
-    for field in ('names','events','resource_references'):
+    for field in ('names','events','resource_references','resource_definitions','merged_dictionaries'):
         # Coalesce duplicate occurrences while retaining one exact source witness.
         dedup = {}
         for item in result[field]:
             key = (item.get('name'),item.get('tag'),item.get('event'),
-                   item.get('handler'),item.get('kind'),item.get('key'))
+                   item.get('handler'),item.get('kind'),item.get('key'),item.get('uri'))
             dedup.setdefault(key,item)
         result[field] = list(dedup.values())
     return result
@@ -84,8 +92,7 @@ def check_codebehind(git, node, inventory, cache):
     if match:
         line=text.count('\n',0,match.start())+1
         node['codebehind']['evidence']={'line':line,'text':text.splitlines()[line-1].strip()}
-    if status != 'verified-declaration':
-        node['status']='needs-review'
+    node['status'] = 'verified-declarations' if status == 'verified-declaration' else 'needs-review'
 
 def synchronize(git, previous, inventory, target):
     """On first run parse XAML inventory once; subsequently read only changed UI blobs."""
@@ -148,6 +155,8 @@ def synchronize(git, previous, inventory, target):
                       'named_controls':sum(len(n.get('names',[])) for n in nodes.values()),
                       'event_declarations':sum(len(n.get('events',[])) for n in nodes.values()),
                       'resource_key_references':sum(len(n.get('resource_references',[])) for n in nodes.values()),
+                      'resource_definitions':sum(len(n.get('resource_definitions',[])) for n in nodes.values()),
+                      'merged_dictionary_declarations':sum(len(n.get('merged_dictionaries',[])) for n in nodes.values()),
                       'pending_review':len(pending)}}
     report={'ui_files_read':len(git.reads)-reads_before,
             'ui_xaml_reparsed':len(modified_xaml & inventory.keys()),
