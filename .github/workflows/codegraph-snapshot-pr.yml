@@ -1,0 +1,135 @@
+name: Codegraph Snapshot Pull Request
+
+# Only trusted pushes to the protected development branch can access the app key.
+on:
+  push:
+    branches: [agent/core-startup-diagnostics-fix]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One writer for the single managed snapshot branch, never cancel an active writer.
+concurrency:
+  group: codegraph-reviewed-snapshot-pr
+  cancel-in-progress: false
+
+jobs:
+  propose-snapshot:
+    name: Propose reviewed Codegraph snapshot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - name: Checkout exact development commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: agent/core-startup-diagnostics-fix
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Reject stale workflow run
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git ls-remote origin refs/heads/agent/core-startup-diagnostics-fix | cut -f1)" = "$GITHUB_SHA"
+
+      - name: Generate incremental graph snapshot locally
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests/CodegraphChecks -p 'test_*.py' -v
+          python3 tools/codegraph/update.py --target "$GITHUB_SHA" \
+            --report "$RUNNER_TEMP/codegraph-auto-pr.json" \
+            --summary "$GITHUB_STEP_SUMMARY"
+
+      - name: Validate generated paths and detect changes
+        id: diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - "$RUNNER_TEMP/codegraph-auto-pr.json" "$GITHUB_OUTPUT" <<'PY'
+          import json, subprocess, sys
+          report=json.load(open(sys.argv[1]))
+          if report.get('validity')=='failed' or report.get('dry_run'):
+              raise SystemExit('Refusing failed or dry-run graph snapshot')
+          if report.get('target_commit') != subprocess.check_output(
+              ['git','rev-parse','HEAD'],text=True).strip():
+              raise SystemExit('Snapshot target does not match checkout')
+          allowed={'docs/codegraph/manifest.json','docs/codegraph/dependencies.md',
+                   'docs/codegraph/status.md','docs/codegraph/ui-index.json'}
+          modified=set(subprocess.check_output(
+              ['git','status','--porcelain','--untracked-files=all'],text=True
+          ).splitlines())
+          paths={line[3:] for line in modified}
+          if paths-allowed:
+              raise SystemExit('Unexpected modified paths: '+repr(sorted(paths-allowed)))
+          changed=bool(paths)
+          with open(sys.argv[2],'a') as out:
+              out.write('changed='+str(changed).lower()+'\n')
+          print('Generated graph files changed:',len(paths),'of',len(allowed))
+          PY
+
+      - name: Check dedicated GitHub App credentials are configured
+        if: steps.diff.outputs.changed == 'true'
+        shell: bash
+        env:
+          APP_CLIENT_ID: ${{ vars.CODEGRAPH_APP_CLIENT_ID }}
+          HAS_APP_KEY: ${{ secrets.CODEGRAPH_APP_PRIVATE_KEY != '' }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$APP_CLIENT_ID" || "$HAS_APP_KEY" != "true" ]]; then
+            echo "::error::Configure CODEGRAPH_APP_CLIENT_ID repository variable and CODEGRAPH_APP_PRIVATE_KEY secret for a repository-scoped GitHub App (Contents and Pull requests: read/write)."
+            exit 1
+          fi
+
+      - name: Mint repository-scoped GitHub App token
+        if: steps.diff.outputs.changed == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.CODEGRAPH_APP_CLIENT_ID }}
+          private-key: ${{ secrets.CODEGRAPH_APP_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+
+      - name: Create or update one reviewable snapshot PR
+        if: steps.diff.outputs.changed == 'true'
+        id: snapshot-pr
+        uses: peter-evans/create-pull-request@v8
+        with:
+          token: ${{ steps.app-token.outputs.token }}
+          branch-token: ${{ steps.app-token.outputs.token }}
+          base: agent/core-startup-diagnostics-fix
+          branch: automation/codegraph-reviewed-snapshot
+          delete-branch: true
+          add-paths: |
+            docs/codegraph/manifest.json
+            docs/codegraph/dependencies.md
+            docs/codegraph/status.md
+            docs/codegraph/ui-index.json
+          commit-message: "docs(codegraph): refresh reviewed snapshot"
+          title: "docs(codegraph): refresh generated snapshot"
+          draft: true
+          body: |
+            Automatically generated Codegraph snapshot for source commit \`${{ github.sha }}\`.
+
+            - Only machine-generated Codegraph outputs are included.
+            - Review source witnesses, validity and stale/pending relationships before marking ready.
+            - The required **Fast offline regression (Linux .NET 8)** check must pass.
+            - No direct push or automatic merge to the development branch.
+            - `main` is not a target.
+
+      - name: Summarize proposal status
+        if: success()
+        shell: bash
+        env:
+          CHANGED: ${{ steps.diff.outputs.changed }}
+          OPERATION: ${{ steps.snapshot-pr.outputs.pull-request-operation }}
+          PR_URL: ${{ steps.snapshot-pr.outputs.pull-request-url }}
+        run: |
+          if [[ "$CHANGED" == "true" ]]; then
+            echo "Snapshot PR: ${PR_URL:-unavailable}; operation: ${OPERATION:-unknown}" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Graph unchanged; no snapshot PR necessary." >> "$GITHUB_STEP_SUMMARY"
+          fi
