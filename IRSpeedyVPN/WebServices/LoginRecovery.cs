@@ -56,7 +56,8 @@ namespace IRSpeedyVPN.WebServices
         internal string Body, RemoteIp;
         internal bool Unavailable, MetricsKnown;
         internal double ConnectSeconds, TlsSeconds, PretransferSeconds, UploadedBytes;
-        // Optional diagnostics only: absence never changes replay eligibility.
+        // Optional receive diagnostics. Missing values never establish the additional
+        // failed-connect proof below or weaken the ordinary replay guard.
         internal double? FirstByteSeconds, TotalSeconds, DownloadedBytes;
         internal string HttpVersion;
         internal string ResponseHeadersSummary = "headersKnown=False", BodyKind = "unknown";
@@ -74,10 +75,12 @@ namespace IRSpeedyVPN.WebServices
         // are never evidence that it is safe to repeat a credential POST.
         internal bool MayHaveBeenSent => !MetricsKnown || UploadedBytes > 0 || HttpCode > 0
             || Redirects != 0 || TlsSeconds > 0 || PretransferSeconds > 0;
-        // Bundled Windows curl can report positive time_pretransfer on exit 6
-        // without resolving/connecting. Only complete DNS-stage evidence can
-        // override that conservative signal; callers apply this proof to HTTPS.
-        internal bool DefinitelyNotSent => !Unavailable && MetricsKnown && ExitCode == 6
+        // Bundled Windows curl can report positive time_pretransfer before DNS or
+        // connect failure. Exit 7 additionally needs the complete receive trailer,
+        // no HTTP protocol and no received data. This proof applies only to HTTPS.
+        internal bool DefinitelyNotSent => !Unavailable && MetricsKnown
+            && (ExitCode == 6 || (ExitCode == 7 && TransferMetricsKnown
+                && DownloadedBytes == 0 && HttpVersion == "0" && string.IsNullOrEmpty(Body)))
             && ConnectSeconds == 0 && TlsSeconds == 0 && UploadedBytes == 0
             && HttpCode == 0 && Redirects == 0 && RemoteIp == null;
         // The all-zero TLS proof is specific to HTTPS. Retain the previous

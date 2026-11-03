@@ -56,7 +56,7 @@ static class DnsFailureChecks
         {
             var result = Captured(); result.ExitCode = code;
             Check(!result.DefinitelyNotSent && !result.CanRecover && result.MayHaveBeenSentFor(true),
-                "positive-pretransfer override is not extended to exit " + code);
+                "positive pretransfer alone cannot prove an unsent request for exit " + code);
         }
         var partial = CurlHelper.ParseLoginResult("__LOGIN_CONNECT__:0\n__LOGIN_TLS__:0\n", 6);
         Check(!partial.MetricsKnown && !partial.DefinitelyNotSent && !partial.CanRecover,
