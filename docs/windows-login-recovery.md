@@ -1,9 +1,10 @@
-# Windows login DNS and recovery (1.4.64)
+# Windows login DNS and recovery (1.4.72)
 
-The production login uses classic DNS first, matching the successful 1.4.50
-behavior. This cleanup removes experiment switches and obsolete login DoH
-transport code. It does not change the UI, Shield, routing, Core, VPN DNS race,
-TLS verification, replay rules or the four-second minimum loading presentation.
+The production login uses classic DNS first and completion-order A/AAAA selection.
+Version 1.4.72 extends the narrow HTTPS pre-send proof to fully evidenced native
+connect failures so the existing cache eviction and bounded recovery can run.
+TLS verification, ambiguous/sent POST protection, UI, Shield, routing, Core,
+VPN DNS and the four-second minimum loading presentation remain unchanged.
 
 ## Production flow
 
@@ -68,11 +69,21 @@ HTTP status, redirects, TLS completion or pretransfer indicates possible send.
 Exit-code-only assumptions do not override complete HTTPS metrics. Plain HTTP
 retains its earlier conservative exit 52/55/56 and connected-timeout guards.
 
-The narrow DefinitelyNotSent exception handles the observed bundled-curl exit 6
-with positive pretransfer despite failure in local DNS. It requires known
-metrics, available curl, exit 6, zero connect/TLS/upload/HTTP/redirects and no
-remote IP. It applies only to HTTPS decisions, including final host failover.
-Incomplete/default-zero metrics cannot authorize retry.
+The narrow DefinitelyNotSent exception handles observed bundled-curl DNS/connect
+failures with positive pretransfer despite no completed connection. Both exit 6
+and exit 7 require known core metrics, available curl, zero
+connect/TLS/upload/HTTP/redirects and no remote IP. Exit 7 additionally requires
+the complete valid receive trailer (first-byte/total/download/protocol), zero
+download, protocol `0` and no response body. Missing or contradictory evidence
+cannot authorize this exception. It applies only to HTTPS decisions, including
+final host failover; plain HTTP and ambiguous/posted attempts remain blocked.
+
+After this proof, the existing recovery path evicts the failed DNS set. A failed
+cached answer can refresh once; a failed fresh answer falls back to system DNS
+without another resolver race for that hostname in the same login. Subsequent
+independent login attempts no longer reuse the evicted failing set. The first
+valid public DNS answer still wins equally for A/AAAA: no family preference,
+extra IPv4 wait, parallel credential POST or new retry loop is introduced.
 
 Same-host recovery remains limited to proven-unsent exit 6/7/35/60, or exit 28
 with zero connect time. The separate unsent connected-TCP timeout gate permits
