@@ -6,8 +6,8 @@ No workflow writes to `main`, the protected development branch, VPN application 
 ## Activation and trial
 
 The initial graph and this automation are proposed together in PR #3. Nothing is merged by this task.
-PR checks run tests plus a read-only trial. After merge, each push to the development branch and each pull request runs checks and generates a scoped graph snapshot **as a build artifact only**. No workflow pushes graph files to any branch.
-There is no bot push, bypass, write token or feedback loop. The single checks job uses `contents: read` and uploads report plus generated graph outputs. This avoids conflict with branch required checks. Reviewers must apply a snapshot through an ordinary reviewed PR before claiming the repository's checked-in graph is current.
+PR checks run tests plus a read-only trial. After merge, each push to the development branch and each pull request runs checks and generates a scoped graph snapshot **as a build artifact**. An independent, **push-only** reviewed-snapshot workflow also proposes generated graph changes on a dedicated PR branch using the built-in GITHUB_TOKEN without any additional secrets. It never pushes directly to the protected development branch. See [reviewed-snapshot-pr.md](reviewed-snapshot-pr.md).
+The artifact-generation job remains read-only. The separate proposal job uses the built-in GITHUB_TOKEN to update **only the proposal branch** and create/update one draft PR; no App or secrets are needed. Since GITHUB_TOKEN-created PRs do not normally trigger workflows, the job explicitly requests a workflow_dispatch of Regression Guard on the PR branch; if this cannot run or satisfy the required check, the PR remains blocked and requires manual investigation. There is no bypass or auto-merge. Reviewers must merge a verified snapshot PR before claiming the repository's checked-in graph is current.
 
 ```sh
 python3 -m unittest discover -s tests/CodegraphChecks -p 'test_*.py' -v
@@ -66,14 +66,14 @@ reviewed rebaseline of witnesses, pins and pending items. Do not clear a warning
 
 ## Output and publication safety
 
-The workflow has `contents: read`, no remote write credentials and no publish step.
+The artifact workflow has `contents: read`, no remote write credentials and no publish step.
 It executes `update.py` in a disposable checkout and uploads `manifest.json`,
 `dependencies.md`, `status.md`, `ui-index.json` and the run report.
 This upload does **not** update the branch or refresh the repository's tracked checkpoint.
 The source baseline can therefore grow older after later pushes. The updater diffs from
 the last *reviewed, committed* checkpoint and may read multiple accumulated changed
 blobs. It never silently claims that a stale repository snapshot is fresh.
-For a persistent refresh, use a **push-triggered** artifact from the actual development
+For a manual persistent refresh (if automatic proposal credentials are not configured), use a **push-triggered** artifact from the actual development
 branch (not a PR merge-ref artifact, whose synthetic commit may not be in the eventual
 branch history). Download/check that artifact, confirm the analyzed source
 commit is an ancestor of the target branch and graph validity, then apply the generated files through a separate ordinary PR
