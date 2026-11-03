@@ -2,18 +2,18 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "8dffd87820b975f617be37417945482311eb7b9c",
-  "base_tree": "cfd5a05c4159411ce9905e35d223d19163663fa6",
-  "generated_at": "2026-11-03T20:35:39Z",
+  "base_commit": "9edc46309b896bb24ede5f811be4525f64941179",
+  "base_tree": "0c192b12f19b4bb057643c6705f25f043b25d99f",
+  "generated_at": "2026-11-03T21:48:16Z",
   "validity": {
-    "status": "validated-for-analyzed-commit",
+    "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
     "analysis_complete": false,
     "runtime_validated": false,
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-03T20:35:39Z"
+    "validated_at": "2026-11-03T21:48:16Z"
   },
   "counts": {
     "inventory_files": 995,
@@ -24,10 +24,10 @@
     "test_projects": 20,
     "python_run_py_files": 19,
     "requested_modules": 6,
-    "primary_paths_mapped": 6,
-    "verified_relations": 80,
+    "primary_paths_mapped": 4,
+    "verified_relations": 73,
     "relation_evidence_files": 32,
-    "stale_relations": 0,
+    "stale_relations": 7,
     "total_relations": 80
   },
   "graph_files": [
@@ -184,7 +184,7 @@
     {
       "id": "residential-vpn",
       "name": "Residential VPN",
-      "status": "primary-path-mapped",
+      "status": "needs-review",
       "entrypoints": [
         "IRSpeedyVPN/UserControls/UCServerList.Residential.cs",
         "IRSpeedyVPN/Residential/ResidentialViewModel.cs"
@@ -218,7 +218,7 @@
     {
       "id": "ui",
       "name": "UI / shared row transitions",
-      "status": "primary-path-mapped",
+      "status": "needs-review",
       "entrypoints": [
         "IRSpeedyVPN/Program.cs",
         "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
@@ -1705,10 +1705,11 @@
         "blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
       "target_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R055",
@@ -1727,10 +1728,11 @@
       },
       "note": "Cached-startup path configures Residential before showing the chooser.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "37e9712259ee6240ff3e676d5ce53212b192c413",
       "target_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R056",
@@ -1748,10 +1750,11 @@
         "blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
       "target_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R057",
@@ -1769,10 +1772,11 @@
         "blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
       "target_blob": "7f2165bb78f9cf6478c69d0a6a6b0c679c574feb",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R058",
@@ -1896,10 +1900,11 @@
         "blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
       "target_blob": "48ab57e561b0c8a6670be31c1c44d1d70eb56221",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R064",
@@ -1917,10 +1922,11 @@
         "blob": "c9e2858c7a4d3f3ab182579cfdc301eebfa2438e"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "c9e2858c7a4d3f3ab182579cfdc301eebfa2438e",
       "target_blob": "48ab57e561b0c8a6670be31c1c44d1d70eb56221",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R065",
@@ -2237,10 +2243,11 @@
         "blob": "5c79f2457d9b918bcb4ee5767049393bb7c2090b"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "5c79f2457d9b918bcb4ee5767049393bb7c2090b",
       "target_blob": "48ab57e561b0c8a6670be31c1c44d1d70eb56221",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R080",
@@ -2408,7 +2415,7 @@
     "IRSpeedyVPN/Models/Services/Setting.cs": "cda177f45a3f88f3dbccad0603ed7d108e3cbe15",
     "IRSpeedyVPN/Models/Services/UserAccount.cs": "a9b959a4e55d52128b8f6898c86a5228689c3d2c",
     "IRSpeedyVPN/Program.cs": "7b777be52d04adcc910678247d0b19ac73f7132a",
-    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "c979f65f85c79dccbe1ffcc6887621f35e6c7714",
+    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "a3fe165aaebf790b49ff2c0380896d7c7175a584",
     "IRSpeedyVPN/Properties/Resources.Designer.cs": "7c0cb8a594732898f58208b4e884920b61557b25",
     "IRSpeedyVPN/Properties/Resources.resx": "1af7de150c99c12dd67a509fe57c10d63e4eeb04",
     "IRSpeedyVPN/Properties/Settings.Designer.cs": "8c14afa6f6e9f405ceba916e27cb4fcac6da06f3",
@@ -2917,9 +2924,9 @@
     "IRSpeedyVPN/UserControls/UCLoginLoading.xaml": "0135ff6b7d1dee75e77978e873bedc785eff1f4e",
     "IRSpeedyVPN/UserControls/UCLoginLoading.xaml.cs": "8de7a7371c352c6e8e31b41006c092969f5a4d75",
     "IRSpeedyVPN/UserControls/UCServerList.Refresh.cs": "c719a86a2abbe6e271650de510896c289d48e3e4",
-    "IRSpeedyVPN/UserControls/UCServerList.Residential.cs": "b491d49bf4b3bb4ba93472301cecc934814ce2d6",
+    "IRSpeedyVPN/UserControls/UCServerList.Residential.cs": "15d287d598dc85bab7ec0fde2677867834b7c8d6",
     "IRSpeedyVPN/UserControls/UCServerList.ServerResultsRefresh.cs": "842a3f77d2c1bf184473fed28592aacc1e946b5c",
-    "IRSpeedyVPN/UserControls/UCServerList.xaml": "c9e2858c7a4d3f3ab182579cfdc301eebfa2438e",
+    "IRSpeedyVPN/UserControls/UCServerList.xaml": "097ee52602f4b58def5756b51177b9fe3944f0d4",
     "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "bfde1369efe64f98b5b544545041d51d7734027e",
     "IRSpeedyVPN/UserControls/UCUpdate.xaml": "3c1099d30b1d0f22392a4221949f7194f304e008",
     "IRSpeedyVPN/UserControls/UCUpdate.xaml.cs": "487f9f766efba20bf54757b5aefa639e9fca1042",
@@ -3071,7 +3078,7 @@
     "docs/versioning.md": "bd18c2df08072a53eca8417723be805182cea300",
     "docs/vpn-time-zone.md": "ddaa0c0af2e0bd20ef3313f672b7f75abf7dd437",
     "docs/windows-login-recovery.md": "e67c0b72651a56464c083a49f6c770dc46af3d97",
-    "docs/windows-residential.md": "3d0cb30484bde0c717112a2213c020dcbdd5f6dd",
+    "docs/windows-residential.md": "8244b25274d67754faff16e9a6634684f4e66315",
     "docs/windows-session-maintenance.md": "cd5327cbce378bae24e86743ee110924b3f99f3d",
     "tests/AiStartupChecks/run.py": "9e552b21bd8a108512f4648cf921cf803f2afba3",
     "tests/ConnectedLatencyChecks/run.py": "7be0c91d88808acefdb30d53a22e589cecf21ceb",
@@ -3183,12 +3190,12 @@
     "tests/ResidentialChecks/CacheChecks.cs": "c9b646e60edf92fcaeebc5ca120ee483009f90fc",
     "tests/ResidentialChecks/CompileBoundary.cs": "e12a052bae26c3b5818575ad843789a99d971d50",
     "tests/ResidentialChecks/HttpChecks.cs": "ccd539f98c1a1328519a61be96e08b41375b2715",
-    "tests/ResidentialChecks/ModelChecks.cs": "2e6b62a1a37ce73801fe3104bceee51e5ea1f578",
+    "tests/ResidentialChecks/ModelChecks.cs": "27950853dd778d5e98ff105aa45efa60d62e432f",
     "tests/ResidentialChecks/README.md": "dfabb4ab9d03e43c077473c87db2e6c0b9677609",
     "tests/ResidentialChecks/StateBoundary.cs": "b2431ba2fc7150a64f5e337a53fa6cf354d37369",
-    "tests/ResidentialChecks/StateChecks.cs": "638a326e26470fb57281df4535a52645b10c086a",
+    "tests/ResidentialChecks/StateChecks.cs": "c1b712e7661f1b1ffa3d1b2c4025710d4aa62ae9",
     "tests/ResidentialChecks/UiCompileBoundary.cs": "15319389b4ea33880526fc7720fa3449b97c684b",
-    "tests/ResidentialChecks/run.py": "5c79f2457d9b918bcb4ee5767049393bb7c2090b",
+    "tests/ResidentialChecks/run.py": "cbd9eae9944bf6c6ce132659e715ca8c6b18f2f5",
     "tests/ServerListTransitionChecks/IncrementalOrderChecks.cs": "f9e0b374a5918180317433e86a257139d6b7728b",
     "tests/ServerListTransitionChecks/README.md": "30a2e993b078f76e9d3e0912c526574afc30a7cc",
     "tests/ServerListTransitionChecks/bindings.py": "ffdde8d8296bde653c417adb63361c879159f29c",
@@ -3266,8 +3273,14 @@
     "previous_status": "verified-for-base-commit",
     "note": "Prior manual review retained as seed provenance; the first automated pass must recheck all existing witnesses."
   },
-  "pending_review_files": {},
+  "pending_review_files": {
+    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/UserControls/UCServerList.Residential.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/UserControls/UCServerList.xaml": "runtime-or-ui-source-needs-review",
+    "tests/ResidentialChecks/ModelChecks.cs": "runtime-or-ui-source-needs-review",
+    "tests/ResidentialChecks/StateChecks.cs": "runtime-or-ui-source-needs-review"
+  },
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "5c51ea4767563f7aa0853861f108f04cd6d8f2872dd6322c90c905733208a809"
+  "validation_digest": "b0f784a59e1f4b8d20765d27db85a3e92160e148ab6419e98f7be841fe2ccec2"
 }
