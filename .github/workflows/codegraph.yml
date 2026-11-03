@@ -15,8 +15,9 @@ concurrency:
 
 jobs:
   checks:
+    name: Codegraph checks
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 8
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -24,39 +25,26 @@ jobs:
           persist-credentials: false
       - name: Test incremental analysis and publication guards
         run: python3 -m unittest discover -s tests/CodegraphChecks -p 'test_*.py' -v
-      - name: Read-only graph trial
-        run: >-
-          python3 tools/codegraph/update.py --dry-run --target "$GITHUB_SHA"
-          --report "$RUNNER_TEMP/codegraph-trial.json" --summary "$GITHUB_STEP_SUMMARY"
-      - name: Upload trial report
-        if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: codegraph-trial-${{ github.run_id }}
-          path: ${{ runner.temp }}/codegraph-trial.json
-          if-no-files-found: warn
-
-  sync:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/agent/core-startup-diagnostics-fix'
-    needs: checks
-    permissions:
-      contents: write
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          fetch-depth: 0
-      - name: Update only changed graph inputs
+      - name: Generate graph snapshot in disposable checkout only
         run: >-
           python3 tools/codegraph/update.py --target "$GITHUB_SHA"
-          --report "$RUNNER_TEMP/codegraph-sync.json" --summary "$GITHUB_STEP_SUMMARY"
-      - name: Publish graph outputs with branch and race guards
-        run: python3 tools/codegraph/publish.py --report "$RUNNER_TEMP/codegraph-sync.json"
-      - name: Upload final report
+          --report "$RUNNER_TEMP/codegraph-snapshot-report.json"
+          --summary "$GITHUB_STEP_SUMMARY"
+      - name: Explain artifact-only publication
+        if: success()
+        run: |
+          echo '### Publication policy' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Graph snapshot is saved as an artifact only. No commit or push to protected development branch.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Apply updated graph files later through a reviewed PR; stale checked-in graph cannot be treated as current.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload generated graph snapshot for reviewed PR application
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: codegraph-sync-${{ github.run_id }}
-          path: ${{ runner.temp }}/codegraph-sync.json
+          name: codegraph-snapshot-${{ github.run_id }}
+          path: |
+            docs/codegraph/manifest.json
+            docs/codegraph/dependencies.md
+            docs/codegraph/status.md
+            docs/codegraph/ui-index.json
+            ${{ runner.temp }}/codegraph-snapshot-report.json
           if-no-files-found: warn

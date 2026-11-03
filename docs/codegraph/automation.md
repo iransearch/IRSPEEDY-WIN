@@ -1,26 +1,20 @@
 # Incremental graph automation
 
 Development branch: `agent/core-startup-diagnostics-fix`. Workflow: `.github/workflows/codegraph.yml`.
-No workflow writes to `main`, VPN application sources, security settings or release/build inputs.
+No workflow writes to `main`, the protected development branch, VPN application sources, security settings or release/build inputs.
 
 ## Activation and trial
 
 The initial graph and this automation are proposed together in PR #3. Nothing is merged by this task.
-PR checks run tests plus a read-only trial. After merge, each push to the development branch runs
-the checks, then a scoped graph synchronization using the repository `GITHUB_TOKEN`.
-GitHub's repository token does not trigger another push workflow, as documented in
-[GitHub token guidance](https://docs.github.com/en/actions/concepts/security/github_token).
-Generated-only diffs also produce a no-op without another commit, independently preventing loops.
-Only the sync job has `contents: write`; the PR/check job has read-only permissions.
-If repository rules deny bot pushes, the job reports failure; it does not bypass branch protection.
+PR checks run tests plus a read-only trial. After merge, each push to the development branch and each pull request runs checks and generates a scoped graph snapshot **as a build artifact only**. No workflow pushes graph files to any branch.
+There is no bot push, bypass, write token or feedback loop. The single checks job uses `contents: read` and uploads report plus generated graph outputs. This avoids conflict with branch required checks. Reviewers must apply a snapshot through an ordinary reviewed PR before claiming the repository's checked-in graph is current.
 
 ```sh
 python3 -m unittest discover -s tests/CodegraphChecks -p 'test_*.py' -v
 python3 tools/codegraph/update.py --dry-run --report /tmp/codegraph-trial.json
 ```
 
-`--dry-run` never writes tracked files. Every run prints counts and writes a JSON report. GitHub jobs
-also append a Step Summary and upload that report as an artifact, including analysis/publication failures.
+`--dry-run` never writes tracked files. The workflow runs the normal updater in its **disposable runner checkout** to produce real snapshot files without committing or pushing. Every run prints counts, writes a JSON report and uploads the generated graph files as an artifact. The artifact is not a repository update.
 An initial seed remains `pending-validation` in this PR; it cannot claim to validate a future merge commit.
 
 ## What is incremental
@@ -72,16 +66,27 @@ reviewed rebaseline of witnesses, pins and pending items. Do not clear a warning
 
 ## Output and publication safety
 
-Reports include changed/examined/content-read file counts, checked/changed/new/stale relation counts,
-dependency declaration changes, pending paths, validity and publication result. The generated
-`status.md`, `dependencies.md` and `manifest.json` are the only allowed automatic commit paths.
-The manually written overview/modules/entrypoints stay explicitly labeled historical.
+The workflow has `contents: read`, no remote write credentials and no publish step.
+It executes `update.py` in a disposable checkout and uploads `manifest.json`,
+`dependencies.md`, `status.md`, `ui-index.json` and the run report.
+This upload does **not** update the branch or refresh the repository's tracked checkpoint.
+The source baseline can therefore grow older after later pushes. The updater diffs from
+the last *reviewed, committed* checkpoint and may read multiple accumulated changed
+blobs. It never silently claims that a stale repository snapshot is fresh.
+For a persistent refresh, use a **push-triggered** artifact from the actual development
+branch (not a PR merge-ref artifact, whose synthetic commit may not be in the eventual
+branch history). Download/check that artifact, confirm the analyzed source
+commit is an ancestor of the target branch and graph validity, then apply the generated files through a separate ordinary PR
+targeting `agent/core-startup-diagnostics-fix`, run required checks and merge.
+No direct commits to the protected branch or status-check bypass are needed.
 
-Publication checks the exact development ref, analyzed checkout SHA and remote branch head, refuses
-staged non-graph files, and performs a normal non-force push. Concurrent developer pushes win; an older
-run reports `superseded` or a push failure. A later run diffs from the last saved checkpoint and includes
-all missed changes. Concurrency groups prevent simultaneous writers but are not assumed to preserve
-every intermediate pending run; the persisted checkpoint is the authority.
+The old `tools/codegraph/publish.py` remains available solely as a legacy
+test fixture; the workflow **must not invoke it**. Future automation using a
+dedicated GitHub App would need separate authorization and explicit review.
+`ui-components.md` and other hand-written narrative pages remain manually
+reviewed and are not automatically regenerated. Validity labels are scoped to
+the analyzed commit, not arbitrary branch HEADs.
+
 
 Tests use temporary local Git repositories/bare remotes without Internet access. They cover rename,
 delete, new/removed/versioned/transitive dependencies, multiple files, fake/commented evidence, missing
