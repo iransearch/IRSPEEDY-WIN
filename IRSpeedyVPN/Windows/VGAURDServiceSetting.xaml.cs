@@ -22,7 +22,11 @@ namespace IRSpeedyVPN.Windows
             InitializeComponent();
 
             if (!Environment.Is64BitOperatingSystem && rowVpn != null)
+            {
                 rowVpn.Visibility = Visibility.Collapsed;
+                rowSmartDns.IsEnabled = false;
+                rowSmartDns.Opacity = 0.45;
+            }
 
             LoadSettings();
             RefreshSplitTunnelStatus();
@@ -38,6 +42,15 @@ namespace IRSpeedyVPN.Windows
         private void btnOK_Click(object sender, RoutedEventArgs e)
         {
             if (CanSavePreferences?.Invoke() == false) return;
+            if (IsOn(GameMode))
+            {
+                try
+                {
+                    var split = SplitTunnelStore.Load();
+                    if (split.Enabled) { split.Enabled = false; SplitTunnelStore.Save(split); }
+                }
+                catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); return; }
+            }
             RegHelper.SetSettingValue(KEY_VPN, IsOn(VPNMode) ? "1" : "0");
             RegHelper.SetSettingValue(KEY_GLOBAL_PROXY, IsOn(GlobalProxy) ? "1" : "0");
             RegHelper.SetSettingValue(KEY_SYSTEM_PROXY, IsOn(SystemProxy) ? "1" : "0");
@@ -46,7 +59,7 @@ namespace IRSpeedyVPN.Windows
             // AI is independent
             Services.Xray.SmartIpRouting.SetEnabled(IsOn(AiService));
 
-            // Game Mode is independent, but forces VPN mode (persisted above as VPN=1).
+            // Smart DNS retains the existing setting key and forces VPN mode.
             RegHelper.SetSettingValue(KEY_GAME, IsOn(GameMode) ? "1" : "0");
 
             // Split tunnel owns its own save/cancel lifecycle. Do not overwrite it here.
@@ -97,7 +110,7 @@ namespace IRSpeedyVPN.Windows
         }
 
         // --------------------------
-        // Game Mode: only makes sense over TUN, so it forces VPN mode on and locks the
+        // Smart DNS only makes sense over TUN, so it forces VPN mode on and locks the
         // connection-mode switches while it is enabled.
         // --------------------------
         private void ApplyGameModeLock(bool gameOn)
@@ -208,7 +221,7 @@ namespace IRSpeedyVPN.Windows
         private void AiService_Checked(object sender, RoutedEventArgs e) { }
         private void AiService_Unchecked(object sender, RoutedEventArgs e) { }
 
-        // Game Mode: on -> force VPN and lock the mode switches; off -> unlock them.
+        // Smart DNS: on -> force VPN and lock the mode switches; off -> unlock them.
         private void GameMode_Checked(object sender, RoutedEventArgs e)
         {
             if (_isUpdating) return;

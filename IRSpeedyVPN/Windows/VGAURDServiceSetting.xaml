@@ -1,5 +1,5 @@
 <Window xmlns:uiScale="clr-namespace:IRSpeedyVPN.Common" uiScale:WindowUiScale.Factor="1" Title="روش‌های اتصال" x:Class="IRSpeedyVPN.Windows.VGAURDServiceSetting" xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation" xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml" xmlns:ctl="clr-namespace:IRSpeedyVPN.Controls"
- Width="380" Height="416" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" SizeToContent="Manual" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
+ Width="380" Height="480" WindowStyle="None" AllowsTransparency="False" ResizeMode="NoResize" SizeToContent="Manual" WindowStartupLocation="CenterOwner" ShowInTaskbar="False"
  Background="{DynamicResource WindowBackgroundBrush}" FlowDirection="RightToLeft" FontFamily="{StaticResource AppFontFamily}" UseLayoutRounding="True" SnapsToDevicePixels="True" TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType"  Foreground="{DynamicResource TextBodyBrush}">
  <WindowChrome.WindowChrome><WindowChrome CaptionHeight="0" CornerRadius="20" GlassFrameThickness="0" ResizeBorderThickness="0" UseAeroCaptionButtons="False"/></WindowChrome.WindowChrome>
  <Window.Resources><ResourceDictionary>
@@ -42,7 +42,14 @@
  <Border Width="36" Height="36" CornerRadius="11" Background="#1AF59E0B"><Control Template="{StaticResource Icon.Route}" Foreground="{DynamicResource SettingsIconRouteBrush}" Width="18" Height="18"/></Border>
  <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="پروکسی‌فایر" Style="{StaticResource NativeMethodTitle}"/><TextBlock Text="مسیریابی هوشمند برنامه‌های خاص" Style="{StaticResource NativeMethodSubtitle}"/></StackPanel>
  <ctl:SettingsToggleSwitch x:Name="GlobalProxy" Grid.Column="4" Width="42" Height="24" Checked="GlobalProxy_Checked" Unchecked="GlobalProxy_Unchecked" AutomationProperties.Name="پروکسی‌فایر"/>
- </Grid></Border><Button Style="{StaticResource CardButtonStyle}" Margin="0,5" Click="SplitApps_Click" AutomationProperties.Name="تقسیم تونل">
+ </Grid></Border>
+ <Border x:Name="rowSmartDns" Style="{StaticResource NativeMethodCard}" Margin="0,5" ToolTip="با فعال‌سازی، وی‌پی‌ان سراسری فعال و تقسیم تونل غیرفعال می‌شود.">
+ <Grid><Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="11"/><ColumnDefinition Width="*"/><ColumnDefinition Width="11"/><ColumnDefinition Width="42"/></Grid.ColumnDefinitions>
+ <Border Width="36" Height="36" CornerRadius="11" Background="#1A2563EB"><Control Template="{StaticResource Icon.Globe}" Foreground="{DynamicResource AccentBrush}" Width="18" Height="18"/></Border>
+ <StackPanel Grid.Column="2" VerticalAlignment="Center"><TextBlock Text="DNS هوشمند" Style="{StaticResource NativeMethodTitle}"/><TextBlock Text="DNS امن با اینترنت مستقیم" Style="{StaticResource NativeMethodSubtitle}"/></StackPanel>
+ <ctl:SettingsToggleSwitch x:Name="GameMode" Grid.Column="4" Width="42" Height="24" Checked="GameMode_Checked" Unchecked="GameMode_Unchecked" AutomationProperties.Name="DNS هوشمند"/>
+ </Grid></Border>
+ <Button Style="{StaticResource CardButtonStyle}" Margin="0,5" Click="SplitApps_Click" AutomationProperties.Name="تقسیم تونل">
  <Border Style="{StaticResource NativeMethodCard}"><Grid>
  <Grid.ColumnDefinitions><ColumnDefinition Width="36"/><ColumnDefinition Width="11"/><ColumnDefinition Width="*"/><ColumnDefinition Width="11"/><ColumnDefinition Width="Auto"/><ColumnDefinition Width="11"/><ColumnDefinition Width="14"/></Grid.ColumnDefinitions>
  <Border Width="36" Height="36" CornerRadius="11" Background="#1A0D9488"><Control Template="{StaticResource Icon.Split}" Foreground="{DynamicResource Theme.IconTealBrush}" Width="18" Height="18"/></Border>
@@ -50,6 +57,6 @@
  <TextBlock x:Name="SplitTunnelStatus" Grid.Column="4" Style="{StaticResource Text.RowStatus}"/>
  <Control Grid.Column="6" Template="{StaticResource Icon.ChevronBack}" Foreground="{DynamicResource Theme.ChevronBrush}" Width="14" Height="14" VerticalAlignment="Center"/>
  </Grid></Border></Button></StackPanel>
- <StackPanel Visibility="Collapsed"><ctl:SettingsToggleSwitch x:Name="TelegramRouteProxy" Checked="TelegramRouteProxy_Checked"/><ctl:SettingsToggleSwitch x:Name="AiService"/><ctl:SettingsToggleSwitch x:Name="GameMode" Checked="GameMode_Checked" Unchecked="GameMode_Unchecked"/></StackPanel>
+ <StackPanel Visibility="Collapsed"><ctl:SettingsToggleSwitch x:Name="TelegramRouteProxy" Checked="TelegramRouteProxy_Checked"/><ctl:SettingsToggleSwitch x:Name="AiService"/></StackPanel>
  <Button Grid.Row="2" Margin="14,0,14,16" Height="44" Style="{StaticResource PrimaryButtonStyle}" Content="تایید و ذخیره" Click="btnOK_Click"/>
  </Grid></Border></Window>

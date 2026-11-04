@@ -1,6 +1,4 @@
 using IRSpeedyVPN.Interfaces;
-using IRSpeedyVPN.Resource;
-using IRSpeedyVPN.Services.SplitTunneling;
 using System;
 using System.Threading.Tasks;
 using System.Windows;
@@ -22,9 +20,8 @@ namespace IRSpeedyVPN.Windows
             bool locked = PreferencesLocked;
             ShareButton.IsEnabled = connected && IsConnectionBusy?.Invoke() != true;
             MethodsButton.IsEnabled = ShieldButton.IsEnabled = PasswordButton.IsEnabled = !locked;
-            GameMode.IsEnabled = !locked && Environment.Is64BitOperatingSystem;
             AiService.IsEnabled = SaveButton.IsEnabled = !locked;
-            GameRow.Opacity = AiRow.Opacity = locked ? 0.45 : 1;
+            AiRow.Opacity = locked ? 0.45 : 1;
             foreach (var control in new System.Windows.UIElement[] { ShareButton, MethodsButton, ShieldButton, PasswordButton, SaveButton })
                 control.Opacity = control.IsEnabled ? 1 : 0.45;
         }
@@ -34,7 +31,6 @@ namespace IRSpeedyVPN.Windows
         public SettingsHub()
         {
             InitializeComponent();
-            GameMode.IsOn = RegHelper.GetSettingValue("VGAURDGameMode") == "1";
             AiService.IsOn = Services.Xray.SmartIpRouting.IsEnabled();
             Loaded += (s, e) => { RefreshAccess(); stateTimer.Start(); };
             stateTimer.Tick += (s, e) => RefreshAccess();
@@ -46,24 +42,7 @@ namespace IRSpeedyVPN.Windows
         private bool SavePreferences()
         {
             if (PreferencesLocked) return false;
-            if (GameMode.IsOn)
-            {
-                try
-                {
-                    var split = SplitTunnelStore.Load();
-                    if (split.Enabled) { split.Enabled = false; SplitTunnelStore.Save(split); }
-                }
-                catch (Exception ex) { MessageBox.Show(this, ex.Message, "تقسیم تونل"); return false; }
-            }
             Services.Xray.SmartIpRouting.SetEnabled(AiService.IsOn);
-            RegHelper.SetSettingValue("VGAURDGameMode", GameMode.IsOn ? "1" : "0");
-            if (GameMode.IsOn)
-            {
-                RegHelper.SetSettingValue("VGAURDVPNMode", "1");
-                RegHelper.SetSettingValue("VGAURDGlobalProxy", "0");
-                RegHelper.SetSettingValue("VGAURDSystemProxy", "0");
-                RegHelper.SetSettingValue("ProxifierTelegramRoute", "0");
-            }
             return true;
         }
         private void btnOK_Click(object sender, RoutedEventArgs e) { if (SavePreferences()) Close(); }
@@ -76,9 +55,7 @@ namespace IRSpeedyVPN.Windows
                 ? (Window)new SSRServiceSetting() : new VGAURDServiceSetting { CanSavePreferences = () => !PreferencesLocked };
             page.Owner = this;
             page.ShowDialog();
-            // A child can enable split tunneling and disable game mode. Do not
-            // overwrite that decision with the hub's older toggle values.
-            GameMode.IsOn = RegHelper.GetSettingValue("VGAURDGameMode") == "1";
+            // Keep the independent AI preference in sync with the child page.
             AiService.IsOn = Services.Xray.SmartIpRouting.IsEnabled();
         }
         private void Shield_Click(object sender, RoutedEventArgs e)
