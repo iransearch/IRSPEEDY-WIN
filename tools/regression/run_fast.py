@@ -24,6 +24,7 @@ SUITES = [
     ("core-startup", "AiStartupChecks", ["python", "tests/AiStartupChecks/run.py", "{dotnet}"]),
     ("server-selection", "LastSuccessfulServerChecks", ["python", "tests/LastSuccessfulServerChecks/run.py", "{dotnet}"]),
     ("server-transitions", "ServerListTransitionChecks", ["python", "tests/ServerListTransitionChecks/run.py", "{dotnet}", "{csc}", "{refs}"]),
+    ("country-cache", "ResidentialChecks", ["python", "tests/ResidentialChecks/run-cache.py", "{dotnet}", "{csc}", "{refs}"]),
     ("device-session-ui", "DeviceLimitChecks", ["python", "tests/DeviceLimitChecks/run.py", "{dotnet}"]),
 ]
 

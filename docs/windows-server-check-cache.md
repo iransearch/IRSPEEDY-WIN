@@ -23,6 +23,7 @@ could be migrated, the old label cannot be recovered from the hash; that config 
 tested again. No country-only or credential-insensitive migration is attempted.
 
 Regression cases live in `tests/ResidentialChecks/CacheChecks.cs` and run through the
-existing Residential harness. They cover empty/partial catalog rebinding, restart,
+existing Residential harness and the .NET 8-only `run-cache.py` entrypoint in Regression Guard.
+They cover empty/partial catalog rebinding, restart,
 URI labels and old cache migration, connection changes, account/scope isolation,
 explicit clearing, bounded retention and failed-result preservation.
