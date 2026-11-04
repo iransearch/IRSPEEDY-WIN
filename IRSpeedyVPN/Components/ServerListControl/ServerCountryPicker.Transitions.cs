@@ -1,3 +1,5 @@
+using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -22,6 +24,11 @@ namespace IRSpeedyVPN.Components.ServerListControl
         {
             _checkCycleSetup = false;
             RefreshDisplayedRows();
+        }
+        public void RetainCompletedResults(IEnumerable<IVPNService> services)
+        {
+            _serverList.RetainCompletedChecks(services.Select(LastSuccessfulServer.Key));
+            RefreshDisplayedRows(instant: true);
         }
         private readonly List<GroupItem> _observedGroups = new List<GroupItem>();
         private DispatcherOperation _rowsUpdate;

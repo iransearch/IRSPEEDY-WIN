@@ -61,6 +61,7 @@ static class IncrementalOrderChecks
     }
     internal static void Run()
     {
+        RetainedResultOrder();
         var groups = Countries(5);
         var model = Start(groups);
         // D finishes while A/B/C/E are still testing. D moves directly to 1.
@@ -150,5 +151,56 @@ static class IncrementalOrderChecks
         Order(dedup, 3, 1, 2);
         Unique(dedup);
         Check(dedup.Servers.Count == 3, "duplicate keys remain safe in Publish, PresentationOrder and Finish");
+    }
+
+    static void RetainedResultOrder()
+    {
+        var groups = Countries(6);
+        long[] pings = { 319, long.MaxValue, 239, 172, 112, 135 };
+        for (int i = 0; i < groups.Length; i++)
+        {
+            groups[i].IsChecking = false;
+            groups[i].SortKey = pings[i];
+            groups[i].IsSelectable = pings[i] != long.MaxValue;
+        }
+        groups[0].IsLastSuccessfulConnection = true;
+        Func<ServerItem[]> ranked = () => ServerListRanking.Order(groups, g => g.IsLastSuccessfulConnection,
+            g => g.SortKey, g => g.CountryName, g => g.Service.ID).Select(g => new ServerItem(g)).ToArray();
+        var model = new ServerListViewModel();
+        model.Publish(ranked(), false);
+        model.BeginCheckCycle();
+        // The cache supplies only completed successes excluded from automatic work.
+        model.RetainCompletedChecks(groups.Where(g => g.IsSelectable).Select(g => new ServerItem(g).Identity));
+        model.Publish(ranked(), false);
+        Order(model, 1, 5, 6, 4, 3, 2);
+        groups[1].IsChecking = true;
+        model.MarkChecking(new ServerItem(groups[1]).Identity);
+        model.Publish(ranked(), true, false);
+        groups[1].IsChecking = false;
+        groups[1].IsSelectable = true;
+        groups[1].SortKey = 458;
+        model.Publish(ranked(), true, true, new ServerItem(groups[1]).Identity);
+        Drain(model);
+        Order(model, 1, 5, 6, 4, 3, 2);
+        Check(model.Slots[0].BadgeServer.IsLastSuccessfulConnection,
+            "cached successes rank with a newly completed slower country while the star remains first");
+
+        // A login/API rebind can arrive in a different order with the same IDs.
+        model.BeginCheckCycle();
+        model.Publish(Snapshot(groups, 1, 2, 3, 4, 5, 6), true, false);
+        model.RetainCompletedChecks(ranked().Select(item => item.Identity));
+        model.Publish(ranked(), false);
+        Order(model, 1, 5, 6, 4, 3, 2);
+
+        // Manual refresh clears the retained evidence. Partial success must not
+        // inherit it or move countries that have not completed this manual round.
+        model.BeginCheckCycle();
+        groups[2].SortKey = 50;
+        model.Publish(ranked(), true, false);
+        Check(model.TryBeginPass() == null, "manual cycle forgets retained results and partial progress does not reorder");
+        Order(model, 1, 5, 6, 4, 3, 2);
+        model.Publish(ranked(), true, true, new ServerItem(groups[2]).Identity);
+        Drain(model);
+        Order(model, 1, 3, 5, 6, 4, 2);
     }
 }

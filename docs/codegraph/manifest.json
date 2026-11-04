@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "7a71837475a8eb3edb6551a965d9f872a12e9851",
-  "base_tree": "55569d30633a52b7d6849a9a4ff64cac240c402e",
-  "generated_at": "2026-11-04T20:13:44Z",
+  "base_commit": "5febacbedc6fe0a551ceb33912bf6eb17c4c628d",
+  "base_tree": "b038a5b7f2a49baa113d762367fe7b6f3488c59b",
+  "generated_at": "2026-11-04T21:14:36Z",
   "validity": {
     "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,7 +13,7 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-04T20:13:44Z"
+    "validated_at": "2026-11-04T21:14:36Z"
   },
   "counts": {
     "inventory_files": 1001,
@@ -25,9 +25,9 @@
     "python_run_py_files": 20,
     "requested_modules": 6,
     "primary_paths_mapped": 2,
-    "verified_relations": 63,
+    "verified_relations": 58,
     "relation_evidence_files": 32,
-    "stale_relations": 17,
+    "stale_relations": 22,
     "total_relations": 80
   },
   "graph_files": [
@@ -2063,10 +2063,11 @@
         "blob": "99351bde81910efd40ce1a484446165e580af3a2"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "99351bde81910efd40ce1a484446165e580af3a2",
       "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R071",
@@ -2105,10 +2106,11 @@
         "blob": "11d21db858a7cab807d63eaafac93b95a55d517e"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "11d21db858a7cab807d63eaafac93b95a55d517e",
       "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R073",
@@ -2126,10 +2128,11 @@
         "blob": "11d21db858a7cab807d63eaafac93b95a55d517e"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "11d21db858a7cab807d63eaafac93b95a55d517e",
       "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R074",
@@ -2147,10 +2150,11 @@
         "blob": "d977a0334d1a09cd6475efd36a4f887793756ce1"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "d977a0334d1a09cd6475efd36a4f887793756ce1",
       "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R075",
@@ -2169,10 +2173,11 @@
       },
       "note": "FinishPass queues Prepare again; model Finish also resynchronizes frozen rows from current Servers.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "d977a0334d1a09cd6475efd36a4f887793756ce1",
       "target_blob": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R076",
@@ -2351,13 +2356,13 @@
     "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Motion.cs": "ea0aabdf221eb74af249d3f978e51c765e141289",
     "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.ProbeShine.cs": "fae80db9e6ad5e94535d8cc878924d2e208eb700",
     "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.StarGlow.cs": "0e6dc853299a761ec8deb1fd9bf1f89b034ddd4b",
-    "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs": "11d21db858a7cab807d63eaafac93b95a55d517e",
+    "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs": "2dab5dbcc28fb944cdc9fd9ff092114732cc1405",
     "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml": "2e83b6a5860fde58bad5da50e3c69d10d4751b1e",
     "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs": "99351bde81910efd40ce1a484446165e580af3a2",
     "IRSpeedyVPN/Components/ServerListControl/ServerListCometOverlay.cs": "67467da213bd92019723d8254bf0845b12a2b96f",
     "IRSpeedyVPN/Components/ServerListControl/ServerListRanking.cs": "ae29a310ca4e6230eba82547f88a95463907ee09",
     "IRSpeedyVPN/Components/ServerListControl/ServerListSweepAnimator.cs": "d977a0334d1a09cd6475efd36a4f887793756ce1",
-    "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs": "d52759e507de37c58d3b94cf4bda6acfb70d2502",
+    "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs": "a3a7ee77b70a48d1926b45c612f09f9a7f8c9765",
     "IRSpeedyVPN/Components/ToggleSwitch/Borders/ClippingBorder.cs": "d3158ea1fb5f8c9a66a62a8259e0539fc2ce5d04",
     "IRSpeedyVPN/Components/ToggleSwitch/Borders/InnerGlowBorder.cs": "c192d1915ccab5a7f1b461a8a7ec9bb4a443bef0",
     "IRSpeedyVPN/Components/ToggleSwitch/Borders/OuterGlowBorder.cs": "46eeb864a412c112bb94097b70f7697a239b9d3c",
@@ -2791,7 +2796,7 @@
     "IRSpeedyVPN/Services/Proxifier.cs": "fc0bdec13cf54787fce6a242dbfbf2b9c5c41256",
     "IRSpeedyVPN/Services/ProxifierBrowserQuic.cs": "4ae82d432bcff0432cf99263ca3b900f5c757656",
     "IRSpeedyVPN/Services/SSRService.cs": "6d4d66e75aa5d059461ade9c85159b78ea9a5d21",
-    "IRSpeedyVPN/Services/ServerCheckCache.cs": "1fd185833f07c72fa3c5bf980c1cdc65dcade914",
+    "IRSpeedyVPN/Services/ServerCheckCache.cs": "40285dda77af372fb89a75d48aebef60aa6fe33a",
     "IRSpeedyVPN/Services/ServerRefreshPlan.cs": "3e22b065d7b4d6f033670da38933ab3872af4319",
     "IRSpeedyVPN/Services/ServiceFactory.cs": "5843a7996f12164aa34b53f222ab7c9b89fc200b",
     "IRSpeedyVPN/Services/SingBox/ConfigGenerator.cs": "b702cee1fca7228bae3402c0d02b27babac121ec",
@@ -2937,7 +2942,7 @@
     "IRSpeedyVPN/UserControls/UCServerList.Residential.cs": "15d287d598dc85bab7ec0fde2677867834b7c8d6",
     "IRSpeedyVPN/UserControls/UCServerList.ServerResultsRefresh.cs": "842a3f77d2c1bf184473fed28592aacc1e946b5c",
     "IRSpeedyVPN/UserControls/UCServerList.xaml": "097ee52602f4b58def5756b51177b9fe3944f0d4",
-    "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "648dca166baf87d2b53468f54ce2aa102019ab24",
+    "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "a8c28533081c22ad00689e8d0a428845d4df0ac4",
     "IRSpeedyVPN/UserControls/UCUpdate.xaml": "3c1099d30b1d0f22392a4221949f7194f304e008",
     "IRSpeedyVPN/UserControls/UCUpdate.xaml.cs": "487f9f766efba20bf54757b5aefa639e9fca1042",
     "IRSpeedyVPN/UserControls/UCUserInfo.ConnectionTest.cs": "bbeb05732ac27d6bfb7fb67a7f9e5e9e47aeb899",
@@ -3197,7 +3202,7 @@
     "tests/PublicIpChecks/Program.cs": "25dbf920443363f7894f281261f93208f1db33a8",
     "tests/PublicIpChecks/PublicIpChecks.csproj": "ea547f7371c1bb8fe236984f75950f850105c517",
     "tests/PublicIpChecks/README.md": "6a0cc2ce9406f991122c44e61a295194f4a41aff",
-    "tests/ResidentialChecks/CacheChecks.cs": "a6fb22fcd198dbb88d7849566a0e5daa38d4e06d",
+    "tests/ResidentialChecks/CacheChecks.cs": "235ec74e0517857fad2a9238ec45e0c8787df885",
     "tests/ResidentialChecks/CompileBoundary.cs": "e12a052bae26c3b5818575ad843789a99d971d50",
     "tests/ResidentialChecks/HttpChecks.cs": "ccd539f98c1a1328519a61be96e08b41375b2715",
     "tests/ResidentialChecks/ModelChecks.cs": "27950853dd778d5e98ff105aa45efa60d62e432f",
@@ -3206,20 +3211,20 @@
     "tests/ResidentialChecks/StateChecks.cs": "c1b712e7661f1b1ffa3d1b2c4025710d4aa62ae9",
     "tests/ResidentialChecks/UiCompileBoundary.cs": "15319389b4ea33880526fc7720fa3449b97c684b",
     "tests/ResidentialChecks/run.py": "cbd9eae9944bf6c6ce132659e715ca8c6b18f2f5",
-    "tests/ServerListTransitionChecks/IncrementalOrderChecks.cs": "f9e0b374a5918180317433e86a257139d6b7728b",
+    "tests/ServerListTransitionChecks/IncrementalOrderChecks.cs": "eea5948eec7f80ed51c1e1c085e5ca4b571c23dc",
     "tests/ServerListTransitionChecks/README.md": "30a2e993b078f76e9d3e0912c526574afc30a7cc",
     "tests/ServerListTransitionChecks/bindings.py": "ffdde8d8296bde653c417adb63361c879159f29c",
     "tests/ServerListTransitionChecks/contracts.py": "3041abb254dd0bb87139ab0532fa7063fd487b80",
-    "tests/ServerListTransitionChecks/cycle_wiring.py": "82c3798fa4702185d8d05509ab1c6c6aa932fe69",
+    "tests/ServerListTransitionChecks/cycle_wiring.py": "3502012b3e00a4ed42a6a28d77905b0421741190",
     "tests/ServerListTransitionChecks/run-wpf.ps1": "290483a6b8374383d3ea510f7dace3682765cd92",
-    "tests/ServerListTransitionChecks/run.py": "f9b0fda8bfb23c08ce6687e117c3d334d6c646eb",
+    "tests/ServerListTransitionChecks/run.py": "efcbd100390973b8c3eaf1b0015663c103ef9502",
     "tests/ServerRefreshChecks/README.md": "08d3435c5f837e2220a05f249014737753113d13",
     "tests/ServerRefreshChecks/api_refresh.py": "d42458a67e3a14a851ca48571618676e96ed3366",
     "tests/ServerRefreshChecks/connection_handoff.py": "dcf3b3f627652b7e1937b0428ca87965d73cc70f",
     "tests/ServerRefreshChecks/core_dispatch.py": "6fd54d1eaac58678a367aa52d7c0cf541f6e6ad9",
     "tests/ServerRefreshChecks/manual_refresh.py": "745c3a98b591be0e0182de55c6e4f2f8968e1905",
     "tests/ServerRefreshChecks/net48_compile.py": "7d0e1eda4102c355cd95043288212cd0b7486f82",
-    "tests/ServerRefreshChecks/run.py": "039ac27b8f20e556784d05cfc80af895d8a7b488",
+    "tests/ServerRefreshChecks/run.py": "0a1cd35f3bddf34d5f4cb642e3767db99ebfa226",
     "tests/ServerRefreshChecks/url_priority.py": "b30d2c88fee6bdd94683742fed30eb553cb402c7",
     "tests/ServerStarGlowChecks/run-wpf.ps1": "09bf3cc81b4b05d41acb3ecbee723d8b86713f87",
     "tests/ServerStarGlowChecks/run.py": "a80a08fbe5d46517cccbdd5f858527265daf5a0b",
@@ -3305,9 +3310,12 @@
     "IRSpeedyVPN/Windows/SettingsHub.xaml.cs": "runtime-or-ui-source-needs-review",
     "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml": "runtime-or-ui-source-needs-review",
     "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml.cs": "runtime-or-ui-source-needs-review",
-    "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "runtime-or-ui-source-needs-review"
+    "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs": "runtime-or-ui-source-needs-review",
+    "tests/ServerListTransitionChecks/IncrementalOrderChecks.cs": "runtime-or-ui-source-needs-review"
   },
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "d38290076a6a209aad847ab0aeb21cdf6a6a2a9eccdd82b5bd6469758e438e6f"
+  "validation_digest": "83ffae84da5f192d7d4c74bbad11f034a09fd99186e155fcc781150bcb6d4de0"
 }

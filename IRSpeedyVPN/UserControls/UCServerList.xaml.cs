@@ -185,6 +185,7 @@ namespace IRSpeedyVPN.UserControls
                 LogHelper.WriteExLog("[ServerChecks] login missing/failed round restarted rows=" + services.Length + " scope=" + (isResidentialTab ? "Residential" : "VPN"));
             }
             countryPicker.Load(services, _isUrlTestSupported);
+            if (!preserveManualRefresh) countryPicker.RetainCompletedResults(probeCache.CompletedSuccessfulServices);
             countryPicker.SelectedService = selectedService;
             countryPicker.SetFilter(txtSearch.Text);
             if (!preserveManualRefresh) TrySelectResidentialFastest();
@@ -333,6 +334,7 @@ namespace IRSpeedyVPN.UserControls
                 cache.RestartFromFirstCountry();
                 probeRestartRequested = false;
                 countryPicker.EndCheckCycleSetup();
+                countryPicker.RetainCompletedResults(cache.CompletedSuccessfulServices);
             }
             var service = cache.NextService;
             if (service == null || !services.Contains(service))

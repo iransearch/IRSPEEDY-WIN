@@ -34,6 +34,18 @@ assert complete.index('picker.SetGroupChecking(row, false);') < complete.index('
 assert manual.index('picker.SetGroupChecking(row, true);') < manual.index('TunnelPlusService.TestRefreshBatch(')
 print('PASS checking precedes probes; only completed country results publish sorting eligibility; canceled/partial results do not')
 
+refresh = background[background.index('        private void RefreshCountry('):background.index('        private static void AssignCountryIndices(')]
+assert 'if (!preserveManualRefresh) countryPicker.RetainCompletedResults(probeCache.CompletedSuccessfulServices);' in refresh
+assert refresh.index('countryPicker.Load(') < refresh.index('countryPicker.RetainCompletedResults(') < refresh.index('RunBackgroundUrlTests(services);')
+restart = background[background.index('            if (probeRestartRequested)'):background.index('            var service = cache.NextService;')]
+assert restart.index('cache.RestartFromFirstCountry();') < restart.index('countryPicker.EndCheckCycleSetup();') < restart.index('countryPicker.RetainCompletedResults(cache.CompletedSuccessfulServices);')
+transitions = (folder / 'ServerCountryPicker.Transitions.cs').read_text()
+retain = transitions[transitions.index('        public void RetainCompletedResults('):transitions.index('        private readonly List<GroupItem>')]
+assert '_serverList.RetainCompletedChecks(services.Select(LastSuccessfulServer.Key));' in retain
+assert 'RefreshDisplayedRows(instant: true);' in retain
+assert 'RetainCompletedResults' not in manual
+print('PASS automatic login/rebind/disconnect retains cached completion evidence before queue checks; manual refresh never seeds it')
+
 finish = animator[animator.index('        private void FinishPass('):animator.index('        private void StopIfIdle(')]
 assert finish.index('_model.Finish(_pass);') < finish.index('_pass = null;') < finish.index('QueuePrepare();')
 assert 'while ((_pass = _model.TryBeginPass()) != null)' in animator

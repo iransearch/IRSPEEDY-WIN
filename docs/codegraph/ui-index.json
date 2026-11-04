@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "analyzed_commit": "6ac266b3a2ea50f378993d245bd2b29c7618985c",
+  "analyzed_commit": "5febacbedc6fe0a551ceb33912bf6eb17c4c628d",
   "scope": "XAML declarations, name/event/resource-key references and matching partial class; not runtime behavior",
   "components": {
     "IRSpeedyVPN/App.xaml": {
@@ -15138,7 +15138,7 @@
       "merged_dictionaries": [],
       "codebehind": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
-        "blob_sha": "648dca166baf87d2b53468f54ce2aa102019ab24",
+        "blob_sha": "a8c28533081c22ad00689e8d0a428845d4df0ac4",
         "status": "verified-declaration",
         "evidence": {
           "line": 20,

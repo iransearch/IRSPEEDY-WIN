@@ -332,6 +332,15 @@ namespace IRSpeedyVPN.Services
         internal bool ShowInitialProgress { get { lock (gate) return !state.InitialScanCompleted && !state.SequentialRound; } }
         internal bool PrioritizeFailedServers { get { lock (gate) return state.SequentialRound; } }
 
+        internal IVPNService[] CompletedSuccessfulServices
+        {
+            get
+            {
+                lock (gate)
+                    return rowKeys.Where(row => !NeedsAutomaticCheck(row.Value)).Select(row => row.Key).ToArray();
+            }
+        }
+
         internal IVPNService NextService
         {
             get
