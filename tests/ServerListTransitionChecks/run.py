@@ -269,7 +269,7 @@ class Program {
 with tempfile.TemporaryDirectory(prefix='server-comet-') as directory:
     path=Path(directory)
     (path/'Program.cs').write_text(fixture.replace('__PICKER_XAML__',(root/'IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml').as_posix()))
-    for name in ['ServerListViewModel.cs','ServerCometTimeline.cs']:
+    for name in ['ServerListViewModel.cs','ServerListRanking.cs','ServerCometTimeline.cs']:
         (path/name).write_text((root/'IRSpeedyVPN/Components/ServerListControl'/name).read_text())
     (path/'IncrementalOrderChecks.cs').write_text((root/'tests/ServerListTransitionChecks/IncrementalOrderChecks.cs').read_text())
     overlay=(root/'IRSpeedyVPN/Components/ServerListControl/ServerListCometOverlay.cs').read_text()

@@ -55,6 +55,8 @@ class Picker {
  public void RefreshGroup(IVPNService s,bool allowSortAnimation=true){CheckThread();Updates++;Displayed=s.GetServerUrls()[0].latency;OnRefresh?.Invoke(s);}
  public void ShowGroupProgress(IVPNService s,long latency){CheckThread();Progresses++;Displayed=latency;}
  public void BeginCheckCycle(){}public void EndCheckCycleSetup(){}
+ public IVPNService[] Retained=new IVPNService[0];
+ public void RetainCompletedResults(IEnumerable<IVPNService> services){CheckThread();Retained=services.ToArray();}
  public void ResetTestResults(){CheckThread();Displayed=0;}
  public void RestoreTestProgress(IVPNService s){CheckThread();Displayed=s.GetServerUrls()[0].latency;}
 }
@@ -125,6 +127,7 @@ tests = r'''
  int successfulCalls=TunnelPlusService.Calls.Count;
  live.ResumeServerChecksAfterCleanup(true);await live.Settle();
  Check(TunnelPlusService.Calls.Count==successfulCalls && live.countryPicker.Updates==1,"disconnect leaves a successful country and its visible result untouched");
+ Check(live.countryPicker.Retained.SequenceEqual(new[]{liveService}),"idle disconnect retains successful country completion for sorting before returning an empty queue");
  TunnelPlusService.Probe=null;
  for(int cycle=0;cycle<3;cycle++){
  RecordResults(live.probeCache,liveService,-1);

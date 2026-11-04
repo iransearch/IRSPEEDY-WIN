@@ -132,6 +132,24 @@ internal static class CacheChecks
         while(cache.NextService!=null){var row=cache.NextService;count++;cache.CompleteService(row);}
         Check(count==3,"explicit refresh can still clear results and test every country");
     }
+    static void RetainedCompletedResultsChecks(string dir)
+    {
+        var rows=new[]{Vpn(201),Vpn(202),Vpn(203)};
+        var cache=new ServerCheckCache("retained-order","xfast",dir);cache.Bind(rows);
+        cache.RecordRefreshMember(rows[0],rows[0].GetServerUrls()[0],112,DateTime.UtcNow);cache.CompleteRefreshRow(rows[0]);
+        cache.RecordRefreshMember(rows[1],rows[1].GetServerUrls()[0],80,DateTime.UtcNow); // Partial only.
+        cache.RecordRefreshMember(rows[2],rows[2].GetServerUrls()[0],90,DateTime.UtcNow);cache.CompleteRefreshRow(rows[2]);
+        cache.RecordRefreshMember(rows[2],rows[2].GetServerUrls()[0],-1,DateTime.UtcNow);cache.CompleteRefreshRow(rows[2]);
+        cache.RestartForLogin();
+        Check(cache.CompletedSuccessfulServices.SequenceEqual(new[]{rows[0]}),"retained ordering accepts only completed success, never partial success or failed-row history");
+        rows=new[]{Vpn(201),Vpn(202),Vpn(203)};
+        cache=new ServerCheckCache("retained-order","xfast",dir);cache.Bind(rows);
+        Check(cache.CompletedSuccessfulServices.SequenceEqual(new[]{rows[0]}),"process restart returns current service objects for retained complete results");
+        rows[0].GetServerUrls()[0].extra_field_1="changed";cache.Bind(rows);
+        Check(cache.CompletedSuccessfulServices.Length==0,"changed configuration cannot retain stale completion eligibility");
+        cache.ClearForManualRefresh();
+        Check(cache.CompletedSuccessfulServices.Length==0,"explicit refresh clears retained completion evidence");
+    }
     internal static void Run()
     {
         string dir=Path.Combine(Path.GetTempPath(),"residential-cache-"+Guid.NewGuid().ToString("N"));
@@ -166,6 +184,7 @@ internal static class CacheChecks
             FingerprintChecks(dir);
             BoundedHistoryChecks(dir);
             AutomaticRoundChecks(dir);
+            RetainedCompletedResultsChecks(dir);
         }
         finally {if(Directory.Exists(dir))Directory.Delete(dir,true);}
     }

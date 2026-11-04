@@ -170,6 +170,9 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _completedChecks = new HashSet<string>(StringComparer.Ordinal);
         }
         public void MarkChecking(string identity) => _completedChecks.Remove(identity);
+        // Automatic rounds skip these fully tested successes. Keep them in the
+        // same ranking as new completions; a partial ping is not this evidence.
+        public void RetainCompletedChecks(IEnumerable<string> identities) => _completedChecks.UnionWith(identities);
         private bool CanMove(ServerItem item) => !item.IsChecking && _completedChecks.Contains(item.Identity);
         private static ServerItem[] UniqueServers(IEnumerable<ServerItem> source)
             => source.GroupBy(item => item.Identity, StringComparer.Ordinal).Select(group => group.First()).ToArray();
