@@ -26,10 +26,12 @@ UI/network dependencies, with a single-threaded synchronization context. It chec
 initial live progress before RPC completion, disconnect-round success/failure/recovery,
 cached UI restoration before cancellation drain completes, late queued progress,
 API row replacement, initial enumeration, finite persistent queues, v1/v2/v3 cache
-migration, ordered full rounds, rapid cancellation/resume and connection suppression.
-Disconnect priority coverage uses the latest completed row result: all-failed,
-unknown or incomplete rows first, followed by rows with at least one success.
-It checks numbered rows independently, stable country/ID order within both groups,
+migration, ordered missing/failed rounds, rapid cancellation/resume and connection suppression.
+Automatic eligibility uses the latest completed row result: login, cached startup
+and disconnect check only all-failed, unknown or incomplete rows. Successful rows
+retain their measurements and issue no automatic test RPCs. Explicit manual
+refresh still tests the full list.
+It checks numbered rows independently, stable country/ID order among eligible rows,
 success-to-failure history, persistence/reload, cancellation with partially mutated
 members, successful-member persistence through Connect/logout, connection-time
 probe persistence, account isolation and pending order after results change or an API rebind. It also checks
