@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "6d4acf22ba787bf2c6e73b1b9ab2896be89b7102",
-  "base_tree": "b335f116a31ea08ca99f56315a784d13070cef7d",
-  "generated_at": "2026-11-04T09:34:20Z",
+  "base_commit": "c7444131a49705b1bea528cceaa4066c0834bd88",
+  "base_tree": "bb83c8545944200008466323305dc53d2d0d7c85",
+  "generated_at": "2026-11-04T16:11:44Z",
   "validity": {
     "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,7 +13,7 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-04T09:34:20Z"
+    "validated_at": "2026-11-04T16:11:44Z"
   },
   "counts": {
     "inventory_files": 1001,
@@ -3176,7 +3176,7 @@
     "tests/ParallelDnsChecks/Program.cs": "b2ca90e7350dcf7398d444794f04efe5e43cc684",
     "tests/ParallelDnsChecks/ProxyDnsChecks.cs": "45c40095ef2cbfda37eb29a5a869d6292c889e17",
     "tests/ParallelDnsChecks/README.md": "3fc297ca0d3ba1ab36f110fcd26fcd52ffa376de",
-    "tests/ParallelDnsChecks/proxy_ipv4_native_test.go": "3525ed92893558ee06d77946d20ae17575c42346",
+    "tests/ParallelDnsChecks/proxy_ipv4_native_test.go": "e21479ab0305011464429c63e1ef067a1e1eb3a4",
     "tests/ParallelDnsChecks/run-core.py": "a9161f1047c5e02aa87122bbb9f9e7f9552b4f66",
     "tests/ParallelDnsChecks/run-proxy-ipv4.py": "b2eccb7e12c4bf94eeab267c37313f3ae7d2988d",
     "tests/PasswordChangeChecks/PasswordChangeChecks.csproj": "0d77f286c1f7678e09c5a90a7329b6934d74ae9c",
@@ -3305,5 +3305,5 @@
   },
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "7e93286b783a8d45464800ee29145f1d0bdc7eb77968f02f9e502bd99760200f"
+  "validation_digest": "9d0070200344b450b8117983bea71be439c7fb3ba92686b9cc69613e4ed2b14f"
 }
