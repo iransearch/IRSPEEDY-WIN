@@ -28,11 +28,12 @@ class ImpactAnalysisChecks(unittest.TestCase):
         self.write('C.cs', '// C -> A\n')
         self.write('Legacy.cs', '// Legacy -> B\n')
         self.write('Unmapped.cs', '// indexed, no relations\n')
+        self.write('tests/ExampleChecks/run.py', '# direct source witness\n')
         self.git('add', '.')
         self.git('commit', '-qm', 'base')
         self.base = self.git('rev-parse', 'HEAD').strip()
         inventory = {p: self.git('rev-parse', 'HEAD:'+p).strip()
-                     for p in ('A.cs', 'B.cs', 'C.cs', 'Legacy.cs', 'Unmapped.cs')}
+                     for p in ('A.cs', 'B.cs', 'C.cs', 'Legacy.cs', 'Unmapped.cs', 'tests/ExampleChecks/run.py')}
         def edge(eid, source, target, status='verified'):
             blob = inventory[source]
             record = {
@@ -161,6 +162,56 @@ class ImpactAnalysisChecks(unittest.TestCase):
         self.git('commit', '-qm', 'unrelated history')
         with self.assertRaisesRegex(ValueError, 'ancestor'):
             self.scan()
+
+
+    def test_advisory_suite_is_reported_without_assertion_coverage_claim(self):
+        witness = 'tests/ExampleChecks/run.py'
+        dest = 'B.cs'
+        source_blob = self.manifest['file_inventory'][witness]
+        self.manifest['relationships'].append({
+            'id': 'T001', 'module': 'tests', 'kind': 'reads_source',
+            'from': witness, 'to': dest, 'origin': 'reviewed-test-witness',
+            'status': 'verified', 'source_blob': source_blob,
+            'target_blob': self.manifest['file_inventory'][dest],
+            'evidence': {'path': witness, 'line': 1,
+                         'text': '# direct source witness', 'blob': source_blob,
+                         'commit': self.base},
+            'last_verified_commit': self.base,
+            'verification': 'literal-harness-file-read-only',
+        })
+        self.manifest['validation_digest'] = digest(self.manifest)
+        self.commit_change('B.cs', '// changed target\n')
+        result = self.scan()
+        self.assertEqual(len(result['related_test_suites']), 1)
+        suite = result['related_test_suites'][0]
+        self.assertEqual(suite['suite'], 'tests/ExampleChecks')
+        self.assertTrue(suite['direct_source_change'])
+        self.assertEqual(suite['evidence_level'], 'source-inclusion-or-read-only')
+        self.assertEqual(suite['relation_ids'], ['T001'])
+        self.assertIn('Related test suites', markdown(result))
+        self.assertIsNone(result['pr_change_count'])
+
+    def test_pr_only_changes_are_separate_from_checkpoint_diff(self):
+        self.commit_change('A.cs', '// earlier commit\n')
+        pr_start = self.git('rev-parse', 'HEAD').strip()
+        self.commit_change('B.cs', '// this PR\n')
+        result = self.scan(pr_base=pr_start)
+        self.assertEqual(result['changed_file_count'], 2)
+        self.assertEqual(result['pr_change_count'], 1)
+        self.assertEqual(result['pr_changed_files'][0]['path'], 'B.cs')
+        self.assertEqual(result['pr_application_change_count'], 0)
+        self.assertIn('PR-only changes', markdown(result))
+
+    def test_invalid_pr_base_fails_closed(self):
+        self.git('checkout', '--orphan', 'unrelated-pr-start')
+        self.git('rm', '-rf', '.')
+        self.write('Other.cs', '// unrelated\n')
+        self.git('add', '-A')
+        self.git('commit', '-qm', 'unrelated')
+        orphan = self.git('rev-parse', 'HEAD').strip()
+        self.git('checkout', '-q', self.base)
+        with self.assertRaisesRegex(ValueError, 'PR base'):
+            self.scan(pr_base=orphan)
 
 
 if __name__ == '__main__':
