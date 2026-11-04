@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "6ac266b3a2ea50f378993d245bd2b29c7618985c",
-  "base_tree": "7c3d344d508696eab01299c83238a04a589de1c4",
-  "generated_at": "2026-11-04T20:07:51Z",
+  "base_commit": "7a71837475a8eb3edb6551a965d9f872a12e9851",
+  "base_tree": "55569d30633a52b7d6849a9a4ff64cac240c402e",
+  "generated_at": "2026-11-04T20:13:44Z",
   "validity": {
     "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,7 +13,7 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-04T20:07:51Z"
+    "validated_at": "2026-11-04T20:13:44Z"
   },
   "counts": {
     "inventory_files": 1001,
@@ -2425,7 +2425,7 @@
     "IRSpeedyVPN/Models/Services/Setting.cs": "cda177f45a3f88f3dbccad0603ed7d108e3cbe15",
     "IRSpeedyVPN/Models/Services/UserAccount.cs": "a9b959a4e55d52128b8f6898c86a5228689c3d2c",
     "IRSpeedyVPN/Program.cs": "7b777be52d04adcc910678247d0b19ac73f7132a",
-    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "0ebf224c551cc45aa4c512cf63d7f087b116fb6a",
+    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "35b6a8dd78a3d6cb7c807730ba8fb7192321b2c0",
     "IRSpeedyVPN/Properties/Resources.Designer.cs": "7c0cb8a594732898f58208b4e884920b61557b25",
     "IRSpeedyVPN/Properties/Resources.resx": "1af7de150c99c12dd67a509fe57c10d63e4eeb04",
     "IRSpeedyVPN/Properties/Settings.Designer.cs": "8c14afa6f6e9f405ceba916e27cb4fcac6da06f3",
@@ -3309,5 +3309,5 @@
   },
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "47c78ad3162ca0864e09582b6c58a295ed76e92f9f5c24adc87a4a3f933a4466"
+  "validation_digest": "d38290076a6a209aad847ab0aeb21cdf6a6a2a9eccdd82b5bd6469758e438e6f"
 }
