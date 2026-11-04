@@ -326,7 +326,7 @@ def update(git, old, target):
 def render(m, report):
     status = f"# Current Codegraph status\n\nAnalyzed commit: `{m['base_commit']}`. Validity: **{m['validity']['status']}**.\n\n"
     status += 'Only this status/manifest describe the current snapshot. Other narrative pages are manually reviewed baseline notes.\n\n'
-    for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','stale_relations']:
+    for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','new_reviewed_test_relations','stale_relations']:
         status += f'- {key}: {report.get(key,0)}\n'
     status += '\nPending source review:\n\n'+ ('\n'.join('- `'+p+'`: '+reason for p,reason in m.get('pending_review_files',{}).items()) or 'None.')+'\n'
     deps = '# Current graph relationships\n\nSee [automation.md](automation.md) for validation limits and [status.md](status.md) for current status.\n\n'
@@ -341,7 +341,7 @@ def render(m, report):
 
 def summary(report):
     return '\n'.join(['### Codegraph incremental run','',f"- Target: `{report.get('target_commit','unknown')}`",f"- Validity: **{report.get('validity','failed')}**"]+
-       [f'- {key}: {report.get(key,0)}' for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','stale_relations','ui_files_read','ui_xaml_reparsed','ui_components','ui_pending_review']])+ '\n'
+       [f'- {key}: {report.get(key,0)}' for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','new_reviewed_test_relations','stale_relations','ui_files_read','ui_xaml_reparsed','ui_components','ui_pending_review']])+ '\n'
 
 
 def main():
