@@ -218,18 +218,48 @@ def markdown(report):
              f"- Graph checkpoint: `{report['baseline_commit']}`",
              f"- Target commit: `{report['target_commit']}`",
              f"- Existing graph status: **{report['graph_status_at_checkpoint']}**",
-             f"- Changed paths: **{report['changed_file_count']}**",
+             f"- Paths changed since graph checkpoint: **{report['changed_file_count']}**",
              f"- Directly touched relationships: **{len(report['directly_touched_relations'])}**",
              f"- Potential dependent files: **{len(report['potential_dependents'])}**",
              f"- Existing stale relationships: **{report['preexisting_stale_relations']}**",
              f"- Existing pending-review files: **{report['preexisting_pending_review_files']}**", '']
+    lines.extend([
+        f"- Related test suites (advisory): **{len(report['related_test_suites'])}**",
+        f"- Inventory paths referenced in graph: **{report['mapped_inventory_paths']}/{report['inventory_path_count']}** (not coverage)",
+        f"- Total mapped relationships: **{report['total_mapped_relations']}**",
+    ])
+    if report['pr_base_commit'] is None:
+        lines.append('- PR-only counts: Not available (supply --pr-base)')
+    else:
+        lines.extend([
+            f"- PR base: {report['pr_base_commit']}",
+            f"- Paths changed in this PR: **{report['pr_change_count']}**",
+            f"- Application paths changed in this PR: **{report['pr_application_change_count']}**",
+        ])
+    lines.append('')
     if report['changed_files']:
-        lines.extend(['## Changed paths', ''])
+        lines.extend(['## Changes since graph checkpoint (may include previous PRs)', ''])
         for c in report['changed_files']:
             lines.append(f"- `{c['path']}` ({c['status']})" +
                          (f" from `{c['old_path']}`" if c['old_path'] else ''))
     else:
         lines.extend(['No tracked non-Codegraph changes since checkpoint.'])
+    if report['pr_changed_files'] is not None:
+        lines.extend(['', '## PR-only changes (explicit comparison base)', ''])
+        if not report['pr_changed_files']:
+            lines.append('None.')
+        for item in report['pr_changed_files']:
+            lines.append('- ' + item['path'] + ' (' + item['status'] + ')' +
+                         (' from ' + item['old_path'] if item['old_path'] else ''))
+    lines.extend(['', '## Related test suites (informational only)', ''])
+    if not report['related_test_suites']:
+        lines.append('No mapped test-suite link. This does not mean tests are unnecessary.')
+    for item in report['related_test_suites']:
+        relation = 'direct source change' if item['direct_source_change'] else 'possible downstream impact'
+        stale = '; stale evidence: re-review required' if item['has_stale_evidence'] else ''
+        lines.append('- ' + item['suite'] + ': ' + relation +
+                     '; linked sources: ' + ', '.join(item['linked_source_files']) +
+                     '; relations: ' + ', '.join(item['relation_ids']) + stale)
     lines.extend(['', '## Potential dependents (not runtime proof)', ''])
     if report['potential_dependents']:
         for item in report['potential_dependents']:
@@ -255,13 +285,14 @@ def main(argv=None):
     parser.add_argument('--repo', default='.')
     parser.add_argument('--target', default='HEAD')
     parser.add_argument('--max-depth', type=int, default=4)
+    parser.add_argument('--pr-base', help='Explicit base commit for PR-only statistics')
     parser.add_argument('--report', help='Optional path for JSON report')
     parser.add_argument('--summary', help='Optional path for Markdown report')
     args = parser.parse_args(argv)
     try:
         root = Path(args.repo).resolve()
         manifest = json.loads((root / GRAPH_PATH).read_text(encoding='utf-8-sig'))
-        result = analyze(Git(root), manifest, args.target, args.max_depth)
+        result = analyze(Git(root), manifest, args.target, args.max_depth, args.pr_base)
         if args.report:
             dest = Path(args.report); dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_text(json.dumps(result, ensure_ascii=False, indent=2)+'\n', encoding='utf-8')
