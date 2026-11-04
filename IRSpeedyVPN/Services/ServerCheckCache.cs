@@ -13,6 +13,7 @@ namespace IRSpeedyVPN.Services
     // Account-scoped results, never raw subscription links or credentials on disk.
     internal sealed class ServerCheckCache
     {
+        private const int MaxSavedEntries = 5000;
         private readonly object gate = new object();
         private readonly string path;
         private State state;
@@ -69,8 +70,15 @@ namespace IRSpeedyVPN.Services
         }
 
         private static string Key(IVPNService service, Url url)
-            => ConfigKey(service, url, service is IRSpeedyVPN.Residential.ResidentialService
-                ? IRSpeedyVPN.Residential.ResidentialPresentation.ConnectionUri(url.url) : url.url);
+        {
+            // URI fragments are display labels. Keep non-URI payloads (including
+            // JSON containing '#') and every connection-affecting field exact.
+            string connection = url.url;
+            if (service is IRSpeedyVPN.Residential.ResidentialService
+                || Uri.TryCreate(connection, UriKind.Absolute, out var uri))
+                connection = IRSpeedyVPN.Residential.ResidentialPresentation.ConnectionUri(connection);
+            return ConfigKey(service, url, connection);
+        }
 
         private static string ConfigKey(IVPNService service, Url url, string connection)
         {
@@ -85,16 +93,23 @@ namespace IRSpeedyVPN.Services
             {
                 var items = services.Where(s => s.IsUrlTestSupported).ToArray();
                 bound = new Dictionary<Url, string>();
+                var legacyKeys = new Dictionary<Url, string>();
                 foreach (var service in items)
                     foreach (var url in service.GetServerUrls() ?? new List<Url>())
                     {
                         if (url == null || string.IsNullOrWhiteSpace(url.url)) continue;
                         string key = Key(service, url);
                         bound[url] = key;
-                        // Migrate the prior Residential fingerprint without discarding history.
-                        if (!state.Results.ContainsKey(key) && service is IRSpeedyVPN.Residential.ResidentialService
-                            && state.Results.TryGetValue(ConfigKey(service, url, url.url), out var legacy))
+                        string legacyKey = ConfigKey(service, url, url.url);
+                        legacyKeys[url] = legacyKey;
+                        // Exact old fingerprints can migrate; a country alone
+                        // is never evidence that its connection config matches.
+                        if (!state.Results.ContainsKey(key)
+                            && state.Results.TryGetValue(legacyKey, out var legacy))
+                        {
                             state.Results[key] = legacy;
+                            if (legacyKey != key) state.Results.Remove(legacyKey);
+                        }
                         if (state.Results.TryGetValue(key, out var result)) Apply(url, result);
                         else
                         {
@@ -105,8 +120,6 @@ namespace IRSpeedyVPN.Services
                             url.LastSuccessfulCheckTime = default(DateTime);
                         }
                     }
-                var live = new HashSet<string>(bound.Values);
-                foreach (string key in state.Results.Keys.Where(k => !live.Contains(k)).ToArray()) state.Results.Remove(key);
                 rowKeys = new Dictionary<IVPNService, string>();
                 rows = new Dictionary<string, IVPNService>();
                 foreach (var service in items)
@@ -117,6 +130,15 @@ namespace IRSpeedyVPN.Services
                         .Where(u => u != null && bound.ContainsKey(u)).Select(u => bound[u])
                         .Distinct().OrderBy(k => k, StringComparer.Ordinal).ToArray();
                     string row = Hash(JsonConvert.SerializeObject(new object[] { service.ID, service.Name, configs }));
+                    var legacyConfigs = (service.GetServerUrls() ?? new List<Url>())
+                        .Where(u => u != null && legacyKeys.ContainsKey(u)).Select(u => legacyKeys[u])
+                        .Distinct().OrderBy(k => k, StringComparer.Ordinal).ToArray();
+                    string legacyRow = Hash(JsonConvert.SerializeObject(new object[] { service.ID, service.Name, legacyConfigs }));
+                    if (!state.RowResults.ContainsKey(row) && state.RowResults.TryGetValue(legacyRow, out var previousRow))
+                    {
+                        state.RowResults[row] = previousRow;
+                        if (legacyRow != row) state.RowResults.Remove(legacyRow);
+                    }
                     rowKeys[service] = row;
                     rows[row] = service;
                 }
@@ -134,8 +156,8 @@ namespace IRSpeedyVPN.Services
                         };
                     }
                 }
-                foreach (string key in state.RowResults.Keys.Where(k => !rows.ContainsKey(k)).ToArray())
-                    state.RowResults.Remove(key);
+                // A catalog can be temporarily empty or partial. Retain its
+                // measured history, but only current rows can enter the queue.
                 if (state.Version < 3)
                 {
                     // Version 2 pre-created an endless next round. Do not run that
@@ -439,11 +461,22 @@ namespace IRSpeedyVPN.Services
             catch { return new State(); } // A corrupt cache must not prevent login or tests.
         }
 
+        private static void TrimHistory<T>(Dictionary<string, T> entries, HashSet<string> live, Func<T, DateTime> checkedUtc)
+        {
+            if (entries.Count <= MaxSavedEntries) return;
+            // Keep storage bounded; prefer current configs, then recent history.
+            foreach (string key in entries.OrderByDescending(p => live.Contains(p.Key))
+                .ThenByDescending(p => checkedUtc(p.Value)).Skip(MaxSavedEntries).Select(p => p.Key).ToArray())
+                entries.Remove(key);
+        }
+
         private void Save()
         {
             string temp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             try
             {
+                TrimHistory(state.Results, new HashSet<string>(bound.Values), result => result.CheckedUtc);
+                TrimHistory(state.RowResults, new HashSet<string>(rows.Keys), result => result.CheckedUtc);
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 File.WriteAllText(temp, JsonConvert.SerializeObject(state), Encoding.UTF8);
                 if (File.Exists(path)) File.Replace(temp, path, null);
