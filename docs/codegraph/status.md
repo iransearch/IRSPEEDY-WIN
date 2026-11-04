@@ -1,12 +1,12 @@
 # Current Codegraph status
 
-Analyzed commit: `298c37b9ff2e22ca67a932f0a8225612871ec445`. Validity: **needs-review**.
+Analyzed commit: `6d4acf22ba787bf2c6e73b1b9ab2896be89b7102`. Validity: **needs-review**.
 
 Only this status/manifest describe the current snapshot. Other narrative pages are manually reviewed baseline notes.
 
-- files_changed: 3
-- files_examined: 0
-- content_files_read: 0
+- files_changed: 6
+- files_examined: 5
+- content_files_read: 5
 - relationships_changed: 0
 - new_verified_relations: 0
 - stale_relations: 14
@@ -24,3 +24,7 @@ Pending source review:
 - `tests/LoginRecoveryChecks/Program.cs`: runtime-or-ui-source-needs-review
 - `IRSpeedyVPN/Services/ServerCheckCache.cs`: runtime-or-ui-source-needs-review
 - `tests/ResidentialChecks/CacheChecks.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Windows/SettingsHub.xaml`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Windows/SettingsHub.xaml.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml.cs`: runtime-or-ui-source-needs-review

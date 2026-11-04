@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "298c37b9ff2e22ca67a932f0a8225612871ec445",
-  "base_tree": "8f3b3b3a946427839819608f10cdcd83004f4e1b",
-  "generated_at": "2026-11-04T07:43:29Z",
+  "base_commit": "6d4acf22ba787bf2c6e73b1b9ab2896be89b7102",
+  "base_tree": "b335f116a31ea08ca99f56315a784d13070cef7d",
+  "generated_at": "2026-11-04T09:34:20Z",
   "validity": {
     "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,16 +13,16 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-04T07:43:29Z"
+    "validated_at": "2026-11-04T09:34:20Z"
   },
   "counts": {
-    "inventory_files": 1000,
+    "inventory_files": 1001,
     "csharp_files": 383,
     "xaml_files": 55,
     "solutions": 2,
     "projects": 24,
     "test_projects": 20,
-    "python_run_py_files": 19,
+    "python_run_py_files": 20,
     "requested_modules": 6,
     "primary_paths_mapped": 2,
     "verified_relations": 66,
@@ -2422,7 +2422,7 @@
     "IRSpeedyVPN/Models/Services/Setting.cs": "cda177f45a3f88f3dbccad0603ed7d108e3cbe15",
     "IRSpeedyVPN/Models/Services/UserAccount.cs": "a9b959a4e55d52128b8f6898c86a5228689c3d2c",
     "IRSpeedyVPN/Program.cs": "7b777be52d04adcc910678247d0b19ac73f7132a",
-    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "f5b13a93031c88b5ed2fe993cd442fe2889f2fd6",
+    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "0ebf224c551cc45aa4c512cf63d7f087b116fb6a",
     "IRSpeedyVPN/Properties/Resources.Designer.cs": "7c0cb8a594732898f58208b4e884920b61557b25",
     "IRSpeedyVPN/Properties/Resources.resx": "1af7de150c99c12dd67a509fe57c10d63e4eeb04",
     "IRSpeedyVPN/Properties/Settings.Designer.cs": "8c14afa6f6e9f405ceba916e27cb4fcac6da06f3",
@@ -2975,8 +2975,8 @@
     "IRSpeedyVPN/Windows/SSRServiceSetting.xaml.cs": "615329b0596e1523bcbcdddcf313bd979e3d3f10",
     "IRSpeedyVPN/Windows/STunnelServiceSetting.xaml": "827fc1c4a0558010451d09f039634e0b1614fd67",
     "IRSpeedyVPN/Windows/STunnelServiceSetting.xaml.cs": "e1a461c3c57f80a93408e514c26ae07db6ffa7bf",
-    "IRSpeedyVPN/Windows/SettingsHub.xaml": "ff6413cdb2368fb8e9d625920ad032034b4e9414",
-    "IRSpeedyVPN/Windows/SettingsHub.xaml.cs": "cc858a2b2349f521f26879ccb617ed8d4cb6e9bd",
+    "IRSpeedyVPN/Windows/SettingsHub.xaml": "a3d83cdd661db4a02f003ee37622d0ae0d7b0eac",
+    "IRSpeedyVPN/Windows/SettingsHub.xaml.cs": "d180d6119355b56760946ad317bf87b8e2a9c686",
     "IRSpeedyVPN/Windows/SettingsPassword.xaml": "b052c9df81ee6dd69cd1cb2742f6775d45364fa0",
     "IRSpeedyVPN/Windows/SettingsPassword.xaml.cs": "cca21d4683600a914ba9fc51deb6354a15442e70",
     "IRSpeedyVPN/Windows/SettingsSplitTunnelApps.xaml": "3dad6043ea6f496293ae359369173571b242cf1d",
@@ -2987,8 +2987,8 @@
     "IRSpeedyVPN/Windows/ShareVPNSetting.xaml.cs": "b58468147599a6f91da4296f1bf9b7d4cdfeca2d",
     "IRSpeedyVPN/Windows/SpeedyShieldSetting.xaml": "99f805a18233136742000d86eab18018d102367d",
     "IRSpeedyVPN/Windows/SpeedyShieldSetting.xaml.cs": "61567fed1911c4622304eefcb07a39c64487f282",
-    "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml": "54c1e512d57c029757f65a6f55d3b281e08869a2",
-    "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml.cs": "5570f4d2b807c6c799a9c432e74264c2d2d537dc",
+    "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml": "b27a8ffee65988dbc7df8efe7595b29710fbc6fc",
+    "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml.cs": "54f654023b48f2b63e47b92b091f1a58421fe14c",
     "IRSpeedyVPN/Windows/VPNPlusServiceSetting.xaml": "d099de6ddbc4ffd6d6674174088c6acdc9c4f44d",
     "IRSpeedyVPN/Windows/VPNPlusServiceSetting.xaml.cs": "825aa34f7cc17da6111215a817a4dbb7a6e4fe4d",
     "IRSpeedyVPN/app.config": "3e0e37cfc8c7a59ae349f3d930cc162ccb3f4d50",
@@ -3278,7 +3278,8 @@
     "docs/windows-server-check-cache.md": "dbe73a4d999a251700e58ada339e287fa2f915b6",
     "tests/CodegraphChecks/test_impact.py": "b0d6c22ea0f285e82d7dcb887cb54b7bc3e0e007",
     "tools/codegraph/impact.py": "7741b0c259c51d6b5f2514ad0a21aef22c9628f1",
-    "tests/ResidentialChecks/run-cache.py": "238448eb761f954f387f70b707121e5318157baa"
+    "tests/ResidentialChecks/run-cache.py": "238448eb761f954f387f70b707121e5318157baa",
+    "tests/ConnectionMethodsChecks/run.py": "96ee05f8e523260d0b37cd9009b826a91c578dee"
   },
   "bootstrap_manual_review": {
     "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
@@ -3296,9 +3297,13 @@
     "tests/LoginRecoveryChecks/DnsFailureChecks.cs": "runtime-or-ui-source-needs-review",
     "tests/LoginRecoveryChecks/Program.cs": "runtime-or-ui-source-needs-review",
     "IRSpeedyVPN/Services/ServerCheckCache.cs": "runtime-or-ui-source-needs-review",
-    "tests/ResidentialChecks/CacheChecks.cs": "runtime-or-ui-source-needs-review"
+    "tests/ResidentialChecks/CacheChecks.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Windows/SettingsHub.xaml": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Windows/SettingsHub.xaml.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml.cs": "runtime-or-ui-source-needs-review"
   },
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "6552f945218e8b442404f90d0da39315d253d6e426d58c90cc0f6e5355893d67"
+  "validation_digest": "7e93286b783a8d45464800ee29145f1d0bdc7eb77968f02f9e502bd99760200f"
 }
