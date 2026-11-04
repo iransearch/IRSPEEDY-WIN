@@ -133,13 +133,20 @@ func TestWindowsProxyIPv4Policy(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			t.Cleanup(func() { _ = box.inbound.Close(); routes.stop(); _ = box.Close() })
+			inboundScope := adapter.NewScope(box.ctx, box.logger)
+			t.Cleanup(func() { _ = inboundScope.Close(); routes.stop(); _ = box.Close() })
 			if err = box.logFactory.Start(); err != nil {
 				t.Fatal(err)
 			}
 			for _, stage := range adapter.ListStartStages {
-				if err = adapter.Start(box.ctx, box.logger, stage, box.outbound, box.dnsTransport, box.dnsRouter, box.connection, box.router, box.endpoint, box.certificateProvider, box.inbound, box.service); err != nil {
-					t.Fatal(err)
+				for _, component := range []adapter.Lifecycle{box.outbound, box.dnsTransport, box.dnsRouter, box.connection, box.router, box.endpoint, box.certificateProvider, box.inbound, box.service} {
+					scope := box.scope
+					if component == box.inbound {
+						scope = inboundScope
+					}
+					if err = scope.Start("proxy-fixture", component, stage); err != nil {
+						t.Fatal(err)
+					}
 				}
 			}
 			// Reproduce a previous IPv6-only cache entry before the current Proxy lookup.
