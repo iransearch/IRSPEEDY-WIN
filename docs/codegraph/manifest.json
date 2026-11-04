@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "c7444131a49705b1bea528cceaa4066c0834bd88",
-  "base_tree": "bb83c8545944200008466323305dc53d2d0d7c85",
-  "generated_at": "2026-11-04T16:11:44Z",
+  "base_commit": "6ac266b3a2ea50f378993d245bd2b29c7618985c",
+  "base_tree": "7c3d344d508696eab01299c83238a04a589de1c4",
+  "generated_at": "2026-11-04T20:07:51Z",
   "validity": {
     "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,7 +13,7 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-04T16:11:44Z"
+    "validated_at": "2026-11-04T20:07:51Z"
   },
   "counts": {
     "inventory_files": 1001,
@@ -25,9 +25,9 @@
     "python_run_py_files": 20,
     "requested_modules": 6,
     "primary_paths_mapped": 2,
-    "verified_relations": 66,
+    "verified_relations": 63,
     "relation_evidence_files": 32,
-    "stale_relations": 14,
+    "stale_relations": 17,
     "total_relations": 80
   },
   "graph_files": [
@@ -787,10 +787,11 @@
         "blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "0c0a70e07fb272ae35ef2d7508c9d0a032738195",
       "target_blob": "bfde1369efe64f98b5b544545041d51d7734027e",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R012",
@@ -1951,10 +1952,11 @@
       },
       "note": "countryPicker selects the active scope; both tabs reuse the picker implementation.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "bfde1369efe64f98b5b544545041d51d7734027e",
       "target_blob": "99351bde81910efd40ce1a484446165e580af3a2",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R066",
@@ -1996,10 +1998,11 @@
       },
       "note": "Committed or rollback result is applied before continuing the queue.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "bfde1369efe64f98b5b544545041d51d7734027e",
       "target_blob": "99351bde81910efd40ce1a484446165e580af3a2",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R068",
@@ -2788,7 +2791,7 @@
     "IRSpeedyVPN/Services/Proxifier.cs": "fc0bdec13cf54787fce6a242dbfbf2b9c5c41256",
     "IRSpeedyVPN/Services/ProxifierBrowserQuic.cs": "4ae82d432bcff0432cf99263ca3b900f5c757656",
     "IRSpeedyVPN/Services/SSRService.cs": "6d4d66e75aa5d059461ade9c85159b78ea9a5d21",
-    "IRSpeedyVPN/Services/ServerCheckCache.cs": "3a18ff6c1aeb1c0740eff0c8e8206fccaad921d5",
+    "IRSpeedyVPN/Services/ServerCheckCache.cs": "1fd185833f07c72fa3c5bf980c1cdc65dcade914",
     "IRSpeedyVPN/Services/ServerRefreshPlan.cs": "3e22b065d7b4d6f033670da38933ab3872af4319",
     "IRSpeedyVPN/Services/ServiceFactory.cs": "5843a7996f12164aa34b53f222ab7c9b89fc200b",
     "IRSpeedyVPN/Services/SingBox/ConfigGenerator.cs": "b702cee1fca7228bae3402c0d02b27babac121ec",
@@ -2934,7 +2937,7 @@
     "IRSpeedyVPN/UserControls/UCServerList.Residential.cs": "15d287d598dc85bab7ec0fde2677867834b7c8d6",
     "IRSpeedyVPN/UserControls/UCServerList.ServerResultsRefresh.cs": "842a3f77d2c1bf184473fed28592aacc1e946b5c",
     "IRSpeedyVPN/UserControls/UCServerList.xaml": "097ee52602f4b58def5756b51177b9fe3944f0d4",
-    "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "bfde1369efe64f98b5b544545041d51d7734027e",
+    "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "648dca166baf87d2b53468f54ce2aa102019ab24",
     "IRSpeedyVPN/UserControls/UCUpdate.xaml": "3c1099d30b1d0f22392a4221949f7194f304e008",
     "IRSpeedyVPN/UserControls/UCUpdate.xaml.cs": "487f9f766efba20bf54757b5aefa639e9fca1042",
     "IRSpeedyVPN/UserControls/UCUserInfo.ConnectionTest.cs": "bbeb05732ac27d6bfb7fb67a7f9e5e9e47aeb899",
@@ -3194,7 +3197,7 @@
     "tests/PublicIpChecks/Program.cs": "25dbf920443363f7894f281261f93208f1db33a8",
     "tests/PublicIpChecks/PublicIpChecks.csproj": "ea547f7371c1bb8fe236984f75950f850105c517",
     "tests/PublicIpChecks/README.md": "6a0cc2ce9406f991122c44e61a295194f4a41aff",
-    "tests/ResidentialChecks/CacheChecks.cs": "49e1591442906bbb6d55175b5ed15f231b899e2a",
+    "tests/ResidentialChecks/CacheChecks.cs": "a6fb22fcd198dbb88d7849566a0e5daa38d4e06d",
     "tests/ResidentialChecks/CompileBoundary.cs": "e12a052bae26c3b5818575ad843789a99d971d50",
     "tests/ResidentialChecks/HttpChecks.cs": "ccd539f98c1a1328519a61be96e08b41375b2715",
     "tests/ResidentialChecks/ModelChecks.cs": "27950853dd778d5e98ff105aa45efa60d62e432f",
@@ -3210,13 +3213,13 @@
     "tests/ServerListTransitionChecks/cycle_wiring.py": "82c3798fa4702185d8d05509ab1c6c6aa932fe69",
     "tests/ServerListTransitionChecks/run-wpf.ps1": "290483a6b8374383d3ea510f7dace3682765cd92",
     "tests/ServerListTransitionChecks/run.py": "f9b0fda8bfb23c08ce6687e117c3d334d6c646eb",
-    "tests/ServerRefreshChecks/README.md": "a6f6e1fae09bb3c16ecb5e20b9eed98841e144ac",
+    "tests/ServerRefreshChecks/README.md": "08d3435c5f837e2220a05f249014737753113d13",
     "tests/ServerRefreshChecks/api_refresh.py": "d42458a67e3a14a851ca48571618676e96ed3366",
     "tests/ServerRefreshChecks/connection_handoff.py": "dcf3b3f627652b7e1937b0428ca87965d73cc70f",
     "tests/ServerRefreshChecks/core_dispatch.py": "6fd54d1eaac58678a367aa52d7c0cf541f6e6ad9",
     "tests/ServerRefreshChecks/manual_refresh.py": "745c3a98b591be0e0182de55c6e4f2f8968e1905",
     "tests/ServerRefreshChecks/net48_compile.py": "7d0e1eda4102c355cd95043288212cd0b7486f82",
-    "tests/ServerRefreshChecks/run.py": "2296052419e2b166d02322a06497b5009d8b3a32",
+    "tests/ServerRefreshChecks/run.py": "039ac27b8f20e556784d05cfc80af895d8a7b488",
     "tests/ServerRefreshChecks/url_priority.py": "b30d2c88fee6bdd94683742fed30eb553cb402c7",
     "tests/ServerStarGlowChecks/run-wpf.ps1": "09bf3cc81b4b05d41acb3ecbee723d8b86713f87",
     "tests/ServerStarGlowChecks/run.py": "a80a08fbe5d46517cccbdd5f858527265daf5a0b",
@@ -3301,9 +3304,10 @@
     "IRSpeedyVPN/Windows/SettingsHub.xaml": "runtime-or-ui-source-needs-review",
     "IRSpeedyVPN/Windows/SettingsHub.xaml.cs": "runtime-or-ui-source-needs-review",
     "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml": "runtime-or-ui-source-needs-review",
-    "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml.cs": "runtime-or-ui-source-needs-review"
+    "IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "runtime-or-ui-source-needs-review"
   },
   "external_nodes": {},
   "unresolved_build_items": {},
-  "validation_digest": "9d0070200344b450b8117983bea71be439c7fb3ba92686b9cc69613e4ed2b14f"
+  "validation_digest": "47c78ad3162ca0864e09582b6c58a295ed76e92f9f5c24adc87a4a3f933a4466"
 }
