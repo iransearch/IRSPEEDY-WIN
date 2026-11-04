@@ -14,6 +14,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import ui
+import test_links
 
 BRANCH = 'agent/core-startup-diagnostics-fix'
 OUTPUTS = ('docs/codegraph/manifest.json', 'docs/codegraph/dependencies.md', 'docs/codegraph/status.md', 'docs/codegraph/ui-index.json')
@@ -288,6 +289,9 @@ def update(git, old, target):
                             source_blob=inventory[path],target_blob=inventory.get(target_path),last_verified_commit=target,
                             verification='literal-declaration-only',note='Literal build declaration; MSBuild conditions and execution are not evaluated.')
             existing.pop('stale_reason', None)
+    # Add only manually reviewed, exact-blob test -> source witnesses. The
+    # regular incremental invalidation above still owns stale edges.
+    test_links.seed_reviewed_test_links(git, m, target, report)
     for module in m['modules']:
         for key in ['files','entrypoints']:
             module[key] = [renames.get(p,p) for p in module[key]]
