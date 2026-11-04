@@ -43,3 +43,22 @@ source baseline, intact schema/digest/provenance, four generated files only and 
 merge `failed` or `pending-validation` graphs or erase uncertainty to satisfy publication.
 
 For WPF UI changes, first inspect `docs/codegraph/ui-components.md` as a navigation index; verify its pinned checkpoint and current XAML/code-behind rather than assuming it is auto-refreshed. The UI index currently covers six verified XAML/partial-class pairs only. Do not infer missing event handlers, template resources, or service dependencies. Changed XAML is tracked in the main graph as pending review. The machine-readable `docs/codegraph/ui-index.json` is regenerated incrementally by the workflow; the manually reviewed `ui-components.md` is not. Event names, resource keys and merged dictionary URIs are declarations only: do not infer runtime dependencies from them.
+
+## Impact Analysis, test witnesses, and honest scope
+
+Before refreshing a graph snapshot, run the read-only Impact Analysis against the
+committed source checkpoint. For PR-specific counts, pass the PR's exact base
+commit with --pr-base. Never label cumulative checkpoint changes as PR-only.
+State 'not available' if the PR base was not supplied.
+
+The graph supports manually reviewed test-harness -> source-file links with
+exact source/target blob pins and literal line witnesses. These prove a harness
+reads/includes a source file, NOT that assertions cover the file's behavior.
+Only seed unchanged reviewed witnesses; never promote stale links automatically.
+See docs/codegraph/impact-analysis.md and tools/codegraph/test_links.py.
+
+Related suites are advisory navigation only. Never skip mandatory Regression
+Guard or task-relevant tests merely because the graph shows no suite.
+Mapped file count and relationship density are not behavioral coverage.
+Windows desktop, packaged Core and live integration checks remain Not Run
+unless actually executed.
