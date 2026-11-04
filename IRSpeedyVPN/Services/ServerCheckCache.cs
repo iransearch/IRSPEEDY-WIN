@@ -35,8 +35,8 @@ namespace IRSpeedyVPN.Services
             public bool InitialScanCompleted { get; set; }
             public bool RoundInProgress { get; set; } = true;
             public bool SequentialRound { get; set; }
-            // Bootstrap retains its shuffled order. Disconnect rounds use stable
-            // country/ID order within unsuccessful and successful row groups.
+            // Automatic rounds contain only rows without a completed success.
+            // Login shuffles those rows; disconnect keeps country/ID order.
             public List<string> PendingRows { get; set; }
             public List<string> CompletedRows { get; set; }
             public Dictionary<string, Result> Results { get; set; } = new Dictionary<string, Result>();
@@ -175,15 +175,15 @@ namespace IRSpeedyVPN.Services
                     // Preserve old results, and resume only missing rows during bootstrap.
                     state.CompletedRows = state.InitialScanCompleted ? new List<string>() : rowKeys
                         .Where(p => HasRecordedResults(p.Key)).Select(p => p.Value).Distinct().ToList();
-                    state.PendingRows = Shuffle(rows.Keys.Except(state.CompletedRows));
+                    state.PendingRows = Shuffle(rows.Keys.Except(state.CompletedRows).Where(NeedsAutomaticCheck));
                 }
                 else
                 {
                     state.CompletedRows = state.CompletedRows.Where(rows.ContainsKey).Distinct().ToList();
-                    state.PendingRows = state.PendingRows.Where(rows.ContainsKey)
+                    state.PendingRows = state.PendingRows.Where(rows.ContainsKey).Where(NeedsAutomaticCheck)
                         .Except(state.CompletedRows).Distinct().ToList();
                     // Preserve an unfinished turn and the order of all surviving rows.
-                    var added = rows.Keys.Except(state.PendingRows).Except(state.CompletedRows);
+                    var added = rows.Keys.Except(state.PendingRows).Except(state.CompletedRows).Where(NeedsAutomaticCheck);
                     state.PendingRows.AddRange(state.SequentialRound ? OrderPriorityRows(added) : Shuffle(added));
                 }
                 state.Version = 4;
@@ -222,24 +222,25 @@ namespace IRSpeedyVPN.Services
 
         private List<string> OrderPriorityRows(IEnumerable<string> keys)
         {
-            // LINQ OrderBy is stable: retain country/ID order within both groups.
-            // Historical success and in-flight URL values cannot change this queue.
-            return OrderRows(keys).OrderBy(key =>
-                state.RowResults.TryGetValue(key, out var result) && result.HasSuccess ? 1 : 0).ToList();
+            return OrderRows(keys.Where(NeedsAutomaticCheck));
         }
+
+        // Only a completed row outcome decides eligibility. A canceled/partial
+        // test or a historical member success cannot replace that outcome.
+        private bool NeedsAutomaticCheck(string row)
+            => !state.RowResults.TryGetValue(row, out var result) || !result.HasSuccess;
 
         internal void RestartForLogin()
         {
             lock (gate)
             {
-                // A real login/app start always gets one fresh bootstrap round.
-                // Keep historical URL/row results for display and later disconnect
-                // priority; only rebuild the work queue in bootstrap (shuffled) order.
-                state.InitialScanCompleted = false;
-                state.RoundInProgress = true;
+                // Preserve successful countries and their displayed measurements.
+                // Rebuild only missing/failed work for login and cached startup.
                 state.SequentialRound = false;
                 state.CompletedRows = new List<string>();
-                state.PendingRows = Shuffle(rows.Keys);
+                state.PendingRows = Shuffle(rows.Keys.Where(NeedsAutomaticCheck));
+                state.RoundInProgress = state.PendingRows.Count > 0;
+                state.InitialScanCompleted = !state.RoundInProgress;
                 Save();
             }
         }
@@ -306,10 +307,11 @@ namespace IRSpeedyVPN.Services
         {
             lock (gate)
             {
-                state.RoundInProgress = true;
                 state.SequentialRound = true;
                 state.CompletedRows = new List<string>();
                 state.PendingRows = OrderPriorityRows(rows.Keys);
+                state.RoundInProgress = state.PendingRows.Count > 0;
+                if (!state.RoundInProgress) state.InitialScanCompleted = true;
             }
         }
 

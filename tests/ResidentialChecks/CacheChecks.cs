@@ -101,6 +101,37 @@ internal static class CacheChecks
         var restored=Vpn(27);cache=new ServerCheckCache("bounded","xfast",dir);cache.Bind(new[]{restored});
         Check(restored.GetServerUrls()[0].latency==512,"current configuration survives retention pressure and a process restart");
     }
+    static void AutomaticRoundChecks(string dir)
+    {
+        var good=Vpn(101);var failed=Vpn(102);var missing=Vpn(103);
+        var rows=new[]{good,failed,missing};
+        var cache=new ServerCheckCache("automatic","xfast",dir);cache.Bind(rows);
+        cache.RecordRefreshMember(good,good.GetServerUrls()[0],120,DateTime.UtcNow);cache.CompleteRefreshRow(good);
+        cache.RecordRefreshMember(failed,failed.GetServerUrls()[0],130,DateTime.UtcNow);cache.CompleteRefreshRow(failed);
+        cache.RecordRefreshMember(failed,failed.GetServerUrls()[0],-1,DateTime.UtcNow);cache.CompleteRefreshRow(failed);
+        cache.StopRound();
+        for(int scenario=0;scenario<3;scenario++)
+        {
+            if(scenario==2)
+            {
+                rows=new[]{Vpn(101),Vpn(102),Vpn(103)};
+                cache=new ServerCheckCache("automatic","xfast",dir);cache.Bind(rows);
+            }
+            if(scenario==0)cache.RestartFromFirstCountry();else cache.RestartForLogin();
+            var seen=new System.Collections.Generic.List<int>();
+            while(cache.NextService!=null){var row=cache.NextService;seen.Add(row.ID);cache.CompleteService(row);}
+            Check(seen.Count==2&&seen.OrderBy(id=>id).SequenceEqual(new[]{102,103}),"disconnect/login/process restart checks only failed and missing country results");
+            Check(rows[0].GetServerUrls()[0].latency==120&&rows[1].GetServerUrls()[0].LastSuccessfulLatency==130,"automatic filtering preserves success and separate failure history");
+        }
+        foreach(var row in rows){cache.RecordRefreshMember(row,row.GetServerUrls()[0],150,DateTime.UtcNow);cache.CompleteRefreshRow(row);}
+        cache.RestartForLogin();Check(cache.NextService==null&&cache.InitialScanCompleted,"all-success login stays idle");
+        cache.RestartFromFirstCountry();Check(cache.NextService==null,"all-success disconnect stays idle");
+        rows[0].GetServerUrls()[0].extra_field_1="changed";cache.Bind(rows);cache.RestartForLogin();
+        Check(ReferenceEquals(cache.NextService,rows[0])&&rows[0].GetServerUrls()[0].latency==0,"a changed configuration becomes missing without retesting unchanged successful countries");
+        cache.ClearForManualRefresh();cache.RestartForLogin();var count=0;
+        while(cache.NextService!=null){var row=cache.NextService;count++;cache.CompleteService(row);}
+        Check(count==3,"explicit refresh can still clear results and test every country");
+    }
     internal static void Run()
     {
         string dir=Path.Combine(Path.GetTempPath(),"residential-cache-"+Guid.NewGuid().ToString("N"));
@@ -134,6 +165,7 @@ internal static class CacheChecks
             HistoryChecks(dir);
             FingerprintChecks(dir);
             BoundedHistoryChecks(dir);
+            AutomaticRoundChecks(dir);
         }
         finally {if(Directory.Exists(dir))Directory.Delete(dir,true);}
     }

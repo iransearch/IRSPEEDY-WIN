@@ -177,12 +177,12 @@ namespace IRSpeedyVPN.UserControls
             probeCache.Bind(services);
             if (services.Length > 0 && (probeLoginRoundRequested || !initializedProbeScopes.Contains(context)))
             {
-                // Bind first so the bootstrap queue is built from the current API
+                // Bind first so the missing/failed queue uses the current API
                 // objects, never stale rows left from the previous login.
                 probeCache.RestartForLogin();
                 initializedProbeScopes.Add(context);
                 probeLoginRoundRequested = false;
-                LogHelper.WriteExLog("[ServerChecks] login bootstrap round restarted rows=" + services.Length + " scope=" + (isResidentialTab ? "Residential" : "VPN"));
+                LogHelper.WriteExLog("[ServerChecks] login missing/failed round restarted rows=" + services.Length + " scope=" + (isResidentialTab ? "Residential" : "VPN"));
             }
             countryPicker.Load(services, _isUrlTestSupported);
             countryPicker.SelectedService = selectedService;
@@ -284,9 +284,8 @@ namespace IRSpeedyVPN.UserControls
         internal void PrepareServerChecksForLogin()
         {
             initializedProbeScopes.Clear();
-            // Every real login/app start begins one complete bootstrap scan. Cached
-            // results remain visible, but a previously completed/stopped persisted
-            // round must not leave NextService empty and silently suppress testing.
+            // Login and cached startup rebuild only missing/failed country work.
+            // Successful countries retain their cached measurements and stay idle.
             probesRequireDisconnect = false;
             probeRestartRequested = false;
             probeLoginRoundRequested = true;
@@ -329,7 +328,7 @@ namespace IRSpeedyVPN.UserControls
             var cache = probeCache;
             if (probeRestartRequested)
             {
-                // Freeze failed-country priority from completed results after the
+                // Freeze missing/failed-country eligibility after the
                 // old worker drains; later results do not reorder the active queue.
                 cache.RestartFromFirstCountry();
                 probeRestartRequested = false;
