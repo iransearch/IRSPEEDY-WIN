@@ -16,7 +16,7 @@ from update import BRANCH, Git, validate, digest
 GRAPH_PATH = 'docs/codegraph/manifest.json'
 
 
-def analyze(git, manifest, target='HEAD', max_depth=4):
+def _analyze_checkpoint(git, manifest, target='HEAD', max_depth=4):
     if manifest.get('base_branch') != BRANCH:
         raise ValueError('Codegraph does not belong to the IRSPEEDY development branch')
     if manifest.get('schema_version') != '2.0.0':
@@ -135,6 +135,80 @@ def analyze(git, manifest, target='HEAD', max_depth=4):
             'The analysis covers committed changes since the recorded graph source checkpoint only.',
         ],
     }
+    return report
+
+
+def analyze(git, manifest, target='HEAD', max_depth=4, pr_base=None):
+    """Return original checkpoint impact plus advisory tests and optional PR-only scope."""
+    report = _analyze_checkpoint(git, manifest, target, max_depth)
+    modified = {p for item in report['changed_files']
+                for p in (item['path'], item['old_path']) if p}
+    impacted = modified | {x['path'] for x in report['potential_dependents']}
+    suites = {}
+    for rel in manifest['relationships']:
+        source, target_path = rel['from'], rel['to']
+        if not (source.startswith('tests/') and target_path in impacted and
+                rel['kind'] in ('reads_source', 'includes_source')):
+            continue
+        parts = source.split('/')
+        if len(parts) < 3:
+            continue
+        suite = '/'.join(parts[:2])
+        item = suites.setdefault(suite, {
+            'suite': suite, 'relation_ids': set(), 'linked_source_files': set(),
+            'witness_files': set(), 'direct_source_change': False,
+            'has_stale_evidence': False,
+            'evidence_level': 'source-inclusion-or-read-only',
+        })
+        item['relation_ids'].add(rel['id'])
+        item['linked_source_files'].add(target_path)
+        item['witness_files'].add(source)
+        item['direct_source_change'] |= target_path in modified
+        item['has_stale_evidence'] |= rel['status'] == 'stale'
+    related = []
+    for item in suites.values():
+        related.append({**item, **{
+            key: sorted(item[key])
+            for key in ('relation_ids', 'linked_source_files', 'witness_files')
+        }})
+    related.sort(key=lambda item: (not item['direct_source_change'], item['suite']))
+
+    inventory = manifest.get('file_inventory', {})
+    mapped = {path for edge in manifest['relationships']
+              for path in (edge['from'], edge['to'], edge['evidence']['path'])}
+    report.update(related_test_suites=related,
+                  inventory_path_count=len(inventory),
+                  mapped_inventory_paths=len(mapped & set(inventory)),
+                  total_mapped_relations=len(manifest['relationships']),
+                  pr_base_commit=None, pr_changed_files=None,
+                  pr_change_count=None, pr_application_change_count=None)
+    if pr_base is not None:
+        sha = git.commit(pr_base)
+        if subprocess.run(['git', 'merge-base', '--is-ancestor', sha,
+                           report['target_commit']], cwd=git.root,
+                          stdout=subprocess.DEVNULL,
+                          stderr=subprocess.DEVNULL).returncode:
+            raise ValueError('PR base must be an ancestor of the analyzed target')
+        pr_changes = [x for x in git.changes(sha, report['target_commit'])
+                      if not (x['path'].startswith('docs/codegraph/') and
+                              x['old_path'].startswith('docs/codegraph/'))]
+        pr_changes.sort(key=lambda x: (x['path'], x['old_path']))
+        report.update(
+            pr_base_commit=sha,
+            pr_change_count=len(pr_changes),
+            pr_application_change_count=sum(
+                x['path'].startswith('IRSpeedyVPN/') or
+                x['old_path'].startswith('IRSpeedyVPN/') for x in pr_changes),
+            pr_changed_files=[{
+                'status': x['status'], 'path': x['path'],
+                'old_path': x['old_path'] if x['old_path'] != x['path'] else None,
+            } for x in pr_changes],
+        )
+    report['limitations'].extend([
+        'PR-only counts require an explicit --pr-base; checkpoint scope is cumulative.',
+        'Test-harness file reads are not assertion/behavior coverage proof.',
+        'Related test suites cannot replace or skip mandatory Regression Guard.',
+    ])
     return report
 
 
