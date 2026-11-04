@@ -1,15 +1,15 @@
 # Current Codegraph status
 
-Analyzed commit: `7a71837475a8eb3edb6551a965d9f872a12e9851`. Validity: **needs-review**.
+Analyzed commit: `5febacbedc6fe0a551ceb33912bf6eb17c4c628d`. Validity: **needs-review**.
 
 Only this status/manifest describe the current snapshot. Other narrative pages are manually reviewed baseline notes.
 
-- files_changed: 1
-- files_examined: 1
-- content_files_read: 1
-- relationships_changed: 0
+- files_changed: 9
+- files_examined: 6
+- content_files_read: 6
+- relationships_changed: 5
 - new_verified_relations: 0
-- stale_relations: 17
+- stale_relations: 22
 
 Pending source review:
 
@@ -29,3 +29,6 @@ Pending source review:
 - `IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml`: runtime-or-ui-source-needs-review
 - `IRSpeedyVPN/Windows/VGAURDServiceSetting.xaml.cs`: runtime-or-ui-source-needs-review
 - `IRSpeedyVPN/UserControls/UCServerList.xaml.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs`: runtime-or-ui-source-needs-review
+- `tests/ServerListTransitionChecks/IncrementalOrderChecks.cs`: runtime-or-ui-source-needs-review
