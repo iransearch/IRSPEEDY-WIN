@@ -14,6 +14,7 @@ import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import ui
+import test_links
 
 BRANCH = 'agent/core-startup-diagnostics-fix'
 OUTPUTS = ('docs/codegraph/manifest.json', 'docs/codegraph/dependencies.md', 'docs/codegraph/status.md', 'docs/codegraph/ui-index.json')
@@ -288,6 +289,9 @@ def update(git, old, target):
                             source_blob=inventory[path],target_blob=inventory.get(target_path),last_verified_commit=target,
                             verification='literal-declaration-only',note='Literal build declaration; MSBuild conditions and execution are not evaluated.')
             existing.pop('stale_reason', None)
+    # Add only manually reviewed, exact-blob test -> source witnesses. The
+    # regular incremental invalidation above still owns stale edges.
+    test_links.seed_reviewed_test_links(git, m, target, report)
     for module in m['modules']:
         for key in ['files','entrypoints']:
             module[key] = [renames.get(p,p) for p in module[key]]
@@ -322,7 +326,7 @@ def update(git, old, target):
 def render(m, report):
     status = f"# Current Codegraph status\n\nAnalyzed commit: `{m['base_commit']}`. Validity: **{m['validity']['status']}**.\n\n"
     status += 'Only this status/manifest describe the current snapshot. Other narrative pages are manually reviewed baseline notes.\n\n'
-    for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','stale_relations']:
+    for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','new_reviewed_test_relations','stale_relations']:
         status += f'- {key}: {report.get(key,0)}\n'
     status += '\nPending source review:\n\n'+ ('\n'.join('- `'+p+'`: '+reason for p,reason in m.get('pending_review_files',{}).items()) or 'None.')+'\n'
     deps = '# Current graph relationships\n\nSee [automation.md](automation.md) for validation limits and [status.md](status.md) for current status.\n\n'
@@ -337,7 +341,7 @@ def render(m, report):
 
 def summary(report):
     return '\n'.join(['### Codegraph incremental run','',f"- Target: `{report.get('target_commit','unknown')}`",f"- Validity: **{report.get('validity','failed')}**"]+
-       [f'- {key}: {report.get(key,0)}' for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','stale_relations','ui_files_read','ui_xaml_reparsed','ui_components','ui_pending_review']])+ '\n'
+       [f'- {key}: {report.get(key,0)}' for key in ['files_changed','files_examined','content_files_read','relationships_changed','new_verified_relations','new_reviewed_test_relations','stale_relations','ui_files_read','ui_xaml_reparsed','ui_components','ui_pending_review']])+ '\n'
 
 
 def main():
