@@ -353,7 +353,8 @@ namespace IRSpeedyVPN.Services.Xray
             out bool aiRoutingEnabled,
             out int poolMemberCount,
             out int hysteriaMemberCount,
-            bool? serviceRoutingEnabled = null)
+            bool? serviceRoutingEnabled = null,
+            bool hasNativeMain = false)
         {
             aiRoutingEnabled = false;
             poolMemberCount = 0;
@@ -433,7 +434,7 @@ namespace IRSpeedyVPN.Services.Xray
                     hysteriaMemberCount++;
             }
 
-            if (idx == 0)
+            if (idx == 0 && !hasNativeMain)
                 return null;
 
             poolMemberCount = idx;

@@ -1,4 +1,5 @@
 ﻿using IRSpeedyVPN.Common;
+using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
 using System.Data;
@@ -95,7 +96,7 @@ namespace IRSpeedyVPN.Services.SingBox
 
             bool hasXrayMember = xraySocksPort.HasValue && xraySocksPort.Value > 0;
             if (hysteriaItems.Count == 1 && !hasXrayMember)
-                return Utils.ToJson(cfg);
+                return SerializeConfig(cfg);
 
             string commonDetour = primary.detour;
             var memberTags = new List<string>();
@@ -141,7 +142,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 interrupt_exist_connections = false
             });
 
-            return Utils.ToJson(cfg);
+            return SerializeConfig(cfg);
         }
 
         private static void RouteSmartAiThroughXray(SingBoxConfig cfg, string xrayTag)
@@ -197,11 +198,12 @@ namespace IRSpeedyVPN.Services.SingBox
             {
                 string msg;
                 var item = ShareHandler.ImportFromConfigLink(Link, out msg);
+                if (item == null && WireGuardEndpoint.IsLink(Link))
+                    throw new FormatException("invalid-wireguard-link");
                 cfg = GenerateConfig(item, port, VpnMode, addExtraInbounds, chain, legacyDNS, isShareActive, shieldFiles, chainLink, defaultChainLink, hasDefaultchain, overrideServer, overrideServerPort,excludeprocesspath, gameMode);
             }
 
-            string res = Utils.ToJson(cfg);
-            return res;
+            return SerializeConfig(cfg);
         }
 
         public static string GetUrlTestConfig(Dictionary<string, string[]> links, int port, out Dictionary<string, string> tagToUrl, Dictionary<string, EndpointOverride> endpointOverrides = null, Dictionary<string, Tuple<int, string, string>> socksOverrides = null, string tagPrefix = "", Dictionary<string, string> rejected = null)
@@ -284,7 +286,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 idx++;
             }
 
-            return Utils.ToJson(cfg);
+            return SerializeConfig(cfg);
         }
 
         // Accept only the exact Core decode/constructor error for this config.
@@ -292,16 +294,30 @@ namespace IRSpeedyVPN.Services.SingBox
         public static string[] GetRejectedProbeLinks(string config, string error, Dictionary<string, string> tags)
         {
             if (config == null || error == null || tags == null) return new string[0];
-            string suffix = null;
-            foreach (var prefix in new[] { "decode config at " + config + ": outbounds[", "create service: initialize outbound[" })
-                if (error.StartsWith(prefix, StringComparison.Ordinal)) { suffix = error.Substring(prefix.Length); break; }
-            if (suffix == null) return new string[0];
-            int end = suffix.IndexOf("]: ", StringComparison.Ordinal);
-            if (end < 0 || !int.TryParse(suffix.Substring(0, end), out var index)) return new string[0];
-            var cfg = Utils.FromJson<SingBoxConfig>(config);
-            if (index < 0 || index >= cfg.outbounds.Count) return new string[0];
-            var rejectedTag = cfg.outbounds[index].tag;
-            var byTag = cfg.outbounds.Where(o => !string.IsNullOrEmpty(o.tag)).ToDictionary(o => o.tag);
+            string collection = null;
+            int index = -1;
+            foreach (var kind in new[] { "outbound", "endpoint" })
+            {
+                var prefix = new[] { "decode config at " + config + ": " + kind + "s[",
+                    "create service: initialize " + kind + "[" }
+                    .FirstOrDefault(candidate => error.StartsWith(candidate, StringComparison.Ordinal));
+                if (prefix == null) continue;
+                int end = error.IndexOf("]: ", prefix.Length, StringComparison.Ordinal);
+                if (end < 0 || !int.TryParse(error.Substring(prefix.Length, end - prefix.Length), out index))
+                    return new string[0];
+                collection = kind + "s";
+                break;
+            }
+            if (collection == null || index < 0) return new string[0];
+            var cfg = JObject.Parse(config);
+            var members = cfg[collection] as JArray;
+            if (members == null || index >= members.Count) return new string[0];
+            var rejectedTag = (string)members[index]["tag"];
+            if (string.IsNullOrEmpty(rejectedTag)) return new string[0];
+            var outbounds = cfg["outbounds"] as JArray ?? new JArray();
+            var endpoints = cfg["endpoints"] as JArray ?? new JArray();
+            var byTag = outbounds.Concat(endpoints).Where(o => !string.IsNullOrEmpty((string)o["tag"]))
+                .ToDictionary(o => (string)o["tag"]);
             return tags.Where(pair =>
             {
                 var seen = new HashSet<string>();
@@ -309,7 +325,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 while (tag != null && seen.Add(tag) && byTag.TryGetValue(tag, out var outbound))
                 {
                     if (tag == rejectedTag) return true;
-                    tag = outbound.detour;
+                    tag = (string)outbound["detour"];
                 }
                 return false;
             }).Select(pair => pair.Value).Distinct(StringComparer.Ordinal).ToArray();
@@ -340,6 +356,8 @@ namespace IRSpeedyVPN.Services.SingBox
                 }
                 idy++;
                 var item = ShareHandler.ImportFromConfigLink(lnk, out msg);
+                if (item == null && WireGuardEndpoint.IsLink(lnk))
+                    throw new FormatException("invalid-wireguard-chain");
                 var outboundchain = new Outbound();
                 FillOutboundForItem(outboundchain, item, strict);
                 if (strict) ValidateProbeOutbound(outboundchain);
@@ -380,6 +398,15 @@ namespace IRSpeedyVPN.Services.SingBox
             if (outbound == null || node == null)
             {
                 if (strict) throw new InvalidOperationException("invalid-outbound");
+                return;
+            }
+
+            if (node.configType == EConfigType.WireGaurd)
+            {
+                outbound.WireGuard = WireGuardEndpoint.Build(node, outbound.tag);
+                outbound.type = Global.wireguardProtocolLite;
+                outbound.server = node.address;
+                outbound.server_port = node.port;
                 return;
             }
 
@@ -478,23 +505,6 @@ namespace IRSpeedyVPN.Services.SingBox
                     outbound.security = null;
                     boundStreamSettings(node, "out", outbound);
                     outbound.type = Global.trojanProtocolLite;
-                }
-                else if (node.configType == EConfigType.WireGaurd)
-                {
-                    var serilizer = new JavaScriptSerializer();
-                    var wgOutbound = serilizer.Deserialize<Outbound>(Samples.sg_wgOutbound);
-                    outbound.server = wgOutbound.server;
-                    outbound.server_port = wgOutbound.server_port;
-                    outbound.type = wgOutbound.type;
-                    outbound.tag = wgOutbound.tag;
-                    outbound.private_key = node.privateKey;
-                    outbound.peer_public_key = node.publicKey;
-                    outbound.pre_shared_key = node.preSharedKey;
-                    if (node.ipList != null)
-                        outbound.local_address = node.ipList.ToList();
-                    outbound.tls = null;
-                    outbound.multiplex = null;
-                    outbound.type = Global.wireguardProtocolLite;
                 }
                 else if (node.configType == EConfigType.SSH)
                 {
@@ -821,7 +831,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 if (detourTag != null && cfg.outbounds.Count > 0 && cfg.outbounds[0] != null)
                     cfg.outbounds[0].detour = detourTag;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!lstChains.Any(WireGuardEndpoint.IsLink))
             {
                 Utils.SaveLog(ex.Message, ex);
             }
@@ -912,11 +922,31 @@ namespace IRSpeedyVPN.Services.SingBox
                     ServerPort = overrideServerPort ?? 0
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (node?.configType != EConfigType.WireGaurd)
             {
                 Utils.SaveLog(ex.Message, ex);
             }
 
+        }
+
+        private static string SerializeConfig(SingBoxConfig cfg)
+        {
+            if (cfg?.outbounds == null) return Utils.ToJson(cfg);
+            // Build tags and chain detours in the shared outbound pipeline before
+            // moving WireGuard to the Core's separate endpoint collection.
+            foreach (var outbound in cfg.outbounds.Where(o => o.WireGuard != null).ToArray())
+            {
+                var endpoint = outbound.WireGuard;
+                var peer = ((Dictionary<string, object>[])endpoint["peers"])[0];
+                peer["address"] = outbound.server;
+                peer["port"] = outbound.server_port.Value;
+                endpoint["tag"] = outbound.tag;
+                if (!string.IsNullOrEmpty(outbound.detour)) endpoint["detour"] = outbound.detour;
+                if (cfg.endpoints == null) cfg.endpoints = new List<Dictionary<string, object>>();
+                cfg.endpoints.Add(endpoint);
+                cfg.outbounds.Remove(outbound);
+            }
+            return Utils.ToJson(cfg);
         }
 
         public class EndpointOverride

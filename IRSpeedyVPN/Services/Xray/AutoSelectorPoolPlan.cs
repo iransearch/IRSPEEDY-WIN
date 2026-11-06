@@ -2,11 +2,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using Newtonsoft.Json.Linq;
+using IRSpeedyVPN.Services.SingBox;
+using v2rayN.Handler;
 
 namespace IRSpeedyVPN.Services.Xray
 {
-    /// <summary>Each SOCKS bridge reaches exactly one Xray member. Selection and
-    /// health belong to independent sing-box groups, never to an inner balancer.</summary>
+    /// <summary>Sing-box selects native endpoints and individual Xray bridges.
+    /// Each SOCKS bridge reaches exactly one Xray member.</summary>
     internal sealed class AutoSelectorPoolPlan : IDisposable
     {
         internal const int CloselyCheckedMemberLimit = 35;
@@ -15,12 +17,16 @@ namespace IRSpeedyVPN.Services.Xray
         private readonly Action<int> releasePort;
         private readonly List<JObject> main = new List<JObject>();
         private readonly List<JObject> ai = new List<JObject>();
+        private readonly List<JObject> wireGuard = new List<JObject>();
+        private string firstWireGuardLink;
         private bool disposed;
         internal string XrayConfig { get; private set; }
         internal string User { get; private set; }
         internal string Password { get; private set; }
-        internal int PrimaryPort => (int)main[0]["server_port"];
-        internal int MainMembers => main.Count;
+        internal string PrimaryLink => main.Count > 0
+            ? $"socks://{User}:{Password}@127.0.0.1:{(int)main[0]["server_port"]}"
+            : firstWireGuardLink;
+        internal int MainMembers => main.Count + wireGuard.Count;
         internal int AiMembers => ai.Count;
         internal int HysteriaMembers { get; private set; }
         internal bool AiEnabled { get; private set; }
@@ -37,11 +43,32 @@ namespace IRSpeedyVPN.Services.Xray
             };
             try
             {
+                var xrayLinks = new List<string>();
+                foreach (var link in links)
+                {
+                    if (!WireGuardEndpoint.IsLink(link))
+                    {
+                        xrayLinks.Add(link);
+                        continue;
+                    }
+                    var item = ShareHandler.ImportFromConfigLink(link, out _);
+                    if (item == null) continue;
+                    try
+                    {
+                        var endpoint = WireGuardEndpoint.Build(item, $"smart-wg-{plan.wireGuard.Count}");
+                        plan.wireGuard.Add(JObject.FromObject(endpoint));
+                        if (plan.firstWireGuardLink == null) plan.firstWireGuardLink = link;
+                    }
+                    catch (FormatException)
+                    {
+                        // An invalid WireGuard candidate cannot prevent the other members from starting.
+                    }
+                }
                 bool policy;
                 int members, hysteria;
                 // Reuse the validated transport builders, refusal filters and Core DNS inheritance.
-                var config = ConfigGenerator.GetSmartBalancerConfig(links, 1, plan.User, plan.Password,
-                    aiLinks, out policy, out members, out hysteria, aiEnabled);
+                var config = ConfigGenerator.GetSmartBalancerConfig(xrayLinks, 1, plan.User, plan.Password,
+                    aiLinks, out policy, out members, out hysteria, aiEnabled, plan.wireGuard.Count > 0);
                 if (string.IsNullOrWhiteSpace(config)) return null;
                 var root = JObject.Parse(config);
                 plan.HysteriaMembers = hysteria;
@@ -85,15 +112,15 @@ namespace IRSpeedyVPN.Services.Xray
                 root["routing"] = new JObject { ["domainStrategy"] = "AsIs", ["rules"] = rules };
                 root.Remove("burstObservatory");
                 root.Remove("observatory");
-                plan.XrayConfig = root.ToString();
+                if (plan.ports.Count > 0) plan.XrayConfig = root.ToString();
                 return plan;
             }
             catch { plan.Dispose(); throw; }
         }
 
-        private static JObject Group(string tag, IEnumerable<JObject> bridges)
+        private static JObject Group(string tag, IEnumerable<JObject> candidates)
         {
-            var members = bridges.ToArray();
+            var members = candidates.ToArray();
             return new JObject
             {
                 ["type"] = tag == "proxy" ? "auto-selector-round-robin" : "auto-selector", ["tag"] = tag,
@@ -117,7 +144,8 @@ namespace IRSpeedyVPN.Services.Xray
             if (disposed) throw new ObjectDisposedException(nameof(AutoSelectorPoolPlan));
             var root = JObject.Parse(singBoxConfig);
             var outbounds = root["outbounds"] as JArray;
-            var primary = outbounds?.OfType<JObject>().SingleOrDefault(o => (string)o["tag"] == "proxy");
+            var endpoints = root["endpoints"] as JArray ?? new JArray();
+            var primary = outbounds?.Concat(endpoints).SingleOrDefault(o => (string)o["tag"] == "proxy");
             var rules = root["route"]?["rules"] as JArray;
             if (primary == null || rules == null)
                 throw new InvalidOperationException("Missing primary outbound or routing rules.");
@@ -130,7 +158,23 @@ namespace IRSpeedyVPN.Services.Xray
                 if (detour != null) copy["detour"] = detour.DeepClone();
                 outbounds.Add(copy);
             }
-            primary.Replace(Group("proxy", main));
+            foreach (var member in wireGuard)
+            {
+                var copy = (JObject)member.DeepClone();
+                if (detour != null) copy["detour"] = detour.DeepClone();
+                endpoints.Add(copy);
+            }
+            if (endpoints.Count > 0 && endpoints.Parent == null) root["endpoints"] = endpoints;
+            var group = Group("proxy", main.Concat(wireGuard));
+            if (primary.Parent == endpoints)
+            {
+                primary.Remove();
+                outbounds.Insert(0, group);
+            }
+            else
+            {
+                primary.Replace(group);
+            }
             if (ai.Count > 0) outbounds.Add(Group("ai-proxy", ai));
             // Core/process bypasses have no user inbound. Restrict AI policy to
             // user traffic so server DNS and physical connectivity checks cannot

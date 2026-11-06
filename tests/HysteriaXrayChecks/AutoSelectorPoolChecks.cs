@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using IRSpeedyVPN.Services.SingBox;
 using IRSpeedyVPN.Services.Xray;
 using Newtonsoft.Json.Linq;
 
@@ -110,6 +111,43 @@ internal static class AutoSelectorPoolChecks
         Check(AutoSelectorPoolPlan.Create(new[] { "missing://invalid" }, null, false,
             () => { throw new Exception("unexpected allocation"); }, released.Add) == null,
             "no accepted main member prevents configuration and allocates no ports");
+        var key = Convert.ToBase64String(Enumerable.Repeat((byte)251, 32).ToArray());
+        var wg = "wg://wg.example:11912?private_key=" + key + "&public_key=" + key
+            + "&local_address=10.0.0.2/32&enable_amnezia=true&random_trailers=true";
+        var wgNode = WireGuardEndpoint.ParseUri(wg);
+        v2rayN.Handler.ShareHandler.Nodes[wg] = wgNode;
+        using (var mixed = AutoSelectorPoolPlan.Create(new[] { wg, "hy2://fixture", "wg://invalid" },
+            new[] { "hy2://fixture" }, true, () => next++, released.Add))
+        {
+            var config = JObject.Parse(mixed.Apply(BaseConfig(true).ToString()));
+            var group = config["outbounds"].Single(o => (string)o["tag"] == "proxy");
+            var endpoint = config["endpoints"].Single();
+            var bridges = JObject.Parse(mixed.XrayConfig)["inbounds"];
+            Check(mixed.MainMembers == 2 && mixed.AiMembers == 1 && bridges.Count() == 2
+                && group["outbounds"].Values<string>().SequenceEqual(new[] { "smart-proxy-0", "smart-wg-0" })
+                && (string)endpoint["tag"] == "smart-wg-0" && (bool)endpoint["amnezia_wg"]["random_trailers"]
+                && (string)endpoint["detour"] == "chain-default-1", "mixed pool uses a native WG endpoint alongside Xray bridges");
+        }
+        foreach (bool aiEnabled in new[] { false, true })
+        {
+            int allocations = next;
+            using (var native = AutoSelectorPoolPlan.Create(new[] { wg },
+                new[] { "hy2://fixture" }, aiEnabled, () => next++, released.Add))
+            {
+                var shell = BaseConfig(false);
+                var primary = JObject.FromObject(WireGuardEndpoint.Build(wgNode, "proxy"));
+                primary["detour"] = "chain-default-1";
+                shell["endpoints"] = new JArray(primary);
+                shell["outbounds"][0].Remove();
+                var config = JObject.Parse(native.Apply(shell.ToString()));
+                Check(native.PrimaryLink == wg && (native.XrayConfig != null) == aiEnabled
+                    && next - allocations == (aiEnabled ? 1 : 0)
+                    && config["outbounds"][0]["outbounds"].Values<string>().SequenceEqual(new[] { "smart-wg-0" })
+                    && (string)config["endpoints"].Single()["tag"] == "smart-wg-0"
+                    && (string)config["route"]["final"] == "proxy",
+                    "native-only main pool replaces its shell and starts Xray only for existing AI members");
+            }
+        }
         foreach (int count in new[] { 8, 9, 35, 36 })
         {
             var largeLinks = Enumerable.Range(0, count).Select(i => "hy2://auto-" + i).ToArray();

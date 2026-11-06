@@ -12,17 +12,22 @@ def method(name):
     while level:
         level+=(source[b]=='{')-(source[b]=='}');b+=1
     return source[m.start():b]
-methods='\n'.join(method(n) for n in ['GetRejectedProbeLinks','GetUrlTestConfig','ApplyEndpointOverride','CreateChainOutbound','ValidateProbeOutbound','FillOutboundForItem','CreateXraySocksOutbound'])
+methods='\n'.join(method(n) for n in ['GetConfigEx','GenerateConfig','ApplyChainOutbound','Filloutbound','GetRejectedProbeLinks',
+    'GetUrlTestConfig','ApplyEndpointOverride','CreateChainOutbound','ValidateProbeOutbound','FillOutboundForItem','CreateXraySocksOutbound','SerializeConfig'])
 fixtures=(root/'tests/HysteriaXrayChecks/Fixtures.cs').read_text()
-fixtures=fixtures.replace('VMess, VLESS, Trojan, Shadowsocks, Socks, Http, Hysteria2','VMess, VLESS, Trojan, Shadowsocks, Socks, Http, Hysteria2, Shadowsocksr, WireGaurd, SSH, Tuic')
-fixtures=fixtures.replace('public int port, alterId;','public int port, alterId, portEnd; public string packetEncoding, protocol, protocol_param, privateKey, preSharedKey, username, congestionControl, udpRelayMode; public string[] ipList;')
+fixtures=fixtures.replace('Hysteria2, WireGaurd','Hysteria2, WireGaurd, Shadowsocksr, SSH, Tuic')
+fixtures=fixtures.replace('public int port, alterId;','public int port, alterId, portEnd; public string packetEncoding, protocol, protocol_param, username, congestionControl, udpRelayMode;')
 fixtures=fixtures.replace('public const string RealitySecurity', 'public static readonly List<string> vmessSecuritys=new List<string>{"auto"};\n public static readonly List<string> ssSecuritysInSagerNet='+re.search(r'new List<string> \{[^\n]+', (root/'IRSpeedyVPN/Services/V2Ray/Global.cs').read_text().split('ssSecuritysInSagerNet = ')[1]).group(0)+'\n public const string DefaultSecurity="auto",vmessProtocolLite="vmess",ssProtocolLite="shadowsocks",ssrProtocolLite="shadowsocksr",socksProtocolLite="socks",vlessProtocolLite="vless",trojanProtocolLite="trojan",wireguardProtocolLite="wireguard",sshProtocolLite="ssh";\n public const string RealitySecurity')
 fixtures=fixtures.replace('public static string ToJson(object value)', 'public static bool IsNullOrEmpty(string v)=>string.IsNullOrEmpty(v); public static T FromJson<T>(string value)=>JsonConvert.DeserializeObject<T>(value); public static string ToJson(object value)')
-program='''using System.Web.Script.Serialization;using System;using System.Linq;using System.Collections.Generic;using System.IO;using Newtonsoft.Json;using v2rayN;using v2rayN.Mode;using v2rayN.Handler;
+program='''using System.Web.Script.Serialization;using System;using System.Linq;using System.Collections.Generic;using System.IO;using Newtonsoft.Json;using Newtonsoft.Json.Linq;using IRSpeedyVPN.Services.SingBox;using v2rayN;using v2rayN.Mode;using v2rayN.Handler;
 namespace System.Web.Script.Serialization {class JavaScriptSerializer {public T Deserialize<T>(string value)=>JsonConvert.DeserializeObject<T>(value);}}
 namespace IRSpeedyVPN.Services.SingBox { public class ConfigGenerator {
 public class EndpointOverride {public string Server;public int ServerPort;}
 static void boundStreamSettings(VmessItem node,string direction,Outbound o){if(node.network=="throw")throw new InvalidOperationException("stream fixture");}
+static void FillDns(SingBoxConfig c,VmessItem n,bool vpn,string[] excluded){}
+static void FillInbound(SingBoxConfig c,VmessItem n,int port,bool vpn,bool share){}
+static void FillRoute(SingBoxConfig c,VmessItem n,bool vpn,string[] files,bool chain,string[] excluded,bool game){}
+static void FillLog(SingBoxConfig c,string name){}
 '''+methods+'''}}
 class Program {
 static void Check(bool ok,string name){if(!ok)throw new Exception(name);Console.WriteLine("PASS "+name);}
@@ -45,6 +50,45 @@ Check(IRSpeedyVPN.Services.SingBox.ConfigGenerator.GetRejectedProbeLinks(json,"c
 Check(IRSpeedyVPN.Services.SingBox.ConfigGenerator.GetRejectedProbeLinks(json,"decode config at "+json+": outbounds[2]: unknown outbound type: ",tags).SequenceEqual(new[]{"valid2022"}),"native decode index maps to the exact member");
 Check(IRSpeedyVPN.Services.SingBox.ConfigGenerator.GetRejectedProbeLinks(json,"dns lookup failed: outbounds[1]: reset",tags).Length==0&&IRSpeedyVPN.Services.SingBox.ConfigGenerator.GetRejectedProbeLinks(json,"create service: initialize outbound[0]: unavailable",tags).Length==0,"network and shared direct failures never delete unrelated members");
 var fixture=Environment.GetEnvironmentVariable("IRSPEEDY_NATIVE_PROBE_FIXTURE");if(fixture!=null)File.WriteAllText(fixture,json);
+var wgKey=Convert.ToBase64String(Enumerable.Repeat((byte)251,32).ToArray());
+var wg="wg://wg.example:11912?private_key="+wgKey+"&public_key="+Uri.EscapeDataString(wgKey)
+    +"&local_address=10.0.0.2/32-fd00::2/128&mtu=1407&enable_amnezia=true&jc=6&s4=13&h4=42"
+    +"&i1=%3Cr%20164%3E&header_protection_key="+wgKey+"&content_padding_addition=21-34"
+    +"&random_trailers=true&disable_cookies=true&persistent_keepalive_interval=25";
+nodes[wg]=WireGuardEndpoint.ParseUri(wg);
+nodes["bad-wg"]=new VmessItem{configType=EConfigType.WireGaurd,address="wg.example",port=11912,privateKey="invalid"};
+var wgJson=ConfigGenerator.GetUrlTestConfig(new Dictionary<string,string[]>{{wg,new[]{"valid"}},{"bad-wg",null},{"valid",null}},1234,out tags,
+    new Dictionary<string,ConfigGenerator.EndpointOverride>{{wg,new ConfigGenerator.EndpointOverride{Server="192.0.2.10",ServerPort=51820}}},rejected:rejected);
+var endpoint=JObject.Parse(wgJson)["endpoints"].Single();
+var peer=endpoint["peers"].Single();
+var awg=endpoint["amnezia_wg"];
+Check((string)endpoint["type"]=="wireguard"&&(string)endpoint["private_key"]==wgKey
+    &&(string)peer["public_key"]==wgKey&&(string)awg["header_protection_key"]==wgKey
+    &&(string)peer["address"]=="192.0.2.10"&&(int)peer["port"]==51820
+    &&(int)endpoint["mtu"]==1407&&endpoint["address"].Count()==2&&(int)peer["persistent_keepalive_interval"]==25
+    &&(int)awg["jc"]==6&&(int)awg["s4"]==13&&(string)awg["h4"]=="42"
+    &&(string)awg["i1"]=="<r 164>"&&(string)awg["content_padding_addition"]=="21-34"
+    &&(bool)awg["random_trailers"]&&(bool)awg["disable_cookies"]&&(string)endpoint["detour"]=="chain-0-1",
+    "Throne AWG 3.1 profile is a native URL test endpoint with intact keys, options and chain");
+Check(tags.Count==2&&tags["proxy"]==wg&&rejected.ContainsKey("bad-wg")
+    &&ConfigGenerator.GetRejectedProbeLinks(wgJson,"create service: initialize endpoint[0]: invalid key",tags).SequenceEqual(new[]{wg}),
+    "bad AWG inputs and native endpoint errors affect only the corresponding probe");
+var direct=JObject.Parse(ConfigGenerator.GetConfigEx(wg,1234,false,false,"",false,false,null,null,null,false));
+Check((string)direct["endpoints"].Single()["tag"]=="proxy"
+    &&(string)direct["endpoints"][0]["peers"][0]["address"]=="wg.example"
+    &&(int)direct["endpoints"][0]["peers"][0]["port"]==11912
+    &&(string)direct["route"]["final"]=="proxy"&&!direct["outbounds"].Any(o=>(string)o["tag"]=="proxy"),
+    "manual AWG connection targets the native peer and keeps proxy routing");
+bool refused=false;
+try{ConfigGenerator.GetConfigEx("wg://invalid",1234,false,false,"",false,false,null,null,null,false);}
+catch(FormatException){refused=true;}
+Check(refused,"a malformed manual WireGuard link cannot fall back to a local tunnel");
+refused=false;
+try{WireGuardEndpoint.ParseUri(wg.Replace("%3Cr%20164%3E","%3Cr%20164%3E%0Aallowed_ip%3D192.0.2.0/24"));}
+catch(FormatException){refused=true;}
+Check(refused,"WireGuard signature values cannot add a Core configuration line");
+var legacy=WireGuardEndpoint.ParseUri("wg://legacy.example:51820?priv="+wgKey+"&pub="+wgKey+"&lp=10.0.0.2/32");
+Check(!WireGuardEndpoint.Build(legacy,"proxy").ContainsKey("amnezia_wg"),"legacy WireGuard stays compatible");
 }}
 '''
 # All simple model files; policy/routing helpers have platform dependencies.
