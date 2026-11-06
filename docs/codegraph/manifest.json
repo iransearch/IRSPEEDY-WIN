@@ -2,9 +2,9 @@
   "schema_version": "2.0.0",
   "repository": "iransearch/IRSPEEDY-WIN",
   "base_branch": "agent/core-startup-diagnostics-fix",
-  "base_commit": "5febacbedc6fe0a551ceb33912bf6eb17c4c628d",
-  "base_tree": "b038a5b7f2a49baa113d762367fe7b6f3488c59b",
-  "generated_at": "2026-11-04T21:14:36Z",
+  "base_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+  "base_tree": "95100de38e0de745710e394383f971e5890c3eec",
+  "generated_at": "2026-11-06T11:36:43Z",
   "validity": {
     "status": "needs-review",
     "assurance": "incremental-blob-pins-and-literal-build-declarations",
@@ -13,22 +13,22 @@
     "freshness": "Read status.md and compare HEAD/worktree with base_commit. No valid-current-snapshot claim exists until the automated validation pass succeeds.",
     "inventory_scope": "Tracked blobs excluding docs/codegraph/**; maintained from raw Git diff, not a whole-tree content scan.",
     "relation_scope": "Explicit file/symbol relationships with an exact source-line witness. Omitted edges are unknown, not evidence of absence.",
-    "validated_at": "2026-11-04T21:14:36Z"
+    "validated_at": "2026-11-06T11:36:43Z"
   },
   "counts": {
-    "inventory_files": 1001,
-    "csharp_files": 383,
+    "inventory_files": 1002,
+    "csharp_files": 384,
     "xaml_files": 55,
     "solutions": 2,
     "projects": 24,
     "test_projects": 20,
     "python_run_py_files": 20,
     "requested_modules": 6,
-    "primary_paths_mapped": 2,
-    "verified_relations": 58,
-    "relation_evidence_files": 32,
-    "stale_relations": 22,
-    "total_relations": 80
+    "primary_paths_mapped": 1,
+    "verified_relations": 61,
+    "relation_evidence_files": 33,
+    "stale_relations": 30,
+    "total_relations": 91
   },
   "graph_files": [
     "AGENTS.md",
@@ -144,7 +144,7 @@
     {
       "id": "vpn-connection",
       "name": "VPN Connection",
-      "status": "primary-path-mapped",
+      "status": "needs-review",
       "entrypoints": [
         "IRSpeedyVPN/MainWindow.xaml.cs",
         "IRSpeedyVPN/Services/TunnelPlusService.cs"
@@ -427,7 +427,7 @@
           "Version": "12.0.2"
         }
       ],
-      "linked_source_count": 10
+      "linked_source_count": 11
     },
     {
       "path": "tests/LoggingChecks/LoggingChecks.csproj",
@@ -1414,10 +1414,11 @@
       },
       "note": "The group overload also has a Cisco branch; other adapter graphs remain unexpanded.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "5843a7996f12164aa34b53f222ab7c9b89fc200b",
       "target_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R041",
@@ -1435,10 +1436,11 @@
         "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
       "target_blob": "a72f2e5a3012bb59204200ede01c4f08ad0b875b",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R042",
@@ -1520,10 +1522,11 @@
         "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
       "target_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R046",
@@ -1542,10 +1545,11 @@
       },
       "note": "One config-building branch; Xray/Pool/Shield branches are not exhaustively expanded.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
       "target_blob": "b702cee1fca7228bae3402c0d02b27babac121ec",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R047",
@@ -1564,10 +1568,11 @@
       },
       "note": "VPN DNS configuration is separate from login resolver-first DNS.",
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
       "target_blob": "ab5dadcb55878e1915567ba89cf57accc3114435",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R048",
@@ -1585,10 +1590,11 @@
         "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
       "target_blob": "97fa5ed521ffa64066afb6efa132eb0e85f39494",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R049",
@@ -1648,10 +1654,11 @@
         "blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
       "target_blob": "161bd23c637c504b1701e224fa0895838da8ae46",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R052",
@@ -1886,10 +1893,11 @@
         "blob": "9c89001cde2d931dfc418f55a903159604631a68"
       },
       "origin": "manual",
-      "status": "verified",
+      "status": "stale",
       "source_blob": "9c89001cde2d931dfc418f55a903159604631a68",
       "target_blob": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
-      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+      "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
+      "stale_reason": "endpoint-or-evidence-changed"
     },
     {
       "id": "R063",
@@ -2284,6 +2292,259 @@
       "source_blob": "c2bbc43964d8ffbd8ac9668b6d441bfd68d8891b",
       "target_blob": "cb2ad4c379aa4b67f30292fee179721cdd2ff61c",
       "last_verified_commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66"
+    },
+    {
+      "id": "Bb7df533607277225",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/InternetConnectivityMonitor.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 8,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/InternetConnectivityMonitor.cs\" Link=\"InternetConnectivityMonitor.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "61ee979d00f3295c236ff7955f72156b55b332a7",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "B25b55a2054f10feb",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/GeoRoutingFallback.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 10,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/GeoRoutingFallback.cs\" Link=\"GeoRoutingFallback.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "3055047bd15bbc5c21f6662e8be681c6ea1563de",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "B47df7129b39a0507",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/SingBox/Samples.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 11,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/Samples.cs\" Link=\"SingBox/Samples.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "5d816be10bc085722dc49d802aec9bed9ae81936",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "Bc69993cfd5d4635f",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/SingBox/DnsServer.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 12,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/DnsServer.cs\" Link=\"SingBox/DnsServer.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "e9516a6d2226c3c104f9006422bc1c1518a0943d",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "B41852f04083736ac",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/SingBox/Tls.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 13,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/Tls.cs\" Link=\"SingBox/Tls.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "99b5cb3ec944277582d8b6a232b129b3b2f0c45b",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "B2fe822f43d7ae17c",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/SingBox/Utls.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 14,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/Utls.cs\" Link=\"SingBox/Utls.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "d99a83ec7e99ad61ec26b48f5e192c8ff7ed81a7",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "B1fac28d512053a61",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/SingBox/Reality.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 15,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/Reality.cs\" Link=\"SingBox/Reality.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "dd455bb00788b57af8d5053405f820778e3cb792",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "Bb29514c728a4e881",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/SingBox/WireGuardEndpoint.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 16,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/SingBox/WireGuardEndpoint.cs\" Link=\"SingBox/WireGuardEndpoint.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "36a1e23a5242bffa5a57320bd02cb66b5670c87f",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "B2d89df9b56acb672",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 17,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs\" Link=\"Libcore/LibcoreMessages.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "433b0cd90487ab321ecc14debcd24cc0d8dd5b0f",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "Bc3b0f10cd7f64ca6",
+      "module": "tests",
+      "kind": "includes_source",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "IRSpeedyVPN/Services/Libcore/LibcoreProto.cs",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 18,
+        "text": "<Compile Include=\"../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs\" Link=\"Libcore/LibcoreProto.cs\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": "eadffb4f170f155ffe007f00e23f7d103342e81b",
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
+    },
+    {
+      "id": "B80f7aec4f92ba6de",
+      "module": "tests",
+      "kind": "package_reference",
+      "from": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+      "to": "nuget:Newtonsoft.Json@12.0.2",
+      "source_symbol": null,
+      "target_symbol": null,
+      "status": "verified",
+      "origin": "literal-build-declaration",
+      "evidence": {
+        "path": "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj",
+        "line": 19,
+        "text": "<PackageReference Include=\"Newtonsoft.Json\" Version=\"12.0.2\" />",
+        "blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+        "commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23"
+      },
+      "source_blob": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
+      "target_blob": null,
+      "last_verified_commit": "8552dedc2d26e13f87e894e1fd3dc6e8221e0e23",
+      "verification": "literal-declaration-only",
+      "note": "Literal build declaration; MSBuild conditions and execution are not evaluated."
     }
   ],
   "file_inventory": {
@@ -2430,7 +2691,7 @@
     "IRSpeedyVPN/Models/Services/Setting.cs": "cda177f45a3f88f3dbccad0603ed7d108e3cbe15",
     "IRSpeedyVPN/Models/Services/UserAccount.cs": "a9b959a4e55d52128b8f6898c86a5228689c3d2c",
     "IRSpeedyVPN/Program.cs": "7b777be52d04adcc910678247d0b19ac73f7132a",
-    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "35b6a8dd78a3d6cb7c807730ba8fb7192321b2c0",
+    "IRSpeedyVPN/Properties/AssemblyInfo.cs": "9fe81fcd05410b7649a93b2aaf35ff97c046633c",
     "IRSpeedyVPN/Properties/Resources.Designer.cs": "7c0cb8a594732898f58208b4e884920b61557b25",
     "IRSpeedyVPN/Properties/Resources.resx": "1af7de150c99c12dd67a509fe57c10d63e4eeb04",
     "IRSpeedyVPN/Properties/Settings.Designer.cs": "8c14afa6f6e9f405ceba916e27cb4fcac6da06f3",
@@ -2799,7 +3060,7 @@
     "IRSpeedyVPN/Services/ServerCheckCache.cs": "40285dda77af372fb89a75d48aebef60aa6fe33a",
     "IRSpeedyVPN/Services/ServerRefreshPlan.cs": "3e22b065d7b4d6f033670da38933ab3872af4319",
     "IRSpeedyVPN/Services/ServiceFactory.cs": "5843a7996f12164aa34b53f222ab7c9b89fc200b",
-    "IRSpeedyVPN/Services/SingBox/ConfigGenerator.cs": "b702cee1fca7228bae3402c0d02b27babac121ec",
+    "IRSpeedyVPN/Services/SingBox/ConfigGenerator.cs": "2dc575500601960da7f7a0fe332adc23cfd9b9d2",
     "IRSpeedyVPN/Services/SingBox/CoreType.cs": "22c7f124b1c9bf729cdd190b7ea075dbab5d10ce",
     "IRSpeedyVPN/Services/SingBox/Dns.cs": "cb05fa5ba9aba1c6f1829ed01935ef71d52853d5",
     "IRSpeedyVPN/Services/SingBox/DnsServer.cs": "e9516a6d2226c3c104f9006422bc1c1518a0943d",
@@ -2809,14 +3070,14 @@
     "IRSpeedyVPN/Services/SingBox/Inbound.cs": "dc6f9f9022c721626819e99aab389ae869c79d73",
     "IRSpeedyVPN/Services/SingBox/Log.cs": "94980fe685d90682b693418b54f117f9787fae55",
     "IRSpeedyVPN/Services/SingBox/Multiplex.cs": "eb4c848358a2a3f8ef64610de43e94b709cdf4fa",
-    "IRSpeedyVPN/Services/SingBox/Outbound.cs": "237a5687a3195a94a512ed5f280bc21a4ed21108",
+    "IRSpeedyVPN/Services/SingBox/Outbound.cs": "d2d2e0b1ad4eb9f13a3a014de127f1f2095f0ce5",
     "IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs": "ab5dadcb55878e1915567ba89cf57accc3114435",
     "IRSpeedyVPN/Services/SingBox/Reality.cs": "dd455bb00788b57af8d5053405f820778e3cb792",
     "IRSpeedyVPN/Services/SingBox/Route.cs": "e26f9805185f13eb5fdde97c5e6790154875be01",
     "IRSpeedyVPN/Services/SingBox/Rule.cs": "9817854be84589ef48b2acd44f312550ac4a9cd2",
     "IRSpeedyVPN/Services/SingBox/RuleSet.cs": "5801a883fa6816203a8a988309fe832ca38c1dde",
     "IRSpeedyVPN/Services/SingBox/Samples.cs": "5d816be10bc085722dc49d802aec9bed9ae81936",
-    "IRSpeedyVPN/Services/SingBox/SingBoxConfig.cs": "0783d30b825552c9ba618237be052285143b0f9b",
+    "IRSpeedyVPN/Services/SingBox/SingBoxConfig.cs": "6e808b59e2d7fb8def27919ed169bd4a4c1a7b81",
     "IRSpeedyVPN/Services/SingBox/Stats.cs": "0eadf56cc5ceb9e3dfab34f850266c4be93ad35a",
     "IRSpeedyVPN/Services/SingBox/Tls.cs": "99b5cb3ec944277582d8b6a232b129b3b2f0c45b",
     "IRSpeedyVPN/Services/SingBox/Transport.cs": "a4765cecca724484e4d5f0a1cfaec08dd35bdb66",
@@ -2842,10 +3103,10 @@
     "IRSpeedyVPN/Services/TunnelPlusService.Hotspot.cs": "eda674b87e4c2d96b746162811bd7dbd07f80b91",
     "IRSpeedyVPN/Services/TunnelPlusService.NetworkRecovery.cs": "161bd23c637c504b1701e224fa0895838da8ae46",
     "IRSpeedyVPN/Services/TunnelPlusService.RefreshTests.cs": "ca50299ed773f0a4cb8689665dd0723e46d02870",
-    "IRSpeedyVPN/Services/TunnelPlusService.cs": "0aea4e047b39c35fd2b6026274d6bdb997459a13",
+    "IRSpeedyVPN/Services/TunnelPlusService.cs": "12fa862707acbefd55726209f6fc2126fa2a5e7b",
     "IRSpeedyVPN/Services/UrlTestCoordinator.cs": "b7484c2e9718e308b0d0f532ee262d656a445c07",
     "IRSpeedyVPN/Services/UrlTestRetryPolicy.cs": "62fc5d02d4415ff510963bf64da8172ec99cbcad",
-    "IRSpeedyVPN/Services/V2Ray/Config.cs": "1bf86be12c4ba706fa9dfe55bb6313408344c792",
+    "IRSpeedyVPN/Services/V2Ray/Config.cs": "fccb703b995e0400fcbdc8ff1d16a525d5b9b024",
     "IRSpeedyVPN/Services/V2Ray/ConfigHandler.cs": "d98dd53d8061e0d72a7c6f03ad33659d521387cb",
     "IRSpeedyVPN/Services/V2Ray/EConfigType.cs": "bb819b0d39376727817024c0cfbb4328f1a4ed43",
     "IRSpeedyVPN/Services/V2Ray/ECoreType.cs": "b3723d60c526ad299e01b24f16a5cdaa2c4e8c0d",
@@ -2855,7 +3116,7 @@
     "IRSpeedyVPN/Services/V2Ray/RoutingItem.cs": "02a93edf8f30d2a482bc2cc52a643e81c2220f8d",
     "IRSpeedyVPN/Services/V2Ray/RulesItem.cs": "823e970b3af4af5c8fc5845755fe2e4cdd191df1",
     "IRSpeedyVPN/Services/V2Ray/Samples.cs": "8c72e731b9caf5bd4045ac1b451e94490d088c07",
-    "IRSpeedyVPN/Services/V2Ray/ShareHandler.cs": "dc0c373b2485a8ffb12e2711e3b616c7df89c385",
+    "IRSpeedyVPN/Services/V2Ray/ShareHandler.cs": "917408f355162057e8daa3e8d80ed103c110a4d1",
     "IRSpeedyVPN/Services/V2Ray/SsSIP008.cs": "6b3bbc24e145136fe563b90207f30f10ab3809c8",
     "IRSpeedyVPN/Services/V2Ray/StringEx.cs": "405441061bb9fe843b88f5a80c77759469e0d926",
     "IRSpeedyVPN/Services/V2Ray/Utils.cs": "e6e07101b188702487a03dc6235a5719ae9304e0",
@@ -2864,8 +3125,8 @@
     "IRSpeedyVPN/Services/V2Ray/V2rayConfigHandler.cs": "966248a150e1f16a59fc3176c2e123aeaceab66e",
     "IRSpeedyVPN/Services/V2Ray/VmessQRCode.cs": "c4db42b4f7e5d57aec34cffe99874aa75c94316d",
     "IRSpeedyVPN/Services/Xray/Account.cs": "89f18e124be2ebe81695f5e6febd8c6788dc629f",
-    "IRSpeedyVPN/Services/Xray/AutoSelectorPoolPlan.cs": "ec3f5be1e4d429f24246321652b5ffa24570e8c4",
-    "IRSpeedyVPN/Services/Xray/ConfigGenerator.cs": "f3fe667461d3864c73f756a59b80a5dc813963d4",
+    "IRSpeedyVPN/Services/Xray/AutoSelectorPoolPlan.cs": "ac355e1cac2fb6d6f13a082754c721a242750ca7",
+    "IRSpeedyVPN/Services/Xray/ConfigGenerator.cs": "d0473ddc00531fb88cbfc1677d759f9abb3814f9",
     "IRSpeedyVPN/Services/Xray/Dns.cs": "202f0188ab26714423304c2d47025653437ab085",
     "IRSpeedyVPN/Services/Xray/DnsServer.cs": "e043df91947bc0f501a1c5dbb164eb41deca14b8",
     "IRSpeedyVPN/Services/Xray/GrpcSettings.cs": "83c2c67abd96bf260e6d25992a054bb6efd57199",
@@ -3136,13 +3397,13 @@
     "tests/HotspotIntegrationChecks/Program.cs": "fb4d241db6b64f20646336004e239c6e3d9d1fa0",
     "tests/HotspotPayloadChecks/HotspotPayloadChecks.csproj": "7f652d8f9931d301cee81030f0625613a60b0eda",
     "tests/HotspotPayloadChecks/Program.cs": "b55775b433bb96f8efaa7ce7c2ec0c26fe3f6dfb",
-    "tests/HysteriaXrayChecks/AutoSelectorPoolChecks.cs": "a6f97bbfb0e98da108fe1d1b54fe5ece12a4722c",
-    "tests/HysteriaXrayChecks/Fixtures.cs": "d6eba7ac2b947e8d2de81d5b404504e7768f2f6b",
-    "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj": "ab2cccc030f254a11cb5e447aaf3e80287b2aee1",
+    "tests/HysteriaXrayChecks/AutoSelectorPoolChecks.cs": "850f38739d0b78d810aa80b9e221832761b03b28",
+    "tests/HysteriaXrayChecks/Fixtures.cs": "8000d4eb7317fc1e40c7225bb830c12cfe05cbeb",
+    "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj": "8539c5cdb19c15572cc953d3bdbfabbe78334cca",
     "tests/HysteriaXrayChecks/PoolDnsChecks.cs": "08b69215290ef86fd39111394ad542be607f4c78",
     "tests/HysteriaXrayChecks/Program.cs": "a6834be935cb61b592eb87383f18c695e1d0e3c0",
     "tests/HysteriaXrayChecks/README.md": "e77f50e75acaa334a3e3110058362e4d90d5563e",
-    "tests/HysteriaXrayChecks/native_probe_checks.py": "763a1134a37e8a0618d7ff2810ca59aeb61df9c3",
+    "tests/HysteriaXrayChecks/native_probe_checks.py": "f25d33b404290f4967a04ae06dfbc13a409bb77b",
     "tests/HysteriaXrayChecks/probe_dns_core_test.go": "1a47d578fd963f65bc23fb438f4b3dcbb58d485f",
     "tests/HysteriaXrayChecks/run-probe-dns-core.py": "41c7367dc96f062e3e8a0d4ab9bebc7214218833",
     "tests/LastSuccessfulServerChecks/README.md": "ae213787f7e894d8243f9751119017103d2effb7",
@@ -3248,7 +3509,7 @@
     "tests/UrlTestRetryChecks/UrlTestRetryChecks.csproj": "9bcaf4dba997d58c75e256a3aa56814a5aae2332",
     "tests/XhttpHeaderChecks/Program.cs": "7bc4e88b5e63cf1a8ae27809557e84524db1a806",
     "tests/XhttpHeaderChecks/README.md": "311ed9ce546a4a6fecd186b05012ed5da3b5935b",
-    "tests/XhttpHeaderChecks/run.py": "220e2c90888636ff5a8b7909fc76c9454ef3b903",
+    "tests/XhttpHeaderChecks/run.py": "89f6d54fb7f242e2e4ef4f93ffabed40384fcec0",
     "tools/HotspotPayload.targets": "aa319204d2826a64a9612c273eb63b05e3f5d012",
     "tools/IRSpeedyHotspotHelper/.gitignore": "cd42ee34e873b4ddf17cdeeed2e6c0d4e094c62b",
     "tools/IRSpeedyHotspotHelper/INTEGRATION.md": "bd9117ea5e0b5abd16744cc95b108aa7f6fd5ce6",
@@ -3287,7 +3548,8 @@
     "tests/CodegraphChecks/test_impact.py": "b0d6c22ea0f285e82d7dcb887cb54b7bc3e0e007",
     "tools/codegraph/impact.py": "7741b0c259c51d6b5f2514ad0a21aef22c9628f1",
     "tests/ResidentialChecks/run-cache.py": "238448eb761f954f387f70b707121e5318157baa",
-    "tests/ConnectionMethodsChecks/run.py": "96ee05f8e523260d0b37cd9009b826a91c578dee"
+    "tests/ConnectionMethodsChecks/run.py": "96ee05f8e523260d0b37cd9009b826a91c578dee",
+    "IRSpeedyVPN/Services/SingBox/WireGuardEndpoint.cs": "36a1e23a5242bffa5a57320bd02cb66b5670c87f"
   },
   "bootstrap_manual_review": {
     "commit": "a57db82d05d3182eba7d98db5a47cf28d4d42f66",
@@ -3313,9 +3575,32 @@
     "IRSpeedyVPN/UserControls/UCServerList.xaml.cs": "runtime-or-ui-source-needs-review",
     "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs": "runtime-or-ui-source-needs-review",
     "IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs": "runtime-or-ui-source-needs-review",
-    "tests/ServerListTransitionChecks/IncrementalOrderChecks.cs": "runtime-or-ui-source-needs-review"
+    "tests/ServerListTransitionChecks/IncrementalOrderChecks.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/SingBox/ConfigGenerator.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/SingBox/Outbound.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/SingBox/SingBoxConfig.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/SingBox/WireGuardEndpoint.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/TunnelPlusService.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/V2Ray/Config.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/V2Ray/ShareHandler.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/Xray/AutoSelectorPoolPlan.cs": "runtime-or-ui-source-needs-review",
+    "IRSpeedyVPN/Services/Xray/ConfigGenerator.cs": "runtime-or-ui-source-needs-review",
+    "tests/HysteriaXrayChecks/AutoSelectorPoolChecks.cs": "runtime-or-ui-source-needs-review",
+    "tests/HysteriaXrayChecks/Fixtures.cs": "runtime-or-ui-source-needs-review",
+    "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj": "unresolved-build-declaration"
   },
-  "external_nodes": {},
-  "unresolved_build_items": {},
-  "validation_digest": "83ffae84da5f192d7d4c74bbad11f034a09fd99186e155fcc781150bcb6d4de0"
+  "external_nodes": {
+    "nuget:Newtonsoft.Json@12.0.2": {
+      "id": "nuget:Newtonsoft.Json@12.0.2",
+      "kind": "declared-nuget-package",
+      "name": "Newtonsoft.Json",
+      "declared_version": "12.0.2"
+    }
+  },
+  "unresolved_build_items": {
+    "tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj": [
+      "nonliteral-compile"
+    ]
+  },
+  "validation_digest": "40cf17f18a816786ee1de0fb80ec9f97e781225dd1a12a7d87f297c01a6d77af"
 }
