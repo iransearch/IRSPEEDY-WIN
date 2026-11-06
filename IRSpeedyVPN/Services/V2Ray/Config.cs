@@ -489,6 +489,9 @@ namespace v2rayN.Mode
         {
             get; set;
         }
+        internal string[] wireGuardAllowedIps { get; set; }
+        internal string wireGuardKeepalive { get; set; }
+        internal Dictionary<string, object> amneziaWireGuard { get; set; }
         public string fingerPrint
         {
             get; set;

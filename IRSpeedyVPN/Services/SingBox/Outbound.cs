@@ -4,6 +4,7 @@ namespace IRSpeedyVPN.Services.SingBox
 {
     public class Outbound
     {
+        internal Dictionary<string, object> WireGuard { get; set; }
         public int? alter_id { get; set; }
         public string domain_strategy { get; set; }
         public string security { get; set; }

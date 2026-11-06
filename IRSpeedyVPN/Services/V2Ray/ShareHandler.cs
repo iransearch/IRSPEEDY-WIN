@@ -121,10 +121,17 @@ namespace v2rayN.Handler
 
                     vmessItem = ResolveTrojan(result);
                 }
-                else if (result.StartsWith(Global.wireguardProtocol) || result.StartsWith(Global.wireguardFullProtocol))
+                else if (WireGuardEndpoint.IsLink(result))
                 {
-
-                    vmessItem = ResolveWireGaurd(result);
+                    try
+                    {
+                        vmessItem = ResolveWireGaurd(result);
+                    }
+                    catch (Exception ex) when (ex is FormatException || ex is ArgumentException || ex is InvalidOperationException)
+                    {
+                        msg = "invalid-wireguard-link";
+                        return null;
+                    }
                 }
                 else if (result.StartsWith(Global.vlessProtocol))
                 {
@@ -361,41 +368,23 @@ namespace v2rayN.Handler
 
         private static VmessItem ResolveWireGaurd(string result)
         {
-            VmessItem item = new VmessItem
+            if (result.StartsWith(Global.wireguardProtocol, StringComparison.OrdinalIgnoreCase))
+                return WireGuardEndpoint.ParseUri(result);
+
+            var data = result.Substring(Global.wireguardFullProtocol.Length);
+            var wg = Utils.FromJson<WireGuardUnformatted>(Utils.Base64Decode(data));
+            if (wg == null) return null;
+            return new VmessItem
             {
-                configType = EConfigType.WireGaurd
+                configType = EConfigType.WireGaurd,
+                address = wg.server,
+                port = wg.server_port,
+                privateKey = wg.private_key,
+                publicKey = wg.peer_public_key,
+                preSharedKey = wg.pre_shared_key,
+                mtu = wg.mtu,
+                ipList = wg.local_address?.ToArray()
             };
-
-           
-            if (result.StartsWith(Global.wireguardProtocol))
-            {
-                Uri url = new Uri(result);
-                item.address = url.DnsSafeHost;
-                item.port = url.Port > 0 ? url.Port : 80;
-                item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
-                var query = HttpUtility.ParseQueryString(url.Query.Replace("&amp;", "&"));
-                item.privateKey = query["priv"];
-                item.publicKey = query["pub"];
-                item.preSharedKey = query["psk"];
-                item.mtu = query["mtu"];
-                item.ipList = string.IsNullOrEmpty(query["lp"]) ? null : query["lp"].Split(',').Select(x => x.Trim()).ToArray();
-            }
-            else
-            {
-                result = result.Substring(Global.wireguardFullProtocol.Length);
-                var wg=Utils.FromJson<WireGuardUnformatted>(Utils.Base64Decode(result));
-                item.address = wg.server;
-                item.port = wg.server_port;
-                // item.remarks = url.GetComponents(UriComponents.Fragment, UriFormat.Unescaped);
-
-                item.privateKey = wg.private_key;
-                item.publicKey = wg.peer_public_key;
-                item.preSharedKey = wg.pre_shared_key;
-                item.mtu = wg.mtu;
-                item.ipList = wg.local_address.ToArray();
-            }
-
-            return item;
         }
 
         private static VmessItem ResolveVmess(string result, out string msg)

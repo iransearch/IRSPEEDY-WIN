@@ -14,6 +14,7 @@ namespace IRSpeedyVPN.Services.SingBox
         public List<Inbound> inbounds { get; set; }
         public Log log { get; set; }
         public List<Outbound> outbounds { get; set; }
+        public List<Dictionary<string, object>> endpoints { get; set; }
         public Route route { get; set; }
     }
 

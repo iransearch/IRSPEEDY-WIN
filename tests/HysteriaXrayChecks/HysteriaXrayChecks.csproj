@@ -13,6 +13,7 @@
     <Compile Include="../../IRSpeedyVPN/Services/SingBox/Tls.cs" Link="SingBox/Tls.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/SingBox/Utls.cs" Link="SingBox/Utls.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/SingBox/Reality.cs" Link="SingBox/Reality.cs" />
+    <Compile Include="../../IRSpeedyVPN/Services/SingBox/WireGuardEndpoint.cs" Link="SingBox/WireGuardEndpoint.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreMessages.cs" Link="Libcore/LibcoreMessages.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreProto.cs" Link="Libcore/LibcoreProto.cs" />
     <PackageReference Include="Newtonsoft.Json" Version="12.0.2" />

@@ -303,7 +303,6 @@ namespace IRSpeedyVPN.Services
 
                         // Stop/rebuild owns the bridge ports for this connection generation.
                         ReleaseAutoSelectorPlan();
-                        needXray = true;
                         connectionTrace.Step("prepare-pool");
                         autoSelectorPlan = Xray.AutoSelectorPoolPlan.Create(smartUrls, GetAiLinks(),
                             isAiEnabled, FreePortManager.Dequeue, FreePortManager.Enqueue);
@@ -314,7 +313,8 @@ namespace IRSpeedyVPN.Services
                             return;
                         }
                         xrayConfig = autoSelectorPlan.XrayConfig;
-                        singboxLink = $"socks://{autoSelectorPlan.User}:{autoSelectorPlan.Password}@127.0.0.1:{autoSelectorPlan.PrimaryPort}";
+                        needXray = xrayConfig != null;
+                        singboxLink = autoSelectorPlan.PrimaryLink;
                         LogHelper.WriteExLog("Smart config prepared. mode=singbox-auto-selector"
                             + " inputCandidates=" + smartUrls.Count
                             + " poolMembers=" + autoSelectorPlan.MainMembers

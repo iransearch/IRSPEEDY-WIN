@@ -32,7 +32,7 @@ if fixture.count(serialization_stub) != 1:
 fixture = fixture.replace(serialization_stub,
     'return FormatJson(JsonConvert.SerializeObject(value, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Ignore }));')
 fixture = fixture.replace('public static bool ToBool(string value)', utils[formatter_start:formatter_end] + '\n        public static bool ToBool(string value)')
-fixture = fixture.replace('public string address, allowInsecure', 'public List<string> alpn;\n        public string packetEncoding, remarks;\n        public string address, allowInsecure')
+fixture = fixture.replace('public string address, allowInsecure', 'public List<string> alpn;\n        public string packetEncoding;\n        public string address, allowInsecure')
 fixture = fixture.replace('public List<string> GetAlpn() { return null; }', 'public List<string> GetAlpn() { return alpn; }')
 fixture = fixture.replace('TcpHeaderHttp =', 'GrpcgunMode = "gun", TcpHeaderHttp =')
 fixture = fixture.replace('public static bool ToBool(string value)', '''public static string UrlDecode(string value) { return System.Web.HttpUtility.UrlDecode(value); }

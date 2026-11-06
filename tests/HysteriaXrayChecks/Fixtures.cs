@@ -45,11 +45,14 @@ namespace v2rayN
 }
 namespace v2rayN.Mode
 {
-    public enum EConfigType { VMess, VLESS, Trojan, Shadowsocks, Socks, Http, Hysteria2 }
+    public enum EConfigType { VMess, VLESS, Trojan, Shadowsocks, Socks, Http, Hysteria2, WireGaurd }
     public class VmessItem
     {
         public EConfigType configType;
         public int port, alterId;
+        public string remarks, privateKey, preSharedKey, mtu, wireGuardKeepalive;
+        public string[] ipList, wireGuardAllowedIps;
+        public Dictionary<string, object> amneziaWireGuard;
         public string address, allowInsecure, certSha256, fingerPrint, flow, headerType, id, obfs,
             obfs_param, password, path, publicKey, requestHost, security, shortId, sni, spiderX,
             streamSecurity, transportExtra, network;
