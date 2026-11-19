@@ -35,8 +35,9 @@ assert c.count('CompositionTarget.Rendering +=')==1 and 'CompositionTarget.Rende
 print('PASS measured existing groups and one elapsed-time callback without backend/ranking/I/O')
 m=(root/'IRSpeedyVPN/UserControls/UCServerList.ServerResultsRefresh.cs').read_text()
 assert m.index('countryPicker.BeginCheckCycle()')<m.index('manualRefreshTask = RefreshServerResultsAsync')
-assert m.index('picker.EndCheckCycleSetup();')<m.index('var plan = new ServerRefreshPlan')
-assert 'RefreshGroup(' not in m[m.index('            finally'):]
+manual_refresh=m[m.index('        private async Task RefreshServerResultsAsync('):m.index('        private async Task<bool> RunDisplayScanAsync(')]
+assert manual_refresh.index('picker.EndCheckCycleSetup();')<manual_refresh.index('await RunDisplayScanAsync(')
+assert 'RefreshGroup(' not in manual_refresh[manual_refresh.index('            finally'):]
 picker=(folder/'ServerCountryPicker.xaml.cs').read_text();completed=picker[picker.index('        public void RefreshGroup('):picker.index('        public void MarkSuccessfulConnection(')]
 assert completed.index('ResortGroups();')<completed.index('RefreshDisplayedRows(allowReorder:')
 assert 'CacheOption = BitmapCacheOption.OnLoad' in picker and '.Freeze()' in picker
@@ -45,8 +46,8 @@ print('PASS reset has no light; country completion publishes existing order; no 
 background=(root/'IRSpeedyVPN/UserControls/UCServerList.xaml.cs').read_text()
 restart=background[background.index('        internal void ResumeServerChecksAfterCleanup'):background.index('        private void StopUrlTests()')]
 assert 'countryPicker.BeginCheckCycle();' in restart
-assert 'countryPicker.EndCheckCycleSetup();' in background
-assert 'allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested' in background
+assert 'picker.EndCheckCycleSetup();' in background
+assert 'allowSortAnimation: Current()' in m
 print('PASS explicit disconnect starts a new presentation cycle; canceled old completions request no sorting effect')
 
 flag_source=(folder/'ServerCountryPicker.ProbeShine.cs').read_text()

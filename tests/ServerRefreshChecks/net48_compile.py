@@ -15,12 +15,8 @@ region = source.split('        #region Background URL tests', 1)[1].split('     
 header = source[source.index('        private void UpdateHeaderIcons()'):source.index('        private void ClearHeaderIcons()')]
 main = (root / 'IRSpeedyVPN/MainWindow.xaml.cs').read_text()
 render = main[main.index('        private void RenderHeaderIcons('):main.index('        void ShowNotifiy(')]
-core = (root / 'IRSpeedyVPN/Services/TunnelPlusService.cs').read_text()
-# Use the exact production method signature, including callback types/names/defaults.
-probe_signature = core[core.index('        public void UrlTestFull('):core.index('            Diagnostic("test-group-enter"')].rstrip()
-probe_signature += ' }'
 linked = [
- 'Services/ServerCheckCache.cs', 'Services/ServerRefreshPlan.cs',
+ 'Services/ServerCheckCache.cs', 'Services/ServerRefreshPlan.cs', 'Services/ServerProbeScheduler.cs', 'Services/UrlTestCoordinator.cs',
  'Services/TunnelPlusService.RefreshTests.cs', 'Services/UrlTestRetryPolicy.cs',
  'Services/Libcore/LibcoreMessages.cs', 'Interfaces/IServer.cs', 'Models/NewService/Url.cs',
  'UserControls/UCServerList.ServerResultsRefresh.cs',
@@ -36,9 +32,10 @@ linked = [
  'Components/ServerListControl/ServerListCometOverlay.cs',
  'Components/ServerListControl/ServerListSweepAnimator.cs',
 ]
-stubs = r'''using System;using System.Linq;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;
+stubs = r'''using System;using System.Linq;using System.Collections.Generic;using System.Threading;using System.Threading.Tasks;using System.Diagnostics;
 using System.Windows;using System.Windows.Controls;using System.Windows.Media;
 using IRSpeedyVPN.Common;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Models;using IRSpeedyVPN.Models.NewService;using IRSpeedyVPN.Services;
+using IRSpeedyVPN.Services.Libcore;
 namespace IRSpeedyVPN.Models { public enum VPNType { NORMAL,CHAIN } internal class GlobalInfo { public object CurrentService; } }
 namespace IRSpeedyVPN.Interfaces {
  public interface IVPNService { int ID{get;}string Name{get;}string CountryCode{get;}string Country{get;}bool IsUrlTestSupported{get;}Url SelectedServerUrl{get;set;}List<Url> GetServerUrls();void UrlTest(); }
@@ -46,12 +43,13 @@ namespace IRSpeedyVPN.Interfaces {
 }
 namespace IRSpeedyVPN.Common {
  static class LogHelper { public static void WriteLog(Exception e){}public static void WriteExLog(string s){} }
+ static class CoreDiagnosticMetadata {internal static int ListenerPid(int port)=>throw new NotSupportedException();}
+ static class FreePortManager {internal static int Dequeue()=>throw new NotSupportedException();internal static void Enqueue(int port){} }
  class ThemeManager { internal static ThemeManager Instance=new ThemeManager();internal Brush GetLiveBrush(string s)=>Brushes.Gray; }
  static class UrlOrder { internal static IEnumerable<Url> OrderByHysteriaFirst(this IEnumerable<Url> u)=>u; }
  static class LastSuccessfulServer { internal static string Read()=>null;internal static string Key(IVPNService s)=>null;internal static bool TryRecord(IVPNService s,out string key){key=null;return true;} }
 }
 namespace IRSpeedyVPN.Services {
- static class UrlTestCoordinator { internal static bool AbortRequested;internal static void CancelAll(){}internal static void BeginBatch(){} }
  partial class TunnelPlusService : IVPNService {
   IServer server;GlobalInfo gInfo;long urlTestSpeed;DateTime lastUrlTest;string selectedUrl;
   public TunnelPlusService(IServer server,GlobalInfo info){this.server=server;gInfo=info;}
@@ -59,13 +57,71 @@ namespace IRSpeedyVPN.Services {
   public bool IsUrlTestSupported=>true;public Url SelectedServerUrl{get;set;}
   public List<Url> GetServerUrls()=>server.urls;public void UrlTest(){}
   internal static string selectedChain;
-''' + probe_signature + '\n} }\n'
+  static readonly object ownedExitGate=new object();
+  static readonly HashSet<Process> ownedExitProcesses=new HashSet<Process>();
+  static bool applicationExiting;
+  class SniConfig {}
+  class SniRuntime {internal string ListenHost,ConfigPath;internal int ListenPort;internal Process Process;}
+  string ResolveCorePath()=>null;
+  string GetSniLink(string link)=>null;
+  string GetChainLink(string link)=>null;
+  string GetDefaultChainLink()=>null;
+  string[] BuildChainLinks(string link,string[] defaults)=>defaults;
+  SniConfig ParseSniLink(string link)=>throw new NotSupportedException();
+  SniRuntime StartSniRuntime(SniConfig config,bool persistent,Func<int> remaining,CancellationToken token)=>throw new NotSupportedException();
+  void ReleaseSniListenPort(int port){}
+  bool TryKillProcess(Process process)=>throw new NotSupportedException();
+ }
+ class CiscoService:TunnelPlusService {
+  internal CiscoService(IServer server,GlobalInfo info):base(server,info){}
+  internal static ServerProbeMeasurement TestDisplayServer(Url url,CancellationToken token)=>throw new NotSupportedException();
+ }
+}
+namespace IRSpeedyVPN.Services.SingBox {
+ static class ConfigGenerator {
+  internal class EndpointOverride {internal string Server;internal int ServerPort;}
+  internal static string GetUrlTestConfig(Dictionary<string,string[]> links,int port,out Dictionary<string,string> tags,
+   Dictionary<string,EndpointOverride> endpoints,Dictionary<string,Tuple<int,string,string>> socks)=>throw new NotSupportedException();
+ }
+}
+namespace IRSpeedyVPN.Services.Xray {
+ static class ConfigGenerator {
+  internal const string UrlTestOutboundDnsStrategy="";
+  internal class XraySocksInfo {internal string Link,Tag,User,Pass;internal int Port;}
+  internal static bool LinkNeedsXrayForUrlTest(string link)=>throw new NotSupportedException();
+  internal static string UrlTestRefusalReason(string link)=>throw new NotSupportedException();
+  internal static string GetUrlTestXrayConfig(List<XraySocksInfo> socks,bool useCoreDns)=>throw new NotSupportedException();
+ }
+}
+namespace IRSpeedyVPN.Services.Libcore {
+ sealed class LibcoreServiceClient {
+  internal LibcoreServiceClient(string host,int port){}
+  internal TestResp TestWithDeadline(TestReq request,int timeout,CancellationToken token)=>throw new NotSupportedException();
+ }
+}
+namespace IRSpeedyVPN.Residential {
+ class ResidentialService:TunnelPlusService {
+  internal ResidentialService(IServer server,GlobalInfo info):base(server,info){}
+  internal string City,Isp;
+ }
+ static class ResidentialPresentation {
+  internal static string ConnectionUri(string link)=>link;
+  internal static long DisplayPing(long latency)=>latency;
+  internal static string DisplayIsp(string isp)=>isp;
+  internal static string LocationSeparator(string city,string isp)=>"";
+  internal static string LocationLine(string city,string isp)=>"";
+ }
+ class ResidentialCatalog {
+  internal Task<bool> RefreshAsync(bool force,CancellationToken cancellation)=>Task.FromResult(false);
+ }
+}
+'''
 stubs += r'''namespace IRSpeedyVPN.Components.ServerListControl {
  public partial class ServerCountryPicker {
   Grid SmartCardHost=new Grid(),EmptyResults=new Grid(),smartCheck=new Grid();
   ServerListCometOverlay CometOverlay=new ServerListCometOverlay();
+  TextBlock MoreLocations=new TextBlock();
   ScrollViewer ServerScroller=new ScrollViewer();ItemsControl icCountries=new ItemsControl();void InitializeComponent(){}
-  Button smartCard=new Button();System.Windows.Shapes.Path SmartCardShine=new System.Windows.Shapes.Path();TranslateTransform SmartMosaicShift=new TranslateTransform();
  }
 }
 namespace IRSpeedyVPN {
@@ -78,7 +134,9 @@ stubs += r'''namespace IRSpeedyVPN.UserControls {
   IVPNService[] _currentServices;GlobalInfo globalInfo;CancellationTokenSource _urlTestCts;
   Components.ServerListControl.ServerCountryPicker countryPicker=new Components.ServerListControl.ServerCountryPicker();
   bool _isUrlTestSupported;IVPNService selectedService;
+  bool isResidentialTab;IRSpeedyVPN.Residential.ResidentialCatalog residential;
   internal Func<Func<bool>,CancellationToken,Task<bool>> RefreshServerListRequest {get;set;}
+  void TrySelectResidentialFastest(){}void UpdateResidentialVisuals(){}
   MainWindow GetMainWindow()=>null;IVPNService GetFallbackService()=>null;void RemoveBaseService(){}void OpenServiceSettings(){}
 ''' + region + header + '\n} }\n'
 with tempfile.TemporaryDirectory(prefix='server-refresh-net48-') as directory:

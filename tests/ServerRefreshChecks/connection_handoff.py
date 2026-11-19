@@ -9,6 +9,7 @@ using System;using System.Collections.Generic;using System.Threading;using Syste
 interface IVPNService { void Disconnect();void Connect(string protocol);bool IsRequirementAvailable(); }
 class TunnelPlusService : IVPNService {
  public ManualResetEventSlim DisconnectRelease=new ManualResetEventSlim(true);
+ public string DiagnosticIdentity=>"fixture";
  public volatile bool DisconnectEntered;public int Connects;
  public void CancelPendingConnection(){}public bool IsRequirementAvailable()=>true;
  public void Disconnect(){DisconnectEntered=true;DisconnectRelease.Wait();}
@@ -19,7 +20,14 @@ class UCServerList {
  public void PauseServerChecks(){}public void PauseServerChecksForConnection(){PausesForConnection++;}
  public Task DrainServerChecksAsync(){Drains++;return Task.CompletedTask;}
  public void ResumeServerChecksAfterCleanup(bool restartRound=false){Resumes.Add(restartRound);}
+ public void UpdateConnectionState(IVPNService service,bool connecting,bool connected){}
 }
+class ConnectionAttemptDiagnostic {
+ public ConnectionAttemptDiagnostic(long version,string source,Func<string> identity){}
+ public void Step(string stage,string status=null,string message=null){}
+ public void Failure(Exception error){}
+}
+static class CoreRuntimeIdentity {public const string ConnectionFailureMessage="fixture failure";}
 class Info { public IVPNService CurrentService; }
 class Proxy { public void Detach(){} }
 class Resource { public void ExtractResource(bool b){} }

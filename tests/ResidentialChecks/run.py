@@ -78,7 +78,13 @@ internal class TabAccessProbe {
     compile_to(tmp/'residential-net48.dll', refs48, models + [base/'Residential/ResidentialTrafficBar.cs',base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',Path(__file__).with_name('CompileBoundary.cs')])
     print('PASS Residential production C# against real .NET Framework 4.8 + WPF reference assemblies')
     ui_sources = list((base/'Residential').glob('*.cs')) + [p for p in (base/'Components/ServerListControl').glob('*.cs') if p.name!='CountryPickerSelector.cs'] + list((base/'UserControls').glob('UCServerList*.cs'))
-    compile_to(tmp/'residential-ui-net48.dll', refs48, ui_sources + [base/'Common/Json/JsonConvertibleAttribute.cs',base/'Common/Json/JsonPropertyAttribute.cs',base/'Models/HeaderIconRegistration.cs',Path(__file__).with_name('UiCompileBoundary.cs')])
+    display_sources = [base/name for name in (
+        'Services/ServerCheckCache.cs', 'Services/ServerRefreshPlan.cs', 'Services/ServerProbeScheduler.cs',
+        'Services/UrlTestCoordinator.cs', 'Services/UrlTestRetryPolicy.cs', 'Services/Libcore/LibcoreMessages.cs',
+        'Models/NewService/Url.cs',
+    )]
+    newtonsoft_net48 = Path(csc).resolve().parents[2]/'Sdks/Microsoft.NET.Sdk/tools/net472/Newtonsoft.Json.dll'
+    compile_to(tmp/'residential-ui-net48.dll', refs48, ui_sources + display_sources + [base/'Common/Json/JsonConvertibleAttribute.cs',base/'Common/Json/JsonPropertyAttribute.cs',base/'Models/HeaderIconRegistration.cs',Path(__file__).with_name('UiCompileBoundary.cs')], [newtonsoft_net48])
     print('PASS production picker, light sweep, traffic control, both UCServerList flows and async refresh compile against .NET 4.8/WPF')
 for name in ['UserControls/UCServerList.xaml','Components/ServerListControl/ServerCountryPicker.xaml']:
     ET.parse(base/name)

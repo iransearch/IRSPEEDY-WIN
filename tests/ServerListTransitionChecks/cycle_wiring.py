@@ -21,30 +21,28 @@ assert checking.index('if (checking) _serverList.MarkChecking(') < checking.inde
 finished = picker[picker.index('        public void RefreshGroup('):picker.index('        public void MarkSuccessfulConnection(')]
 assert finished.index('group.RefreshSignals();') < finished.index('ResortGroups();') < finished.index('RefreshDisplayedRows(')
 assert 'completedIdentity: allowSortAnimation && !_checkCycleSetup ? LastSuccessfulServer.Key(group.Service) : null' in finished
-start = background.index('        private async Task<bool> CheckServerAsync(')
-check = background[start:background.index('        #endregion', start)]
-assert check.index('picker.SetGroupChecking(service, true);') < check.index('await Task.Run(')
-assert check.index('picker.SetGroupChecking(service, false);') < check.index('picker.RefreshGroup(service,')
-assert 'allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested' in check
-progress = manual[manual.index('Action<Url, long> progress'):manual.index('Action<Url, long> complete')]
-assert 'RefreshGroup(' not in progress and 'ShowGroupProgress(' in progress
-complete = manual[manual.index('Action<Url, long> complete'):manual.index('TunnelPlusService.TestRefreshBatch(')]
-assert 'foreach (var row in rowsDone)' in complete
-assert complete.index('picker.SetGroupChecking(row, false);') < complete.index('picker.RefreshGroup(row);')
-assert manual.index('picker.SetGroupChecking(row, true);') < manual.index('TunnelPlusService.TestRefreshBatch(')
+start = manual.index('        private async Task<bool> RunDisplayScanAsync(')
+refresh_handler, scan = manual[:start], manual[start:]
+assert 'RunDisplayScanAsync(services, cache, token)' in background and 'RunDisplayScanAsync(services, cache, token)' in refresh_handler
+assert scan.index('picker.SetGroupChecking(row, true);') < scan.index('ServerProbeScheduler.RunAsync(')
+assert scan.index('if (!Current() || !cache.CommitDisplayRow(row, winner, measurements, token)) return;') < scan.index('Dispatcher.Invoke(')
+assert scan.index('picker.SetGroupChecking(row, false);') < scan.index('picker.RefreshGroup(row, allowSortAnimation: Current());')
+assert scan.count('picker.RefreshGroup(') == 1 and 'ShowGroupProgress(' not in scan
+cleanup = scan[scan.index('                finally'):]
+assert 'if (OwnsRows())' in cleanup and 'picker.RestoreTestProgress(row);' in cleanup
 print('PASS checking precedes probes; only completed country results publish sorting eligibility; canceled/partial results do not')
 
 refresh = background[background.index('        private void RefreshCountry('):background.index('        private static void AssignCountryIndices(')]
 assert 'if (!preserveManualRefresh) countryPicker.RetainCompletedResults(probeCache.CompletedSuccessfulServices);' in refresh
 assert refresh.index('countryPicker.Load(') < refresh.index('countryPicker.RetainCompletedResults(') < refresh.index('RunBackgroundUrlTests(services);')
 restart = background[background.index('            if (probeRestartRequested)'):background.index('            var service = cache.NextService;')]
-assert restart.index('cache.RestartFromFirstCountry();') < restart.index('countryPicker.EndCheckCycleSetup();') < restart.index('countryPicker.RetainCompletedResults(cache.CompletedSuccessfulServices);')
+assert restart.index('cache.RestartFromFirstCountry();') < restart.index('picker.EndCheckCycleSetup();') < restart.index('picker.RetainCompletedResults(cache.CompletedSuccessfulServices);')
 transitions = (folder / 'ServerCountryPicker.Transitions.cs').read_text()
 retain = transitions[transitions.index('        public void RetainCompletedResults('):transitions.index('        private readonly List<GroupItem>')]
 assert '_serverList.RetainCompletedChecks(services.Select(LastSuccessfulServer.Key));' in retain
 assert 'RefreshDisplayedRows(instant: true);' in retain
-assert 'RetainCompletedResults' not in manual
-print('PASS automatic login/rebind/disconnect retains cached completion evidence before queue checks; manual refresh never seeds it')
+assert refresh_handler.index('cache.RestartForLogin();') < refresh_handler.index('picker.RetainCompletedResults(cache.CompletedSuccessfulServices);') < refresh_handler.index('await RunDisplayScanAsync(')
+print('PASS login, rebind, disconnect and manual refresh retain cached completion evidence before queue checks')
 
 finish = animator[animator.index('        private void FinishPass('):animator.index('        private void StopIfIdle(')]
 assert finish.index('_model.Finish(_pass);') < finish.index('_pass = null;') < finish.index('QueuePrepare();')

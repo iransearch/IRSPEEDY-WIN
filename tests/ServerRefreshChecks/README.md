@@ -1,97 +1,44 @@
-Run `python3 tests/ServerRefreshChecks/run.py /path/to/dotnet` with .NET 8.
-Run `python3 tests/ServerRefreshChecks/connection_handoff.py /path/to/dotnet`
-to check the real connection handlers against delayed VPN cleanup and newer clicks.
-Run `python3 tests/ServerRefreshChecks/url_priority.py /path/to/dotnet`
-to check the production RPC's failed-first member ordering and stable fallback order.
-Run `python3 tests/ServerRefreshChecks/manual_refresh.py /path/to/dotnet`
-to exercise the global configuration shuffle, independent numbered rows, persistent
-cache clearing, partial/final updates, duplicate clicks, API replacement and cancellation.
-The Greece regression runs the production retry policy through manual callbacks:
-cancel during a pending primary request or >500ms alternate retry, then reload
-the real cache. Measured successes survive; untested members stay unknown, late
-callbacks are rejected, and an unfinished row is not marked complete.
-Run `python3 tests/ServerRefreshChecks/api_refresh.py /path/to/dotnet`
-to exercise the authenticated API phase, transactional list replacement, shared
-maintenance gate, stale-response guards and prompt cancellation. Add `--net48`
-to compile those production methods against .NET Framework 4.8.
-Run `python3 tests/ServerRefreshChecks/core_dispatch.py /path/to/dotnet`
-to exercise the actual batch runner and full URL-test method with a fake Core transport,
-including tag mapping, chain/SNI metadata, config rejection, port release and cancellation.
-Append `--net48` to compile that method against .NET Framework 4.8.
-Run `python3 tests/ServerRefreshChecks/net48_compile.py /path/to/dotnet`
-to compile the actual controller, picker, header renderer and animation against net48/WPF
-reference assemblies. This does not run Windows XAML or a real VPN.
-The harness compiles the actual scheduler region and persistent cache against fake
-UI/network dependencies, with a single-threaded synchronization context. It checks
-initial live progress before RPC completion, disconnect-round success/failure/recovery,
-cached UI restoration before cancellation drain completes, late queued progress,
-API row replacement, initial enumeration, finite persistent queues, v1/v2/v3 cache
-migration, ordered missing/failed rounds, rapid cancellation/resume and connection suppression.
-Automatic eligibility uses the latest completed row result: login, cached startup
-and disconnect check only all-failed, unknown or incomplete rows. Successful rows
-retain their measurements and issue no automatic test RPCs. Explicit manual
-refresh still tests the full list.
-It checks numbered rows independently, stable country/ID order among eligible rows,
-success-to-failure history, persistence/reload, cancellation with partially mutated
-members, successful-member persistence through Connect/logout, connection-time
-probe persistence, account isolation and pending order after results change or an API rebind. It also checks
-that only disconnect rounds ask the RPC to prioritize failed server links, and
-that a response lacking fresh results for every member keeps the last complete
-row outcome for priority, including after URL reorder and reload.
-It does not exercise the Windows renderer, real Core RPC or Windows routing.
+# Display server scan checks
 
-Manual Windows acceptance:
-- Refresh appears beside logout on the server-list header, in both themes;
-  settings and the Windows minimize/close controls retain their positions.
-- Click refresh during the initial/disconnect scan: drain the old RPC, fetch and bind
-  the latest authenticated server list, then erase pings/history, show placeholders,
-  and scan a single global shuffled config queue built from the new list.
-  If the fetch fails, retain the previous list and measurements and test that list;
-  replace member measurements as actual successful probes arrive. Untested members
-  retain their old measurements.
-  A malformed response must not leave a partially replaced list. Canceling during
-  the fetch must allow Connect/logout promptly and ignore the late API response.
-  Search filtering does not limit testing. Smart remains fixed, the last successful
-  connection stays starred below Smart, and the selection resets to Smart.
-- Partial minimum pings appear in place; only fully completed numbered rows reorder.
-  Successful rows sort by final minimum ping, failed rows sink. Duplicate countries
-  finish independently; identical configs share one probe across their owning rows.
-- The refresh icon spins while busy and ignores repeat clicks. Hide/minimize stops
-  its animation clock; restoring restarts it while busy. Check the optional base-service
-  action also fits without overlapping the wordmark. A final failure stops the spinner.
-- Connect/logout during refresh cancels and drains it before lifecycle work continues;
-  every actual successful measurement already shown survives in the row and on disk;
-  late callbacks cannot change it after cancellation.
-- An explicit refresh after a failed connection is allowed while disconnected.
-  Merely returning to the list never resumes a consumed scan.
-- Initial list checks all countries once.
-- Connect during a test: probe drains before connection begins.
-- Leave connected >15 minutes: no list probes; previous values remain on return.
-- Disconnect: list appears immediately; no probe until cleanup completes.
-- After user disconnect cleanup: first check rows whose latest complete test had
-  no success, including unknown or changed configurations. Then check rows with
-  at least one success. Preserve country/ID order within each group, finish all
-  links in each row, then move to the next row immediately. Failed links come first
-  inside each row; the initial scan keeps its existing order.
-- Multiple numbered rows in one country remain independent: a failed row comes
-  first even when another row in the same country succeeded.
-- After every country has finished, reopening the list or refreshing the API must
-  not restart testing. There is no periodic server-test timer.
-- Connect during a scan: stop it; ordinary failed-connect cleanup must not resume
-  that scan. The next user disconnect starts a fresh round with failure priority.
-- A canceled test or an older historical success must not replace the latest
-  completed outcome used for priority. Reopening the app preserves that priority.
-- If a core/RPC error prevents a full row test, retain its last complete outcome
-  for priority until a later full test finishes.
-- UI/API reordering and new results must not reorder a round already in progress.
-- API list refresh preserves measurements only for identical URL configurations.
-- Rapid connect/disconnect and failed connection must not overlap a list probe with VPN.
-- During the initial scan, include a fast successful member and a member that times out: the first ping
-  appears while the remaining members/retry are still running. Ordering stays
-  stable until the final result; the provisional status clears on completion.
-- During manual refresh, connect after the first ping appears while its batch/retry
-  is still running. Disconnect and verify that the starred country keeps its real
-  ping and availability. Repeat with logout/login and an API rebind; untested members
-  must remain unknown and a partial row must not acquire a completed outcome.
-- During disconnect rounds, the previous result stays visible until that row's
-  full test completes, then updates/reorders, including failure and recovery.
+Run the scripts below from the repository root with .NET 8. Each takes the
+path to `dotnet` as its first argument.
+
+| Script | Coverage |
+| --- | --- |
+| `run.py` | Startup, login, disconnect and rebind against the production controller, scheduler and persistent cache. Retains coverage of v1/v2/v3 cache formats. |
+| `manual_refresh.py` | API refresh and replacement, successful-row retention, skipped members, cancellation during fallback after a successful primary, and Residential catalog refresh. |
+| `core_dispatch.py` | Production single-config runner and existing `UrlTestFull` with fake worker/RPC boundaries. Checks tag mapping, chain/SNI/Xray metadata, cancellation, port release and admission failures. |
+| `api_refresh.py` | The production authenticated API phase and factory replacement with a delayed response, session and connection guards, and a shared maintenance gate. |
+| `connection_handoff.py` | Production connection handlers with delayed VPN cleanup and newer clicks. |
+| `url_priority.py` | Existing `UrlTestFull` member ordering and stable fallback order. |
+| `net48_compile.py` | Controller, runner, picker, header and animation compile against .NET Framework 4.8/WPF references. |
+
+Pass `--net48` to `api_refresh.py` or `core_dispatch.py` after the `dotnet`
+argument for the .NET Framework compile check. `DisplayServerProbeChecks`
+covers the scheduler's concurrency, deadlines, retries, tie-breaking and
+display cache identity. These offline tests use fake configs and responses.
+
+## Windows acceptance
+
+- Start with no cached results. Check that independent rows begin testing
+  within the global limit of eight. With eight eligible rows, each has
+  one slot. With two eligible rows, each can use four slots.
+- A measurement below 300 ms skips the waiting links in that row. A row
+  reorders once its running probes finish. Successful rows sort by measured
+  latency and title, checking rows follow, then rows without success. Smart
+  and the last successful connection keep their existing positions.
+- Log in again, restart, disconnect and click the header refresh. Confirm
+  successful rows retain pings. Only failed, missing or changed rows are
+  eligible. Search filtering does not limit testing.
+- In VPN and Residential, a manual refresh drains the old scan before joining
+  the catalog refresh. If fetching the list fails, eligible rows in the
+  previous list are tested. Repeat clicks share the same refresh. Confirm
+  the header icon's busy animation stops on completion and cancellation.
+- Connect or log out while a probe is running. Check that the old scan
+  drains, finished country results survive, and the interrupted country
+  does not publish a late result. Ordinary failed-connect cleanup does not
+  resume the scan. The next explicit disconnect retries eligible rows.
+- Check Residential ping formatting while the ordering uses measured latency.
+  Verify the existing selector, two themes and header placement on Windows.
+
+A Windows desktop, packaged Core and live VPN are required for this acceptance.
