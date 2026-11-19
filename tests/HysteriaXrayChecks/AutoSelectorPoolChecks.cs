@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text;
 using IRSpeedyVPN.Services.SingBox;
 using IRSpeedyVPN.Services.Xray;
 using Newtonsoft.Json.Linq;
@@ -148,6 +149,7 @@ internal static class AutoSelectorPoolChecks
                     "native-only main pool replaces its shell and starts Xray only for existing AI members");
             }
         }
+        CheckWireGuardProfile(key);
         foreach (int count in new[] { 8, 9, 35, 36 })
         {
             var largeLinks = Enumerable.Range(0, count).Select(i => "hy2://auto-" + i).ToArray();
@@ -166,6 +168,70 @@ internal static class AutoSelectorPoolChecks
             }
         }
         Console.WriteLine(passed + " Auto Selector pool checks passed.");
+    }
+
+    private static void CheckWireGuardProfile(string key)
+    {
+        const string endpoint = "[2001:db8::10]:11912";
+        var profile = string.Join("\r\n", new[]
+        {
+            "[Interface]", "PrivateKey = " + key, "Address = 10.0.0.2/32, fd00::2/128",
+            "DNS = 192.0.2.53", "MTU = 1200", "PostUp = fixture-ignored",
+            "Jc = 6", "H1 = 120-150", "I1 = <r 164>", "HeaderProtectionKey = " + key,
+            "KeepaliveTimeout = 13-25", "RandomTrailers = on", "DisableCookies = on", "",
+            "# A wg-quick profile comment", "[Peer]", "PublicKey = " + key,
+            "AllowedIPs = 0.0.0.0/0, ::/0", "PersistentKeepalive = 25", "Endpoint = " + endpoint
+        });
+        string ProfileLink(string text) => "vpn://" + Convert.ToBase64String(Encoding.UTF8.GetBytes(text))
+            .TrimEnd('=').Replace('+', '-').Replace('/', '_');
+
+        var link = ProfileLink(profile) + "#AWG%20profile";
+        Check(WireGuardEndpoint.IsLink(link), "vpn:// profiles are classified as native WireGuard links");
+        var node = WireGuardEndpoint.ParseUri(link);
+        v2rayN.Handler.ShareHandler.Nodes[link] = node;
+        var shell = BaseConfig(false);
+        using (var plan = AutoSelectorPoolPlan.Create(new[] { link }, null, false,
+            () => throw new Exception("unexpected profile bridge"), _ => { }))
+        {
+            var config = JObject.Parse(plan.Apply(shell.ToString()));
+            var member = config["endpoints"].Single();
+            var peer = member["peers"].Single();
+            var options = member["amnezia_wg"];
+            Check(plan.PrimaryLink == link && plan.MainMembers == 1 && plan.XrayConfig == null
+                && (string)member["tag"] == "smart-wg-0" && (string)member["type"] == "wireguard",
+                "a country with only vpn:// profiles produces a native pool without Xray");
+            Check(node.remarks == "AWG profile" && (string)member["private_key"] == key
+                && (int)member["mtu"] == 1200 && member["address"].Count() == 2
+                && (string)peer["address"] == "2001:db8::10" && (int)peer["port"] == 11912
+                && (string)peer["public_key"] == key && (int)peer["persistent_keepalive_interval"] == 25
+                && peer["allowed_ips"].Values<string>().SequenceEqual(new[] { "0.0.0.0/0", "::/0" })
+                && (int)options["jc"] == 6 && (string)options["h1"] == "120-150"
+                && (string)options["i1"] == "<r 164>" && (string)options["header_protection_key"] == key
+                && (string)options["keepalive_timeout"] == "13-25" && (bool)options["random_trailers"]
+                && (bool)options["disable_cookies"] && member["dns"] == null && member["postup"] == null,
+                "native vpn:// pool keeps WireGuard/AWG options and ignores wg-quick DNS and hooks");
+        }
+
+        var padded = "vpn://" + Uri.EscapeDataString(Convert.ToBase64String(Encoding.UTF8.GetBytes(profile)));
+        Check(WireGuardEndpoint.ParseUri(padded).address == node.address,
+            "vpn:// also accepts escaped, padded standard Base64");
+        foreach (var malformed in new[]
+        {
+            "vpn://%%%INVALID",
+            ProfileLink(profile + "\n[Peer]\nEndpoint = " + endpoint),
+            ProfileLink(profile + "\nPublic_Key = " + key),
+            ProfileLink(profile.Replace(endpoint, endpoint + "/path")),
+            ProfileLink(profile.Replace("<r 164>", "<r\u0000164>"))
+        })
+        {
+            try
+            {
+                WireGuardEndpoint.ParseUri(malformed);
+                throw new InvalidOperationException("malformed vpn:// profile accepted");
+            }
+            catch (FormatException) { }
+        }
+        Check(true, "malformed encodings, duplicate sections/keys and invalid profile fields fail closed");
     }
 
     private static JObject BaseConfig(bool tun)
