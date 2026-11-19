@@ -263,17 +263,33 @@ namespace IRSpeedyVPN.Services
 
         internal void RestartForLogin()
         {
+            // Login and cached startup rebuild only missing or failed work.
+            lock (gate) RestartShuffledRound(rows.Keys.Where(NeedsAutomaticCheck));
+        }
+
+        internal bool RestartForManualRefresh(IVPNService[] services, CancellationToken cancellation)
+        {
             lock (gate)
             {
-                // Preserve successful countries and their displayed measurements.
-                // Rebuild only missing/failed work for login and cached startup.
-                state.SequentialRound = false;
-                state.CompletedRows = new List<string>();
-                state.PendingRows = Shuffle(rows.Keys.Where(NeedsAutomaticCheck));
-                state.RoundInProgress = state.PendingRows.Count > 0;
-                state.InitialScanCompleted = !state.RoundInProgress;
-                Save();
+                var expected = services.Where(s => s.IsUrlTestSupported).ToArray();
+                if (cancellation.IsCancellationRequested || expected.Length != rowKeys.Count
+                    || expected.Any(s => !rowKeys.ContainsKey(s))) return false;
+
+                // A deliberate recheck includes cached winners. Their measurements
+                // stay visible until the new row result is committed.
+                RestartShuffledRound(rows.Keys);
+                return true;
             }
+        }
+
+        private void RestartShuffledRound(IEnumerable<string> keys)
+        {
+            state.SequentialRound = false;
+            state.CompletedRows = new List<string>();
+            state.PendingRows = Shuffle(keys);
+            state.RoundInProgress = state.PendingRows.Count > 0;
+            state.InitialScanCompleted = !state.RoundInProgress;
+            Save();
         }
 
         internal bool ClearForManualRefresh(IVPNService[] expected = null)

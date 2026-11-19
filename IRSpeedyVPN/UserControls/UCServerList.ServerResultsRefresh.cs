@@ -52,6 +52,7 @@ namespace IRSpeedyVPN.UserControls
                 if (!Current()) return;
                 probeRestartRequested = false;
                 probeWakeRequested = false;
+                LogHelper.WriteExLog("[ServerChecks] stage=manual-refresh-request scope=" + (isResidentialTab ? "Residential" : "VPN"));
                 bool listRefreshed = isResidentialTab
                     ? await residential.RefreshAsync(force: true, cancellation: token)
                     : RefreshServerListRequest != null && await RefreshServerListRequest(Current, token);
@@ -62,11 +63,13 @@ namespace IRSpeedyVPN.UserControls
                 }
                 if (!Current()) return;
 
-                await Task.Run(() => { if (Current()) cache.RestartForLogin(); });
-                if (!Current()) return;
+                bool queued = await Task.Run(() => Current() && cache.RestartForManualRefresh(services, token));
+                if (!queued || !Current()) return;
                 picker.EndCheckCycleSetup();
                 picker.RetainCompletedResults(cache.CompletedSuccessfulServices);
                 UrlTestCoordinator.BeginBatch();
+                LogHelper.WriteExLog("[ServerChecks] stage=manual-refresh-probe rows=" + cache.PendingServices.Length
+                    + " listRefreshed=" + listRefreshed);
                 await RunDisplayScanAsync(services, cache, token);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested) { }
