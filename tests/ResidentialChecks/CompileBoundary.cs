@@ -9,7 +9,7 @@ namespace IRSpeedyVPN.Interfaces {
         IRSpeedyVPN.Models.NewService.Url SelectedServerUrl {get;set;}
         int ID {get;} string Name {get;set;} string Country {get;} string CountryCode {get;}
     }
-    internal interface ISmartFastConnection {bool IsSmartFast {get;}}
+    internal interface ISmartFastConnection {bool IsSmartFast {get;}void SetSmartFastUrls(string[] urls);}
 }
 namespace IRSpeedyVPN.Models { internal class GlobalInfo { public string Username { get; set; } public IRSpeedyVPN.Interfaces.IVPNService CurrentService; } }
 namespace IRSpeedyVPN.Models.NewService {

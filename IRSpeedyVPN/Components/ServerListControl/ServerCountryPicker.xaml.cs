@@ -535,7 +535,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (poolUrls.Length == 0)
                 return false;
 
-            // Intentionally send EVERY URL in this numbered row to Xray. URL tests only
+            // Intentionally send every URL in this numbered row to the Smart Pool. URL tests only
             // decide row availability and the minimum latency shown in the picker.
             smart.SetSmartFastUrls(poolUrls);
 
@@ -590,25 +590,18 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (!(sender is FrameworkElement fe) || !(fe.DataContext is ServerDisplaySlot slot))
                 return;
 
-            // Click the revealed identity, then recheck the CURRENT health/pool.
-            var identity = slot.DisplayedServer?.Identity;
-            var group = _allGroups.FirstOrDefault(g => LastSuccessfulServer.Key(g.Service) == identity);
-            if (group == null) { e.Handled = true; return; }
-
-            if (!group.IsSelectable)
-            {
-                e.Handled = true;
-                return;
-            }
-
-            var connectionService = group.Service;
-            if (!PrepareCountryPool(group, connectionService))
+            // Resolve the displayed service instance even if another record shares its key.
+            var connectionService = slot.DisplayedServer?.Service;
+            var group = _allGroups.FirstOrDefault(g => ReferenceEquals(g.Service, connectionService));
+            if (group == null || !PrepareCountryPool(group, connectionService))
             {
                 e.Handled = true;
                 return;
             }
 
             Apply(connectionService, group, SelectionKind.Country);
+            // A sweep retains old snapshots until its last frame. Show the new selection now.
+            if (_serverList.IsTransitioning) CompleteRowTransitions();
             ServerSelected?.Invoke(connectionService);
             e.Handled = true;
         }

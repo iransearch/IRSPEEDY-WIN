@@ -65,7 +65,52 @@ internal class TabAccessProbe {
     (tmp/'DefaultSelectionProbe.cs').write_text('using System.Linq;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Residential;class DefaultSelectionProbe{readonly ResidentialViewModel residential;bool isResidentialTab=true,connectionConnecting,connectionConnected;internal IVPNService selectedService;IVPNService residentialSelection;class Picker{internal IVPNService SelectedService;internal System.Collections.Generic.HashSet<int> Checking=new System.Collections.Generic.HashSet<int>();internal bool IsServiceChecking(IVPNService service)=>Checking.Contains(service.ID);}readonly Picker residentialCountryPicker=new Picker();internal DefaultSelectionProbe(ResidentialViewModel vm){residential=vm;}void UpdateResidentialVisuals(){}internal void SetChecking(IVPNService service,bool value){if(value)residentialCountryPicker.Checking.Add(service.ID);else residentialCountryPicker.Checking.Remove(service.ID);}internal void Choose()=>TrySelectResidentialFastest();'+health_method+'internal bool CanConnect()=>ResidentialSelectionHasSuccess();'+selection_method+'}')
     start=picker_source.index('        private void Row_KeyDown(')
     handlers=picker_source[start:picker_source.index('        #endregion',start)]
-    (tmp/'RowInputProbe.cs').write_text('using System;using System.Linq;using System.Collections.Generic;using System.Windows;using System.Windows.Input;using IRSpeedyVPN.Common;using IRSpeedyVPN.Interfaces;using IRSpeedyVPN.Components.ServerListControl;class RowInputProbe{readonly List<GroupItem> _allGroups=new List<GroupItem>();internal IVPNService Selected;internal int Changes;internal RowInputProbe(GroupItem group,IVPNService selected){_allGroups.Add(group);Selected=selected;}bool PrepareCountryPool(GroupItem g,IVPNService s)=>g.IsSelectable;void Apply(IVPNService service,GroupItem group,SelectionKind kind){Selected=service;Changes++;}Action<IVPNService> ServerSelected;internal void Click(IVPNService service){Row_Click(new FrameworkElement{DataContext=new ServerDisplaySlot{DisplayedServer=new ServerItem{Identity=LastSuccessfulServer.Key(service)}}},new RoutedEventArgs());}internal void PressKey(IVPNService service,Key key){Row_KeyDown(new FrameworkElement{DataContext=new ServerDisplaySlot{DisplayedServer=new ServerItem{Identity=LastSuccessfulServer.Key(service)}}},new KeyEventArgs{Key=key});}'+handlers+'}')
+    start=picker_source.index('        private bool PrepareCountryPool(')
+    prepare=picker_source[start:picker_source.index('        private void Apply(',start)]
+    (tmp/'RowInputProbe.cs').write_text('''
+using System;
+using System.Linq;
+using System.Collections.Generic;
+using System.Windows;
+using System.Windows.Input;
+using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Interfaces;
+using IRSpeedyVPN.Components.ServerListControl;
+class RowInputProbe
+{
+    private sealed class ListState { public bool IsTransitioning; }
+    private readonly ListState _serverList = new ListState();
+    private readonly List<GroupItem> _allGroups = new List<GroupItem>();
+    internal IVPNService Selected;
+    internal int Changes, CompletedTransitions;
+    private Action<IVPNService> ServerSelected;
+    internal RowInputProbe(GroupItem group, IVPNService selected)
+    {
+        _allGroups.Add(group);
+        Selected = selected;
+    }
+    internal void Add(GroupItem group) => _allGroups.Add(group);
+    internal void StartSweep() => _serverList.IsTransitioning = true;
+    private void CompleteRowTransitions()
+    {
+        _serverList.IsTransitioning = false;
+        CompletedTransitions++;
+    }
+    private void Apply(IVPNService service, GroupItem group, SelectionKind kind)
+    {
+        Selected = service;
+        Changes++;
+    }
+    private static FrameworkElement Row(IVPNService service) => new FrameworkElement
+    {
+        DataContext = new ServerDisplaySlot
+        {
+            DisplayedServer = new ServerItem { Service = service, Identity = LastSuccessfulServer.Key(service) }
+        }
+    };
+    internal void Click(IVPNService service) => Row_Click(Row(service), new RoutedEventArgs());
+    internal void PressKey(IVPNService service, Key key) => Row_KeyDown(Row(service), new KeyEventArgs { Key = key });
+'''+prepare+handlers+'}')
     newtonsoft=Path(csc).resolve().parents[2]/'Newtonsoft.Json.dll'
     shutil.copy2(newtonsoft,tmp/'Newtonsoft.Json.dll')
     compile_to(tmp/'state.dll', refs8, models+[base/'Residential/ResidentialViewModel.cs',base/'Residential/ResidentialService.cs',base/'Services/ServerCheckCache.cs',Path(__file__).with_name('CompileBoundary.cs'),Path(__file__).with_name('StateBoundary.cs'),Path(__file__).with_name('StateChecks.cs'),Path(__file__).with_name('CacheChecks.cs'),Path(__file__).with_name('HttpChecks.cs'),tmp/'GroupItem.cs',tmp/'StatusDetailProbe.cs',tmp/'DefaultSelectionProbe.cs',tmp/'RowInputProbe.cs'],[newtonsoft])
