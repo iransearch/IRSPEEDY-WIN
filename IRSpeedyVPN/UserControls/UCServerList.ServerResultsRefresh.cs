@@ -1,9 +1,8 @@
 using IRSpeedyVPN.Common;
 using IRSpeedyVPN.Interfaces;
-using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Services;
 using System;
-using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -19,6 +18,76 @@ namespace IRSpeedyVPN.UserControls
         private bool manualRefreshExternalPause;
 
         private void CancelManualRefresh() => manualRefreshCancellation?.Cancel();
+
+        private string DisplayTestTarget()
+            => UrlTestRetryPolicy.DisplayTarget(globalInfo?.settings?.setting?.url_test);
+
+        private async Task RunServerProbeRoundAsync(IVPNService[] pending, ServerCheckCache cache,
+            Func<bool> current, CancellationToken token, bool showProgress)
+        {
+            if (pending.Length == 0 || !current()) return;
+            var picker = countryPicker;
+            var info = globalInfo;
+            string target = DisplayTestTarget();
+            var committed = new HashSet<IVPNService>(); // Only touched on the dispatcher.
+            foreach (var row in pending) picker.SetGroupChecking(row, true);
+            using (var round = CancellationTokenSource.CreateLinkedTokenSource(token, UrlTestCoordinator.DisplayCancellation))
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    if (!current()) return;
+                    var plan = new ServerRefreshPlan(pending, failed: cache.WasDisplayFailure);
+                    LogHelper.WriteExLog("[ServerChecks] display-round candidates=" + plan.Total + " rows=" + pending.Length);
+                    cache.PersistQueue();
+                    try
+                    {
+                        using (var session = new TunnelPlusService.DisplayProbeSession(info))
+                        {
+                            await plan.RunAsync((candidate, cancellation) => Task.Run(() =>
+                            {
+                                cancellation.ThrowIfCancellationRequested();
+                                return TunnelPlusService.TestRefreshBatch(session, candidate.Service,
+                                    candidate.Probe, target, cancellation, latency =>
+                                {
+                                    if (!cache.RememberDisplayProgress(candidate.Service, candidate.Original, latency,
+                                        () => !round.IsCancellationRequested && current()) || !showProgress) return;
+                                    Dispatcher.BeginInvoke(new Action(() =>
+                                    {
+                                        if (!round.IsCancellationRequested && current() && !committed.Contains(candidate.Service))
+                                            picker.ShowGroupProgress(candidate.Service, cache.PeekDisplayPing(candidate.Service));
+                                    }), System.Windows.Threading.DispatcherPriority.Background);
+                                });
+                            }, cancellation), (row, result) =>
+                            {
+                                if (!cache.CompleteDisplayRow(row, result.Winner, result.Latency, result.Failed,
+                                    () => !round.IsCancellationRequested && current())) return;
+                                Dispatcher.Invoke(new Action(() =>
+                                {
+                                    if (!current() || round.IsCancellationRequested) return;
+                                    committed.Add(row);
+                                    (row as TunnelPlusService)?.UpdateListTestResult();
+                                    picker.SetGroupChecking(row, false);
+                                    picker.RefreshGroup(row);
+                                    TrySelectResidentialFastest();
+                                    UpdateResidentialVisuals();
+                                }));
+                            }, round.Token);
+                        }
+                    }
+                    finally { cache.PersistQueue(); }
+                }, round.Token);
+            }
+            finally
+            {
+                // Invalidate queued previews even on a failed/canceled probe.
+                foreach (var row in pending)
+                {
+                    picker.SetGroupChecking(row, false);
+                    if (committed.Add(row)) picker.RestoreTestProgress(row);
+                }
+            }
+        }
 
         private void RefreshServerResults()
         {
@@ -45,7 +114,6 @@ namespace IRSpeedyVPN.UserControls
             manualRefreshCancellation = cancellation;
             var token = cancellation.Token;
             long generation = ++manualRefreshGeneration;
-            bool refreshStarted = false;
             Func<bool> current = () => !token.IsCancellationRequested && generation == manualRefreshGeneration
                 && ReferenceEquals(services, _currentServices) && ReferenceEquals(cache, probeCache)
                 && globalInfo?.CurrentService == null && !probesRequireDisconnect;
@@ -54,9 +122,8 @@ namespace IRSpeedyVPN.UserControls
                 await probeTask;
                 if (!current()) return;
                 probeRestartRequested = false; probeWakeRequested = false;
-                // Fetch and bind the latest API snapshot while this round owns
-                // the pause. A failed fetch tests the old list without erasing
-                // its committed results; cancellation still stops the round.
+                // Rebind the latest API snapshot before admitting any probes.
+                // Valid successes remain reusable, including on a manual round.
                 bool listRefreshed = isResidentialTab
                     ? await residential.RefreshAsync(force: true, cancellation: token)
                     : RefreshServerListRequest != null && await RefreshServerListRequest(current, token);
@@ -66,109 +133,20 @@ namespace IRSpeedyVPN.UserControls
                     cache = probeCache;
                 }
                 if (!current()) return;
-                refreshStarted = await Task.Run(() =>
-                {
-                    if (!current()) return false;
-                    if (listRefreshed) return cache.ClearForManualRefresh(services);
-                    cache.StopRound();
-                    return true;
-                });
-                if (!refreshStarted) return;
+                cache.BindDisplay(services, DisplayTestTarget(), TunnelPlusService.selectedChain);
+                await Task.Run(() => { if (current()) cache.RestartForLogin(); });
                 if (!current()) return;
-                if (listRefreshed)
-                {
-                    foreach (var service in services.OfType<TunnelPlusService>()) service.ResetListTestResult();
-                    picker.ResetTestResults();
-                }
                 picker.EndCheckCycleSetup();
-                var plan = new ServerRefreshPlan(services);
-                var finishedRows = new ConcurrentDictionary<IVPNService, bool>();
-                var bestByRow = new ConcurrentDictionary<IVPNService, long>();
+                picker.RetainCompletedResults(cache.CompletedSuccessfulServices);
                 UrlTestCoordinator.BeginBatch();
-                LogHelper.WriteExLog("[ServerChecks] manual-refresh-begin candidates=" + plan.Total + " listRefreshed=" + listRefreshed);
-                while (current() && plan.HasPending)
-                {
-                    var batch = plan.TakeBatch();
-                    foreach (var row in batch.SelectMany(c => c.Owners).Select(o => o.Service).Distinct())
-                        picker.SetGroupChecking(row, true);
-                    await Task.Run(() =>
-                    {
-                        if (!current()) return;
-                        var members = batch.ToDictionary(c => c.Probe);
-                        Action<Url, long> progress = (url, latency) =>
-                        {
-                            ServerRefreshPlan.Candidate member;
-                            if (latency <= 0 || !current() || !members.TryGetValue(url, out member) || member.Completed
-                                || (member.BestSuccessfulLatency > 0 && latency >= member.BestSuccessfulLatency)) return;
-                            member.BestSuccessfulLatency = latency;
-                            // Progress is an actual successful probe, even when its
-                            // primary batch or >500ms retry is still pending. Commit
-                            // before making the row selectable so Connect/logout can
-                            // cancel the remaining work without losing this ping.
-                            foreach (var owner in member.Owners)
-                                cache.RecordRefreshMember(owner.Service, owner.Url, latency, DateTime.UtcNow);
-                            if (!listRefreshed) return;
-                            foreach (var owner in member.Owners.Select(o => o.Service).Distinct())
-                            {
-                                bestByRow.AddOrUpdate(owner, latency, (s, old) => Math.Min(old, latency));
-                                Dispatcher.BeginInvoke(new Action(() =>
-                                {
-                                    long best;
-                                    if (current() && !finishedRows.ContainsKey(owner) && bestByRow.TryGetValue(owner, out best))
-                                        picker.ShowGroupProgress(owner, best);
-                                }), System.Windows.Threading.DispatcherPriority.Background);
-                            }
-                        };
-                        Action<Url, long> complete = (url, latency) =>
-                        {
-                            ServerRefreshPlan.Candidate member;
-                            if (!current() || !members.TryGetValue(url, out member) || member.Completed) return;
-                            if (member.BestSuccessfulLatency > 0)
-                                latency = latency > 0 ? Math.Min(latency, member.BestSuccessfulLatency) : member.BestSuccessfulLatency;
-                            var rowsDone = plan.Complete(member);
-                            foreach (var owner in member.Owners)
-                                cache.RecordRefreshMember(owner.Service, owner.Url, latency, DateTime.UtcNow);
-                            foreach (var row in rowsDone) { finishedRows[row] = true; cache.CompleteRefreshRow(row); }
-                            Dispatcher.BeginInvoke(new Action(() =>
-                            {
-                                if (!current()) return;
-                                foreach (var row in member.Owners.Select(o => o.Service).Distinct())
-                                    (row as TunnelPlusService)?.UpdateListTestResult();
-                                foreach (var row in rowsDone)
-                                {
-                                    picker.SetGroupChecking(row, false);
-                                    picker.RefreshGroup(row);
-                                }
-                                TrySelectResidentialFastest();
-                                UpdateResidentialVisuals();
-                            }));
-                        };
-                        TunnelPlusService.TestRefreshBatch(batch.Select(c => c.Probe).ToArray(), globalInfo, token, progress, complete);
-                        // A global RPC/config error may return without per-member
-                        // results. It cannot leave the refresh spinning forever.
-                        foreach (var member in batch.Where(c => !c.Completed)) complete(member.Probe, -1);
-                        if (current()) cache.PersistQueue();
-                    });
-                }
-                if (current()) await Task.Run(() => { if (current()) cache.FinishManualRefresh(services); });
+                var pending = cache.DisplayRoundServices.Where(services.Contains).ToArray();
+                await RunServerProbeRoundAsync(pending, cache, current, token, listRefreshed);
                 LogHelper.WriteExLog("[ServerChecks] manual-refresh-end canceled=" + !current());
             }
             catch (OperationCanceledException) { }
             catch (Exception ex) { LogHelper.WriteLog(ex); }
             finally
             {
-                // Persist every actual successful measurement accepted before
-                // cancellation, including members whose batch/retry is unfinished.
-                if (refreshStarted) await Task.Run(() => cache.PersistQueue());
-                if (ReferenceEquals(services, _currentServices))
-                {
-                    foreach (var service in services)
-                    {
-                        picker.SetGroupChecking(service, false);
-                        picker.RestoreTestProgress(service);
-                        (service as TunnelPlusService)?.UpdateListTestResult();
-                    }
-                }
                 // A connection/logout cancellation owns the pause until its
                 // existing cleanup resumes it. Never restart an interrupted scan.
                 if (!manualRefreshExternalPause && globalInfo?.CurrentService == null && !probesRequireDisconnect)

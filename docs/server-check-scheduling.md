@@ -1,31 +1,65 @@
-# Server-list checks and manual refresh
+# Display server checks
 
-- Cached per Windows user, account username and service/protocol scope in LocalAppData/IRSpeedy/ServerChecks. Password changes retain the cache. Only hashed row/configuration identities, times, results and queue progress are stored; no raw subscription links or credentials.
-- Each numbered visible server row is an independent turn. Germany 1 and Germany 2 are separate rows, even though they share a country. The queue has no country grouping or country-code sort.
-- Each real login/app start creates one Fisher-Yates permutation of the current row identities. Consume the queue without replacement. Every explicit user disconnect starts a full round with latest all-failed/unknown rows first, then successful rows, keeping stable country/ID order within both groups and failed links first within each row.
-- UI sorting, filtering and selection do not rebuild the queue. First success makes the row selectable and updates its ping in place; the completed row is then reordered by final minimum latency using the existing picker logic.
-- Test rows consecutively with no interval; a completed round stops. Reopening the list and an API refresh do not create another round. There is no periodic list-test timer. Pending turns survive API replacement and persisted queue reloads; a real login starts a fresh bootstrap.
-- Connect cancels/drains the active test and consumes that scan opportunity. Ordinary failed/canceled connection cleanup does not resume it; the next explicit disconnect or manual refresh starts a fresh round. No background list probes run during a VPN connection. Canceling an ordinary test restores committed cache values; queued partial callbacks cannot overwrite final/canceled results.
-- Cache version 4 preserves compatible legacy results and migration history. Completed periodic queues from older versions are retired. Latest fully completed row outcomes determine disconnect priority; historical success and unfinished mutations cannot change it.
-- API reloads replace bound row objects but preserve the order of surviving pending rows. Removed rows are pruned; new or changed configurations are appended in random order. Changed links invalidate their previous results. Reordering the same URLs does not change row identity. Obsolete row completions cannot advance the replacement queue.
-- The queue is saved on the worker before probing and after completed turns, using atomic file replacement. Results are saved after completed service tests. A crash between result saving and queue advancement may repeat the unfinished turn; it cannot skip the rest. Storage failures preserve usable in-memory state.
-- Failed current results retain separate last-success history for display but do not make a failed row selectable. Successful results show their recorded timestamp.
-- List testing is independent of the runtime Pool/AI health checks and of the separate 60-second RunUrlTest cache validity. IP display does not control scanning or VPN lifecycle.
+Login, cached startup, disconnect, manual refresh and Residential use the
+same display scheduler. An API row (including a numbered row for a repeated
+country code) owns its own route queue. This does not alter the Smart Pool,
+Auto Selector, connected latency, or runtime VPN health checks.
 
-Validation: `tests/ServerRefreshChecks/run.py` compiles the production queue/cache/scanner with fake network/UI and real temporary files. It covers finite rounds, disconnect priority, cache migration, cancellation, API changes, progress/final UI updates and connection pause. Windows UI/runtime acceptance remains necessary.
+- Shuffle the routes separately from presentation. Among a row's candidates,
+  try measured failures from its previous completed scan first. Admit at most
+  eight probes, and at most `ceil(8 / active rows)` per eligible row.
+- A result below 300 ms skips that row's waiting routes. Already-running
+  probes finish. Choose the lowest positive ping, then fewer failures, more
+  samples, and case-insensitive server ID. Skipped routes are never failures.
+- The eight-second budget includes preparation and RPC startup. A distinct
+  API target gets up to four seconds for the first attempt; retry a failure
+  or a measurement above 500 ms once using
+  `http://connectivitycheck.gstatic.com/generate_204` and the remaining budget.
+  Keep the better success. With no API target, use the fallback directly.
+  Capacity or an interrupted individual attempt is deferred for 250 ms.
+- A scan uses a temporary Throne Core separate from the active VPN process.
+  The display RPC uses two requests on one warmed connection for ordinary
+  transports, and one request for XHTTP/SplitHTTP. Windows prepares its
+  temporary outbound again for a fallback attempt, within the same deadline.
+  Cisco continues to measure its own HTTPS endpoint, under the same scheduler,
+  because the Cisco adapter does not expose an outbound tunnel for display probes.
+- Cache a completed country's winner or no-result, and measured failure
+  fingerprints, without an elapsed-time expiry. Account, target, and the
+  full roster's configuration identities gate reuse. An API reorder does
+  not invalidate a result. The first round after upgrade cannot reuse old
+  snapshots whose test target was never recorded. Persist only fingerprints,
+  not raw links or credentials.
+- Every explicit round, including a manual refresh, leaves valid successes
+  alone and retries failed, missing, incomplete or changed rows. Manual
+  refresh still fetches a fresh catalog and can use the current catalog if
+  that fetch fails. Connect/logout cancel and drain the scan. A ping measured
+  before cancellation can be restored, but an incomplete country cannot
+  satisfy next-round eligibility. A canceled or skipped probe records no failure.
+- Preserve the existing picker, pinning, progress and Residential ping
+  formatting. Rank completed successes by displayed ping then title, keep
+  outstanding rows between successes and completed failures.
 
-## Manual header refresh (1.4.11)
+## Core and verification
 
-- A refresh action beside logout is available on the disconnected server list. It drains the old test, then fetches the latest authenticated list through Login2 before starting any probes. On success, bind the new list, clear current pings, timestamps, last-success measurement history and persisted result/priority state, and test only the new configuration snapshot. The separate last-successful-connection star is retained. Selection resets to Smart.
-- If the API fetch fails, keep the previous complete list and cached measurements and test that same list. Actual successful measurements update the member cache immediately; untested members retain their previous results. The existing row display stays in place until completion or cancellation restores committed measurements. Building replacement service objects is transactional, so a malformed response cannot leave a partially replaced list. Explicit authentication failures retain the existing logout policy.
-- Manual and periodic API refreshes share one gate. A manual action waits for existing maintenance, then makes its own fresh request. Its own list rebind retains the manual pause and cancellation ownership, so it cannot cancel itself or launch an overlapping automatic scan.
-- Fisher-Yates shuffles **configurations across all countries** once. The search filter, country names and visible row order do not limit or order this queue. Each configuration appears once; identical transport/chain/SNI metadata can share a probe across owning rows. The same link with different metadata (including case-insensitive lookup collisions) is kept in separate batches.
-- Execute bounded batches of at most 15 copied configurations using the existing Core test/retry policy. Preserve the global permutation when generating RPC tags. The dedicated batch runner resolves chain/SNI metadata from these copies, and never changes the runtime main/AI Pool configuration.
-- Every actual successful member measurement is cached before its progress makes the row selectable, including a >500ms first pass awaiting retry. Accept improvements only for a live member of this batch; a slower duplicate or missing final RPC result cannot erase a success already measured in the round. Final callbacks still control row completion: only once every configuration belonging to a numbered row has finished does that row reorder by its minimum positive latency. All-failed rows sink. Smart remains a fixed card and the starred row remains immediately below it.
-- The header refresh icon spins while busy, repeat clicks are disabled, and its animation clock stops when hidden/unloaded/minimized. Core/config failures mark unreported members failed and end the round. Completion never schedules another automatic round.
-- Connect/logout cancels and drains this worker before proceeding. Canceling during a synchronous API fetch releases the lifecycle wait immediately; the API worker retains its gate and discards its late response. Every successful measurement accepted before cancellation is persisted and restored to the row, even if its primary batch/retry is unfinished. This does not fabricate a completed row outcome for priority or a ping from connection success alone. In the API-failure fallback, untested members retain their old committed measurements. Replacing API objects rejects their obsolete results and completion markers.
+The separate source patch is
+[`core-patches/throne-display-probes.patch`](../core-patches/throne-display-probes.patch).
+Apply to `iransearch/Throne-G` at `c3802d34`:
 
-Validation: `manual_refresh.py` exercises the production plan/cache/controller and list binding with a single UI thread and fake Core. `api_refresh.py` exercises authenticated refresh, transactional factory replacement, API serialization and cancellation with fake API/UI. `core_dispatch.py` exercises the actual full probe method and batch runner with a fake RPC transport. `net48_compile.py` compiles the production controller, picker and header against real net48/WPF reference assemblies. See `tests/ServerRefreshChecks/README.md` for commands and Windows acceptance checks.
+```sh
+git am /path/to/IRSPEEDY-WIN/core-patches/throne-display-probes.patch
+cd core/server
+go test -race ./test_utils -run TestDisplay
+```
+
+Build and package the matching Windows Core using Throne-G's normal build
+pipeline. The app repository has no updated Core binary. An older Core
+without the display RPC stops the scan without marking rows failed.
+
+Run `dotnet run --project tests/DisplayProbeChecks` for the offline scheduler,
+deadline, fallback, cancellation and cache checks. Windows runtime verification
+still requires the packaged Core. The historical display scheduling relationships in
+the codegraph are stale for this change; use these sources for the display flow until
+a reviewed graph snapshot records the new call paths.
 
 ## Probe indicator
 Each numbered row starts a clipped diagonal flag sheen before its RPC starts, and clears it in a UI-thread finally block, including cancellation and errors. Partial latency updates do not end the sheen. The sheen uses the smart flag’s white gradient, skew and 3.2-second easing cycle; clocks are removed when hidden/unloaded/minimized. Removed the checking/failure subtitle; cached latency and its history tooltip remain.
