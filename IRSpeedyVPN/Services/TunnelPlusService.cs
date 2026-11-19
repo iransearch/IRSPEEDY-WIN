@@ -2003,7 +2003,8 @@ namespace IRSpeedyVPN.Services
             }
         }
 
-        private SniRuntime StartSniRuntime(SniConfig config, bool persistent)
+        private SniRuntime StartSniRuntime(SniConfig config, bool persistent,
+            Func<int> displayRemaining = null, CancellationToken cancellation = default)
         {
             if (config == null)
                 throw new ArgumentNullException(nameof(config));
@@ -2014,7 +2015,8 @@ namespace IRSpeedyVPN.Services
 
             var listenPort = AllocateSniListenPort();            
 
-            var configPath = Path.Combine(Path.GetDirectoryName(sniPath), "config.json");
+            var configPath = Path.Combine(Path.GetDirectoryName(sniPath),
+                displayRemaining == null ? "config.json" : "display-sni-" + Guid.NewGuid().ToString("N") + ".json");
             var serializer = new JavaScriptSerializer();
             var configJson = serializer.Serialize(new Dictionary<string, object>
             {
@@ -2026,20 +2028,38 @@ namespace IRSpeedyVPN.Services
                 { "QUEUE_NUM", config.QueueNum },
                 { "HANDSHAKE_TIMEOUT_MS", config.HandshakeTimeoutMs },
             });
-            File.WriteAllText(configPath, configJson, Encoding.ASCII);
-
-            Process process;
-            lock (ownedExitGate)
+            Process process = null;
+            try
             {
-                if (applicationExiting) throw new OperationCanceledException("Application is exiting.");
-                process = ShellExecute.ShellexecAndReturnProcess(sniPath, configPath);
-                if (process != null) ownedExitProcesses.Add(process);
+                cancellation.ThrowIfCancellationRequested();
+                File.WriteAllText(configPath, configJson, Encoding.ASCII);
+                if (displayRemaining != null)
+                {
+                    process = StartDisplayProcess(sniPath, "\"" + configPath + "\"");
+                    WaitForDisplayListener(process, listenPort, displayRemaining, cancellation);
+                }
+                else
+                {
+                    lock (ownedExitGate)
+                    {
+                        if (applicationExiting) throw new OperationCanceledException("Application is exiting.");
+                        process = ShellExecute.ShellexecAndReturnProcess(sniPath, configPath);
+                        if (process != null) ownedExitProcesses.Add(process);
+                    }
+                    if (!WaitForSniPort("127.0.0.1", listenPort, TimeSpan.FromSeconds(10)))
+                        throw new TimeoutException($"sni.exe did not start listening on port {listenPort} within 10 seconds.");
+                }
             }
-            if (!WaitForSniPort("127.0.0.1", listenPort, TimeSpan.FromSeconds(10)))
+            catch
             {
-                TryKillProcess(process);
+                if (displayRemaining != null)
+                {
+                    StopDisplayProcess(process);
+                    DeleteDisplaySniConfig(configPath);
+                }
+                else if (process != null) TryKillProcess(process);
                 ReleaseSniListenPort(listenPort);
-                throw new TimeoutException($"sni.exe did not start listening on port {listenPort} within 10 seconds.");
+                throw;
             }
             return new SniRuntime
             {
