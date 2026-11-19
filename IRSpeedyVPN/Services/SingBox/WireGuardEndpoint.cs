@@ -33,6 +33,35 @@ namespace IRSpeedyVPN.Services.SingBox
             ["endpoint"] = "endpoint"
         };
 
+        // Framework exception messages can contain input. Only our fixed parser codes may enter logs.
+        internal static string DiagnosticReason(Exception error)
+        {
+            switch (error.Message)
+            {
+                case "duplicate-wireguard-parameter":
+                case "invalid-wireguard-flag":
+                case "invalid-wireguard-key":
+                case "invalid-wireguard-mtu":
+                case "invalid-wireguard-number":
+                case "invalid-wireguard-peer":
+                case "invalid-wireguard-prefix":
+                case "invalid-wireguard-profile-encoding":
+                case "invalid-wireguard-profile-endpoint":
+                case "invalid-wireguard-profile-field":
+                case "invalid-wireguard-profile-section":
+                case "invalid-wireguard-profile-size":
+                case "invalid-wireguard-profile-text":
+                case "invalid-wireguard-profile-value":
+                case "invalid-wireguard-range":
+                case "invalid-wireguard-signature":
+                case "invalid-wireguard-uri":
+                case "missing-wireguard-prefix":
+                    return error.Message;
+                default:
+                    return error.GetType().Name;
+            }
+        }
+
         internal static bool IsLink(string link)
         {
             link = link?.TrimStart();
