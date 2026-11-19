@@ -140,8 +140,13 @@ namespace IRSpeedyVPN.Residential
             }
         }
         internal sealed class Payload { internal string Body, TrafficHeader; }
-        internal static async Task<Payload> DownloadAsync(string url, CancellationToken token)
+        internal static Task<Payload> DownloadAsync(string url, CancellationToken token) =>
+            DownloadSubscriptionAsync(url, token, countrySubscription: false);
+        internal static Task<Payload> DownloadCountryAsync(string url, CancellationToken token) =>
+            DownloadSubscriptionAsync(url, token, countrySubscription: true);
+        private static async Task<Payload> DownloadSubscriptionAsync(string url, CancellationToken token, bool countrySubscription)
         {
+            string logTag = countrySubscription ? "[CountrySubscription]" : "[Residential]";
             for (int redirects = 0; redirects <= 3; redirects++)
             {
                 token.ThrowIfCancellationRequested();
@@ -151,12 +156,14 @@ namespace IRSpeedyVPN.Residential
                 request.AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate;
                 request.Headers[HttpRequestHeader.CacheControl] = "no-cache";
                 request.AllowAutoRedirect = false; request.Timeout = 10000; request.ReadWriteTimeout = 10000;
-                // No CookieContainer, credentials, auth headers, or certificate callback.
+                // Isolate subscription TLS from legacy process-wide probe callbacks.
+                if (countrySubscription)
+                    request.ServerCertificateValidationCallback = (_, cert, chain, errors) => errors == System.Net.Security.SslPolicyErrors.None;
                 using (token.Register(request.Abort))
                 using (var response = (HttpWebResponse)await request.GetResponseAsync().ConfigureAwait(false))
                 {
                     int code = (int)response.StatusCode;
-                    LogHelper.WriteExLog("[Residential] stage=http-response status=" + code + " redirects=" + redirects);
+                    LogHelper.WriteExLog(logTag + " stage=http-response status=" + code + " redirects=" + redirects);
                     if (code >= 300 && code < 400)
                     {
                         if (redirects == 3 || string.IsNullOrWhiteSpace(response.Headers["Location"])) throw new WebException("Subscription redirects");
@@ -173,7 +180,7 @@ namespace IRSpeedyVPN.Residential
                             if (bytes.Length + read > ResidentialSubscription.MaxBytes) throw new FormatException("Subscription size");
                             bytes.Write(buffer, 0, read);
                         }
-                        LogHelper.WriteExLog("[Residential] stage=download-complete bytes=" + bytes.Length
+                        LogHelper.WriteExLog(logTag + " stage=download-complete bytes=" + bytes.Length
                             + " trafficHeader=" + (response.Headers["subscription-userinfo"] != null));
                         return new Payload { Body = Encoding.UTF8.GetString(bytes.ToArray()), TrafficHeader = response.Headers["subscription-userinfo"] };
                     }

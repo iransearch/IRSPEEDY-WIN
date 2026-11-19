@@ -18,6 +18,14 @@ namespace IRSpeedyVPN.Models.NewService
         public DateTime created_at { get; set; }
         public DateTime updated_at { get; set; }
         public List<Url> urls { get; set; }
+        [JsonProperty("xui_server_id")]
+        public int? xui_server_id { get; set; }
+        internal ServerEx WithUrls(List<Url> links)
+        {
+            var copy = (ServerEx)MemberwiseClone();
+            copy.urls = links;
+            return copy;
+        }
         public string Protocol { get; set; }
     }
 

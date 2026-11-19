@@ -1094,7 +1094,7 @@ namespace IRSpeedyVPN
                     var acc = res.ResponseData.Decrypted;
                     if (acc.UserAccount != null)
                         acc.UserAccount.Username = username;
-                    if (ProcessInfo(acc, password, onlyRenew, sessionValidated: true))
+                    if (ProcessInfo(acc, password, onlyRenew, sessionValidated: true, allowCountryDownload: res.VerifiedServerList))
                     {
                         gInfo.ServerResponse = res.ResponseData.DecryptedString;
 
@@ -1222,7 +1222,7 @@ namespace IRSpeedyVPN
             }
             return null;
         }
-        private bool ProcessInfo(AccountInfoEx acc, string password, bool onlyRenew = false, bool sessionValidated = false)
+        private bool ProcessInfo(AccountInfoEx acc, string password, bool onlyRenew = false, bool sessionValidated = false, bool allowCountryDownload = false)
         {
             if (!onlyRenew) SetLoginStage(1);
             var processStopwatch = Stopwatch.StartNew();
@@ -1255,7 +1255,8 @@ namespace IRSpeedyVPN
                     if (!onlyRenew) BeginAccountSession(verified: sessionValidated);
                     IsUserLogin = true;
                     //serviceFactory.RenewServiceList(acc.Servers);
-                    serviceFactory.RenewServiceList(acc.groups);
+                    if (allowCountryDownload) ApplyCountryCatalog(acc.groups, accountSessionMaintenance.Generation);
+                    else serviceFactory.RenewServiceList(Services.CountrySubscription.Expand(acc.groups, null));
                     uCServerList.ConfigureResidential(acc);
                     LogHelper.WriteExLog("[LoginPerformance] stage=services-ready processElapsedMs=" + processStopwatch.ElapsedMilliseconds);
                     if (!onlyRenew &&!isUpdateAvailable)

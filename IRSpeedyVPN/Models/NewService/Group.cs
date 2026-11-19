@@ -6,6 +6,12 @@ namespace IRSpeedyVPN.Models.NewService
     // Root myDeserializedClass = JsonConvert.DeserializeObject<Root>(myJsonResponse);
     public class Group
     {
+        internal Group WithServers(List<ServerEx> rows)
+        {
+            var copy = (Group)MemberwiseClone();
+            copy.servers = rows;
+            return copy;
+        }
         public int id { get; set; }
         public string title { get; set; }
         public string en_title { get; set; }

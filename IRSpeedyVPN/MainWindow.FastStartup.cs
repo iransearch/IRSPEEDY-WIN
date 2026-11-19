@@ -188,7 +188,7 @@ namespace IRSpeedyVPN
                 }
 
                 SetLoginStage(2);
-                await Task.Run(() => serviceFactory.RenewServiceList(account.groups));
+                await Task.Run(() => serviceFactory.RenewServiceList(Services.CountrySubscription.Expand(account.groups, null)));
                 IsUserLogin = true;
                 // Cached startup bypasses ProcessInfo; it must configure Residential too.
                 uCServerList.ConfigureResidential(account);
@@ -343,6 +343,7 @@ namespace IRSpeedyVPN
         private long EndAccountSession()
         {
             long generation = accountSessionMaintenance.End();
+            RetireCountryCatalog(generation);
             lock (sessionMaintenanceTimerGate)
             {
                 if (generation == accountSessionMaintenance.Generation)
@@ -606,7 +607,7 @@ namespace IRSpeedyVPN
                         // exact live object so a successful 30-minute refresh cannot disconnect or
                         // replace the currently running VPN session.
                         {
-                            serviceFactory.RenewServiceList(account.groups);
+                            ApplyCountryCatalog(account.groups, sessionVersion);
                             gInfo.Import(account, password, localResource.TempPath);
                             gInfo.CurrentService = currentService;
                             gInfo.ServerResponse = response.ResponseData.DecryptedString;

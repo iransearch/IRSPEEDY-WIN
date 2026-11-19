@@ -56,6 +56,8 @@ class LogHelper {public static void WriteExLog(string s){} public static void Wr
 static class VpnTimeZone { public static DateTime AccountNow=>DateTime.Now;public static void EndConnection(){} }
 enum Visibility {Collapsed,Visible}class Button {public Visibility Visibility;}
 class Program {
+ void ApplyCountryCatalog(object groups,long generation){serviceFactory.RenewServiceList(groups);}
+ void RetireCountryCatalog(long generation){}
  readonly CancellationTokenSource loginApplicationExit=new CancellationTokenSource();
  readonly SemaphoreSlim serverRefreshGate=new SemaphoreSlim(1,1);bool LoadLocal;FakeDispatcher Dispatcher=new FakeDispatcher();Factory serviceFactory=new Factory();
  readonly SemaphoreSlim connectionRequestGate=new SemaphoreSlim(1,1);
@@ -70,7 +72,7 @@ class Program {
  Label txtUsername=new Label();Proxy proxifier=new Proxy();object Screen;Action Worker;string Error;
  void UnRegiserVpnService(){} void DisconnectAll(){Renewals++;if(RenewalFailure)throw new InvalidOperationException("renewal cleanup");}void HideLoading(){} void ShowMessage(string s){Error=s;} void ShowControl(object c){Screen=c;}
  void RunLoginWithPresentation(Action a){Worker=a;loginPresentationActive=true;}
- bool ProcessInfo(Account a,string password,bool renew,bool sessionValidated=false){gInfo.Password=password;if(!renew)BeginAccountSession(sessionValidated);IsUserLogin=true;return true;}
+ bool ProcessInfo(Account a,string password,bool renew,bool sessionValidated=false,bool allowCountryDownload=false){gInfo.Password=password;if(!renew)BeginAccountSession(sessionValidated);IsUserLogin=true;return true;}
  object TryParseDeviceList(string s)=>null;void ShowDeviceLimitPopup(object d,string m){}
  static void Check(bool v,string m){if(!v)throw new Exception(m);Console.WriteLine("PASS "+m);}
 '''
