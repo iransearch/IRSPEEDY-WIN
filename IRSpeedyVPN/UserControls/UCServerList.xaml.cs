@@ -371,6 +371,9 @@ namespace IRSpeedyVPN.UserControls
 
         private void btnConnect_Click(object sender, RoutedEventArgs e)
         {
+            ConnectionDiagnostics.Write("country-selection", "action=connect-button picker=" + (isResidentialTab ? "residential" : "vpn")
+                + " current=" + ServerCountryPicker.TraceRow(selectedService) + " connecting=" + connectionConnecting
+                + " connected=" + connectionConnected);
             if (connectionConnected || connectionConnecting) { OnDisconnectRequest?.Invoke(this, EventArgs.Empty); return; }
             if (OnConnectRequest == null) return;
             if (isResidentialTab)

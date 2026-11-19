@@ -35,6 +35,7 @@ namespace IRSpeedyVPN.Models.NewService {
  internal class AccountInfoEx {public IRSpeedyVPN.Residential.ResidentialConfig residential_vpn;public UserAccount UserAccount;}
 }
 namespace IRSpeedyVPN.Common {
+ static class ConnectionDiagnostics {public static void Write(string stage,string fields){}}
  static class LogHelper { public static void WriteExLog(string s){}public static void WriteLog(Exception e){} }
  static class LastSuccessfulServer {
   internal static string Key(IVPNService s)=>s?.ID.ToString()??"";internal static string Read()=>"";

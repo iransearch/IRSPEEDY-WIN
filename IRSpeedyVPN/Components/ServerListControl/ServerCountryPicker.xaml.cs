@@ -343,7 +343,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
                 // still false and a guarded rebuild would leave the row with no pool.
                 // Without a pool the connection skips the smart balancer config, and
                 // the AI balancer that live in it never reach the core.
-                PrepareCountryPool(group, value);
+                PrepareCountryPool(group, value, out _);
 
                 Apply(value, group, SelectionKind.Country);
             }
@@ -354,6 +354,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             _serverList = new ServerListViewModel();
             InitializeComponent();
             _sweepAnimator = new ServerListSweepAnimator(_serverList, icCountries, ServerScroller, CometOverlay);
+            ServerScroller.AddHandler(Mouse.PreviewMouseDownEvent, new MouseButtonEventHandler(Rows_PreviewMouseDown), true);
             icCountries.ItemsSource = _serverList.Slots;
             _serverList.Slots.CollectionChanged += (s, e) => UpdateEmptyResultVisibility();
         }
@@ -415,7 +416,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             if (selected != null)
             {
                 var service = _selectedService ?? selected.Service;
-                PrepareCountryPool(selected, service);
+                PrepareCountryPool(selected, service, out _);
                 Apply(service, selected, SelectionKind.Country);
             }
             else
@@ -521,19 +522,28 @@ namespace IRSpeedyVPN.Components.ServerListControl
             ApplyFilter();
         }
 
-        private bool PrepareCountryPool(GroupItem group, IVPNService preferredService = null)
+        private bool PrepareCountryPool(GroupItem group, IVPNService preferredService, out string outcome)
         {
             if (group == null || !group.IsSelectable)
+            {
+                outcome = group == null ? "row-not-in-list" : "row-disabled";
                 return false;
+            }
 
             var connectionService = preferredService ?? group.Service;
             var smart = connectionService as ISmartFastConnection;
             if (smart == null)
+            {
+                outcome = "adapter-has-no-country-pool";
                 return false;
+            }
 
             var poolUrls = group.GetPoolUrls();
             if (poolUrls.Length == 0)
+            {
+                outcome = "empty-pool";
                 return false;
+            }
 
             // Intentionally send every URL in this numbered row to the Smart Pool. URL tests only
             // decide row availability and the minimum latency shown in the picker.
@@ -542,11 +552,23 @@ namespace IRSpeedyVPN.Components.ServerListControl
             // Marker used by UCServerList to distinguish a row-scoped Smart connection
             // from global Smart/Fast, which keeps SelectedServerUrl null.
             connectionService.SelectedServerUrl = group.GetUrls().FirstOrDefault();
+            outcome = "accepted";
             return true;
         }
 
-        private void Apply(IVPNService service, GroupItem group, SelectionKind kind)
+        // Catalog IDs can repeat. The process-local instance tag distinguishes those rows
+        // without writing the service name, account scope or any connection URL.
+        internal static string TraceRow(IVPNService service)
+            => service == null ? "none" : service.ID + "@" + System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(service).ToString("x");
+
+        private void TraceSelection(string fields)
+            => ConnectionDiagnostics.Write("country-selection", "picker=" + (ShowSmartCard ? "vpn" : "residential") + " " + fields);
+
+        private void Apply(IVPNService service, GroupItem group, SelectionKind kind, [CallerMemberName] string source = null)
         {
+            if (_kind != kind || !ReferenceEquals(_selectedService, service))
+                TraceSelection("action=selection-change source=" + source + " previous=" + TraceRow(_selectedService)
+                    + " previousKind=" + _kind + " current=" + TraceRow(service) + " currentKind=" + kind);
             _selectedService = service;
             _selectedGroup = group;
             _kind = kind;
@@ -580,6 +602,30 @@ namespace IRSpeedyVPN.Components.ServerListControl
             ServerSelected?.Invoke(null);
         }
 
+        private void Rows_PreviewMouseDown(object sender, MouseButtonEventArgs e)
+        {
+            if (e.ChangedButton != MouseButton.Left) return;
+            var point = e.GetPosition(icCountries);
+            if (!new Rect(icCountries.RenderSize).Contains(point)) return;
+
+            // Input routing skips disabled buttons. Visual hit testing still finds the
+            // physical card under the pointer, including its effective WPF enabled state.
+            var visual = VisualTreeHelper.HitTest(icCountries, point)?.VisualHit;
+            while (visual != null && visual != icCountries && !(visual is Button))
+                visual = VisualTreeHelper.GetParent(visual);
+            var button = visual as Button;
+            if (!(button?.DataContext is ServerDisplaySlot slot))
+            {
+                TraceSelection("action=press outcome=no-row-under-pointer");
+                return;
+            }
+            var signal = slot.SignalServer;
+            TraceSelection("action=press row=" + TraceRow(slot.DisplayedServer?.Service)
+                + " signalRow=" + TraceRow(signal?.Service) + " signal=" + (signal?.SignalText ?? "none").Replace(" ", "")
+                + " enabled=" + button.IsEnabled + " selectable=" + slot.IsSelectable
+                + " checking=" + slot.DisplayedServer?.IsChecking + " sweeping=" + _serverList.IsTransitioning);
+        }
+
         private void Row_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.Key != Key.Enter && e.Key != Key.Space) return;
@@ -588,12 +634,18 @@ namespace IRSpeedyVPN.Components.ServerListControl
         private void Row_Click(object sender, RoutedEventArgs e)
         {
             if (!(sender is FrameworkElement fe) || !(fe.DataContext is ServerDisplaySlot slot))
+            {
+                TraceSelection("action=activate outcome=missing-row-context");
                 return;
+            }
 
             // Resolve the displayed service instance even if another record shares its key.
             var connectionService = slot.DisplayedServer?.Service;
             var group = _allGroups.FirstOrDefault(g => ReferenceEquals(g.Service, connectionService));
-            if (group == null || !PrepareCountryPool(group, connectionService))
+            bool accepted = PrepareCountryPool(group, connectionService, out var outcome);
+            TraceSelection("action=activate input=" + (e is KeyEventArgs ? "keyboard" : "click")
+                + " row=" + TraceRow(connectionService) + " outcome=" + outcome);
+            if (!accepted)
             {
                 e.Handled = true;
                 return;

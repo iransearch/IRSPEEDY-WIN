@@ -78,6 +78,7 @@ using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Components.ServerListControl;
 class RowInputProbe
 {
+    private bool ShowSmartCard => true;
     private sealed class ListState { public bool IsTransitioning; }
     private readonly ListState _serverList = new ListState();
     private readonly List<GroupItem> _allGroups = new List<GroupItem>();
