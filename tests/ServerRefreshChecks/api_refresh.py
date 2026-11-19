@@ -17,7 +17,7 @@ ui = stubs[stubs.index('class FakeDispatcher {'):stubs.index('class Picker {')]
 prefix = r'''
 using System;using System.Linq;using System.Collections.Generic;using System.Collections.Concurrent;using System.Threading;using System.Threading.Tasks;using System.Net;
 using IRSpeedyVPN.Common;
-class Url {public string url;public long latency;public DateTime latencychkTime;}
+class Url {public string url;public int is_subscription;public long latency;public DateTime latencychkTime;}
 class ServerEx {public int ID;public string Country,Protocol;public List<Url> urls=new List<Url>();public bool Invalid;}
 class Group {public string title="xfast";public List<ServerEx> servers=new List<ServerEx>();}
 interface IVPNService {string Name{get;set;}List<Url> GetServerUrls();}
@@ -26,7 +26,12 @@ class TunnelPlusService:IVPNService {
  public TunnelPlusService(ServerEx s,Info i){if(s.Invalid)throw new Exception("bad config");Server=s;}
 }
 class CiscoService:TunnelPlusService {public CiscoService(ServerEx s,Info i):base(s,i){} }
+static class ConnectionDiagnostics {
+ internal static readonly ConcurrentQueue<string> Lines=new ConcurrentQueue<string>();
+ internal static void Write(string stage,string fields)=>Lines.Enqueue(stage+" "+fields);
+}
 static class WireGuardEndpoint {
+ internal static string DiagnosticReason(Exception error)=>error.GetType().Name;
  internal static bool IsLink(string link)=>link!=null&&link.StartsWith("vpn://",StringComparison.OrdinalIgnoreCase);
  internal static object Build(string profile,string tag) {
   if(profile!="vpn://supported-fixture")throw new FormatException("invalid fixture key");
@@ -34,7 +39,8 @@ static class WireGuardEndpoint {
  }
 }
 static class ShareHandler {
- internal static string ImportFromConfigLink(string link,out string message) {
+ internal static string ImportFromConfigLink(string link,out string message,out string failure) {
+  failure=link=="vpn://unreadable-fixture"?"invalid-wireguard-profile-section":null;
   message="";return link=="vpn://unreadable-fixture"?null:link;
  }
 }
@@ -91,6 +97,11 @@ class Program {
   Check(catalog.Services.Skip(1).All(s=>s is CiscoService),
    "existing Cisco rows remain Cisco when no valid native WireGuard endpoint is available");
 
+  Check(ConnectionDiagnostics.Lines.Contains("country-catalog row=41 entries=3 gatewayLinks=1 subscriptions=0 wireguardLinks=1 adapter=TunnelPlusService")
+   &&ConnectionDiagnostics.Lines.Contains("country-catalog row=0 entries=1 gatewayLinks=1 subscriptions=0 wireguardLinks=0 adapter=CiscoService")
+   &&ConnectionDiagnostics.Lines.Contains("country-catalog row=0 step=import reason=invalid-wireguard-profile-section")
+   &&ConnectionDiagnostics.Lines.Contains("country-catalog row=0 step=endpoint reason=FormatException")
+   &&!ConnectionDiagnostics.Lines.Any(line=>line.Contains("://")),"catalog evidence distinguishes missing, unreadable and unusable WireGuard members without URLs");
   var live=View();object settings=live.gInfo.settings,connected=new object();live.gInfo.CurrentService=connected;
   Check(await live.RefreshServerListForManualCheckAsync(()=>true,CancellationToken.None),"manual action awaits successful authenticated list fetch");
   Check(live.serviceController.Calls==1&&live.serviceFactory.Services[0].GetServerUrls()[0].url=="vless://new"&&live.uCServerList.Binds==1&&live.uCServerList.Preserve,"fresh API list binds while retaining manual pause/cancellation ownership");

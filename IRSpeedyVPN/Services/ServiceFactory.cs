@@ -1,4 +1,5 @@
-﻿using IRSpeedyVPN.Interfaces;
+﻿using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Models.Services;
@@ -59,7 +60,13 @@ namespace IRSpeedyVPN.Services
             if (!server.urls.Any(IsCiscoLink)) return new TunnelPlusService(server, globalInfo);
 
             var tunnelLinks = server.urls.Where(url => !IsCiscoLink(url)).ToList();
-            if (!tunnelLinks.Any(IsUsableWireGuardLink)) return new CiscoService(server, globalInfo);
+            bool native = tunnelLinks.Any(link => IsUsableWireGuardLink(server.ID, link));
+            ConnectionDiagnostics.Write("country-catalog", "row=" + server.ID
+                + " entries=" + server.urls.Count + " gatewayLinks=" + (server.urls.Count - tunnelLinks.Count)
+                + " subscriptions=" + server.urls.Count(url => url != null && url.is_subscription != 0)
+                + " wireguardLinks=" + tunnelLinks.Count(url => WireGuardEndpoint.IsLink(url?.url))
+                + " adapter=" + (native ? "TunnelPlusService" : "CiscoService"));
+            if (!native) return new CiscoService(server, globalInfo);
 
             // A compatible WireGuard peer belongs in the native country pool.
             // Keep Cisco gateways out of its display tests and connection roster.
@@ -76,17 +83,25 @@ namespace IRSpeedyVPN.Services
             && (link.url.StartsWith("https://", StringComparison.Ordinal)
                 || link.url.StartsWith("cisco://", StringComparison.Ordinal));
 
-        private static bool IsUsableWireGuardLink(Url link)
+        private static bool IsUsableWireGuardLink(int row, Url link)
         {
             if (!WireGuardEndpoint.IsLink(link?.url)) return false;
-            var profile = ShareHandler.ImportFromConfigLink(link.url, out _);
-            if (profile == null) return false;
+            var profile = ShareHandler.ImportFromConfigLink(link.url, out _, out var failure);
+            if (profile == null)
+            {
+                ConnectionDiagnostics.Write("country-catalog", "row=" + row + " step=import reason=" + (failure ?? "no-profile"));
+                return false;
+            }
             try
             {
                 WireGuardEndpoint.Build(profile, "proxy");
                 return true;
             }
-            catch (FormatException) { return false; }
+            catch (FormatException error)
+            {
+                ConnectionDiagnostics.Write("country-catalog", "row=" + row + " step=endpoint reason=" + WireGuardEndpoint.DiagnosticReason(error));
+                return false;
+            }
         }
 
         public void RenewServiceList(List<Server> servers)

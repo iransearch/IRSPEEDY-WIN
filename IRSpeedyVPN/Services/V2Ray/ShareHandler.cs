@@ -27,7 +27,11 @@ namespace v2rayN.Handler
         /// <param name="msg"></param>
         /// <returns></returns>
         public static VmessItem ImportFromConfigLink(string configLink, out string msg)
+            => ImportFromConfigLink(configLink, out msg, out _);
+
+        internal static VmessItem ImportFromConfigLink(string configLink, out string msg, out string wireGuardFailure)
         {
+            wireGuardFailure = null;
             msg = string.Empty;
             VmessItem vmessItem = new VmessItem();
             configLink= configLink.Replace("%3A",":");
@@ -129,6 +133,7 @@ namespace v2rayN.Handler
                     }
                     catch (Exception ex) when (ex is FormatException || ex is ArgumentException || ex is InvalidOperationException)
                     {
+                        wireGuardFailure = WireGuardEndpoint.DiagnosticReason(ex);
                         msg = "invalid-wireguard-link";
                         return null;
                     }
