@@ -16,12 +16,50 @@ checks = r'''
     }
 
     static async Task MainAsync(string directory) {
+        await RecheckWithOnlyCachedSuccesses(directory);
         await RebindAfterFetch(directory);
         await RefreshWithoutReplacement(directory);
         await CancelFetch(directory);
         await WaitForOldWorker(directory);
         await CancelDuringFallback(directory);
         await RefreshResidential(directory);
+    }
+
+    static async Task RecheckWithOnlyCachedSuccesses(string directory) {
+        var cached = S("DE", 60);
+        var replacement = S("DE", 60);
+        var view = View(directory, "manual-all-healthy", cached);
+        SaveSuccess(view, cached, 96);
+        view.RefreshServerListRequest = (current, token) => {
+            view.Bind(new[] { replacement }, preserveManualRefresh: true);
+            return Task.FromResult(true);
+        };
+        var entered = Signal();
+        using (var release = new ManualResetEventSlim()) {
+            TunnelPlusService.Probe = (url, target, token) => {
+                entered.SetResult(true);
+                if (!release.Wait(5000)) throw new TimeoutException("waiting to release manual display probe");
+                return new ServerProbeMeasurement(142);
+            };
+            view.RefreshServerResults();
+            var first = await Task.WhenAny(entered.Task, view.manualRefreshTask);
+            try {
+                Check(first == entered.Task, "manual refresh starts a probe even when every row has a valid cached result");
+                Check(Ping(replacement) == 96 && view.countryPicker.Checking.Contains(replacement),
+                      "the cached ping stays visible until the manual probe finishes");
+            }
+            finally { release.Set(); }
+            await view.manualRefreshTask;
+        }
+        Check(Ping(replacement) == 142 && view.countryPicker.Published.SequenceEqual(new[] { replacement }),
+              "the manual probe publishes the fresh result");
+        TunnelPlusService.Probe = (url, target, token) => throw new Exception("automatic startup must keep manual success");
+        var startup = new Program(directory, "manual-all-healthy");
+        var restored = S("DE", 60);
+        startup.Bind(new[] { restored });
+        await startup.Settle();
+        Check(Ping(restored) == 142 && !startup.countryPicker.Published.Any(),
+              "automatic startup restores the new success without probing it again");
     }
 
     static async Task RebindAfterFetch(string directory) {
@@ -48,7 +86,7 @@ checks = r'''
         TunnelPlusService.Probe = (url, target, token) => {
             calls.Enqueue(url.url);
             url.latency = 999;
-            return new ServerProbeMeasurement(88);
+            return new ServerProbeMeasurement(url.url == same.urls[0].url ? 104 : 88);
         };
         view.RefreshServerResults();
         view.RefreshServerResults();
@@ -59,16 +97,18 @@ checks = r'''
         await view.manualRefreshTask;
         var winner = added.urls.Single(url => url.latency == 88);
         var skipped = added.urls.Where(url => !calls.Contains(url.url)).ToArray();
-        Check(calls.Contains(winner.url) && calls.All(link => added.urls.Any(url => url.url == link)),
-              "only the new row needs a probe and the winner is one of its measured links");
-        Check(calls.Count <= ServerProbeScheduler.Capacity && skipped.Length > 0,
+        Check(calls.Contains(winner.url) && calls.Count(link => link == same.urls[0].url) == 1 &&
+              calls.All(link => link == same.urls[0].url || added.urls.Any(url => url.url == link)),
+              "the fresh list rechecks the cached and new rows and excludes the removed row");
+        Check(calls.Count(link => link != same.urls[0].url) <= ServerProbeScheduler.Capacity && skipped.Length > 0,
               "a good result skips the links that did not start");
         Check(skipped.All(url => url.latency == 0 && url.latencychkTime == default(DateTime).ToLocalTime() &&
                   !view.probeCache.FailedLastDisplayRound(added, url)),
               "skipped links have no measured ping, check time, or failure history");
-        Check(Ping(same) == 96 && view.countryPicker.Retained.SequenceEqual(new[] { same }) &&
-              view.countryPicker.Published.SequenceEqual(new[] { added }) && !view.manualRefreshBusy,
-              "cached success still sorts and only the newly completed row is published on the UI thread");
+        Check(Ping(same) == 104 && view.countryPicker.Retained.SequenceEqual(new[] { same }) &&
+              view.countryPicker.Published.Count == 2 && view.countryPicker.Published.Contains(same) &&
+              view.countryPicker.Published.Contains(added) && !view.manualRefreshBusy,
+              "the cached success retains its initial sorting evidence and both new results publish on the UI thread");
     }
 
     static async Task RefreshWithoutReplacement(string directory) {
@@ -81,13 +121,14 @@ checks = r'''
         var calls = new ConcurrentQueue<string>();
         TunnelPlusService.Probe = (url, target, token) => {
             calls.Enqueue(url.url);
-            return new ServerProbeMeasurement(124);
+            return new ServerProbeMeasurement(url.url == retained.urls[0].url ? 125 : 124);
         };
         view.RefreshServerResults();
         await view.manualRefreshTask;
-        Check(calls.Count == 2 && calls.All(link => link == pending.urls[0].url) &&
-              Ping(pending) == 124 && Ping(other) == 124 && Ping(retained) == 97 && !view.manualRefreshBusy,
-              "API failure retries only missing rows in the previous list and identical links in two rows are independent");
+        Check(calls.Count == 3 && calls.Count(link => link == pending.urls[0].url) == 2 &&
+              calls.Contains(retained.urls[0].url) && Ping(pending) == 124 && Ping(other) == 124 &&
+              Ping(retained) == 125 && !view.manualRefreshBusy,
+              "API failure rechecks the previous list and identical links in two rows are independent");
 
         TunnelPlusService.Probe = (url, target, token) => throw new Exception("empty list cannot probe");
         view.RefreshServerListRequest = (current, token) => {
@@ -195,11 +236,13 @@ checks = r'''
     }
 
     static async Task RefreshResidential(string directory) {
-        var original = S("DE", 71);
+        var original = new IRSpeedyVPN.Residential.ResidentialService { ID = 72, CountryCode = "CA" };
+        original.urls.Add(new Url { url = "vless://residential-fixture@example.invalid" });
         var current = new IRSpeedyVPN.Residential.ResidentialService { ID = 72, CountryCode = "CA" };
-        current.urls.Add(new Url { url = "vless://residential-fixture@example.invalid" });
+        current.urls.Add(new Url { url = original.urls[0].url });
         var view = new Program(directory, "manual-residential") { probesPaused = true, isResidentialTab = true };
         view.Bind(new[] { original });
+        SaveSuccess(view, original, 133);
         view.RefreshServerListRequest = (currentView, token) => throw new Exception("Residential should refresh its own catalog");
         int loads = 0;
         view.residential.Load = (force, token) => {
@@ -217,7 +260,7 @@ checks = r'''
         await view.manualRefreshTask;
         Check(loads == 1 && calls.SequenceEqual(new[] { current.urls[0].url }) && Ping(current) == 199 &&
               view.countryPicker.Published.SequenceEqual(new[] { current }),
-              "Residential replacement uses the shared display scanner and publishes its completed result");
+              "Residential rechecks its cached success with the shared display scanner and publishes its new result");
     }
 }
 '''

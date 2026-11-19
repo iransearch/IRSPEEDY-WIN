@@ -6,7 +6,7 @@ path to `dotnet` as its first argument.
 | Script | Coverage |
 | --- | --- |
 | `run.py` | Startup, login, disconnect and rebind against the production controller, scheduler and persistent cache. Retains coverage of v1/v2/v3 cache formats. |
-| `manual_refresh.py` | API refresh and replacement, successful-row retention, skipped members, cancellation during fallback after a successful primary, and Residential catalog refresh. |
+| `manual_refresh.py` | API refresh and replacement, rechecking cached winners, skipped members, cancellation during fallback after a successful primary, and Residential catalog refresh. |
 | `core_dispatch.py` | Production single-config runner and existing `UrlTestFull` with fake worker/RPC boundaries. Checks tag mapping, chain/SNI/Xray metadata, cancellation, port release and admission failures. |
 | `api_refresh.py` | The production authenticated API phase and factory replacement with a delayed response, session and connection guards, and a shared maintenance gate. |
 | `connection_handoff.py` | Production connection handlers with delayed VPN cleanup and newer clicks. |
@@ -27,13 +27,14 @@ display cache identity. These offline tests use fake configs and responses.
   reorders once its running probes finish. Successful rows sort by measured
   latency and title, checking rows follow, then rows without success. Smart
   and the last successful connection keep their existing positions.
-- Log in again, restart, disconnect and click the header refresh. Confirm
-  successful rows retain pings. Only failed, missing or changed rows are
-  eligible. Search filtering does not limit testing.
+- Log in again, restart and disconnect. Confirm successful rows retain pings
+  and only failed, missing or changed rows are rechecked.
 - In VPN and Residential, a manual refresh drains the old scan before joining
-  the catalog refresh. If fetching the list fails, eligible rows in the
-  previous list are tested. Repeat clicks share the same refresh. Confirm
-  the header icon's busy animation stops on completion and cancellation.
+  the catalog refresh. Every testable row is rechecked, including cached
+  winners. A previous ping remains visible until its new row result arrives.
+  If fetching fails, the previous list is used. Search filtering does not
+  limit testing. Repeat clicks share the same refresh. Confirm the header
+  icon's busy animation stops on completion and cancellation.
 - Connect or log out while a probe is running. Check that the old scan
   drains, finished country results survive, and the interrupted country
   does not publish a late result. Ordinary failed-connect cleanup does not

@@ -41,7 +41,7 @@ transitions = (folder / 'ServerCountryPicker.Transitions.cs').read_text()
 retain = transitions[transitions.index('        public void RetainCompletedResults('):transitions.index('        private readonly List<GroupItem>')]
 assert '_serverList.RetainCompletedChecks(services.Select(LastSuccessfulServer.Key));' in retain
 assert 'RefreshDisplayedRows(instant: true);' in retain
-assert refresh_handler.index('cache.RestartForLogin();') < refresh_handler.index('picker.RetainCompletedResults(cache.CompletedSuccessfulServices);') < refresh_handler.index('await RunDisplayScanAsync(')
+assert refresh_handler.index('cache.RestartForManualRefresh(services, token)') < refresh_handler.index('picker.RetainCompletedResults(cache.CompletedSuccessfulServices);') < refresh_handler.index('await RunDisplayScanAsync(')
 print('PASS login, rebind, disconnect and manual refresh retain cached completion evidence before queue checks')
 
 finish = animator[animator.index('        private void FinishPass('):animator.index('        private void StopIfIdle(')]
