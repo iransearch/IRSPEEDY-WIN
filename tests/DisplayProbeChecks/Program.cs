@@ -164,6 +164,21 @@ internal static class Program
         Probe(Fallback, 0, 0, new DisplayProbeResult(600), new DisplayProbeResult(10), 600, new[] { (Fallback, 8000) });
         Probe(Primary, 0, 4001, new DisplayProbeResult(100), new DisplayProbeResult(281), 281,
             new[] { (Primary, 4000), (Fallback, 3999) });
+        int remaining = 175;
+        var waits = new List<int>();
+        Check(!UrlTestRetryPolicy.WaitForDisplayListener(() => remaining, ms =>
+        { waits.Add(ms); remaining -= ms; return false; }, null, CancellationToken.None)
+            && waits.SequenceEqual(new[] { 100, 75 }),
+            "Core and SNI listener startup share the attempt deadline, including the final partial wait");
+        using var stopped = new CancellationTokenSource();
+        stopped.Cancel();
+        try
+        {
+            UrlTestRetryPolicy.WaitForDisplayListener(() => 8000, ms =>
+                throw new Exception("Canceled startup must not connect"), null, stopped.Token);
+            throw new Exception("Canceled startup continued");
+        }
+        catch (OperationCanceledException) { Console.WriteLine("PASS canceled startup makes no listener attempt"); }
         string split = "vless://example.invalid?path=%2F&TYPE=Split%48ttp&extra=%7B%22x%22%3A1%7D#type=splithttp";
         Check(UrlTestRetryPolicy.NormalizeDisplayTransport(split) ==
             "vless://example.invalid?path=%2F&type=xhttp&extra=%7B%22x%22%3A1%7D#type=splithttp",

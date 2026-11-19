@@ -3,6 +3,7 @@ using IRSpeedyVPN.Interfaces;
 using IRSpeedyVPN.Models;
 using IRSpeedyVPN.Models.NewService;
 using IRSpeedyVPN.Services.Libcore;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -86,21 +87,7 @@ namespace IRSpeedyVPN.Services
             {
                 lock (gate)
                 {
-                    if (process != null)
-                    {
-                        try
-                        {
-                            if (!process.HasExited)
-                            {
-                                process.Kill();
-                                if (!process.WaitForExit(1000)) port = -1;
-                            }
-                        }
-                        catch (InvalidOperationException) { port = -1; }
-                        catch (System.ComponentModel.Win32Exception) { port = -1; }
-                        finally { process.Dispose(); }
-                    }
-                    if (port > 0) FreePortManager.Enqueue(port);
+                    if (StopDisplayProcess(process) && port > 0) FreePortManager.Enqueue(port);
                 }
             }
         }
@@ -109,15 +96,32 @@ namespace IRSpeedyVPN.Services
             Url member, string target, CancellationToken cancellation, Action<long> measured)
             => session.Measure(service, member, target, cancellation, measured);
 
-        private static readonly object displaySniStartup = new object();
+        private static bool StopDisplayProcess(Process process)
+        {
+            if (process == null) return true;
+            try
+            {
+                if (process.HasExited) return true;
+                process.Kill();
+                return process.WaitForExit(1000);
+            }
+            catch (InvalidOperationException) { return false; }
+            catch (System.ComponentModel.Win32Exception) { return false; }
+            finally { process.Dispose(); }
+        }
+
+        private static bool WaitDisplayPort(int port, Func<int> remaining, Action checkProcess, CancellationToken token)
+            => UrlTestRetryPolicy.WaitForDisplayListener(remaining,
+                budget => ProtorpcClient.CanConnect("127.0.0.1", port, budget), checkProcess, token);
 
         private DisplayProbeResult RunDisplayAttempt(DisplayProbeSession session, Url member, string target,
             int budget, string chain, CancellationToken cancellation)
         {
             var watch = Stopwatch.StartNew();
             int Remaining() => Math.Max(0, budget - (int)Math.Min(int.MaxValue, watch.ElapsedMilliseconds));
-            var runtimes = new Dictionary<string, SniRuntime>(StringComparer.OrdinalIgnoreCase);
-            int configPort = -1, sidecarPort = -1;
+            Process sni = null;
+            string sniConfig = null;
+            int configPort = -1, sidecarPort = -1, sniPort = -1;
             try
             {
                 cancellation.ThrowIfCancellationRequested();
@@ -133,21 +137,32 @@ namespace IRSpeedyVPN.Services
                 catch (TimeoutException) { return DisplayProbeResult.Deferred; }
 
                 var overrides = new Dictionary<string, SingBox.ConfigGenerator.EndpointOverride>(StringComparer.OrdinalIgnoreCase);
-                if (!string.IsNullOrWhiteSpace(GetSniLink(member.url)))
+                string sniLink = GetSniLink(member.url);
+                if (!string.IsNullOrWhiteSpace(sniLink))
                 {
-                    // The legacy SNI helper allocates a local port per runner.
-                    // Serialize only its listener startup to avoid duplicate binds.
-                    SniRuntime runtime;
-                    if (!Monitor.TryEnter(displaySniStartup, Remaining())) return DisplayProbeResult.Deferred;
-                    try
+                    SniConfig description;
+                    try { description = ParseSniLink(sniLink); }
+                    catch (InvalidOperationException) { return DisplayProbeResult.Failed; }
+                    string executable = ResolveSniCorePath();
+                    if (string.IsNullOrEmpty(executable))
+                        throw new NotSupportedException("The packaged SNI helper is unavailable for display probes.");
+                    try { sniPort = FreePortManager.Dequeue(); }
+                    catch (TimeoutException) { return DisplayProbeResult.Deferred; }
+                    if (Remaining() == 0) return DisplayProbeResult.Failed;
+                    sniConfig = Path.Combine(gInfo.TempPath, "display-sni-" + Guid.NewGuid().ToString("N") + ".json");
+                    File.WriteAllText(sniConfig, JsonConvert.SerializeObject(new
                     {
-                        cancellation.ThrowIfCancellationRequested();
-                        runtime = GetSniRuntime(member.url, runtimes, false);
-                    }
-                    finally { Monitor.Exit(displaySniStartup); }
-                    if (runtime != null)
-                        overrides[member.url] = new SingBox.ConfigGenerator.EndpointOverride
-                        { Server = runtime.ListenHost, ServerPort = runtime.ListenPort };
+                        LISTEN_HOST = "127.0.0.1", LISTEN_PORT = sniPort,
+                        CONNECT_IP = description.ConnectIp, CONNECT_PORT = description.ConnectPort,
+                        FAKE_SNI = description.FakeSni, QUEUE_NUM = description.QueueNum,
+                        HANDSHAKE_TIMEOUT_MS = Math.Max(1, Math.Min(description.HandshakeTimeoutMs, Remaining()))
+                    }));
+                    cancellation.ThrowIfCancellationRequested();
+                    sni = ShellExecute.ShellexecAndReturnProcess(executable, "\"" + sniConfig + "\"");
+                    if (!WaitDisplayPort(sniPort, () => sni?.HasExited != false ? 0 : Remaining(), null, cancellation))
+                        return DisplayProbeResult.Failed;
+                    overrides[member.url] = new SingBox.ConfigGenerator.EndpointOverride
+                    { Server = "127.0.0.1", ServerPort = sniPort };
                 }
                 var links = new Dictionary<string, string[]> { [member.url] =
                     BuildChainLinks(GetChainLink(member.url), new[] { GetDefaultChainLink(), chain }) };
@@ -170,15 +185,8 @@ namespace IRSpeedyVPN.Services
 
                 // Waiting for the probe Core to listen, local config preparation,
                 // RPC startup and HTTP requests all debit this attempt's budget.
-                while (Remaining() > 0)
-                {
-                    cancellation.ThrowIfCancellationRequested();
-                    if (ProtorpcClient.CanConnect("127.0.0.1", rpcPort, Math.Min(100, Remaining()))) break;
-                    session.GetPort(corePath, cancellation); // Report an exited process instead of recording server failure.
-                    cancellation.WaitHandle.WaitOne(Math.Min(20, Remaining()));
-                }
-                cancellation.ThrowIfCancellationRequested();
-                if (Remaining() == 0) return DisplayProbeResult.Failed;
+                if (!WaitDisplayPort(rpcPort, Remaining, () => session.GetPort(corePath, cancellation), cancellation))
+                    return DisplayProbeResult.Failed;
 
                 var request = new TestReq
                 {
@@ -202,7 +210,8 @@ namespace IRSpeedyVPN.Services
             }
             finally
             {
-                StopSniServers(runtimes);
+                if (StopDisplayProcess(sni) && sniPort >= 0) FreePortManager.Enqueue(sniPort);
+                if (sniConfig != null) { try { File.Delete(sniConfig); } catch (IOException) { } }
                 if (configPort >= 0) FreePortManager.Enqueue(configPort);
                 if (sidecarPort >= 0) FreePortManager.Enqueue(sidecarPort);
             }

@@ -66,6 +66,20 @@ namespace IRSpeedyVPN.Services
             return changed ? link.Substring(0, query + 1) + string.Join("&", fields) + link.Substring(end) : link;
         }
 
+        internal static bool WaitForDisplayListener(Func<int> remaining, Func<int, bool> connect,
+            Action checkProcess, CancellationToken cancellation)
+        {
+            while (true)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                int budget = remaining();
+                if (budget <= 0) return false;
+                if (connect(Math.Min(100, budget))) return remaining() > 0;
+                checkProcess?.Invoke();
+                cancellation.WaitHandle.WaitOne(Math.Min(20, remaining()));
+            }
+        }
+
         // Display attempts take one shared stopwatch (started before preparation).
         // The original Run overloads below retain connection/health probe semantics.
         internal static DisplayProbeResult RunDisplay(string requestedTarget,
