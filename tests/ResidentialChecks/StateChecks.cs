@@ -78,12 +78,18 @@ internal static class StateChecks
         Check(!residentialRow.IsSelectable&&residentialRow.DisplaySignalText=="—"&&residentialRow.SignalToolTip.Contains("ناموفق"),"failed Residential row uses the same disabled/dash/tooltip policy as VPN");
         var input=new RowInputProbe(residentialRow,vpn);input.Click(service);input.PressKey(service,System.Windows.Input.Key.Enter);input.PressKey(service,System.Windows.Input.Key.Space);
         Check(input.Changes==0&&ReferenceEquals(input.Selected,vpn),"actual mouse/Enter/Space handlers never select failed rows or alter the current selection");
+        Check(IRSpeedyVPN.Common.ConnectionDiagnostics.Last.Contains("action=activate input=keyboard")
+            && IRSpeedyVPN.Common.ConnectionDiagnostics.Last.EndsWith("outcome=row-disabled"),"disabled row reports the rejection reason");
+        input.Click(vpn);
+        Check(IRSpeedyVPN.Common.ConnectionDiagnostics.Last.EndsWith("outcome=row-not-in-list"),"removed row reports a distinct rejection reason");
         raw.latency=101;residentialRow.RefreshSignals();
         input.StartSweep();
         input.Click(service);
         Check(ReferenceEquals(input.Selected,service)&&input.CompletedTransitions==1
             &&service is IRSpeedyVPN.Interfaces.ISmartFastConnection smart&&smart.IsSmartFast,
             "clicking a healthy row applies its pool and flushes a pending animation so the selection is immediately visible");
+        Check(IRSpeedyVPN.Common.ConnectionDiagnostics.Last.EndsWith("outcome=accepted")
+            && !IRSpeedyVPN.Common.ConnectionDiagnostics.Last.Contains("example.invalid"),"accepted click reports outcome without the server address");
         var duplicateVpn=new IRSpeedyVPN.Services.TunnelPlusService(new ServerEx
         {
             ID=vpn.ID, Country="AZ", urls=new System.Collections.Generic.List<Url>{new Url{url="vpn://fixture",latency=1149}}
