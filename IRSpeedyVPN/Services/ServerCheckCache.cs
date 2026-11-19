@@ -53,6 +53,14 @@ namespace IRSpeedyVPN.Services
             public long Ping { get; set; }
             public HashSet<string> Failed { get; set; }
             public string Roster { get; set; }
+
+            internal void InvalidateOutcome()
+            {
+                Roster = null;
+                HasSuccess = false;
+                Winner = null;
+                Ping = 0;
+            }
         }
 
         internal ServerCheckCache(string account, string scope, string directory = null, Random random = null, string testUrl = null)
@@ -125,15 +133,9 @@ namespace IRSpeedyVPN.Services
                             state.Results[key] = legacy;
                             if (legacyKey != key) state.Results.Remove(legacyKey);
                         }
+                        // An API refresh may copy a result by URL alone. A config change must invalidate it.
                         if (!displayScoped && state.Results.TryGetValue(key, out var result)) Apply(url, result);
-                        else
-                        {
-                            // An API refresh may copy a result by URL alone. A config change must invalidate it.
-                            url.latency = 0;
-                            url.latencychkTime = default(DateTime);
-                            url.LastSuccessfulLatency = 0;
-                            url.LastSuccessfulCheckTime = default(DateTime);
-                        }
+                        else ClearMeasurement(url);
                     }
                 rowKeys = new Dictionary<IVPNService, string>();
                 rows = new Dictionary<string, IVPNService>();
@@ -159,13 +161,7 @@ namespace IRSpeedyVPN.Services
                     if (displayScoped && state.RowResults.TryGetValue(DisplayRowKey(service), out var display))
                     {
                         if (display.Roster == row) ApplyDisplayRow(service, display);
-                        else
-                        {
-                            display.Roster = null;
-                            display.HasSuccess = false;
-                            display.Winner = null;
-                            display.Ping = 0;
-                        }
+                        else display.InvalidateOutcome();
                     }
                 }
                 if (state.Version == 3)
@@ -275,8 +271,18 @@ namespace IRSpeedyVPN.Services
                 if (cancellation.IsCancellationRequested || expected.Length != rowKeys.Count
                     || expected.Any(s => !rowKeys.ContainsKey(s))) return false;
 
-                // A deliberate recheck includes cached winners. Their measurements
-                // stay visible until the new row result is committed.
+                // A manual scan starts with a blank outcome for every bound row.
+                // Keep failed-link fingerprints so the planner can prioritize them.
+                foreach (var service in expected)
+                {
+                    var key = displayScoped ? DisplayRowKey(service) : rowKeys[service];
+                    if (state.RowResults.TryGetValue(key, out var result)) result.InvalidateOutcome();
+                }
+                foreach (var entry in bound)
+                {
+                    state.Results.Remove(entry.Value);
+                    ClearMeasurement(entry.Key);
+                }
                 RestartShuffledRound(rows.Keys);
                 return true;
             }
@@ -301,11 +307,7 @@ namespace IRSpeedyVPN.Services
                 state.Results.Clear(); state.RowResults.Clear();
                 state.PendingRows = new List<string>(); state.CompletedRows = new List<string>();
                 state.InitialScanCompleted = false; state.RoundInProgress = false; state.SequentialRound = false;
-                foreach (var url in bound.Keys)
-                {
-                    url.latency = 0; url.latencychkTime = default(DateTime);
-                    url.LastSuccessfulLatency = 0; url.LastSuccessfulCheckTime = default(DateTime);
-                }
+                foreach (var url in bound.Keys) ClearMeasurement(url);
                 Save();
                 return true;
             }
@@ -562,6 +564,14 @@ namespace IRSpeedyVPN.Services
                 }
                 Save();
             }
+        }
+
+        private static void ClearMeasurement(Url url)
+        {
+            url.latency = 0;
+            url.latencychkTime = default(DateTime);
+            url.LastSuccessfulLatency = 0;
+            url.LastSuccessfulCheckTime = default(DateTime);
         }
 
         private static void Apply(Url url, Result result)

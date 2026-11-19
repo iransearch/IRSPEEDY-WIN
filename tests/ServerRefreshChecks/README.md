@@ -29,12 +29,11 @@ display cache identity. These offline tests use fake configs and responses.
   and the last successful connection keep their existing positions.
 - Log in again, restart and disconnect. Confirm successful rows retain pings
   and only failed, missing or changed rows are rechecked.
-- In VPN and Residential, a manual refresh drains the old scan before joining
-  the catalog refresh. Every testable row is rechecked, including cached
-  winners. A previous ping remains visible until its new row result arrives.
-  If fetching fails, the previous list is used. Search filtering does not
-  limit testing. Repeat clicks share the same refresh. Confirm the header
-  icon's busy animation stops on completion and cancellation.
+- In VPN and Residential, a manual refresh drains the old scan and prepares
+  the catalog. It clears the bound rows' results before probing. The previous
+  list is used if fetching fails. Each row shows its fresh result on completion.
+  Search filtering does not limit testing. Repeat clicks share the refresh.
+  Confirm the header icon's busy animation stops on completion and cancellation.
 - Connect or log out while a probe is running. Check that the old scan
   drains, finished country results survive, and the interrupted country
   does not publish a late result. Ordinary failed-connect cleanup does not
