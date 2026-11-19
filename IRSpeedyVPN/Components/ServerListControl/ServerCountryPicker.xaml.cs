@@ -455,12 +455,16 @@ namespace IRSpeedyVPN.Components.ServerListControl
             }
         }
 
-        public void ResetTestResults()
+        public void ResetTestResults() => ResetTestResults(resetSelection: true);
+
+        internal void ResetTestResults(bool resetSelection)
         {
             foreach (var group in _allGroups) { group.IsChecking = false; group.RefreshSignals(); }
-            // Measurements are cleared, while the independent connection star is retained.
-            Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
-            ServerSelected?.Invoke(null);
+            if (resetSelection)
+            {
+                Apply(null, null, _urlTest ? SelectionKind.Smart : SelectionKind.None);
+                ServerSelected?.Invoke(null);
+            }
             ResortGroups();
         }
 

@@ -65,10 +65,13 @@ namespace IRSpeedyVPN.UserControls
 
                 bool queued = await Task.Run(() => Current() && cache.RestartForManualRefresh(services, token));
                 if (!queued || !Current()) return;
+                var pending = cache.PendingServices;
+                foreach (var row in pending) UpdateListTestResult(row);
+                picker.ResetTestResults(resetSelection: false);
                 picker.EndCheckCycleSetup();
-                picker.RetainCompletedResults(cache.CompletedSuccessfulServices);
+                UpdateResidentialVisuals();
                 UrlTestCoordinator.BeginBatch();
-                LogHelper.WriteExLog("[ServerChecks] stage=manual-refresh-probe rows=" + cache.PendingServices.Length
+                LogHelper.WriteExLog("[ServerChecks] stage=manual-refresh-probe rows=" + pending.Length
                     + " listRefreshed=" + listRefreshed);
                 await RunDisplayScanAsync(services, cache, token);
             }
@@ -120,8 +123,7 @@ namespace IRSpeedyVPN.UserControls
                             Dispatcher.Invoke(() =>
                             {
                                 if (!OwnsRows()) return;
-                                (row as TunnelPlusService)?.UpdateListTestResult();
-                                (row as CiscoService)?.UpdateListTestResult();
+                                UpdateListTestResult(row);
                                 checking.Remove(row);
                                 picker.SetGroupChecking(row, false);
                                 picker.RefreshGroup(row, allowSortAnimation: Current());
@@ -143,6 +145,12 @@ namespace IRSpeedyVPN.UserControls
                         }
                 }
             }
+        }
+
+        private static void UpdateListTestResult(IVPNService row)
+        {
+            (row as TunnelPlusService)?.UpdateListTestResult();
+            (row as CiscoService)?.UpdateListTestResult();
         }
     }
 }

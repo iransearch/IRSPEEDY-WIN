@@ -124,7 +124,7 @@ class Picker {
     public readonly List<IVPNService> Restored = new List<IVPNService>();
     public IVPNService SelectedService;
     public IVPNService[] Retained = new IVPNService[0];
-    public int CycleStarts;
+    public int CycleStarts, ResultResets;
     public void SetGroupChecking(IVPNService row, bool checking) {
         CheckThread();
         if (checking) Checking.Add(row); else Checking.Remove(row);
@@ -140,6 +140,12 @@ class Picker {
         Retained = rows.ToArray();
     }
     public void Load(IVPNService[] rows, bool supported) { CheckThread(); Checking.Clear(); }
+    public void ResetTestResults(bool resetSelection) {
+        CheckThread();
+        Checking.Clear();
+        if (resetSelection) SelectedService = null;
+        ResultResets++;
+    }
     public void RestoreTestProgress(IVPNService row) { CheckThread(); Restored.Add(row); }
     public void BeginCheckCycle() { CheckThread(); CycleStarts++; }
     public void EndCheckCycleSetup() { CheckThread(); }
