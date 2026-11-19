@@ -11,7 +11,7 @@ namespace IRSpeedyVPN.Components.ServerListControl
             Func<T, long> latency, Func<T, string> country, Func<T, int> id)
         {
             return items.OrderByDescending(lastSuccessful).ThenBy(latency)
-                .ThenBy(country, StringComparer.CurrentCulture).ThenBy(id);
+                .ThenBy(country, StringComparer.OrdinalIgnoreCase).ThenBy(id);
         }
     }
 }

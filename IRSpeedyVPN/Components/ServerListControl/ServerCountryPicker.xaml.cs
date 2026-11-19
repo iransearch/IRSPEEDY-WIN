@@ -266,8 +266,8 @@ namespace IRSpeedyVPN.Components.ServerListControl
             {
                 IsSelectable = true;
                 var best = positive.Min();
-                SortKey = DisplayLatency(best);
-                Sig.FromLatency(SortKey, out var text);
+                SortKey = best;
+                Sig.FromLatency(DisplayLatency(best), out var text);
                 SignalText = text;
                 SetSignalColor(best);
                 var checkedAt = urls.Where(u => u.latency == best).Max(u => u.latencychkTime);
