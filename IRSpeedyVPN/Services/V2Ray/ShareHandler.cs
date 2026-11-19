@@ -368,7 +368,7 @@ namespace v2rayN.Handler
 
         private static VmessItem ResolveWireGaurd(string result)
         {
-            if (result.StartsWith(Global.wireguardProtocol, StringComparison.OrdinalIgnoreCase))
+            if (!result.StartsWith(Global.wireguardFullProtocol, StringComparison.OrdinalIgnoreCase))
                 return WireGuardEndpoint.ParseUri(result);
 
             var data = result.Substring(Global.wireguardFullProtocol.Length);
