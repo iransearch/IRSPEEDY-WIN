@@ -18,14 +18,26 @@ prefix = r'''
 using System;using System.Linq;using System.Collections.Generic;using System.Collections.Concurrent;using System.Threading;using System.Threading.Tasks;using System.Net;
 using IRSpeedyVPN.Common;
 class Url {public string url;public long latency;public DateTime latencychkTime;}
-class Server {public List<Url> urls=new List<Url>();public bool Invalid;}
-class Group {public string title="xfast";public List<Server> servers=new List<Server>();}
+class ServerEx {public int ID;public string Country,Protocol;public List<Url> urls=new List<Url>();public bool Invalid;}
+class Group {public string title="xfast";public List<ServerEx> servers=new List<ServerEx>();}
 interface IVPNService {string Name{get;set;}List<Url> GetServerUrls();}
 class TunnelPlusService:IVPNService {
- readonly Server server;public string Name{get;set;}public List<Url> GetServerUrls()=>server.urls;
- public TunnelPlusService(Server s,Info i){if(s.Invalid)throw new Exception("bad config");server=s;}
+ internal readonly ServerEx Server;public string Name{get;set;}public List<Url> GetServerUrls()=>Server.urls;
+ public TunnelPlusService(ServerEx s,Info i){if(s.Invalid)throw new Exception("bad config");Server=s;}
 }
-class CiscoService:TunnelPlusService {public CiscoService(Server s,Info i):base(s,i){} }
+class CiscoService:TunnelPlusService {public CiscoService(ServerEx s,Info i):base(s,i){} }
+static class WireGuardEndpoint {
+ internal static bool IsLink(string link)=>link!=null&&link.StartsWith("vpn://",StringComparison.OrdinalIgnoreCase);
+ internal static object Build(string profile,string tag) {
+  if(profile!="vpn://supported-fixture")throw new FormatException("invalid fixture key");
+  return new object();
+ }
+}
+static class ShareHandler {
+ internal static string ImportFromConfigLink(string link,out string message) {
+  message="";return link=="vpn://unreadable-fixture"?null:link;
+ }
+}
 class Factory {
  public List<IVPNService> services=new List<IVPNService>();public List<IVPNService> Services=>services;Info globalInfo=new Info();
  RENEW
@@ -59,12 +71,26 @@ class Program {
  void ShowMessage(string text){Message=text;}void LogoutInvalidSession(string m,bool expired=false){IsUserLogin=false;accountSessionMaintenance.End();}
  bool IsExplicitSessionFailure(HttpStatusCode status)=>status==HttpStatusCode.Unauthorized||status==HttpStatusCode.Forbidden||status==HttpStatusCode.NotAcceptable;
  static void Check(bool value,string text){if(!value)throw new Exception(text);Console.WriteLine("PASS "+text);}
- static List<Group> Groups(params Server[] servers)=>new List<Group>{new Group{servers=servers.ToList()}};
- static Server S(string url)=>new Server{urls=new List<Url>{new Url{url=url}}};
+ static List<Group> Groups(params ServerEx[] servers)=>new List<Group>{new Group{servers=servers.ToList()}};
+ static ServerEx S(params string[] urls)=>new ServerEx{urls=urls.Select(url=>new Url{url=url}).ToList()};
  static Program View(){var p=new Program();p.accountSessionMaintenance.Begin(true);p.serviceFactory.RenewServiceList(Groups(S("vless://old")));p.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://new"));return p;}
  static async Task Until(Func<bool> condition){for(int i=0;i<1000&&!condition();i++)await Task.Delay(2);Check(condition(),"async API phase settled");}
  static void Main()=>new UiContext().Run(Run);
  static async Task Run(){
+  const string awg="vpn://supported-fixture",cisco="https://cisco.example.invalid/",proxy="vless://fixture";
+  var catalog=new Factory();
+  var mixed=S(cisco,awg,proxy);mixed.ID=41;mixed.Country="AZ";mixed.Protocol="native";
+  catalog.RenewServiceList(Groups(mixed,S(cisco),S(cisco,"vpn://unreadable-fixture"),S(cisco,"vpn://invalid-key")));
+  var awgRow=(TunnelPlusService)catalog.Services[0];
+  Check(awgRow.GetType()==typeof(TunnelPlusService)&&awgRow.Name=="xfast"
+   &&awgRow.Server.ID==41&&awgRow.Server.Country=="AZ"&&awgRow.Server.Protocol=="native",
+   "a valid AWG member keeps the mixed Azerbaijan row eligible for a country Smart Pool");
+  Check(awgRow.GetServerUrls().Select(u=>u.url).SequenceEqual(new[]{awg,proxy})
+   &&mixed.urls.Select(u=>u.url).SequenceEqual(new[]{cisco,awg,proxy}),
+   "mixed rows probe and pool their tunnel links while the original API catalog is preserved");
+  Check(catalog.Services.Skip(1).All(s=>s is CiscoService),
+   "existing Cisco rows remain Cisco when no valid native WireGuard endpoint is available");
+
   var live=View();object settings=live.gInfo.settings,connected=new object();live.gInfo.CurrentService=connected;
   Check(await live.RefreshServerListForManualCheckAsync(()=>true,CancellationToken.None),"manual action awaits successful authenticated list fetch");
   Check(live.serviceController.Calls==1&&live.serviceFactory.Services[0].GetServerUrls()[0].url=="vless://new"&&live.uCServerList.Binds==1&&live.uCServerList.Preserve,"fresh API list binds while retaining manual pause/cancellation ownership");
@@ -75,7 +101,7 @@ class Program {
    if(kind=="500")failed.serviceController.Next.StatusCode=HttpStatusCode.InternalServerError;
    if(kind=="missing")failed.serviceController.Next.ResponseData.Decrypted.groups=null;
    if(kind=="auth-server")failed.serviceController.Next.ResponseData.Decrypted.UserAccount.Status="AuthServerError";
-   if(kind=="malformed")failed.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://valid"),new Server{Invalid=true,urls=new List<Url>{new Url{url="vless://bad"}}});
+   if(kind=="malformed")failed.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://valid"),new ServerEx{Invalid=true,urls=new List<Url>{new Url{url="vless://bad"}}});
    Check(!await failed.RefreshServerListForManualCheckAsync(()=>true,CancellationToken.None),kind+" returns fallback signal");
    Check(ReferenceEquals(failed.serviceFactory.Services,original)&&original[0].GetServerUrls()[0].latency==101&&failed.uCServerList.Binds==0&&failed.localResource.Saves==0&&failed.IsUserLogin,kind+" preserves complete previous list, results and session");
   }

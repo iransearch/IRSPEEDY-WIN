@@ -16,7 +16,9 @@ namespace IRSpeedyVPN.Common {
  internal static class Extensions {internal static System.Collections.Generic.IEnumerable<IRSpeedyVPN.Models.NewService.Url> OrderByHysteriaFirst(this System.Collections.Generic.IEnumerable<IRSpeedyVPN.Models.NewService.Url> urls)=>urls;}
 }
 namespace IRSpeedyVPN.Components.ServerListControl {
- internal enum SelectionKind{Country}internal class ServerItem{internal string Identity;}internal class ServerDisplaySlot{internal ServerItem DisplayedServer;}
+ internal enum SelectionKind{Country}
+ internal class ServerItem{internal string Identity;internal IRSpeedyVPN.Interfaces.IVPNService Service;}
+ internal class ServerDisplaySlot{internal ServerItem DisplayedServer;}
  internal abstract class PickerItem {protected void On(string name=null){} }
  internal static class FlagCatalog {internal static System.Windows.Media.ImageSource TryGetListFlag(string code)=>null;internal static string Initials(string name)=>"";}
 }
