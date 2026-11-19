@@ -67,6 +67,7 @@ namespace IRSpeedyVPN.UserControls
                                     if (!current() || round.IsCancellationRequested) return;
                                     committed.Add(row);
                                     (row as TunnelPlusService)?.UpdateListTestResult();
+                                    (row as CiscoService)?.UpdateListTestResult();
                                     picker.SetGroupChecking(row, false);
                                     picker.RefreshGroup(row);
                                     TrySelectResidentialFastest();
@@ -84,7 +85,11 @@ namespace IRSpeedyVPN.UserControls
                 foreach (var row in pending)
                 {
                     picker.SetGroupChecking(row, false);
-                    if (committed.Add(row)) picker.RestoreTestProgress(row);
+                    if (committed.Add(row))
+                    {
+                        (row as CiscoService)?.UpdateListTestResult();
+                        picker.RestoreTestProgress(row);
+                    }
                 }
             }
         }

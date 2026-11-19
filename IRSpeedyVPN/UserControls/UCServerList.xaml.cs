@@ -175,6 +175,7 @@ namespace IRSpeedyVPN.UserControls
                 probeCacheContext = context;
             }
             probeCache.BindDisplay(services, DisplayTestTarget(), TunnelPlusService.selectedChain);
+            foreach (var legacy in services.OfType<CiscoService>()) legacy.UpdateListTestResult();
             if (services.Length > 0 && (probeLoginRoundRequested || !initializedProbeScopes.Contains(context)))
             {
                 // Bind first so the missing/failed queue uses the current API
