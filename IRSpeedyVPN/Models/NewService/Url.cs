@@ -6,6 +6,15 @@ namespace IRSpeedyVPN.Models.NewService
     public partial class Url
     {
 
+        internal Url WithSubscriptionLink(string link)
+        {
+            var copy = (Url)MemberwiseClone();
+            copy.url = link;
+            copy.latency = copy.LastSuccessfulLatency = 0;
+            copy.latencychkTime = copy.LastSuccessfulCheckTime = default(DateTime);
+            return copy;
+        }
+
         // Properties
         public int id { get; set; }
 

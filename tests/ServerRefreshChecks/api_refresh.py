@@ -17,26 +17,37 @@ ui = stubs[stubs.index('class FakeDispatcher {'):stubs.index('class Picker {')]
 prefix = r'''
 using System;using System.Linq;using System.Collections.Generic;using System.Collections.Concurrent;using System.Threading;using System.Threading.Tasks;using System.Net;
 using IRSpeedyVPN.Common;
-class Url {public string url;public int is_subscription;public long latency;public DateTime latencychkTime;}
-class ServerEx {public int ID;public string Country,Protocol;public List<Url> urls=new List<Url>();public bool Invalid;}
-class Group {public string title="xfast";public List<ServerEx> servers=new List<ServerEx>();}
+using IRSpeedyVPN.Models.NewService;
+using IRSpeedyVPN.Services.SingBox;
+using IRSpeedyVPN.Residential;
+namespace Newtonsoft.Json { class JsonIgnoreAttribute : Attribute {} }
+namespace IRSpeedyVPN.Residential {
+ static class ResidentialViewModel {
+  internal class Payload {public string Body;}
+  internal static Func<string,CancellationToken,Task<Payload>> DownloadCountryAsync;
+ }
+}
+static class DispatcherExtensions {
+ internal static void BeginInvoke(this FakeDispatcher dispatcher,Action action) => dispatcher.Invoke(action);
+}
 interface IVPNService {string Name{get;set;}List<Url> GetServerUrls();}
 class TunnelPlusService:IVPNService {
  internal readonly ServerEx Server;public string Name{get;set;}public List<Url> GetServerUrls()=>Server.urls;
- public TunnelPlusService(ServerEx s,Info i){if(s.Invalid)throw new Exception("bad config");Server=s;}
+ public TunnelPlusService(ServerEx s,Info i){if(s.ID==int.MinValue)throw new Exception("bad config");Server=s;}
 }
 class CiscoService:TunnelPlusService {public CiscoService(ServerEx s,Info i):base(s,i){} }
 static class ConnectionDiagnostics {
  internal static readonly ConcurrentQueue<string> Lines=new ConcurrentQueue<string>();
  internal static void Write(string stage,string fields)=>Lines.Enqueue(stage+" "+fields);
 }
-static class WireGuardEndpoint {
+namespace IRSpeedyVPN.Services.SingBox { static class WireGuardEndpoint {
  internal static string DiagnosticReason(Exception error)=>error.GetType().Name;
  internal static bool IsLink(string link)=>link!=null&&link.StartsWith("vpn://",StringComparison.OrdinalIgnoreCase);
  internal static object Build(string profile,string tag) {
   if(profile!="vpn://supported-fixture")throw new FormatException("invalid fixture key");
   return new object();
  }
+}
 }
 static class ShareHandler {
  internal static string ImportFromConfigLink(string link,out string message,out string failure) {
@@ -59,13 +70,13 @@ class Controller {
  // Deliver the blocked response even after cancellation to exercise the late-result guard.
  public Response Login2(string u,string p,CancellationToken cancellation){Interlocked.Increment(ref Calls);Hold?.Wait();return Next;}
 }
-class ListView {public int Binds;public bool Preserve;public void ConfigureResidential(Account account){}public void RefreshServicesFromFactory(bool preserveManualRefresh=false){Binds++;Preserve=preserveManualRefresh;} }
+class ListView {public void RefreshCountrySubscriptionRows(){Binds++;}public int Binds;public bool Preserve;public void ConfigureResidential(Account account){}public void RefreshServicesFromFactory(bool preserveManualRefresh=false){Binds++;Preserve=preserveManualRefresh;} }
 class Cache {public string TempPath="temp";public int Saves;public void SaveConfig(Account a,string p){Saves++;} }
 static class VpnTimeZone {public static DateTime AccountNow=>DateTime.Now;}
 static class LogHelper {public static void WriteLog(Exception e){}public static void WriteExLog(string message){} }
 '''.replace('RENEW', renew)
 program = r'''
-class Program {
+namespace IRSpeedyVPN { public partial class MainWindow {
  readonly SemaphoreSlim serverRefreshGate=new SemaphoreSlim(1,1);
  readonly AccountSessionMaintenance accountSessionMaintenance=new AccountSessionMaintenance();
  readonly CancellationTokenSource loginApplicationExit=new CancellationTokenSource();
@@ -77,9 +88,9 @@ class Program {
  void ShowMessage(string text){Message=text;}void LogoutInvalidSession(string m,bool expired=false){IsUserLogin=false;accountSessionMaintenance.End();}
  bool IsExplicitSessionFailure(HttpStatusCode status)=>status==HttpStatusCode.Unauthorized||status==HttpStatusCode.Forbidden||status==HttpStatusCode.NotAcceptable;
  static void Check(bool value,string text){if(!value)throw new Exception(text);Console.WriteLine("PASS "+text);}
- static List<Group> Groups(params ServerEx[] servers)=>new List<Group>{new Group{servers=servers.ToList()}};
- static ServerEx S(params string[] urls)=>new ServerEx{urls=urls.Select(url=>new Url{url=url}).ToList()};
- static Program View(){var p=new Program();p.accountSessionMaintenance.Begin(true);p.serviceFactory.RenewServiceList(Groups(S("vless://old")));p.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://new"));return p;}
+ static List<Group> Groups(params ServerEx[] servers)=>new List<Group>{new Group{title="xfast",servers=servers.ToList()}};
+ static ServerEx S(params string[] urls)=>new ServerEx{urls=urls.Select(url=>new Url{url=url,status=1}).ToList()};
+ static MainWindow View(){var p=new MainWindow();p.accountSessionMaintenance.Begin(true);p.serviceFactory.RenewServiceList(Groups(S("vless://old")));p.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://new"));return p;}
  static async Task Until(Func<bool> condition){for(int i=0;i<1000&&!condition();i++)await Task.Delay(2);Check(condition(),"async API phase settled");}
  static void Main()=>new UiContext().Run(Run);
  static async Task Run(){
@@ -102,6 +113,49 @@ class Program {
    &&ConnectionDiagnostics.Lines.Contains("country-catalog row=0 step=import reason=invalid-wireguard-profile-section")
    &&ConnectionDiagnostics.Lines.Contains("country-catalog row=0 step=endpoint reason=FormatException")
    &&!ConnectionDiagnostics.Lines.Any(line=>line.Contains("://")),"catalog evidence distinguishes missing, unreadable and unusable WireGuard members without URLs");
+  const string sourceUrl="https://example.invalid/sub/fixture";
+  var subView=View();var sourceRow=S(sourceUrl);sourceRow.ID=49;sourceRow.xui_server_id=1;
+  var parentEntry=sourceRow.urls.Single();parentEntry.chainproxy=1;parentEntry.extra_field_2="singbox";
+  var gate=new TaskCompletionSource<ResidentialViewModel.Payload>();
+  ResidentialViewModel.DownloadCountryAsync=(url,token)=>gate.Task;
+  subView.ApplyCountryCatalog(Groups(sourceRow),subView.accountSessionMaintenance.Generation);
+  Check(subView.serviceFactory.Services.Count==0,"a pending X-UI subscription cannot become a Cisco gateway");
+  var text="# fixture\n"+awg+"#first\n"+awg+"#duplicate\nhttps://example.invalid/nested";
+  gate.SetResult(new ResidentialViewModel.Payload{Body=Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(text)).TrimEnd('=')});
+  await Until(()=>subView.uCServerList.Binds==1);
+  var child=subView.serviceFactory.Services.Single().GetServerUrls().Single();
+  Check(subView.serviceFactory.Services.Single().GetType()==typeof(TunnelPlusService)&&child.url==awg+"#first"
+    &&child.chainproxy==1&&child.status==1&&Equals(child.extra_field_2,"singbox")
+    &&sourceRow.urls.Single()==parentEntry&&parentEntry.url==sourceUrl,
+   "an unflagged X-UI parent expands a Base64 feed into a native row and preserves account data and metadata");
+  var retiredGeneration=subView.accountSessionMaintenance.End();subView.RetireCountryCatalog(retiredGeneration);
+  var late=new TaskCompletionSource<ResidentialViewModel.Payload>();
+  var started=new TaskCompletionSource<bool>();
+  ResidentialViewModel.DownloadCountryAsync=(url,token)=>{started.TrySetResult(true);return late.Task;};
+  var nextGeneration=subView.accountSessionMaintenance.Begin(true);
+  subView.ApplyCountryCatalog(Groups(sourceRow),nextGeneration);
+  await Until(()=>started.Task.IsCompleted);
+  subView.ApplyCountryCatalog(Groups(S("vless://replacement")),nextGeneration);
+  late.SetResult(new ResidentialViewModel.Payload{Body=awg});await Task.Delay(30);
+  Check(subView.serviceFactory.Services.Single().GetServerUrls().Single().url=="vless://replacement"&&subView.uCServerList.Binds==1,
+   "a retired download cannot repopulate a replacement catalog");
+  var unmarked=S(sourceUrl);ResidentialViewModel.DownloadCountryAsync=(url,token)=>Task.FromResult(new ResidentialViewModel.Payload{Body=awg});
+  subView.ApplyCountryCatalog(Groups(unmarked),nextGeneration);
+  await Until(()=>subView.uCServerList.Binds==2);
+  Check(subView.serviceFactory.Services.Single().GetType()==typeof(TunnelPlusService),"a plain-text subscription with neither API marker is recognized by its content");
+  subView.RetireCountryCatalog(subView.accountSessionMaintenance.End());
+  var gatewayView=View();var gateway=S(cisco);gateway.ID=501;
+  ResidentialViewModel.DownloadCountryAsync=(url,token)=>Task.FromResult(new ResidentialViewModel.Payload{Body="<html>gateway</html>"});
+  gatewayView.ApplyCountryCatalog(Groups(gateway),gatewayView.accountSessionMaintenance.Generation);
+  await Until(()=>ConnectionDiagnostics.Lines.Any(line=>line.Contains("row=501")&&line.Contains("classified=false")));
+  Check(gatewayView.serviceFactory.Services.Single() is CiscoService&&gatewayView.uCServerList.Binds==0,
+   "HTML at an unmarked HTTPS gateway preserves Cisco and performs no replacement");
+  Check(!ConnectionDiagnostics.Lines.Any(line=>line.Contains("://")),"subscription diagnostics omit link material");
+  Check(Services.CountrySubscription.Source(new Url{url="https%3A%2F%2Fexample.invalid%2Fs%3Fa%3Dx%252Fy%2Bz"})=="https://example.invalid/s?a=x%2Fy+z",
+    "decoding the API wrapper preserves signed URI components");
+  Check(Services.CountrySubscription.Source(new Url{url="http://example.invalid/"})==null
+   &&Services.CountrySubscription.Source(new Url{url="https://name@example.invalid/"})==null,"subscription transport requires credential-free HTTPS");
+  try{Services.CountrySubscription.Parse("{\"outbounds\":[]}");throw new Exception("raw config accepted");}catch(FormatException){}
   var live=View();object settings=live.gInfo.settings,connected=new object();live.gInfo.CurrentService=connected;
   Check(await live.RefreshServerListForManualCheckAsync(()=>true,CancellationToken.None),"manual action awaits successful authenticated list fetch");
   Check(live.serviceController.Calls==1&&live.serviceFactory.Services[0].GetServerUrls()[0].url=="vless://new"&&live.uCServerList.Binds==1&&live.uCServerList.Preserve,"fresh API list binds while retaining manual pause/cancellation ownership");
@@ -112,7 +166,7 @@ class Program {
    if(kind=="500")failed.serviceController.Next.StatusCode=HttpStatusCode.InternalServerError;
    if(kind=="missing")failed.serviceController.Next.ResponseData.Decrypted.groups=null;
    if(kind=="auth-server")failed.serviceController.Next.ResponseData.Decrypted.UserAccount.Status="AuthServerError";
-   if(kind=="malformed")failed.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://valid"),new ServerEx{Invalid=true,urls=new List<Url>{new Url{url="vless://bad"}}});
+   if(kind=="malformed")failed.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://valid"),new ServerEx{ID=int.MinValue,urls=new List<Url>{new Url{url="vless://bad"}}});
    Check(!await failed.RefreshServerListForManualCheckAsync(()=>true,CancellationToken.None),kind+" returns fallback signal");
    Check(ReferenceEquals(failed.serviceFactory.Services,original)&&original[0].GetServerUrls()[0].latency==101&&failed.uCServerList.Binds==0&&failed.localResource.Saves==0&&failed.IsUserLogin,kind+" preserves complete previous list, results and session");
   }
@@ -147,13 +201,18 @@ class Program {
 '''
 with tempfile.TemporaryDirectory(prefix='api-refresh-checks-') as directory:
     path = Path(directory)
-    (path / 'Program.cs').write_text(prefix + ui + program + methods + '\n}\n')
-    maintenance = root / 'IRSpeedyVPN/Common/AccountSessionMaintenance.cs'
+    (path / 'Program.cs').write_text(prefix + ui + program + methods + '\n}}\n')
+    base = root / 'IRSpeedyVPN'
+    sources = ['Common/AccountSessionMaintenance.cs','Common/Json/JsonConvertibleAttribute.cs','Common/Json/JsonPropertyAttribute.cs',
+               'Residential/ResidentialModels.cs','Residential/ResidentialSubscription.cs','Interfaces/IServer.cs',
+               'Models/NewService/Group.cs','Models/NewService/ServerEx.cs','Models/NewService/Url.cs','Models/NewService/VPNType.cs',
+               'Services/CountrySubscription.cs','MainWindow.CountrySubscriptions.cs']
+    includes = ''.join('<Compile Include="' + str(base / name) + '" />' for name in sources)
     framework = 'net48' if '--net48' in sys.argv else 'net8.0'
     (path / 'Checks.csproj').write_text(
         '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>' + framework +
         '</TargetFramework><LangVersion>7.3</LangVersion><NuGetAudit>false</NuGetAudit><NoWarn>CS0649;CS0414</NoWarn>' +
-        '</PropertyGroup><ItemGroup><Compile Include="' + str(maintenance) + '" /></ItemGroup></Project>'
+        '</PropertyGroup><ItemGroup>' + includes + '</ItemGroup></Project>'
     )
     args = ['build', str(path / 'Checks.csproj')] if framework == 'net48' else ['run', '--project', str(path / 'Checks.csproj')]
     subprocess.run([sys.argv[1] if len(sys.argv) > 1 else 'dotnet'] + args + ['-v:q'], check=True)

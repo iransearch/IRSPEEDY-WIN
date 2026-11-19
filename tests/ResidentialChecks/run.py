@@ -210,7 +210,7 @@ fast=(base/'MainWindow.FastStartup.cs').read_text()
 assert 'uCServerList.OnDisconnectRequest += UCUserInfo_OnDisconnectRequest;' in fast
 assert 'uCServerList.ConfigureResidential(account);' in fast
 cached=fast[fast.index('private async Task<bool> TryApplyCachedAccountAsync('):fast.index('private async Task<bool> TryApplyCachedAccountAsync(')+6000]
-assert cached.index('serviceFactory.RenewServiceList(account.groups)') < cached.index('uCServerList.ConfigureResidential(account);') < cached.index('ShowLoginServerList();')
+assert cached.index('serviceFactory.RenewServiceList(Services.CountrySubscription.Expand(account.groups, null))') < cached.index('uCServerList.ConfigureResidential(account);') < cached.index('ShowLoginServerList();')
 assert 'account.residential_vpn == null && account.UserAccount.residential_vpn == null' in cached
 assert 'BeginAccountSession(verified: false);' in cached
 assert cached.index('ShowLoginServerList();') < cached.index('BeginAccountSession(verified: false);') < cached.index('StartSessionMaintenance();')

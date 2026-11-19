@@ -6,6 +6,11 @@ namespace IRSpeedyVPN.UserControls
 {
     public partial class UCServerList
     {
+        internal void RefreshCountrySubscriptionRows()
+        {
+            if (!isResidentialTab) RefreshServicesFromFactory(preserveManualRefresh: manualRefreshBusy);
+        }
+
         /// <summary>
         /// Rebind the visible server picker after an API refresh.
         /// If the user is on the connection-info screen, do nothing here; the normal
