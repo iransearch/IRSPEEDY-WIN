@@ -306,6 +306,15 @@ namespace IRSpeedyVPN.Services
 
         }
 
+        // Feed the existing fastest-row selection from the display cache.
+        // Connection-time UrlTest keeps its own timing and code path.
+        internal void UpdateListTestResult()
+        {
+            var best = server.urls.Where(u => u != null && u.latency > 0).OrderBy(u => u.latency).FirstOrDefault();
+            urlTestSpeed = best?.latency ?? -1;
+            selectedUrl = best?.url;
+        }
+
         public List<Url> GetServerUrls()
         {
             return server.urls;

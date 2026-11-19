@@ -1,13 +1,123 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using IRSpeedyVPN.Services.Libcore;
 
 namespace IRSpeedyVPN.Services
 {
+    // Latency 0 means no measurement, -1 a measured failure.
+    internal readonly struct DisplayProbeResult
+    {
+        internal static DisplayProbeResult Deferred => default(DisplayProbeResult);
+        internal static DisplayProbeResult Failed => new DisplayProbeResult(-1, 1);
+        internal readonly long Latency;
+        internal readonly int FailureCount, SampleCount;
+        internal bool Success => Latency > 0;
+        internal bool Measured => Latency != 0;
+
+        internal DisplayProbeResult(long latency, int failureCount = 0, int sampleCount = 1)
+        {
+            Latency = latency;
+            FailureCount = failureCount;
+            SampleCount = sampleCount;
+        }
+
+        internal int CompareTo(DisplayProbeResult other)
+        {
+            int compare = Latency.CompareTo(other.Latency);
+            if (compare != 0) return compare;
+            compare = FailureCount.CompareTo(other.FailureCount);
+            return compare != 0 ? compare : other.SampleCount.CompareTo(SampleCount);
+        }
+    }
+
     internal static class UrlTestRetryPolicy
     {
         internal const string RetryUrl = "http://connectivitycheck.gstatic.com/generate_204";
+
+        internal const int DisplayBudgetMs = 8000;
+        internal static string DisplayTarget(string target)
+            => string.IsNullOrWhiteSpace(target) ? RetryUrl : target.Trim();
+
+        // SplitHTTP is the older spelling of the XHTTP transport. Keep the
+        // API link and runtime conversion unchanged; normalize only the probe copy.
+        internal static string NormalizeDisplayTransport(string link)
+        {
+            int query = link.IndexOf('?');
+            int fragment = link.IndexOf('#');
+            if (query < 0 || (fragment >= 0 && fragment < query)) return link;
+            int end = fragment >= 0 ? fragment : link.Length;
+            var fields = link.Substring(query + 1, end - query - 1).Split('&');
+            bool changed = false;
+            for (int i = 0; i < fields.Length; i++)
+            {
+                int equals = fields[i].IndexOf('=');
+                if (equals < 0 || !string.Equals(Uri.UnescapeDataString(fields[i].Substring(0, equals)), "type", StringComparison.OrdinalIgnoreCase))
+                    continue;
+                string transport = Uri.UnescapeDataString(fields[i].Substring(equals + 1));
+                if (string.Equals(transport, "splithttp", StringComparison.OrdinalIgnoreCase)
+                    || (transport != "xhttp" && string.Equals(transport, "xhttp", StringComparison.OrdinalIgnoreCase)))
+                {
+                    fields[i] = "type=xhttp";
+                    changed = true;
+                }
+            }
+            return changed ? link.Substring(0, query + 1) + string.Join("&", fields) + link.Substring(end) : link;
+        }
+
+        internal static bool WaitForDisplayListener(Func<int> remaining, Func<int, bool> connect,
+            Action checkProcess, CancellationToken cancellation)
+        {
+            while (true)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                int budget = remaining();
+                if (budget <= 0) return false;
+                if (connect(Math.Min(100, budget))) return remaining() > 0;
+                checkProcess?.Invoke();
+                cancellation.WaitHandle.WaitOne(Math.Min(20, remaining()));
+            }
+        }
+
+        // Display attempts take one shared stopwatch (started before preparation).
+        // The original Run overloads below retain connection/health probe semantics.
+        internal static DisplayProbeResult RunDisplay(string requestedTarget,
+            Func<string, int, DisplayProbeResult> attempt, Func<long> elapsedMilliseconds,
+            CancellationToken cancellation, Action<long> measured = null)
+        {
+            int Remaining() => (int)Math.Max(0, DisplayBudgetMs - elapsedMilliseconds());
+
+            DisplayProbeResult Probe(string target, int budget)
+            {
+                cancellation.ThrowIfCancellationRequested();
+                long start = elapsedMilliseconds();
+                try
+                {
+                    var result = attempt(target, budget);
+                    return result.Measured && elapsedMilliseconds() - start > budget ? DisplayProbeResult.Failed : result;
+                }
+                catch (TimeoutException) { return DisplayProbeResult.Failed; }
+                catch (OperationCanceledException) when (!cancellation.IsCancellationRequested)
+                { return DisplayProbeResult.Deferred; }
+            }
+
+            string primary = DisplayTarget(requestedTarget);
+            bool distinct = !SameEndpoint(primary, RetryUrl);
+            int available = Remaining();
+            if (available == 0) return DisplayProbeResult.Failed;
+            var first = Probe(primary, distinct ? Math.Min(4000, available) : available);
+            cancellation.ThrowIfCancellationRequested();
+            if (first.Success) measured?.Invoke(first.Latency);
+            if (!distinct || !first.Measured || (first.Success && first.Latency <= 500))
+                return first;
+            available = Remaining();
+            if (available == 0) return first;
+            var fallback = Probe(RetryUrl, available);
+            cancellation.ThrowIfCancellationRequested();
+            if (fallback.Success && (!first.Success || fallback.Latency < first.Latency)) measured?.Invoke(fallback.Latency);
+            return first.Success && (!fallback.Success || first.Latency <= fallback.Latency) ? first : fallback;
+        }
 
         internal static bool IsSuccess(URLTestResp result)
         {

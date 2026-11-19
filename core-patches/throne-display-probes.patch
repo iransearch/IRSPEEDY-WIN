@@ -1,0 +1,285 @@
+From 6b780e6157c88e53effd3303a8db335feb7cc85a Mon Sep 17 00:00:00 2001
+From: Codex <codex@openai.com>
+Date: Thu, 19 Nov 2026 16:52:25 +0330
+Subject: [PATCH] Add isolated bounded display URL probes
+
+---
+ core/server/display_probe.go                 | 74 +++++++++++++++++
+ core/server/server.go                        |  4 +-
+ core/server/test_utils/display_probe.go      | 83 ++++++++++++++++++++
+ core/server/test_utils/display_probe_test.go | 73 +++++++++++++++++
+ 4 files changed, 232 insertions(+), 2 deletions(-)
+ create mode 100644 core/server/display_probe.go
+ create mode 100644 core/server/test_utils/display_probe.go
+ create mode 100644 core/server/test_utils/display_probe_test.go
+
+diff --git a/core/server/display_probe.go b/core/server/display_probe.go
+new file mode 100644
+index 00000000..30e77141
+--- /dev/null
++++ b/core/server/display_probe.go
+@@ -0,0 +1,74 @@
++package main
++
++import (
++	"context"
++	"errors"
++	"time"
++
++	"ThroneCore/gen"
++	"ThroneCore/internal/boxdns"
++	"ThroneCore/test_utils"
++)
++
++var displaySlots = make(chan struct{}, 8)
++
++// The desktop list runs this on a separate probe Core. Neither currentBox,
++// the legacy TestContext, nor its global progress reporter is involved.
++func (s *protoRPCServer) DisplayTest(in *gen.TestReq, out *gen.TestResp) error {
++	if len(in.OutboundTags) != 1 || in.GetTestCurrent() || in.GetUseDefaultOutbound() ||
++		in.GetTestTimeoutMs() <= 0 || in.GetTestTimeoutMs() > 8000 {
++		return errors.New("invalid display probe request")
++	}
++	tag := in.OutboundTags[0]
++	reply := func(latency int32, failure string) {
++		out.Results = []*gen.URLTestResp{{OutboundTag: To(tag), LatencyMs: To(latency), Error: To(failure)}}
++	}
++	select {
++	case displaySlots <- struct{}{}:
++	default:
++		reply(0, "display-probe-deferred")
++		return nil
++	}
++	var closeEnvironment func()
++	defer func() {
++		if closeEnvironment == nil {
++			<-displaySlots
++			return
++		}
++		// Return the measurement before cleanup, but don't free native
++		// capacity while the Core or sidecar still owns resources.
++		go func() {
++			defer func() { <-displaySlots }()
++			closeEnvironment()
++		}()
++	}()
++	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(in.GetTestTimeoutMs())*time.Millisecond)
++	defer cancel()
++	_ = boxdns.Start()
++	if ctx.Err() != nil {
++		reply(-1, "display-probe-timeout")
++		return nil
++	}
++	env, err := prepareTestEnv(false, in.GetNeedXray(), in.GetXrayConfig(), in.XrayFullConfigs,
++		in.GetConfig(), in.OutboundTags, false, in.GetXrayOutboundDnsStrategy(), true)
++	if err != nil {
++		reply(-1, "display-probe-config")
++		return nil
++	}
++	closeEnvironment = env.close
++	if ctx.Err() != nil {
++		reply(-1, "display-probe-timeout")
++		return nil
++	}
++	single := test_utils.IsDisplayXHTTP(in.GetConfig()) || test_utils.IsDisplayXHTTP(in.GetXrayConfig())
++	for _, config := range in.XrayFullConfigs {
++		single = single || test_utils.IsDisplayXHTTP(config)
++	}
++	latency, err := test_utils.DisplayURLTest(ctx, env.box, env.tags[0], in.GetUrl(), single)
++	if err != nil || ctx.Err() != nil {
++		reply(-1, "display-probe-failed")
++	} else {
++		reply(int32(max(1, latency.Milliseconds())), "")
++	}
++	return nil
++}
+diff --git a/core/server/server.go b/core/server/server.go
+index 5c7cf901..ac0508a0 100644
+--- a/core/server/server.go
++++ b/core/server/server.go
+@@ -280,7 +280,7 @@ type testEnv struct {
+ // `current` measures the running instance instead of building one, and owns nothing.
+ func prepareTestEnv(current bool, needXray bool, xrayConfig string, xrayFullConfigs []string,
+ 	coreConfig string, tags []string, useDefaultOutbound bool,
+-	xrayDNSStrategy string) (*testEnv, error) {
++	xrayDNSStrategy string, waitForClose ...bool) (*testEnv, error) {
+ 
+ 	// fc668b60 test requests predate the test-only DNS strategy fields.
+ 	// Preserve their sing-box-backed Xray/Hysteria test DNS behavior.
+@@ -350,7 +350,7 @@ func prepareTestEnv(current bool, needXray bool, xrayConfig string, xrayFullConf
+ 		return nil, err
+ 	}
+ 	cleanups = append(cleanups, func() {
+-		box.CloseWithTimeout(cancel, 2*time.Second, log.Println, false)
++		box.CloseWithTimeout(cancel, 2*time.Second, log.Println, len(waitForClose) > 0 && waitForClose[0])
+ 	})
+ 
+ 	outTags := tags
+diff --git a/core/server/test_utils/display_probe.go b/core/server/test_utils/display_probe.go
+new file mode 100644
+index 00000000..c318b700
+--- /dev/null
++++ b/core/server/test_utils/display_probe.go
+@@ -0,0 +1,83 @@
++package test_utils
++
++import (
++	"context"
++	"encoding/json"
++	"errors"
++	"io"
++	"net"
++	"net/http"
++	"net/http/httptrace"
++	"strings"
++	"time"
++
++	"ThroneCore/internal/boxbox"
++)
++
++// Only the display RPC uses this rule. XHTTP can close its stream after
++// the first response; that response is a real measurement, not a failure.
++func IsDisplayXHTTP(config string) bool {
++	var profile struct {
++		Outbounds []struct {
++			StreamSettings struct{ Network string }
++			Transport      struct{ Type string }
++		}
++	}
++	if json.Unmarshal([]byte(config), &profile) != nil {
++		return false
++	}
++	for _, outbound := range profile.Outbounds {
++		for _, transport := range []string{outbound.StreamSettings.Network, outbound.Transport.Type} {
++			if strings.EqualFold(transport, "xhttp") || strings.EqualFold(transport, "splithttp") {
++				return true
++			}
++		}
++	}
++	return false
++}
++
++func DisplayURLTest(ctx context.Context, box *boxbox.Box, tag, url string, single bool) (time.Duration, error) {
++	if err := awaitTunnels(ctx, box, tag); err != nil {
++		return 0, err
++	}
++	outbound, found := box.Outbound().Outbound(tag)
++	if !found {
++		return 0, errors.New("display probe outbound is missing")
++	}
++	client, closeClient := outboundHTTPClient(ctx, outbound)
++	defer closeClient()
++	return displayRTT(ctx, client, url, single)
++}
++
++func displayRTT(ctx context.Context, client *http.Client, url string, single bool) (time.Duration, error) {
++	request := func(warmup bool) (time.Duration, net.Conn, error) {
++		var conn net.Conn
++		trace := &httptrace.ClientTrace{GotConn: func(info httptrace.GotConnInfo) { conn = info.Conn }}
++		req, err := http.NewRequestWithContext(httptrace.WithClientTrace(ctx, trace), http.MethodGet, url, nil)
++		if err != nil {
++			return 0, nil, err
++		}
++		begin := time.Now()
++		resp, err := client.Do(req)
++		if err != nil {
++			return 0, nil, err
++		}
++		latency := time.Since(begin)
++		defer resp.Body.Close()
++		if warmup {
++			// Read the first body before reusing the connection. The context
++			// also bounds servers that send a large or nonterminating body.
++			_, err = io.Copy(io.Discard, resp.Body)
++		}
++		return latency, conn, err
++	}
++	first, connection, err := request(!single)
++	if err != nil || single {
++		return first, err
++	}
++	second, nextConnection, err := request(false)
++	if err == nil && (connection == nil || connection != nextConnection) {
++		return 0, errors.New("display probe did not reuse its connection")
++	}
++	return second, err
++}
+diff --git a/core/server/test_utils/display_probe_test.go b/core/server/test_utils/display_probe_test.go
+new file mode 100644
+index 00000000..f82becab
+--- /dev/null
++++ b/core/server/test_utils/display_probe_test.go
+@@ -0,0 +1,73 @@
++package test_utils
++
++import (
++	"context"
++	"io"
++	"net"
++	"net/http"
++	"net/http/httptrace"
++	"strings"
++	"testing"
++	"time"
++)
++
++type probeTransport func(*http.Request) (*http.Response, error)
++
++func (t probeTransport) RoundTrip(req *http.Request) (*http.Response, error) { return t(req) }
++
++func TestDisplayProbesOnlyOneHandshakeForXHTTP(t *testing.T) {
++	for _, tc := range []struct {
++		name, config string
++		wantCalls    int
++		wantErr      bool
++	}{
++		{"xhttp", `{"outbounds":[{"streamSettings":{"network":"xhttp"}}]}`, 1, false},
++		{"split", `{"outbounds":[{"streamSettings":{"network":"SplitHTTP"}}]}`, 1, false},
++		{"sing-box", `{"outbounds":[{"transport":{"type":"xhttp"}}]}`, 1, false},
++		{"ordinary", `{"outbounds":[{"streamSettings":{"network":"ws"}}]}`, 2, true},
++	} {
++		t.Run(tc.name, func(t *testing.T) {
++			calls := 0
++			// This XHTTP-like stream succeeds once and closes on the second read.
++			client := &http.Client{Transport: probeTransport(func(req *http.Request) (*http.Response, error) {
++				calls++
++				if calls > 1 {
++					return nil, io.ErrUnexpectedEOF
++				}
++				return &http.Response{StatusCode: 204, Body: http.NoBody}, nil
++			})}
++			rtt, err := displayRTT(context.Background(), client, "http://fixture.invalid/", IsDisplayXHTTP(tc.config))
++			if calls != tc.wantCalls || (err != nil) != tc.wantErr || (err == nil && rtt <= 0) {
++				t.Fatalf("calls=%d latency=%v err=%v", calls, rtt, err)
++			}
++		})
++	}
++}
++
++func TestDisplayProbeUsesSecondRequestOfSameConnection(t *testing.T) {
++	for _, different := range []bool{false, true} {
++		first, peer := net.Pipe()
++		second, otherPeer := net.Pipe()
++		calls := 0
++		client := &http.Client{Transport: probeTransport(func(req *http.Request) (*http.Response, error) {
++			calls++
++			conn := first
++			if calls == 2 && different {
++				conn = second
++			}
++			httptrace.ContextClientTrace(req.Context()).GotConn(httptrace.GotConnInfo{Conn: conn, Reused: calls == 2 && !different})
++			if calls == 1 {
++				time.Sleep(25 * time.Millisecond)
++			}
++			return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader("warm up"))}, nil
++		})}
++		delay, err := displayRTT(context.Background(), client, "http://fixture.invalid/", false)
++		first.Close()
++		peer.Close()
++		second.Close()
++		otherPeer.Close()
++		if calls != 2 || (err != nil) != different || (!different && delay >= 25*time.Millisecond) {
++			t.Fatalf("different=%v calls=%d latency=%v err=%v", different, calls, delay, err)
++		}
++	}
++}

@@ -1,3 +1,5 @@
+using System.Threading;
+
 namespace IRSpeedyVPN.Services
 {
     /// <summary>
@@ -9,6 +11,11 @@ namespace IRSpeedyVPN.Services
     {
         private static readonly object Lock = new object();
         private static bool _abortRequested;
+        private static CancellationTokenSource displayCancellation = new CancellationTokenSource();
+        internal static CancellationToken DisplayCancellation
+        {
+            get { lock (Lock) return displayCancellation.Token; }
+        }
 
         /// <summary>True while a "stop all tests" request is pending.</summary>
         public static bool AbortRequested
@@ -19,13 +26,23 @@ namespace IRSpeedyVPN.Services
         /// <summary>Request that all running URL tests stop (user started a service).</summary>
         public static void CancelAll()
         {
-            lock (Lock) _abortRequested = true;
+            CancellationTokenSource display;
+            lock (Lock)
+            {
+                _abortRequested = true;
+                display = displayCancellation;
+            }
+            display.Cancel();
         }
 
         /// <summary>Allow a new batch of tests (fresh UI load / connect flow).</summary>
         public static void BeginBatch()
         {
-            lock (Lock) _abortRequested = false;
+            lock (Lock)
+            {
+                if (_abortRequested) displayCancellation = new CancellationTokenSource();
+                _abortRequested = false;
+            }
         }
     }
 }

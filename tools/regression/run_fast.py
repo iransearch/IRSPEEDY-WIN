@@ -22,6 +22,7 @@ SUITES = [
     ("login-dns", "LoginRecoveryChecks", ["python", "tests/LoginRecoveryChecks/run.py", "{dotnet}", "{csc}", "{refs}"]),
     ("connection", "ConnectionTestChecks", ["python", "tests/ConnectionTestChecks/run.py", "{dotnet}"]),
     ("core-startup", "AiStartupChecks", ["python", "tests/AiStartupChecks/run.py", "{dotnet}"]),
+    ("list-probes", "DisplayProbeChecks", ["{dotnet}", "run", "--project", "tests/DisplayProbeChecks/DisplayProbeChecks.csproj"]),
     ("server-selection", "LastSuccessfulServerChecks", ["python", "tests/LastSuccessfulServerChecks/run.py", "{dotnet}"]),
     ("server-transitions", "ServerListTransitionChecks", ["python", "tests/ServerListTransitionChecks/run.py", "{dotnet}", "{csc}", "{refs}"]),
     ("country-cache", "ResidentialChecks", ["python", "tests/ResidentialChecks/run-cache.py", "{dotnet}", "{csc}", "{refs}"]),
