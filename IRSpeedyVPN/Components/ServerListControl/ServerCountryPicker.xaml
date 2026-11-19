@@ -317,7 +317,8 @@
       <ItemsControl x:Name="icCountries" Focusable="False">
         <ItemsControl.ItemTemplate>
           <DataTemplate>
-            <Button Style="{StaticResource ServerCardButton}" Height="{Binding DisplayedServer.RowHeight, Mode=OneWay}" Margin="0,0,0,8" IsEnabled="{Binding IsSelectable, Mode=OneWay}" Cursor="{Binding RowCursor, Mode=OneWay}" Click="Row_Click" PreviewKeyDown="Row_KeyDown" Tag="{Binding DisplayedServer.Identity, Mode=OneWay}" AutomationProperties.Name="{Binding DisplayedServer.AutomationDescription, Mode=OneWay}" AutomationProperties.HelpText="{Binding DisplayedServer.SignalText, Mode=OneWay}" ToolTip="{Binding DisplayedServer.RowToolTip, Mode=OneWay}" ToolTipService.ShowOnDisabled="True"/>
+            <!-- A sweep can change the country shown by this button before the mouse is released. -->
+            <Button Style="{StaticResource ServerCardButton}" Height="{Binding DisplayedServer.RowHeight, Mode=OneWay}" Margin="0,0,0,8" IsEnabled="{Binding IsSelectable, Mode=OneWay}" Cursor="{Binding RowCursor, Mode=OneWay}" ClickMode="Press" Click="Row_Click" PreviewKeyDown="Row_KeyDown" Tag="{Binding DisplayedServer.Identity, Mode=OneWay}" AutomationProperties.Name="{Binding DisplayedServer.AutomationDescription, Mode=OneWay}" AutomationProperties.HelpText="{Binding DisplayedServer.SignalText, Mode=OneWay}" ToolTip="{Binding DisplayedServer.RowToolTip, Mode=OneWay}" ToolTipService.ShowOnDisabled="True"/>
           </DataTemplate>
         </ItemsControl.ItemTemplate>
       </ItemsControl>

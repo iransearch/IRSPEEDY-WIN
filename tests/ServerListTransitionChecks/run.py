@@ -101,7 +101,8 @@ class Program {
   // BAML defers enum conversion until the country-row template is loaded.
   // Reproduce SmartAssembly field renaming and exercise the same converter
   // against the actual XAML values, independently of WPF/desktop availability.
-  var tokens=System.Xml.Linq.XElement.Load(@"__PICKER_XAML__").DescendantsAndSelf().SelectMany(rowElement=>rowElement.Attributes())
+  var pickerMarkup = System.Xml.Linq.XElement.Load(@"__PICKER_XAML__");
+  var tokens=pickerMarkup.DescendantsAndSelf().SelectMany(rowElement=>rowElement.Attributes())
    .Where(rowAttribute=>rowAttribute.Name.LocalName=="ServerCometPart.Part").Select(rowAttribute=>rowAttribute.Value).ToArray();
   var renamedAssembly=System.Reflection.Emit.AssemblyBuilder.DefineDynamicAssembly(
    new System.Reflection.AssemblyName("RenamedRowParts"),System.Reflection.Emit.AssemblyBuilderAccess.Run);
@@ -176,7 +177,9 @@ class Program {
   repair.Publish(new[]{S(pc),S(pb)},true);Unique(repair);
   Check(repair.Slots.Count==2&&repair.Slots.All(slot=>!slot.BadgeServer.IsLastSuccessfulConnection),
     "removing the pinned country leaves no phantom star or missing identity");
-  IncrementalOrderChecks.Run();
+  var countryButton = pickerMarkup.Descendants().Single(element =>
+   element.Name.LocalName == "Button" && (string)element.Attribute("Click") == "Row_Click");
+  IncrementalOrderChecks.Run((string)countryButton.Attribute("ClickMode") ?? "Release");
   var a=G(1,true);var b=G(2);var c=G(3);var vm=new ServerListViewModel();int work=0;vm.WorkAvailable+=()=>work++;
   vm.PublishForTest(new[]{S(a),S(b),S(c)},true);var stable=vm.Slots.ToArray();
   Check(!vm.IsTransitioning,"initial load has no light");var before=vm.Slots.Select(s=>s.DisplayedServer.Identity).ToArray();vm.CompleteImmediately();work=0;
