@@ -64,7 +64,7 @@ internal static class StateChecks
         var raw=new Url{url="vless://id@example.invalid:443",latency=101,latencychkTime=DateTime.Now};
         service.GetServerUrls().Clear();service.GetServerUrls().Add(raw);
         var residentialRow=new GroupItem{Service=service};residentialRow.RefreshSignals();
-        Check(residentialRow.SignalText=="71 ms"&&residentialRow.SortKey==71&&raw.latency==101,"actual production GroupItem uses adjusted Residential display/order without altering raw latency");
+        Check(residentialRow.SignalText=="71 ms"&&residentialRow.SortKey==101&&raw.latency==101,"actual production GroupItem keeps the adjusted Residential display and ranks by measured latency");
         var vpn=new IRSpeedyVPN.Services.TunnelPlusService(new ServerEx{urls=new System.Collections.Generic.List<Url>{raw}},new GlobalInfo());
         var vpnRow=new GroupItem{Service=vpn};vpnRow.RefreshSignals();
         Check(vpnRow.SignalText=="101 ms"&&vpnRow.SortKey==101,"actual production GroupItem retains unchanged VPN ping and order");

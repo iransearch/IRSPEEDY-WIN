@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -89,6 +90,19 @@ namespace IRSpeedyVPN.Services.Libcore
         public TestResp Test(TestReq req)
         {
             return Call("LibcoreService.Test", LibcoreProto.EncodeTestReq(req), LibcoreProto.DecodeTestResp);
+        }
+
+        internal TestResp TestWithDeadline(TestReq req, int timeoutMs, CancellationToken cancellation)
+        {
+            var clock = Stopwatch.StartNew();
+            using (var client = ProtorpcClient.Connect(_host, _port, timeoutMs, cancellation))
+            {
+                int remaining = timeoutMs - (int)clock.ElapsedMilliseconds;
+                if (remaining <= 0) throw new TimeoutException("Display probe deadline exceeded.");
+                req.TestTimeoutMs = remaining;
+                return client.CallWithDeadline("LibcoreService.Test", LibcoreProto.EncodeTestReq(req),
+                    LibcoreProto.DecodeTestResp, remaining, cancellation, reportTimeout: true);
+            }
         }
 
         public TestResp TestWithProgress(TestReq req, Action<TestResp> report,

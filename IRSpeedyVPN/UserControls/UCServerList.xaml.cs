@@ -167,11 +167,12 @@ namespace IRSpeedyVPN.UserControls
             if (!preserveManualRefresh) CancelManualRefresh();
             _currentServices = services;
             string scope = isResidentialTab ? "Residential" : _selectedServiceName;
-            string context = (globalInfo?.Username ?? "") + "\n" + scope + "\n" + (protocol ?? "");
+            string testUrl = UrlTestRetryPolicy.DisplayUrl(globalInfo?.settings?.setting?.url_test);
+            string context = (globalInfo?.Username ?? "") + "\n" + scope + "\n" + (protocol ?? "") + "\n" + testUrl;
             if (probeCache == null || probeCacheContext != context)
             {
                 if (!probeCaches.TryGetValue(context, out probeCache))
-                    probeCaches[context] = probeCache = new ServerCheckCache(globalInfo?.Username ?? "", scope + "\n" + (protocol ?? ""));
+                    probeCaches[context] = probeCache = new ServerCheckCache(globalInfo?.Username ?? "", scope + "\n" + (protocol ?? ""), testUrl: testUrl);
                 probeCacheContext = context;
             }
             probeCache.Bind(services);
@@ -327,14 +328,15 @@ namespace IRSpeedyVPN.UserControls
             }
             if (probeRunning) { probeWakeRequested = true; return; }
             var cache = probeCache;
+            var picker = countryPicker;
             if (probeRestartRequested)
             {
                 // Freeze missing/failed-country eligibility after the
                 // old worker drains; later results do not reorder the active queue.
                 cache.RestartFromFirstCountry();
                 probeRestartRequested = false;
-                countryPicker.EndCheckCycleSetup();
-                countryPicker.RetainCompletedResults(cache.CompletedSuccessfulServices);
+                picker.EndCheckCycleSetup();
+                picker.RetainCompletedResults(cache.CompletedSuccessfulServices);
             }
             var service = cache.NextService;
             if (service == null || !services.Contains(service))
@@ -349,7 +351,7 @@ namespace IRSpeedyVPN.UserControls
             probeWakeRequested = false;
             UrlTestCoordinator.BeginBatch();
             bool completed = false;
-            var serverTask = CheckServerAsync(services, service, cache, token);
+            var serverTask = RunDisplayScanAsync(services, cache, token);
             probeTask = serverTask;
             try { completed = await serverTask; }
             catch (Exception ex) { LogHelper.WriteLog(ex); }
@@ -361,86 +363,6 @@ namespace IRSpeedyVPN.UserControls
                 // Reload/resume may also have replaced the canceled worker's list.
                 RunBackgroundUrlTests(_currentServices);
             }
-        }
-
-        private async Task<bool> CheckServerAsync(IVPNService[] services, IVPNService service,
-            ServerCheckCache cache, CancellationToken token)
-        {
-            var picker = countryPicker;
-            string scope = service is IRSpeedyVPN.Residential.ResidentialService ? "Residential" : "VPN";
-            LogHelper.WriteExLog("[ServerChecks] scope=" + scope + " stage=row-start id=" + service.ID);
-            if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
-            int acceptingProgress = 1;
-            picker.SetGroupChecking(service, true);
-            try
-            {
-                await Task.Run(() =>
-                {
-                    cache.PersistQueue();
-                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return;
-                    DateTime started = DateTime.Now;
-                    try
-                    {
-                        if (service is TunnelPlusService tunnel)
-                            tunnel.UrlTestFull(null, false, cache.ShowInitialProgress ? (Action<long>)(latency =>
-                            {
-                                Dispatcher.BeginInvoke(new Action(() =>
-                                {
-                                    // A queued partial result must not overwrite a final/rolled-back
-                                    // result, a replacement API row, or a newly connected session.
-                                    if (Volatile.Read(ref acceptingProgress) != 0
-                                        && !token.IsCancellationRequested && !probesPaused
-                                        && !UrlTestCoordinator.AbortRequested
-                                        && ReferenceEquals(services, _currentServices)
-                                        && globalInfo?.CurrentService == null)
-                                        picker.ShowGroupProgress(service, latency);
-                                }), System.Windows.Threading.DispatcherPriority.Background);
-                            }) : null, () => token.IsCancellationRequested, token,
-                                prioritizeFailed: cache.PrioritizeFailedServers,
-                                memberProgress: (url, latency) =>
-                                {
-                                    // A completed successful member remains useful even
-                                    // if Connect/logout cancels the rest of this country.
-                                    if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested && latency > 0)
-                                        cache.RecordRefreshMember(service, url, latency, DateTime.UtcNow);
-                                });
-                        else service.UrlTest();
-                    }
-                    catch (Exception ex) { LogHelper.WriteLog(ex); }
-                    finally { Interlocked.Exchange(ref acceptingProgress, 0); }
-
-                    if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested)
-                    {
-                        cache.Restore(service);
-                        cache.PersistQueue();
-                    }
-                    else
-                        cache.Record(service, started);
-                });
-            }
-            finally
-            {
-                // Always stop the indicator, including cancellation and cache/write errors.
-                picker.SetGroupChecking(service, false);
-            }
-
-            // This continuation runs on the UI thread. Apply the committed result
-            // (or restored cache on cancellation) before advancing/draining the worker.
-            // Cancellation must not discard this refresh as it did in the queued path.
-            if (ReferenceEquals(services, _currentServices))
-            {
-                picker.RefreshGroup(service, allowSortAnimation: !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested);
-                TrySelectResidentialFastest();
-                UpdateResidentialVisuals();
-            }
-            LogHelper.WriteExLog("[ServerChecks] scope=" + scope + " stage=row-end id=" + service.ID + " canceled=" + (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested));
-            if (token.IsCancellationRequested || UrlTestCoordinator.AbortRequested) return false;
-            await Task.Run(() =>
-            {
-                if (!token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested)
-                    cache.CompleteService(service);
-            });
-            return !token.IsCancellationRequested && !UrlTestCoordinator.AbortRequested;
         }
 
         #endregion

@@ -13,6 +13,8 @@ using System.Threading;
 using System.Diagnostics;
 using System.Threading.Tasks;
 using IRSpeedyVPN.Models.NewService;
+using System.Net;
+using System.Net.Security;
 
 namespace IRSpeedyVPN.Services
 {
@@ -223,6 +225,59 @@ namespace IRSpeedyVPN.Services
         public long UrlTest()
         {
             return UrlTest(false);
+        }
+
+        // Cisco display testing is HTTPS reachability to the gateway. It does
+        // not authenticate or start OpenConnect as part of a list scan.
+        internal static ServerProbeMeasurement TestDisplayServer(Url server, CancellationToken cancellation)
+        {
+            string target = server.url.StartsWith("cisco://", StringComparison.OrdinalIgnoreCase)
+                ? "https://" + server.url.Substring("cisco://".Length) : server.url;
+            if (!Uri.TryCreate(target, UriKind.Absolute, out var endpoint) || endpoint.Scheme != Uri.UriSchemeHttps)
+                return ServerProbeMeasurement.Failed;
+
+            using (var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellation))
+            {
+                limit.CancelAfter(UrlTestRetryPolicy.DisplayBudgetMs);
+                var group = Guid.NewGuid().ToString("N");
+                ServicePoint point = null;
+                try
+                {
+                    long latency = 0;
+                    for (int attempt = 0; attempt < 2; attempt++)
+                    {
+                        limit.Token.ThrowIfCancellationRequested();
+                        var request = (HttpWebRequest)WebRequest.Create(endpoint);
+                        request.ConnectionGroupName = group;
+                        request.ServerCertificateValidationCallback = (_, cert, chain, errors) => errors == SslPolicyErrors.None;
+                        point = request.ServicePoint;
+                        var watch = Stopwatch.StartNew();
+                        using (limit.Token.Register(request.Abort))
+                        using (var response = request.GetResponse())
+                        {
+                            latency = Math.Max(1, watch.ElapsedMilliseconds);
+                            using (var body = response.GetResponseStream())
+                                body?.CopyTo(Stream.Null);
+                        }
+                    }
+                    cancellation.ThrowIfCancellationRequested();
+                    return new ServerProbeMeasurement(latency);
+                }
+                catch (Exception ex) when (ex is WebException || ex is IOException || ex is OperationCanceledException)
+                {
+                    cancellation.ThrowIfCancellationRequested();
+                    return ServerProbeMeasurement.Failed;
+                }
+                finally { point?.CloseConnectionGroup(group); }
+            }
+        }
+
+        internal void UpdateListTestResult()
+        {
+            var best = server.urls.Where(url => url != null && url.latency > 0).OrderBy(url => url.latency).FirstOrDefault();
+            urlTestSpeed = best?.latency ?? -1;
+            selectedUrl = best?.url;
+            lastUrlTest = DateTime.Now;
         }
 
         public long UrlTest(bool force)

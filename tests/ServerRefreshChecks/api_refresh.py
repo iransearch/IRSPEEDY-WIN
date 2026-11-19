@@ -3,27 +3,20 @@
 No credentials, live API calls, Core process or Windows runtime are used.
 """
 from pathlib import Path
-import ast
 import subprocess
 import sys
 import tempfile
+from run import stubs
 
 root = Path(__file__).resolve().parents[2]
 source = (root / 'IRSpeedyVPN/MainWindow.FastStartup.cs').read_text()
-methods = source[source.index('        private void ValidateSessionAndRefreshServerList()'):source.index('        private void FastStartup_Closing')]
+methods = source[source.index('        private void ValidateSessionAndRefreshServerList('):source.index('        private void FastStartup_Closing')]
 factory = (root / 'IRSpeedyVPN/Services/ServiceFactory.cs').read_text()
 renew = factory[factory.index('        public void RenewServiceList(List<Group> groups)'):factory.index('        public void RenewServiceList(List<Server> servers)')]
-fixture = ast.parse(Path(__file__).with_name('run.py').read_text())
-stubs = next(ast.literal_eval(n.value) for n in fixture.body if isinstance(n, ast.Assign)
-             and any(isinstance(t, ast.Name) and t.id == 'stubs' for t in n.targets))
 ui = stubs[stubs.index('class FakeDispatcher {'):stubs.index('class Picker {')]
-ui = ui.replace('if(!CheckAccess())throw new Exception("unexpected synchronous dispatcher call");a();',
-                'if(CheckAccess())a();else context.Send(_=>a(),null);')
-ui = ui.replace('public override void Post(SendOrPostCallback d,object state)=>queue.Add(()=>d(state));', '''public override void Post(SendOrPostCallback d,object state)=>queue.Add(()=>d(state));
- public override void Send(SendOrPostCallback d,object state){Exception error=null;using(var done=new ManualResetEventSlim()){
-  queue.Add(()=>{try{d(state);}catch(Exception ex){error=ex;}finally{done.Set();}});done.Wait();}if(error!=null)throw error;}''')
 prefix = r'''
 using System;using System.Linq;using System.Collections.Generic;using System.Collections.Concurrent;using System.Threading;using System.Threading.Tasks;using System.Net;
+using IRSpeedyVPN.Common;
 class Url {public string url;public long latency;public DateTime latencychkTime;}
 class Server {public List<Url> urls=new List<Url>();public bool Invalid;}
 class Group {public string title="xfast";public List<Server> servers=new List<Server>();}
@@ -42,28 +35,33 @@ class Info {public string Username="user",Password="pw",ServerResponse;public ob
 class Account {public User UserAccount=new User();public List<Group> groups=new List<Group>();public object Settings;}
 class User {public string Username,Status="OK";public DateTime? ExpiryDate;}
 class LoginData {public Account Decrypted=new Account();public string DecryptedString="cached",message="denied";}
-class Response {public HttpStatusCode StatusCode=HttpStatusCode.OK;public LoginData ResponseData=new LoginData();}
+class Response {public HttpStatusCode StatusCode=HttpStatusCode.OK;public LoginData ResponseData=new LoginData();public bool VerifiedServerList=true;}
 class Controller {
  public Response Next=new Response();public int Calls;public ManualResetEventSlim Hold;
- public Response Login2(string u,string p){Interlocked.Increment(ref Calls);Hold?.Wait();return Next;}
+ // Deliver the blocked response even after cancellation to exercise the late-result guard.
+ public Response Login2(string u,string p,CancellationToken cancellation){Interlocked.Increment(ref Calls);Hold?.Wait();return Next;}
 }
-class ListView {public int Binds;public bool Preserve;public void RefreshServicesFromFactory(bool preserveManualRefresh=false){Binds++;Preserve=preserveManualRefresh;} }
+class ListView {public int Binds;public bool Preserve;public void ConfigureResidential(Account account){}public void RefreshServicesFromFactory(bool preserveManualRefresh=false){Binds++;Preserve=preserveManualRefresh;} }
 class Cache {public string TempPath="temp";public int Saves;public void SaveConfig(Account a,string p){Saves++;} }
 static class VpnTimeZone {public static DateTime AccountNow=>DateTime.Now;}
-static class LogHelper {public static void WriteLog(Exception e){} }
+static class LogHelper {public static void WriteLog(Exception e){}public static void WriteExLog(string message){} }
 '''.replace('RENEW', renew)
 program = r'''
 class Program {
  readonly SemaphoreSlim serverRefreshGate=new SemaphoreSlim(1,1);
+ readonly AccountSessionMaintenance accountSessionMaintenance=new AccountSessionMaintenance();
+ readonly CancellationTokenSource loginApplicationExit=new CancellationTokenSource();
+ bool ExitCleanupStarted;
+ void ScheduleSessionMaintenance(){}
  bool IsUserLogin=true,LoadLocal,IsRememberChecked=true;long connectionRequestVersion;
  Info gInfo=new Info();Controller serviceController=new Controller();Factory serviceFactory=new Factory();
  FakeDispatcher Dispatcher=new FakeDispatcher();ListView uCServerList=new ListView();Cache localResource=new Cache();string Message;
- void ShowMessage(string text){Message=text;}void LogoutInvalidSession(string m){IsUserLogin=false;}void RechareLogout(bool v){IsUserLogin=false;}
+ void ShowMessage(string text){Message=text;}void LogoutInvalidSession(string m,bool expired=false){IsUserLogin=false;accountSessionMaintenance.End();}
  bool IsExplicitSessionFailure(HttpStatusCode status)=>status==HttpStatusCode.Unauthorized||status==HttpStatusCode.Forbidden||status==HttpStatusCode.NotAcceptable;
  static void Check(bool value,string text){if(!value)throw new Exception(text);Console.WriteLine("PASS "+text);}
  static List<Group> Groups(params Server[] servers)=>new List<Group>{new Group{servers=servers.ToList()}};
  static Server S(string url)=>new Server{urls=new List<Url>{new Url{url=url}}};
- static Program View(){var p=new Program();p.serviceFactory.RenewServiceList(Groups(S("vless://old")));p.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://new"));return p;}
+ static Program View(){var p=new Program();p.accountSessionMaintenance.Begin(true);p.serviceFactory.RenewServiceList(Groups(S("vless://old")));p.serviceController.Next.ResponseData.Decrypted.groups=Groups(S("vless://new"));return p;}
  static async Task Until(Func<bool> condition){for(int i=0;i<1000&&!condition();i++)await Task.Delay(2);Check(condition(),"async API phase settled");}
  static void Main()=>new UiContext().Run(Run);
  static async Task Run(){
@@ -110,14 +108,15 @@ class Program {
   }queued.serverRefreshGate.Release();
  }
 '''
-# FakeDispatcher's optional hook emulates an account/connection transition before UI apply.
-ui = ui.replace('public bool HoldPosted;', 'public Action Before; public bool HoldPosted;')
-ui = ui.replace('if(CheckAccess())a();else context.Send(_=>a(),null);',
-                'Action apply=()=>{Before?.Invoke();a();};if(CheckAccess())apply();else context.Send(_=>apply(),null);')
 with tempfile.TemporaryDirectory(prefix='api-refresh-checks-') as directory:
     path = Path(directory)
     (path / 'Program.cs').write_text(prefix + ui + program + methods + '\n}\n')
+    maintenance = root / 'IRSpeedyVPN/Common/AccountSessionMaintenance.cs'
     framework = 'net48' if '--net48' in sys.argv else 'net8.0'
-    (path / 'Checks.csproj').write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>' + framework + '</TargetFramework><LangVersion>7.3</LangVersion><NoWarn>CS0649;CS0414</NoWarn></PropertyGroup></Project>')
+    (path / 'Checks.csproj').write_text(
+        '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>' + framework +
+        '</TargetFramework><LangVersion>7.3</LangVersion><NuGetAudit>false</NuGetAudit><NoWarn>CS0649;CS0414</NoWarn>' +
+        '</PropertyGroup><ItemGroup><Compile Include="' + str(maintenance) + '" /></ItemGroup></Project>'
+    )
     args = ['build', str(path / 'Checks.csproj')] if framework == 'net48' else ['run', '--project', str(path / 'Checks.csproj')]
     subprocess.run([sys.argv[1] if len(sys.argv) > 1 else 'dotnet'] + args + ['-v:q'], check=True)

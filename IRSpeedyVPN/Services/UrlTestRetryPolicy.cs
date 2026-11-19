@@ -1,13 +1,59 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using IRSpeedyVPN.Services.Libcore;
 
 namespace IRSpeedyVPN.Services
 {
+    internal readonly struct ServerProbeMeasurement
+    {
+        internal readonly long Latency;
+        internal readonly int FailureCount;
+        internal readonly int SampleCount;
+        internal bool Measured => SampleCount > 0 || FailureCount > 0;
+        internal bool Successful => Latency > 0;
+
+        internal ServerProbeMeasurement(long latency, int failures = 0, int samples = 1)
+        {
+            Latency = latency;
+            FailureCount = failures;
+            SampleCount = samples;
+        }
+
+        internal static ServerProbeMeasurement Failed => new ServerProbeMeasurement(-1, 1, 0);
+    }
+
     internal static class UrlTestRetryPolicy
     {
         internal const string RetryUrl = "http://connectivitycheck.gstatic.com/generate_204";
+        internal const int DisplayBudgetMs = 8000;
+        private const int DisplayPrimaryMs = 4000;
+
+        internal static string DisplayUrl(string configured)
+            => string.IsNullOrWhiteSpace(configured) ? RetryUrl : configured.Trim();
+
+        // The clock starts at admission; startup and both RPCs use the same budget.
+        internal static ServerProbeMeasurement RunDisplay(string configured, Func<string, int, ServerProbeMeasurement> attempt,
+            Func<long> elapsedMs, CancellationToken cancellation)
+        {
+            string primary = DisplayUrl(configured);
+            bool distinctFallback = !SameEndpoint(primary, RetryUrl);
+            int Remaining() => (int)Math.Max(0, DisplayBudgetMs - elapsedMs());
+            cancellation.ThrowIfCancellationRequested();
+            int available = Remaining();
+            if (available == 0) return ServerProbeMeasurement.Failed;
+            var first = attempt(primary, distinctFallback ? Math.Min(DisplayPrimaryMs, available) : available);
+            cancellation.ThrowIfCancellationRequested();
+            if (!first.Measured || !distinctFallback || (first.Successful && first.Latency <= 500))
+                return first;
+
+            int remaining = Remaining();
+            if (remaining == 0) return first;
+            var second = attempt(RetryUrl, remaining);
+            cancellation.ThrowIfCancellationRequested();
+            return first.Successful && (!second.Successful || first.Latency <= second.Latency) ? first : second;
+        }
 
         internal static bool IsSuccess(URLTestResp result)
         {

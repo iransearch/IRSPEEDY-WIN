@@ -7,6 +7,7 @@ using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
+using System.Threading;
 
 namespace IRSpeedyVPN.Services
 {
@@ -16,6 +17,8 @@ namespace IRSpeedyVPN.Services
         private const int MaxSavedEntries = 5000;
         private readonly object gate = new object();
         private readonly string path;
+        private readonly bool displayScoped;
+        internal string TestUrl { get; }
         private State state;
         private Dictionary<Url, string> bound = new Dictionary<Url, string>();
         private readonly Random random;
@@ -46,12 +49,19 @@ namespace IRSpeedyVPN.Services
         {
             public bool HasSuccess { get; set; }
             public DateTime CheckedUtc { get; set; }
+            public string Winner { get; set; }
+            public long Ping { get; set; }
+            public HashSet<string> Failed { get; set; }
+            public string Roster { get; set; }
         }
 
-        internal ServerCheckCache(string account, string scope, string directory = null, Random random = null)
+        internal ServerCheckCache(string account, string scope, string directory = null, Random random = null, string testUrl = null)
         {
             directory = directory ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "IRSpeedy", "ServerChecks");
-            path = Path.Combine(directory, Hash(account + "\n" + scope) + ".json");
+            displayScoped = testUrl != null;
+            TestUrl = testUrl;
+            path = Path.Combine(directory, Hash(account + "\n" + scope
+                + (displayScoped ? "\ndisplay-v1\n" + testUrl : "")) + ".json");
             this.random = random ?? new Random();
             state = Load();
         }
@@ -79,6 +89,11 @@ namespace IRSpeedyVPN.Services
                 connection = IRSpeedyVPN.Residential.ResidentialPresentation.ConnectionUri(connection);
             return ConfigKey(service, url, connection);
         }
+
+        internal static string ProbeIdentity(IVPNService service, Url url) => Key(service, url);
+
+        private static string DisplayRowKey(IVPNService service) =>
+            Hash(JsonConvert.SerializeObject(new object[] { service.ID, service.Name, CountryKey(service) }));
 
         private static string ConfigKey(IVPNService service, Url url, string connection)
         {
@@ -110,7 +125,7 @@ namespace IRSpeedyVPN.Services
                             state.Results[key] = legacy;
                             if (legacyKey != key) state.Results.Remove(legacyKey);
                         }
-                        if (state.Results.TryGetValue(key, out var result)) Apply(url, result);
+                        if (!displayScoped && state.Results.TryGetValue(key, out var result)) Apply(url, result);
                         else
                         {
                             // An API refresh may copy a result by URL alone. A config change must invalidate it.
@@ -141,6 +156,17 @@ namespace IRSpeedyVPN.Services
                     }
                     rowKeys[service] = row;
                     rows[row] = service;
+                    if (displayScoped && state.RowResults.TryGetValue(DisplayRowKey(service), out var display))
+                    {
+                        if (display.Roster == row) ApplyDisplayRow(service, display);
+                        else
+                        {
+                            display.Roster = null;
+                            display.HasSuccess = false;
+                            display.Winner = null;
+                            display.Ping = 0;
+                        }
+                    }
                 }
                 if (state.Version == 3)
                 {
@@ -228,7 +254,12 @@ namespace IRSpeedyVPN.Services
         // Only a completed row outcome decides eligibility. A canceled/partial
         // test or a historical member success cannot replace that outcome.
         private bool NeedsAutomaticCheck(string row)
-            => !state.RowResults.TryGetValue(row, out var result) || !result.HasSuccess;
+        {
+            if (!displayScoped)
+                return !state.RowResults.TryGetValue(row, out var result) || !result.HasSuccess;
+            return !state.RowResults.TryGetValue(DisplayRowKey(rows[row]), out var display)
+                || display.Roster != row || !display.HasSuccess;
+        }
 
         internal void RestartForLogin()
         {
@@ -351,6 +382,74 @@ namespace IRSpeedyVPN.Services
             }
         }
 
+        internal IVPNService[] PendingServices
+        {
+            get
+            {
+                lock (gate)
+                    return (state.PendingRows ?? new List<string>()).Where(rows.ContainsKey).Select(key => rows[key]).ToArray();
+            }
+        }
+
+        internal bool FailedLastDisplayRound(IVPNService service, Url url)
+        {
+            lock (gate)
+                return rowKeys.ContainsKey(service) && state.RowResults.TryGetValue(DisplayRowKey(service), out var outcome)
+                    && bound.TryGetValue(url, out var key) && outcome.Failed?.Contains(key) == true;
+        }
+
+        internal bool CommitDisplayRow(IVPNService service, Url winner, IReadOnlyDictionary<Url, long> measurements,
+            CancellationToken cancellation = default)
+        {
+            lock (gate)
+            {
+                if (cancellation.IsCancellationRequested || !rowKeys.TryGetValue(service, out var row)
+                    || !state.PendingRows.Remove(row)) return false;
+                var result = new RowResult
+                {
+                    CheckedUtc = DateTime.UtcNow,
+                    Roster = row,
+                    Failed = new HashSet<string>(measurements.Where(entry => entry.Value <= 0 && bound.ContainsKey(entry.Key))
+                        .Select(entry => bound[entry.Key]), StringComparer.Ordinal)
+                };
+                if (winner != null && bound.TryGetValue(winner, out var key)
+                    && measurements.TryGetValue(winner, out var ping) && ping > 0)
+                {
+                    result.HasSuccess = true;
+                    result.Winner = key;
+                    result.Ping = ping;
+                }
+                state.RowResults[DisplayRowKey(service)] = result;
+                state.CompletedRows.Add(row);
+                if (state.PendingRows.Count == 0)
+                {
+                    state.InitialScanCompleted = true;
+                    state.RoundInProgress = false;
+                }
+                ApplyDisplayRow(service, result);
+                Save();
+                return true;
+            }
+        }
+
+        private void ApplyDisplayRow(IVPNService service, RowResult display)
+        {
+            foreach (var url in service.GetServerUrls() ?? new List<Url>())
+            {
+                if (url == null || !bound.TryGetValue(url, out var key)) continue;
+                if (key == display?.Winner && display.Ping > 0)
+                {
+                    Apply(url, new Result { Latency = display.Ping, CheckedUtc = display.CheckedUtc,
+                        LastSuccess = display.Ping, LastSuccessUtc = display.CheckedUtc });
+                }
+                else
+                {
+                    bool failed = display?.Failed?.Contains(key) == true;
+                    Apply(url, new Result { Latency = failed ? -1 : 0, CheckedUtc = failed ? display.CheckedUtc : default });
+                }
+            }
+        }
+
         // Called on the worker before testing; no new disk write on the UI thread.
         internal void PersistQueue() { lock (gate) Save(); }
 
@@ -399,6 +498,12 @@ namespace IRSpeedyVPN.Services
             lock (gate)
             {
                 if (service == null || !rowKeys.ContainsKey(service)) return;
+                if (displayScoped)
+                {
+                    state.RowResults.TryGetValue(DisplayRowKey(service), out var display);
+                    ApplyDisplayRow(service, display?.Roster == rowKeys[service] ? display : null);
+                    return;
+                }
                 foreach (var url in service.GetServerUrls() ?? new List<Url>())
                 {
                     if (url == null || url.latency <= 0 || url.latencychkTime == default(DateTime)
@@ -466,7 +571,10 @@ namespace IRSpeedyVPN.Services
                     || p.Value.CheckedUtc == default(DateTime) || p.Value.CheckedUtc > DateTime.UtcNow.AddMinutes(5)
                     || p.Value.Latency < -1 || p.Value.LastSuccess < 0)) return new State();
                 if (value.RowResults.Any(p => p.Key == null || p.Key.Length != 64 || p.Value == null
-                    || p.Value.CheckedUtc == default(DateTime) || p.Value.CheckedUtc > DateTime.UtcNow.AddMinutes(5))) return new State();
+                    || p.Value.CheckedUtc == default(DateTime) || p.Value.CheckedUtc > DateTime.UtcNow.AddMinutes(5)
+                    || p.Value.Winner != null && p.Value.Winner.Length != 64
+                    || p.Value.Roster != null && p.Value.Roster.Length != 64
+                    || p.Value.Failed?.Any(key => key == null || key.Length != 64) == true)) return new State();
                 return value;
             }
             catch { return new State(); } // A corrupt cache must not prevent login or tests.
@@ -487,7 +595,8 @@ namespace IRSpeedyVPN.Services
             try
             {
                 TrimHistory(state.Results, new HashSet<string>(bound.Values), result => result.CheckedUtc);
-                TrimHistory(state.RowResults, new HashSet<string>(rows.Keys), result => result.CheckedUtc);
+                TrimHistory(state.RowResults, new HashSet<string>(displayScoped
+                    ? rows.Values.Select(DisplayRowKey) : rows.Keys.AsEnumerable()), result => result.CheckedUtc);
                 Directory.CreateDirectory(Path.GetDirectoryName(path));
                 File.WriteAllText(temp, JsonConvert.SerializeObject(state), Encoding.UTF8);
                 if (File.Exists(path)) File.Replace(temp, path, null);
