@@ -59,8 +59,9 @@ static class IncrementalOrderChecks
         }
         return count;
     }
-    internal static void Run()
+    internal static void Run(string countryClickMode)
     {
+        RowClickDuringPromotion(countryClickMode);
         RetainedResultOrder();
         var groups = Countries(5);
         var model = Start(groups);
@@ -151,6 +152,24 @@ static class IncrementalOrderChecks
         Order(dedup, 3, 1, 2);
         Unique(dedup);
         Check(dedup.Servers.Count == 3, "duplicate keys remain safe in Publish, PresentationOrder and Finish");
+    }
+
+    static void RowClickDuringPromotion(string clickMode)
+    {
+        var groups = Countries(2);
+        groups[0].SignalText = "—";
+        groups[0].IsSelectable = false;
+        groups[1].SignalText = "1149 ms";
+        var model = Start(groups);
+        Complete(model, groups, 2);
+        var pass = model.TryBeginPass();
+        var pressedSlot = model.Slots[1];
+        Check(pressedSlot.IsSelectable && ReferenceEquals(pressedSlot.DisplayedServer.Service, groups[1].Service),
+            "the successful country can receive a pointer press before the sweep reassigns its slot");
+        model.Reveal(pass, ServerRowPart.Name);
+        Check(!pressedSlot.IsSelectable && ReferenceEquals(pressedSlot.DisplayedServer.Service, groups[0].Service),
+            "the same button now represents a pending country and cannot deliver a release click for the pressed country");
+        Check(clickMode == "Press", "the country button must dispatch selection on press before the slot can change");
     }
 
     static void RetainedResultOrder()
