@@ -32,6 +32,43 @@ internal static class StartupFailureChecks
             && !CoreStartFailureDiagnostic.IsDnsComponent(denied)
             && !CoreStartFailureDiagnostic.IsDnsComponent("start inbound/mixed[dns-server]: listen tcp 127.0.0.1:10808: bind denied"),
             "only Core DNS-component rejection authorizes standard-DNS fallback");
+        // Throne-G 15a68bb emits the first parser cause. 21c9a2c with the pinned
+        // sing-box f154bec emits the other parser, DNS manager and inbound causes.
+        const string unknownRace = "dns.servers[0]: unknown transport type: vpn-dns-race";
+        string configPrefix = "decode config at {\"dns\":{\"servers\":[{\"type\":\"vpn-dns-race\"}]},"
+            + "\"outbounds\":[{\"tag\":\"proxy\"}],\"test\":\"PRIVATE }\\\": dns.rules[0].timeout " + new string('x', 9000) + "\"}: ";
+        var dnsErrors = new[] {
+            unknownRace,
+            configPrefix + unknownRace,
+            "start service: start dns/vpn-dns-race[dns-remote]: outbound detour not found: proxy",
+            configPrefix + "dns.rules[0].timeout: time: invalid duration \"invalid\"",
+            "create service: initialize dns router: parse dns rule[0]: domain_regex: parse expression 0: error parsing regexp: missing closing ]: `[`",
+            "create service: initialize DNS server[0]: vpn-dns-race requires 2 to 7 primary servers"
+        };
+        for (int i = 0; i < dnsErrors.Length; i++)
+        {
+            string dnsError = dnsErrors[i];
+            fields = CoreStartFailureDiagnostic.Fields(dnsError);
+            check(CoreStartFailureDiagnostic.IsDnsComponent(dnsError) && fields.Contains("component=dns") && !fields.Contains("PRIVATE"),
+                "Core DNS rejection and privacy-safe diagnostic agree for fixture " + i);
+        }
+        var otherErrors = new[] {
+            configPrefix + "duplicate outbound/endpoint tag: proxy",
+            configPrefix + "duplicate outbound/endpoint tag: dns server",
+            "start inbound/mixed[vpn-dns-race]: listen tcp 127.0.0.1:37233: bind: address already in use",
+            "start service: create netlink socket: operation not permitted",
+            "initialize inbound[0]: dns server options rejected",
+            "start inbound/private_type[dns server]: invalid settings",
+            "initialize inbound/tun[tun-in]: configure tun interface: dns server options rejected",
+            "start dns/vpn-dns-race[dns-remote]: permission denied",
+            "start dns/vpn-dns-race[dns-remote]: socketError=10013",
+            "start dns/vpn-dns-race[dns-remote]: listen udp 127.0.0.1:10808: bind: address already in use",
+            "unknown transport type: vpn-dns-race-test",
+            "decode config at {\"tag\":\"unknown transport type: vpn-dns-race"
+        };
+        for (int i = 0; i < otherErrors.Length; i++)
+            check(!CoreStartFailureDiagnostic.IsDnsComponent(otherErrors[i]),
+                "non-DNS or blocked Core error cannot authorize fallback for fixture " + i);
         fields = CoreStartFailureDiagnostic.Fields("start inbound/PRIVATE_TYPE[PRIVATE_TAG]: listen tcp 127.0.0.1:99999: bind: denied");
         check(fields.Contains("inboundType=unknown") && fields.Contains("localPort=-1") && !fields.Contains("PRIVATE"), "unknown types and invalid port values are bounded");
         check(CoreStartFailureDiagnostic.Fields(new string('x', 9000)).Contains("errorTruncated=True"), "large startup errors have an explicit truncation marker");

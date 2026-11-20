@@ -16,6 +16,12 @@ namespace IRSpeedyVPN.Common
         private static readonly Regex Inbound = new Regex(@"\binbound/(?<type>[a-z0-9_-]+)\b", RegexOptions.IgnoreCase);
         private static readonly Regex NativeCode = new Regex(
             @"\b(?:native(?:error|code)|errno|win32(?:error)?|socketerror|error\s+code)\s*[:=]\s*(?<code>[0-9]{1,7})\b", RegexOptions.IgnoreCase);
+        private static readonly Regex IndexedInbound = new Regex(@"\binitialize inbound\[[0-9]+\]");
+        private static readonly Regex BlockedDnsFallback = new Regex(
+            @"\b(?:bind|denied|wsaeacces|wsaeaddrinuse|wsaeaddrnotavail)\b|operation not permitted|forbidden by its access permissions");
+        private static readonly Regex DnsRulePath = new Regex(@"^dns\.rules\[[0-9]+\][.:]");
+        private static readonly Regex DnsRaceError = new Regex(
+            @"\b(?:unknown transport type: vpn-dns-race(?![\w-])|start dns/vpn-dns-race\[|vpn-dns-race (?:requires|timeouts must be positive|servers must share one vpn detour|fallback must use the same vpn detour)\b|invalid vpn-dns-race doh options\b|unsupported vpn-dns-race transport:)");
 
         internal static string Context(string error)
         {
@@ -31,11 +37,11 @@ namespace IRSpeedyVPN.Common
         internal static string Fields(string error)
         {
             int length = (error ?? string.Empty).Length;
-            string text = Context(error);
+            string text = StartupContext(error);
             string lower = text.ToLowerInvariant();
             var inbound = Inbound.Match(text);
             string kind = inbound.Success ? AllowedInbound(inbound.Groups["type"].Value.ToLowerInvariant()) : "unknown";
-            string component = Component(lower, kind);
+            string component = Component(lower, kind, inbound.Success);
             var socket = Socket.Match(text);
             string network = socket.Success ? socket.Groups["network"].Value.ToLowerInvariant().Replace(':', '-') : "unknown";
             string operation = socket.Success ? socket.Groups["op"].Value.ToLowerInvariant() : Operation(lower);
@@ -75,11 +81,49 @@ namespace IRSpeedyVPN.Common
 
         internal static bool IsDnsComponent(string error)
         {
-            string text = Context(error);
+            string text = StartupContext(error);
             string lower = text.ToLowerInvariant();
             var inbound = Inbound.Match(text);
             string kind = inbound.Success ? AllowedInbound(inbound.Groups["type"].Value.ToLowerInvariant()) : "unknown";
-            return Component(lower, kind) == "dns";
+            var native = NativeCode.Match(text);
+            string code = native.Success ? native.Groups["code"].Value : "";
+            return code != "10013" && code != "10048" && code != "10049" && !BlockedDnsFallback.IsMatch(lower)
+                && Component(lower, kind, inbound.Success) == "dns";
+        }
+
+        private static string StartupContext(string error)
+        {
+            // Throne-G puts the original config before the parser error. Skip
+            // that object, including quoted braces, without classifying its data.
+            const string prefix = "decode config at ";
+            if (error == null || !error.StartsWith(prefix, StringComparison.Ordinal)) return Context(error);
+            int first = prefix.Length;
+            while (first < error.Length && char.IsWhiteSpace(error[first])) first++;
+            if (first == error.Length || error[first] != '{') return string.Empty;
+            int depth = 0;
+            bool quoted = false;
+            for (int i = first; i < error.Length; i++)
+            {
+                char c = error[i];
+                if (quoted)
+                {
+                    if (c == '\\') i++;
+                    else if (c == '"') quoted = false;
+                }
+                else if (c == '"') quoted = true;
+                else if (c == '{') depth++;
+                else if (c == '}')
+                {
+                    if (--depth != 0) continue;
+                    int separator = i + 1;
+                    while (separator < error.Length && char.IsWhiteSpace(error[separator])) separator++;
+                    if (separator >= error.Length || error[separator] != ':') return string.Empty;
+                    int cause = separator + 1;
+                    while (cause < error.Length && char.IsWhiteSpace(error[cause])) cause++;
+                    return Context(error.Substring(cause, Math.Min(error.Length - cause, 8192)));
+                }
+            }
+            return string.Empty;
         }
 
         private static string AllowedInbound(string value)
@@ -92,13 +136,15 @@ namespace IRSpeedyVPN.Common
             }
         }
 
-        private static string Component(string text, string inbound)
+        private static string Component(string text, string inbound, bool hasInbound)
         {
             if (text.Contains("wintun")) return "tun-driver";
             if (inbound == "tun" || text.Contains("tun interface") || text.Contains("tun adapter") || text.Contains("tun device")) return "tun";
-            if (inbound != "unknown") return "inbound";
+            if (hasInbound || IndexedInbound.IsMatch(text)) return "inbound";
             if (text.Contains("network monitor") || text.Contains("interface monitor")) return "network-monitor";
-            if (text.Contains("dns server") || text.Contains("dns transport") || text.Contains("dns router")) return "dns";
+            if (text.StartsWith("duplicate outbound/endpoint tag: ", StringComparison.Ordinal)) return "unknown";
+            if (text.Contains("dns server") || text.Contains("dns transport") || text.Contains("dns router")
+                || DnsRulePath.IsMatch(text) || DnsRaceError.IsMatch(text)) return "dns";
             if (text.Contains("xray") || text.Contains("app/proxyman") || text.Contains("proxy/socks")) return "xray";
             if (text.Contains("rule-set") || text.Contains("rule set") || text.Contains("routing")) return "routing";
             if (text.Contains("createprocess") || text.Contains("extra process")) return "extra-process";

@@ -1,5 +1,9 @@
 # Android-style VPN DNS
 
+Run the startup fallback checks with `python tests/ParallelDnsChecks/startup_flow.py`
+from the repository root with the .NET 8 SDK on PATH. The runner compiles the
+production startup method and generated DNS policy with a fake Core client.
+
 Windows uses the app-owned native `vpn-dns-race` transport introduced in 1.4.36's updated
 Throne-G Core. Reference Android commit:
 12f470f443f5f5217a4713f87f24469feacd44f9.
