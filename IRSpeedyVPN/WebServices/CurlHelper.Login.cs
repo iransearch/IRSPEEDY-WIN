@@ -5,6 +5,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Diagnostics;
 using System.Net;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Web.Script.Serialization;
 
@@ -13,6 +14,14 @@ namespace IRSpeedyVPN.WebServices
     internal sealed partial class CurlHelper
     {
         private static readonly LoginDnsCache LoginDns = new LoginDnsCache(FetchLoginAddresses);
+        // Match the actual write-out block at its boundary. A peer in stdout
+        // before that block is not evidence about the timed-out connection.
+        private static readonly Regex LoginTimeoutTrailer = new Regex(
+            @"\G" + MarkerHttpCode + @"(?<status>[0-9]{1,3})\r?\n__LOGIN_CONNECT__:[0-9.]+\r?\n__LOGIN_TLS__:[0-9.]+"
+            + @"\r?\n__LOGIN_READY__:[0-9.]+\r?\n__LOGIN_UPLOAD__:[0-9.]+\r?\n__LOGIN_REDIRECTS__:[0-9]+"
+            + @"\r?\n__LOGIN_HTTP__:[0-9]{1,3}\r?\n__LOGIN_REMOTE__:(?<peer>[^\r\n]*)\r?\n"
+            + @"(?<receive>__LOGIN_FIRST_BYTE__:[0-9.]+\r?\n__LOGIN_TOTAL__:[0-9.]+\r?\n__LOGIN_DOWNLOAD__:[0-9.]+"
+            + @"\r?\n__LOGIN_VERSION__:[0-9.]+\r?\n)?\z");
         // Credential POSTs use the first valid public answer from the classic DNS race.
         internal const LoginDnsOrder LoginResolutionOrder = LoginDnsOrder.ResolverFirst;
         internal CurlResponse SendLogin(string url, string method, string headers, string body,
@@ -132,15 +141,32 @@ namespace IRSpeedyVPN.WebServices
             result.ConnectSeconds = connect; result.TlsSeconds = tls;
             result.PretransferSeconds = ready; result.UploadedBytes = upload;
             result.Redirects = redirects; result.HttpCode = http;
+            int boundary = output.LastIndexOf(MarkerHttpCode, StringComparison.Ordinal);
+            string peer;
+            if (exitCode == 28)
+            {
+                var trailer = boundary >= 0 && (boundary == 0 || output[boundary - 1] == '\n')
+                    ? LoginTimeoutTrailer.Match(output, boundary) : Match.Empty;
+                peer = trailer.Success ? trailer.Groups["peer"].Value : null;
+                result.CompleteTimeoutTrailerWithEmptyPeer = peer == "" && trailer.Groups["receive"].Success
+                    && trailer.Groups["status"].Value.Trim('0').Length == 0;
+            }
+            else peer = ParseTrailingValue(output, "__LOGIN_REMOTE__:");
             IPAddress remote;
-            if (IPAddress.TryParse(ParseTrailingValue(output, "__LOGIN_REMOTE__:"), out remote))
-                result.RemoteIp = remote.ToString();
+            if (IPAddress.TryParse(peer, out remote))
+            {
+                string canonical = remote.ToString();
+                // TryParse accepts shortened IPv4 addresses and bracketed IPv6
+                // endpoints. curl writes a numeric host address without brackets.
+                if (exitCode != 28 || (peer[0] != '['
+                    && (remote.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork || peer == canonical)))
+                    result.RemoteIp = canonical;
+            }
             result.FirstByteSeconds = OptionalMetric(output, "__LOGIN_FIRST_BYTE__:");
             result.TotalSeconds = OptionalMetric(output, "__LOGIN_TOTAL__:");
             result.DownloadedBytes = OptionalMetric(output, "__LOGIN_DOWNLOAD__:");
             string version = ParseTrailingValue(output, "__LOGIN_VERSION__:");
             if (LoginCurlResult.IsKnownHttpVersion(version)) result.HttpVersion = version;
-            int boundary = output.LastIndexOf(MarkerHttpCode, StringComparison.Ordinal);
             result.Body = boundary < 0 ? "" : output.Substring(0, boundary).TrimEnd('\r', '\n');
             result.BodyKind = LoginResponseDiagnostics.ClassifyBody(result.Body);
             responseHeaders?.Apply(result);
