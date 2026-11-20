@@ -10,7 +10,7 @@ namespace IRSpeedyVPN.Common
     internal sealed class CoreRuntimeIdentity
     {
         internal const string ErrorPrefix = "[CoreFailure]\n";
-        internal const string ConnectionFailureMessage = "خطا در اتصال به سرویس";
+        internal const string ConnectionFailureMessage = "خطا در برقراری اتصال VPN";
 
         internal static string UserConnectionError(string error)
             => string.IsNullOrWhiteSpace(error) || error == "سروری یافت نشد" || error == "سرور یافت نشد" || error == "Connection canceled."
