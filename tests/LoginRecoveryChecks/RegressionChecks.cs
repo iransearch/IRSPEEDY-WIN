@@ -40,9 +40,15 @@ static class RegressionChecks
         foreach (int code in new[] { 28, 52, 55, 56 })
         {
             var unsent = Unsent(code);
-            Check(!unsent.MayHaveBeenSent && !unsent.CanRecover, "HTTPS exit " + code + " before TLS permits failover but not same-host DoH");
+            const string peer = "93.184.216.34";
+            if (code == 28) unsent.RemoteIp = peer;
+            Check(!unsent.MayHaveBeenSent && !unsent.CanRecover, "HTTPS exit " + code + " with pre-TLS evidence permits failover but not an unconditional same-host retry");
             var transport = new StubTransport { Handler = resolve => unsent };
-            var failure = Fails(new LoginRecovery(transport, EmptyDns, null), "https://login.test/");
+            // The known-peer timeout can resolve an alternative. A DNS answer
+            // containing only that same peer must not trigger another POST.
+            var resolver = code == 28 ? new LoginDnsCache((host, timeout, token) => new[] { peer }) : EmptyDns;
+            var failure = Fails(new LoginRecovery(transport, resolver, null), "https://login.test/");
+            Check(transport.Calls == 1, "HTTPS exit " + code + " does not retry the same peer");
             Failover(failure, true);
             unsent.TlsSeconds = .000001;
             Check(unsent.MayHaveBeenSent && !unsent.CanRecover, "HTTPS exit " + code + " after TLS remains blocked");
@@ -51,6 +57,9 @@ static class RegressionChecks
             Check(Fails(new LoginRecovery(transport, EmptyDns, null), "http://login.test/").MayHaveBeenSent,
                 "HTTP exit " + code + " retains the previous conservative policy");
         }
+        var unknownTimeout = new StubTransport { Handler = resolve => Unsent(28) };
+        Failover(Fails(new LoginRecovery(unknownTimeout, EmptyDns, null), "https://login.test/"), false);
+        Check(unknownTimeout.Calls == 1, "TCP timing without a validated peer cannot justify exit 28 failover");
         foreach (var status in new[] { WebExceptionStatus.NameResolutionFailure, WebExceptionStatus.ConnectFailure })
         {
             var managed = new ManagedFailureTransport(new WebException("fixture", status));

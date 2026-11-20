@@ -11,12 +11,13 @@ static class DnsFailureChecks
     { if (!condition) throw new Exception(name); Console.WriteLine("PASS " + name); }
 
     // Exact -w metrics from the bundled Windows curl 8.21.0 user report.
-    static LoginCurlResult Captured(int exitCode = 6)
-        => CurlHelper.ParseLoginResult("__HTTP_CODE__:000\n__LOGIN_CONNECT__:0.000000\n"
-            + "__LOGIN_TLS__:0.000000\n__LOGIN_READY__:3.001837\n__LOGIN_UPLOAD__:0\n"
-            + "__LOGIN_REDIRECTS__:0\n__LOGIN_HTTP__:000\n__LOGIN_REMOTE__:\n"
-            + "__LOGIN_FIRST_BYTE__:3.001837\n__LOGIN_TOTAL__:3.001841\n"
-            + "__LOGIN_DOWNLOAD__:0\n__LOGIN_VERSION__:0\n", exitCode);
+    const string CapturedTrailer = "__HTTP_CODE__:000\n__LOGIN_CONNECT__:0.000000\n"
+        + "__LOGIN_TLS__:0.000000\n__LOGIN_READY__:3.001837\n__LOGIN_UPLOAD__:0\n"
+        + "__LOGIN_REDIRECTS__:0\n__LOGIN_HTTP__:000\n__LOGIN_REMOTE__:\n"
+        + "__LOGIN_FIRST_BYTE__:3.001837\n__LOGIN_TOTAL__:3.001841\n"
+        + "__LOGIN_DOWNLOAD__:0\n__LOGIN_VERSION__:0\n";
+    internal static LoginCurlResult Captured(int exitCode = 6)
+        => CurlHelper.ParseLoginResult(CapturedTrailer, exitCode);
     static LoginCurlResult Send(LoginRecovery recovery, string url = "https://login.test/", LoginNetworkContext context = null)
         => recovery.Send(url, "POST", "", "credential-must-not-be-logged", 8000,
             context ?? new LoginNetworkContext(CancellationToken.None));
@@ -76,6 +77,7 @@ static class DnsFailureChecks
             Check(!result.DefinitelyNotSent && !result.CanRecover && result.MayHaveBeenSentFor(true),
                 "exit 28 remains fail-closed with " + mutation.Key);
         }
+        CheckTimeoutPeerEvidence();
         var partial = CurlHelper.ParseLoginResult("__LOGIN_CONNECT__:0\n__LOGIN_TLS__:0\n", 6);
         Check(!partial.MetricsKnown && !partial.DefinitelyNotSent && !partial.CanRecover,
             "partial native trailer cannot authorize DNS recovery through default-zero fields");
@@ -133,5 +135,66 @@ static class DnsFailureChecks
             && logs.Any(line => line.Contains("effectiveMayHaveBeenSent=False"))
             && logs.All(line => !line.Contains("credential-must-not-be-logged")),
             "logs distinguish conservative metrics from effective HTTPS DNS proof without credentials");
+    }
+
+    private static void CheckTimeoutPeerEvidence()
+    {
+        const string remoteLine = "__LOGIN_REMOTE__:\n";
+        var missing = CapturedTrailer.Replace(remoteLine, "");
+        var invalid = CapturedTrailer.Replace(remoteLine, "__LOGIN_REMOTE__:not-an-ip\n");
+        var noPretransfer = CapturedTrailer.Replace("__LOGIN_READY__:3.001837", "__LOGIN_READY__:0");
+        var fixtures = new Dictionary<string, string>
+        {
+            { "missing peer", missing },
+            { "invalid peer", invalid },
+            { "abbreviated IPv4 peer", CapturedTrailer.Replace(remoteLine, "__LOGIN_REMOTE__:12345\n") },
+            { "whitespace peer", CapturedTrailer.Replace(remoteLine, "__LOGIN_REMOTE__: \n") },
+            { "peer line outside trailer", remoteLine + missing },
+            { "valid IP outside trailer", "__LOGIN_REMOTE__:93.184.216.34\n" + missing },
+            { "duplicate peer line", CapturedTrailer.Replace(remoteLine, "__LOGIN_REMOTE__:not-an-ip\n" + remoteLine) },
+            { "nonzero trailer HTTP marker", CapturedTrailer.Replace("__HTTP_CODE__:000", "__HTTP_CODE__:200") },
+            { "missing trailer boundary", CapturedTrailer.Replace("__HTTP_CODE__:000\n", "") },
+            { "truncated trailer", CapturedTrailer.TrimEnd('\n') },
+            { "missing peer with zero pretransfer", noPretransfer.Replace(remoteLine, "") },
+            { "invalid peer with zero pretransfer", noPretransfer.Replace(remoteLine, "__LOGIN_REMOTE__:not-an-ip\n") },
+            { "partial receive trailer with zero pretransfer", noPretransfer.Replace("__LOGIN_VERSION__:0\n", "") }
+        };
+
+        var crlf = CurlHelper.ParseLoginResult(CapturedTrailer.Replace("\n", "\r\n"), 28);
+        Check(crlf.DefinitelyNotSent && crlf.CanRecover && !crlf.MayHaveBeenSentFor(true),
+            "complete CRLF exit 28 trailer proves an explicitly empty peer");
+        foreach (var fixture in fixtures)
+        {
+            var result = CurlHelper.ParseLoginResult(fixture.Value, 28);
+            Check(result.MayHaveBeenSentFor(true) && !result.DefinitelyNotSent
+                && !result.CanRecover && !result.CanResolveAlternatePeer,
+                "exit 28 stays ambiguous with " + fixture.Key);
+        }
+
+        foreach (bool resolverFirst in new[] { false, true })
+        foreach (var fixture in new[] { CapturedTrailer, missing, invalid, fixtures["missing peer with zero pretransfer"] })
+        {
+            bool provenUnsent = fixture == CapturedTrailer;
+            int endpoints = 0;
+            var context = new LoginNetworkContext(CancellationToken.None);
+            var transport = new StubTransport { Handler = resolve => endpoints > 1
+                ? new LoginCurlResult { HttpCode = 200 }
+                : CurlHelper.ParseLoginResult(fixture, 28) };
+            var recovery = new LoginRecovery(transport, new LoginDnsCache((host, ms, token) => new[] { "93.184.216.34" }),
+                null, resolverFirst ? LoginDnsOrder.ResolverFirst : LoginDnsOrder.SystemFirst);
+            Func<BaseHttpResponse<object>> login = () => new ControllerHarness().Run((host, timeout) =>
+            {
+                endpoints++;
+                return new BaseHttpResponse<object>
+                { StatusCode = (HttpStatusCode)Send(recovery, host.BaseAddress, context).HttpCode };
+            }, context);
+            if (provenUnsent)
+                Check(login().StatusCode == HttpStatusCode.OK && endpoints == 2 && transport.Calls == 3,
+                    "complete exit 28 proof allows the next API hostname (resolver-first=" + resolverFirst + ")");
+            else
+                Check(Fails(() => login()).MayHaveBeenSent && endpoints == 1 && transport.Calls == 1
+                    && transport.ManagedCalls == 0,
+                    "ambiguous exit 28 peer blocks all credential retries (resolver-first=" + resolverFirst + ")");
+        }
     }
 }

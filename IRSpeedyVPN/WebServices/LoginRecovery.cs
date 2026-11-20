@@ -55,6 +55,7 @@ namespace IRSpeedyVPN.WebServices
         internal int ExitCode, HttpCode;
         internal string Body, RemoteIp;
         internal bool Unavailable, MetricsKnown;
+        internal bool CompleteTimeoutTrailerWithEmptyPeer;
         internal double ConnectSeconds, TlsSeconds, PretransferSeconds, UploadedBytes;
         // Optional receive diagnostics. Missing values never establish the additional
         // failed-connect proof below or weaken the ordinary replay guard.
@@ -71,16 +72,18 @@ namespace IRSpeedyVPN.WebServices
         private string RemoteIpForLog => IPAddress.TryParse(RemoteIp, out var ip) ? ip.ToString() : "unknown";
         private string RemoteFamilyForLog => !IPAddress.TryParse(RemoteIp, out var ip) ? "unknown"
             : ip.AddressFamily == AddressFamily.InterNetworkV6 ? "IPv6" : "IPv4";
-        // These fields come from -w even on nonzero exit. Unknown/partial metrics
-        // are never evidence that it is safe to repeat a credential POST.
+        // A timeout without peer evidence stays ambiguous even when curl's
+        // reported durations and upload count are all zero.
         internal bool MayHaveBeenSent => !MetricsKnown || UploadedBytes > 0 || HttpCode > 0
-            || Redirects != 0 || TlsSeconds > 0 || PretransferSeconds > 0;
+            || Redirects != 0 || TlsSeconds > 0 || PretransferSeconds > 0
+            || (ExitCode == 28 && string.IsNullOrEmpty(RemoteIp) && !DefinitelyNotSent);
         // Bundled Windows curl can report positive time_pretransfer before DNS or
-        // connect timeout. Exit 7 and exit 28 additionally need the complete receive
-        // trailer, no HTTP protocol and no received data. This proof applies only to HTTPS.
+        // connect timeout. The HTTPS timeout override requires the complete
+        // write-out block with an explicitly empty peer field.
         internal bool DefinitelyNotSent => !Unavailable && MetricsKnown
             && (ExitCode == 6 || ((ExitCode == 7 || ExitCode == 28) && TransferMetricsKnown
                 && DownloadedBytes == 0 && HttpVersion == "0" && string.IsNullOrEmpty(Body)))
+            && (ExitCode != 28 || CompleteTimeoutTrailerWithEmptyPeer)
             && ConnectSeconds == 0 && TlsSeconds == 0 && UploadedBytes == 0
             && HttpCode == 0 && Redirects == 0 && string.IsNullOrEmpty(RemoteIp);
         // The all-zero TLS proof is specific to HTTPS. Retain the previous

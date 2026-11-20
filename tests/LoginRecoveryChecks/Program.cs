@@ -178,7 +178,8 @@ class Program
 
             foreach (int code in new[] { 6, 7, 35, 60, 28 })
             {
-                var eligible = new StubTransport { Handler = resolve => resolve == null ? Failure(code) : new LoginCurlResult { HttpCode = 200 } };
+                var eligible = new StubTransport { Handler = resolve => resolve == null
+                    ? (code == 28 ? DnsFailureChecks.Captured(28) : Failure(code)) : new LoginCurlResult { HttpCode = 200 } };
                 int queries = 0;
                 var answers = new LoginDnsCache((host, timeout, cancellation) => { queries++; return new[] { "93.184.216.34" }; });
                 Check(Send(new LoginRecovery(eligible, answers, logs.Add), url).HttpCode == 200
