@@ -12,6 +12,7 @@ namespace IRSpeedyVPN.Services
     {
         internal const int Capacity = 8;
         private const int RetryDelayMs = 250;
+        private const int MaxConsecutiveLocalFailures = 3;
         private const int SatisfiedLatencyMs = 300;
         private static readonly SemaphoreSlim Slots = new SemaphoreSlim(Capacity, Capacity);
 
@@ -31,7 +32,7 @@ namespace IRSpeedyVPN.Services
         {
             internal Row Row;
             internal ServerRefreshPlan.Candidate Candidate;
-            internal Task<ServerProbeMeasurement> Work;
+            internal Task<ServerProbeMeasurement?> Work;
         }
 
         internal static async Task RunAsync(IEnumerable<ServerRefreshPlan.Country> plan,
@@ -52,27 +53,34 @@ namespace IRSpeedyVPN.Services
                     cancellation.ThrowIfCancellationRequested();
                     foreach (var finished in running.Where(f => f.Work.IsCompleted).ToArray())
                     {
-                        var result = await finished.Work.ConfigureAwait(false);
+                        var attempt = await finished.Work.ConfigureAwait(false);
                         cancellation.ThrowIfCancellationRequested();
                         running.Remove(finished);
                         var row = finished.Row;
+                        var candidate = finished.Candidate;
                         row.Running--;
+                        var result = attempt.GetValueOrDefault();
+                        if (result.Measured)
+                            candidate.ConsecutiveLocalFailures = 0;
+                        else if (attempt.HasValue && ++candidate.ConsecutiveLocalFailures >= MaxConsecutiveLocalFailures)
+                            result = ServerProbeMeasurement.Failed;
+
                         if (!result.Measured)
                         {
                             if (!row.Satisfied)
                             {
-                                row.Deferred[finished.Candidate] = delay(RetryDelayMs, cancellation);
-                                row.Country.Pending.Add(finished.Candidate);
+                                row.Deferred[candidate] = delay(RetryDelayMs, cancellation);
+                                row.Country.Pending.Add(candidate);
                             }
                             continue;
                         }
 
-                        foreach (var owner in finished.Candidate.Owners)
+                        foreach (var owner in candidate.Owners)
                             row.Measurements[owner.Url] = result.Latency;
                         if (result.Successful && (row.Winner == null ||
-                            ServerRefreshPlan.Compare(finished.Candidate, result, row.Winner, row.Best) < 0))
+                            ServerRefreshPlan.Compare(candidate, result, row.Winner, row.Best) < 0))
                         {
-                            row.Winner = finished.Candidate;
+                            row.Winner = candidate;
                             row.Best = result;
                         }
                         if (result.Successful && result.Latency < SatisfiedLatencyMs)
@@ -129,13 +137,15 @@ namespace IRSpeedyVPN.Services
             }
         }
 
-        private static async Task<ServerProbeMeasurement> ProbeAsync(ServerRefreshPlan.Candidate candidate,
+        private static async Task<ServerProbeMeasurement?> ProbeAsync(ServerRefreshPlan.Candidate candidate,
             Func<ServerRefreshPlan.Candidate, CancellationToken, Task<ServerProbeMeasurement>> probe,
             CancellationToken cancellation)
         {
-            if (!await Slots.WaitAsync(0, cancellation).ConfigureAwait(false)) return default;
+            // Null means the probe never acquired a slot. A default measurement
+            // means admitted work ended without measuring.
+            if (!await Slots.WaitAsync(0, cancellation).ConfigureAwait(false)) return null;
             try { return await probe(candidate, cancellation).ConfigureAwait(false); }
-            catch (OperationCanceledException) when (!cancellation.IsCancellationRequested) { return default; }
+            catch (OperationCanceledException) when (!cancellation.IsCancellationRequested) { return default(ServerProbeMeasurement); }
             finally { Slots.Release(); }
         }
     }

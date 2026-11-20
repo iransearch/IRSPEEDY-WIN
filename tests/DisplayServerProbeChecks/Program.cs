@@ -30,6 +30,10 @@ internal static class Program
         await Satisfied(300, false);
         await InFlightResultsAreKept();
         await DeferredDoesNotMeasure();
+        await ConsecutiveLocalFailuresFinishRow();
+        await MeasurementResetsLocalFailures();
+        await NoSlotDoesNotCountAsLocalFailure();
+        await CancelAllDoesNotCountAsLocalFailure();
         await CancellationDrainsAndDoesNotPublish();
         ProbeBudgets();
         OrderAndCache();
@@ -154,6 +158,109 @@ internal static class Program
             backoffs++;
             return Task.CompletedTask;
         });
+    }
+
+    private static async Task ConsecutiveLocalFailuresFinishRow()
+    {
+        var plan = Plan(new TestRow(1, 1));
+        var candidate = plan.Single().Pending.Single();
+        int calls = 0, completed = 0, backoffs = 0;
+        await ServerProbeScheduler.RunAsync(plan, (_, __) =>
+        {
+            if (++calls > 3) throw new Exception("A terminal candidate ran again.");
+            return Task.FromResult(default(ServerProbeMeasurement));
+        }, (row, winner, results) =>
+        {
+            completed++;
+            Check(winner == null && results.Count == 1
+                && results[candidate.Owners[0].Url] == ServerProbeMeasurement.Failed.Latency,
+                "three consecutive local failures publish a failed measurement with no winner");
+        }, CancellationToken.None, (delay, _) =>
+        {
+            Check(delay == 250, "local failure retries still wait 250 ms");
+            backoffs++;
+            return Task.CompletedTask;
+        });
+        Check(calls == 3 && backoffs == 2 && completed == 1 && plan[0].Pending.Count == 0,
+            "the third local failure finishes the row exactly once with no further retry");
+    }
+
+    private static async Task MeasurementResetsLocalFailures()
+    {
+        var plan = Plan(new TestRow(1, 1));
+        var candidate = plan.Single().Pending.Single();
+        int calls = 0;
+        await ServerProbeScheduler.RunAsync(plan, (current, _) =>
+        {
+            if (++calls < 3) return Task.FromResult(default(ServerProbeMeasurement));
+            Check(current.ConsecutiveLocalFailures == 2, "two admitted unmeasured probes accumulate two local failures");
+            return Task.FromResult(new ServerProbeMeasurement(500));
+        }, (row, winner, results) =>
+        {
+            Check(winner == candidate.Owners[0].Url && results[winner] == 500
+                && candidate.ConsecutiveLocalFailures == 0, "a successful measurement resets the candidate's local failures");
+        }, CancellationToken.None, (_, __) => Task.CompletedTask);
+    }
+
+    private static async Task NoSlotDoesNotCountAsLocalFailure()
+    {
+        var release = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var holders = ServerProbeScheduler.RunAsync(Plan(new TestRow(1, ServerProbeScheduler.Capacity)), async (_, __) =>
+        {
+            await release.Task;
+            return new ServerProbeMeasurement(500);
+        }, (row, winner, results) => { }, CancellationToken.None);
+        var plan = Plan(new TestRow(2, 1));
+        var candidate = plan.Single().Pending.Single();
+        int denials = 0, calls = 0;
+        try
+        {
+            await ServerProbeScheduler.RunAsync(plan, (_, __) =>
+            {
+                calls++;
+                Check(denials == 40 && candidate.ConsecutiveLocalFailures == 0,
+                    "forty slot denials leave the failure count at zero before the probe actually runs");
+                return Task.FromResult(new ServerProbeMeasurement(500));
+            }, (row, winner, results) =>
+            {
+                Check(calls == 1 && winner == candidate.Owners[0].Url && results[winner] == 500,
+                    "capacity contention retries without publishing a failed measurement");
+            }, CancellationToken.None, (delay, _) =>
+            {
+                if (++denials < 40) return Task.CompletedTask;
+                release.SetResult(true);
+                return holders;
+            });
+        }
+        finally
+        {
+            release.TrySetResult(true);
+            await holders;
+        }
+    }
+
+    private static async Task CancelAllDoesNotCountAsLocalFailure()
+    {
+        UrlTestCoordinator.BeginBatch();
+        var plan = Plan(new TestRow(1, 1));
+        var candidate = plan.Single().Pending.Single();
+        int calls = 0, completed = 0;
+        try
+        {
+            await ServerProbeScheduler.RunAsync(plan, (_, __) =>
+            {
+                if (++calls == 3) UrlTestCoordinator.CancelAll();
+                return Task.FromResult(default(ServerProbeMeasurement));
+            }, (row, winner, results) => completed++, UrlTestCoordinator.DisplayCancellation,
+                (_, __) => Task.CompletedTask);
+            throw new Exception("The canceled scan returned successfully.");
+        }
+        catch (OperationCanceledException)
+        {
+            Check(calls == 3 && candidate.ConsecutiveLocalFailures == 2 && completed == 0,
+                "CancelAll leaves the local failure count unchanged and publishes no result");
+        }
+        finally { UrlTestCoordinator.BeginBatch(); }
     }
 
     private static async Task CancellationDrainsAndDoesNotPublish()

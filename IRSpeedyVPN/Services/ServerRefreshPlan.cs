@@ -14,6 +14,7 @@ namespace IRSpeedyVPN.Services
         internal sealed class Candidate
         {
             internal Url Probe;
+            internal int ConsecutiveLocalFailures;
             internal readonly List<Owner> Owners = new List<Owner>();
         }
         internal sealed class Country
