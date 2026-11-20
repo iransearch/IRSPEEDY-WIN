@@ -13,6 +13,13 @@ namespace IRSpeedyVPN.Services.SingBox
         // core owns completion-order selection; DNS rule order cannot pick a provider.
         public static string Apply(string json)
         {
+            bool ignored;
+            return Apply(json, out ignored);
+        }
+
+        internal static string Apply(string json, out bool raceAdded)
+        {
+            raceAdded = false;
             var config = JObject.Parse(json);
             var dns = config["dns"] as JObject;
             var servers = dns?["servers"] as JArray;
@@ -26,6 +33,9 @@ namespace IRSpeedyVPN.Services.SingBox
             if (remote == null || (string)remote["type"] != "https" || (string)remote["detour"] != "proxy"
                 || (string)remote["path"] != "/dns-query"
                 || ((string)remote["server"] != "1.1.1.1" && (string)remote["server"] != "8.8.8.8")) return json;
+            // Every generated DNS transport detours through this outbound. Do not
+            // create a composite that the Core can only reject at startup.
+            if (!HasSingleOutbound(config, "proxy")) return json;
             if (servers.OfType<JObject>().Any(s => (string)s["tag"] == "dns-remote-cloudflare"
                 || (string)s["tag"] == "dns-remote-yandex" || (string)s["tag"] == "dns-remote-additional")) return json;
             var rules = dns["rules"] as JArray ?? new JArray();
@@ -67,7 +77,15 @@ namespace IRSpeedyVPN.Services.SingBox
                 rules.Add(new JObject { ["action"] = "route", ["server"] = Remote, ["timeout"] = "12s" });
             dns["rules"] = rules;
             ResolveProxyDestinations(config);
+            raceAdded = true;
             return config.ToString(Formatting.None);
+        }
+
+        private static bool HasSingleOutbound(JObject config, string tag)
+        {
+            var outbounds = (config["outbounds"] as JArray)?.OfType<JObject>() ?? Enumerable.Empty<JObject>();
+            var endpoints = (config["endpoints"] as JArray)?.OfType<JObject>() ?? Enumerable.Empty<JObject>();
+            return outbounds.Concat(endpoints).Count(item => (string)item["tag"] == tag) == 1;
         }
 
         private static bool IsVpnOutbound(string tag) => tag == "proxy" || tag == "ai-proxy";

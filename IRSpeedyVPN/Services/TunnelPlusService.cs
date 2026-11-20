@@ -489,9 +489,12 @@ namespace IRSpeedyVPN.Services
         }
 
         private bool TryStartCoreWithConfig(string configData, out string error, bool needXray = false,
-            string xrayConfig = null, string xrayOutboundDnsStrategy = "")
+            string xrayConfig = null, string xrayOutboundDnsStrategy = "", bool allowParallelDns = true)
         {
             error = null;
+            string originalConfigData = configData;
+            string originalXrayConfig = xrayConfig;
+            bool parallelDnsAdded = false;
             if (!PauseSharingBeforeCoreRestart())
             {
                 error = "Hotspot cleanup was not confirmed.";
@@ -518,9 +521,11 @@ namespace IRSpeedyVPN.Services
                 configData = SingBox.TunBrowserCompatibility.Apply(configData);
                 var split = SplitTunneling.SplitTunnelStore.Load();
                 configData = SplitTunneling.SplitTunnelPolicyBuilder.Apply(configData, split, System.Windows.Forms.Application.ExecutablePath);
-                configData = SingBox.ParallelDnsRouting.Apply(configData);
+                if (allowParallelDns)
+                    configData = SingBox.ParallelDnsRouting.Apply(configData, out parallelDnsAdded);
                 configData = Traffic.TrafficConfiguration.Enable(configData);
                 configData = SingBox.VpnTimeZoneRouting.Apply(configData);
+                Diagnostic("parallel-dns-config", "enabled=" + allowParallelDns + " added=" + parallelDnsAdded);
                 if (split.Enabled)
                     Diagnostic("split-tunnel", "policy=selected-only selected=" + split.Apps.Count
                         + " mode=" + (lastVpnMode ? "TUN+local-proxy" : "local-proxy")
@@ -673,6 +678,15 @@ namespace IRSpeedyVPN.Services
                 LogHelper.WriteLog(report);
                 error = runtimeIdentity.Failure(startResp.Error);
                 TryStopCore();
+                if (allowParallelDns && parallelDnsAdded && CoreStartFailureDiagnostic.IsDnsComponent(startResp.Error)
+                    && !userCancelRequested && !GetStartCancellation().IsCancellationRequested)
+                {
+                    Diagnostic("parallel-dns-fallback", "stage=begin trigger=dns-config-rejected");
+                    bool recovered = TryStartCoreWithConfig(originalConfigData, out error, needXray,
+                        originalXrayConfig, xrayOutboundDnsStrategy, allowParallelDns: false);
+                    Diagnostic("parallel-dns-fallback", "stage=end success=" + recovered);
+                    return recovered;
+                }
                 return false;
             }
             if (recoveredRpcFailure != null) LogHelper.WriteLog(recoveredRpcFailure);

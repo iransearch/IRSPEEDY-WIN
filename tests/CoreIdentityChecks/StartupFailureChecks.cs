@@ -28,13 +28,17 @@ internal static class StartupFailureChecks
         check(fields.Contains("component=tun") && fields.Contains("operation=configure") && fields.Contains("localPort=-1"), "TUN access denial is distinguished from a proxy port failure");
         check(CoreStartFailureDiagnostic.Fields("open wintun.dll: Access is denied.").Contains("component=tun-driver")
             && CoreStartFailureDiagnostic.Fields("initialize network monitor: permission denied").Contains("component=network-monitor"), "driver and network monitor failures are separate");
+        check(CoreStartFailureDiagnostic.IsDnsComponent("create service: initialize DNS server[dns-remote]: outbound not found")
+            && !CoreStartFailureDiagnostic.IsDnsComponent(denied)
+            && !CoreStartFailureDiagnostic.IsDnsComponent("start inbound/mixed[dns-server]: listen tcp 127.0.0.1:10808: bind denied"),
+            "only Core DNS-component rejection authorizes standard-DNS fallback");
         fields = CoreStartFailureDiagnostic.Fields("start inbound/PRIVATE_TYPE[PRIVATE_TAG]: listen tcp 127.0.0.1:99999: bind: denied");
         check(fields.Contains("inboundType=unknown") && fields.Contains("localPort=-1") && !fields.Contains("PRIVATE"), "unknown types and invalid port values are bounded");
         check(CoreStartFailureDiagnostic.Fields(new string('x', 9000)).Contains("errorTruncated=True"), "large startup errors have an explicit truncation marker");
         fields = CoreStartFailureDiagnostic.Fields("error password=\"listen tcp 127.0.0.1:7085\" {\"remark\":\"wintun\"}");
         check(fields.Contains("component=unknown") && fields.Contains("network=unknown") && fields.Contains("localPort=-1"), "private payload cannot masquerade as bind or driver metadata");
 
-        const string userMessage = "خطا در اتصال به سرویس";
+        const string userMessage = "خطا در برقراری اتصال VPN";
         foreach (string error in new[] { denied, "short technical error", "startup-timeout", "rpc-transport-failure",
             new CoreRuntimeIdentity().Failure("permission denied"), "تنظیمات مسیریابی یا DNS معتبر نیست" })
             check(CoreRuntimeIdentity.UserConnectionError(error) == userMessage, "connection failure displays only the requested text");

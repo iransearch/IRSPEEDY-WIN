@@ -73,6 +73,15 @@ namespace IRSpeedyVPN.Common
                 + " errorTruncated=" + (length > 8192);
         }
 
+        internal static bool IsDnsComponent(string error)
+        {
+            string text = Context(error);
+            string lower = text.ToLowerInvariant();
+            var inbound = Inbound.Match(text);
+            string kind = inbound.Success ? AllowedInbound(inbound.Groups["type"].Value.ToLowerInvariant()) : "unknown";
+            return Component(lower, kind) == "dns";
+        }
+
         private static string AllowedInbound(string value)
         {
             switch (value)

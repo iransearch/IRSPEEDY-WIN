@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix='core-error-ui-') as temp:
     folder = Path(temp)
     (folder/'Handlers.cs').write_text('''using System; using System.Windows;
 class CoreRuntimeIdentity { internal const string ErrorPrefix="[CoreFailure]\\n";
- internal const string ConnectionFailureMessage="خطا در اتصال به سرویس"; }
+ internal const string ConnectionFailureMessage="خطا در برقراری اتصال VPN"; }
 class LogHelper { internal static void WriteLog(string value) {} }
 class MainWindow : Window { System.Windows.Controls.TextBlock lblErrorMessage = new System.Windows.Controls.TextBlock();
 ''' + methods + '}')

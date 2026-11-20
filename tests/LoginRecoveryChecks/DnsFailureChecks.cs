@@ -11,10 +11,12 @@ static class DnsFailureChecks
     { if (!condition) throw new Exception(name); Console.WriteLine("PASS " + name); }
 
     // Exact -w metrics from the bundled Windows curl 8.21.0 user report.
-    static LoginCurlResult Captured()
+    static LoginCurlResult Captured(int exitCode = 6)
         => CurlHelper.ParseLoginResult("__HTTP_CODE__:000\n__LOGIN_CONNECT__:0.000000\n"
-            + "__LOGIN_TLS__:0.000000\n__LOGIN_READY__:0.017777\n__LOGIN_UPLOAD__:0\n"
-            + "__LOGIN_REDIRECTS__:0\n__LOGIN_HTTP__:000\n__LOGIN_REMOTE__:\n", 6);
+            + "__LOGIN_TLS__:0.000000\n__LOGIN_READY__:3.001837\n__LOGIN_UPLOAD__:0\n"
+            + "__LOGIN_REDIRECTS__:0\n__LOGIN_HTTP__:000\n__LOGIN_REMOTE__:\n"
+            + "__LOGIN_FIRST_BYTE__:3.001837\n__LOGIN_TOTAL__:3.001841\n"
+            + "__LOGIN_DOWNLOAD__:0\n__LOGIN_VERSION__:0\n", exitCode);
     static LoginCurlResult Send(LoginRecovery recovery, string url = "https://login.test/", LoginNetworkContext context = null)
         => recovery.Send(url, "POST", "", "credential-must-not-be-logged", 8000,
             context ?? new LoginNetworkContext(CancellationToken.None));
@@ -52,11 +54,27 @@ static class DnsFailureChecks
         }
         var unavailable = Captured(); unavailable.Unavailable = true;
         Check(!unavailable.DefinitelyNotSent && !unavailable.CanRecover, "unavailable curl cannot claim DNS-stage proof");
-        foreach (int code in new[] { 7, 35, 60, 28, 52, 55, 56 })
+        foreach (int code in new[] { 7, 35, 60, 52, 55, 56 })
         {
-            var result = Captured(); result.ExitCode = code;
+            var result = Captured(); result.ExitCode = code; result.DownloadedBytes = null;
             Check(!result.DefinitelyNotSent && !result.CanRecover && result.MayHaveBeenSentFor(true),
                 "positive pretransfer alone cannot prove an unsent request for exit " + code);
+        }
+        var connectTimeout = Captured(28);
+        Check(connectTimeout.MayHaveBeenSent && connectTimeout.DefinitelyNotSent && connectTimeout.CanRecover
+            && !connectTimeout.MayHaveBeenSentFor(true) && connectTimeout.MayHaveBeenSentFor(false),
+            "complete Windows exit 28 trailer proves the HTTPS POST never connected or transferred");
+        foreach (var mutation in new Dictionary<string, Action<LoginCurlResult>>
+        {
+            { "missing receive metrics", r => r.DownloadedBytes = null },
+            { "received data", r => r.DownloadedBytes = 1 },
+            { "HTTP protocol", r => r.HttpVersion = "1.1" },
+            { "response body", r => r.Body = "x" }
+        })
+        {
+            var result = Captured(28); mutation.Value(result);
+            Check(!result.DefinitelyNotSent && !result.CanRecover && result.MayHaveBeenSentFor(true),
+                "exit 28 remains fail-closed with " + mutation.Key);
         }
         var partial = CurlHelper.ParseLoginResult("__LOGIN_CONNECT__:0\n__LOGIN_TLS__:0\n", 6);
         Check(!partial.MetricsKnown && !partial.DefinitelyNotSent && !partial.CanRecover,

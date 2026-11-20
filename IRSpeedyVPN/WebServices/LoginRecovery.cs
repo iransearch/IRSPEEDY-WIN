@@ -76,13 +76,13 @@ namespace IRSpeedyVPN.WebServices
         internal bool MayHaveBeenSent => !MetricsKnown || UploadedBytes > 0 || HttpCode > 0
             || Redirects != 0 || TlsSeconds > 0 || PretransferSeconds > 0;
         // Bundled Windows curl can report positive time_pretransfer before DNS or
-        // connect failure. Exit 7 additionally needs the complete receive trailer,
-        // no HTTP protocol and no received data. This proof applies only to HTTPS.
+        // connect timeout. Exit 7 and exit 28 additionally need the complete receive
+        // trailer, no HTTP protocol and no received data. This proof applies only to HTTPS.
         internal bool DefinitelyNotSent => !Unavailable && MetricsKnown
-            && (ExitCode == 6 || (ExitCode == 7 && TransferMetricsKnown
+            && (ExitCode == 6 || ((ExitCode == 7 || ExitCode == 28) && TransferMetricsKnown
                 && DownloadedBytes == 0 && HttpVersion == "0" && string.IsNullOrEmpty(Body)))
             && ConnectSeconds == 0 && TlsSeconds == 0 && UploadedBytes == 0
-            && HttpCode == 0 && Redirects == 0 && RemoteIp == null;
+            && HttpCode == 0 && Redirects == 0 && string.IsNullOrEmpty(RemoteIp);
         // The all-zero TLS proof is specific to HTTPS. Retain the previous
         // conservative exit-code guard when a caller supplies a plain HTTP URL.
         internal bool MayHaveBeenSentFor(bool https) => (MayHaveBeenSent && !(https && DefinitelyNotSent)) || (!https

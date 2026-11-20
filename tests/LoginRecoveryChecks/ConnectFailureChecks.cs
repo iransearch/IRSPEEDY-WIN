@@ -51,7 +51,10 @@ static class ConnectFailureChecks
             Check(!result.DefinitelyNotSent && !result.CanRecover && result.MayHaveBeenSentFor(true),
                 "connect-failure proof rejects " + mutation.Key);
         }
-        foreach (int code in new[] { 28, 35, 60, 52, 55, 56, -1 })
+        var timedOut = Captured(); timedOut.ExitCode = 28;
+        Check(timedOut.DefinitelyNotSent && timedOut.CanRecover && !timedOut.MayHaveBeenSentFor(true),
+            "complete diagnostic trailer also proves an exit 28 HTTPS connect timeout was unsent");
+        foreach (int code in new[] { 35, 60, 52, 55, 56, -1 })
         {
             var result = Captured(); result.ExitCode = code;
             Check(!result.DefinitelyNotSent && !result.CanRecover && result.MayHaveBeenSentFor(true),

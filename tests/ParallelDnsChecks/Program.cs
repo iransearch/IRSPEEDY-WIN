@@ -32,7 +32,9 @@ internal static class Program
             foreach (bool split in new[] { false, true })
             {
                 var before = Build(tun, split);
-                var after = JObject.Parse(ParallelDnsRouting.Apply(before.ToString()));
+                bool raceAdded;
+                var after = JObject.Parse(ParallelDnsRouting.Apply(before.ToString(), out raceAdded));
+                Check(raceAdded, "caller can retain the standard DNS config for startup fallback");
                 var servers = (JArray)after["dns"]["servers"];
                 var remote = servers.Single(s => (string)s["tag"] == "dns-remote");
                 Check((string)remote["type"] == "vpn-dns-race", "one native completion-order transport");
@@ -80,7 +82,9 @@ internal static class Program
                 if (split)
                     Check(JToken.DeepEquals(before["dns"]["rules"].Single(r => (string)r["server"] == "split-dns-direct"),
                         rules.Single(r => (string)r["server"] == "split-dns-direct")), "unselected apps retain scoped direct DNS");
-                Check(JToken.DeepEquals(after, JObject.Parse(ParallelDnsRouting.Apply(after.ToString()))), "idempotent");
+                bool secondRaceAdded;
+                Check(JToken.DeepEquals(after, JObject.Parse(ParallelDnsRouting.Apply(after.ToString(), out secondRaceAdded)))
+                    && !secondRaceAdded, "idempotent and an existing race is not reported as newly added");
                 if (!string.IsNullOrEmpty(output))
                 {
                     Directory.CreateDirectory(output);
@@ -105,6 +109,12 @@ internal static class Program
         custom = Build(false, false);
         ((JArray)custom["dns"]["servers"]).Add(new JObject { ["type"] = "udp", ["tag"] = "dns-remote-additional", ["server"] = "192.0.2.53" });
         Check(ParallelDnsRouting.Apply(custom.ToString()) == custom.ToString(), "existing custom provider untouched");
+        custom = Build(false, false);
+        custom["outbounds"].Single(o => (string)o["tag"] == "proxy").Remove();
+        Check(ParallelDnsRouting.Apply(custom.ToString()) == custom.ToString(), "missing DNS detour outbound leaves standard DNS unchanged");
+        custom = Build(false, false);
+        ((JArray)custom["outbounds"]).Add(custom["outbounds"].Single(o => (string)o["tag"] == "proxy").DeepClone());
+        Check(ParallelDnsRouting.Apply(custom.ToString()) == custom.ToString(), "ambiguous DNS detour outbound leaves standard DNS unchanged");
         if (!string.IsNullOrEmpty(output)) File.WriteAllText(Path.Combine(output, "scoped.json"), expanded.ToString());
         ProxyDnsChecks.Run(Check, Build, output);
         Console.WriteLine("PASS " + checks + " parallel DNS configuration checks");
