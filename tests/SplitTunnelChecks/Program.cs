@@ -42,18 +42,19 @@ class Program
     }
     // Evaluate a small subset independently to verify effective route precedence,
     // including logical AND/invert, unknown processes and non-TUN callers.
-    static bool Match(JObject rule, string process, string inbound, string network, int port, string domain = "www.youtube.com", string sourceIp = "127.0.0.1")
+    static bool Match(JObject rule, string process, string inbound, string network, int port, string domain = "www.youtube.com", string sourceIp = "127.0.0.1", int ipVersion = 4)
     {
         bool ok;
         if ((string)rule["type"] == "logical")
         {
             if (rule["inbound"] != null) throw new Exception("invalid logical rule schema");
-            var matches = ((JArray)rule["rules"]).OfType<JObject>().Select(r => Match(r, process, inbound, network, port, domain, sourceIp));
+            var matches = ((JArray)rule["rules"]).OfType<JObject>().Select(r => Match(r, process, inbound, network, port, domain, sourceIp, ipVersion));
             ok = (string)rule["mode"] == "or" ? matches.Any(v => v) : matches.All(v => v);
         }
         else
         {
             ok = rule["inbound"] == null || ((JArray)rule["inbound"]).Values<string>().Contains(inbound);
+            if (rule["ip_version"] != null) ok &= (int)rule["ip_version"] == ipVersion;
             if (rule["source_ip_cidr"] != null)
                 ok &= ((JArray)rule["source_ip_cidr"]).Values<string>().Any(cidr => InSubnet(sourceIp, cidr));
             if (rule["process_path_regex"] != null)
@@ -84,11 +85,11 @@ class Program
         }
         return true;
     }
-    static string Route(JObject c, string process, string inbound = "tun-in", string network = "tcp", int port = 443, string sourceIp = "127.0.0.1")
+    static string Route(JObject c, string process, string inbound = "tun-in", string network = "tcp", int port = 443, string sourceIp = "127.0.0.1", int ipVersion = 4)
     {
         foreach (var r in ((JArray)c["route"]["rules"]).OfType<JObject>())
         {
-            if (!Match(r, process, inbound, network, port, sourceIp: sourceIp)) continue;
+            if (!Match(r, process, inbound, network, port, sourceIp: sourceIp, ipVersion: ipVersion)) continue;
             string action = (string)r["action"];
             if (action == "sniff") continue;
             return (string)r["outbound"] ?? action;
@@ -116,6 +117,47 @@ class Program
         }
         return false;
     }
+    static void WireGuardTunRoutes()
+    {
+        var config = JObject.Parse(Base());
+        var group = (JObject)config["outbounds"][0];
+        group["type"] = "auto-selector-round-robin";
+        group["outbounds"] = new JArray("smart-wg-0", "smart-wg-1");
+        var endpoints = new JArray(group["outbounds"].Values<string>().Select(tag => new JObject
+        {
+            ["tag"] = tag, ["type"] = "wireguard", ["address"] = new JArray("10.0.0.2/32"),
+            ["peers"] = new JArray(new JObject { ["allowed_ips"] = new JArray("0.0.0.0/0", "::/0") })
+        }));
+        config["endpoints"] = endpoints;
+        var applied = Build(config.ToString(), Settings());
+        Check(Route(applied, Browser, ipVersion: 6) == "reject", "IPv4-only AWG pool rejects IPv6 on the TUN fallback");
+        var reject = applied["route"]["rules"].Last;
+        Check((bool)reject["no_drop"] && (string)reject["method"] == "default", "unsupported IPv6 is rejected rather than silently dropped");
+        Check(Route(applied, Browser) == "proxy", "selected app IPv4 still uses the AWG pool");
+        Check(Route(applied, Other, ipVersion: 6) == "split-direct", "unselected app IPv6 remains direct");
+        Check(Route(applied, Browser, port: 53, ipVersion: 6) == "hijack-dns", "TUN IPv6 DNS capture precedes the guard");
+        Check(Route(applied, Browser, "mixed-in", ipVersion: 6) == "proxy", "the guard is scoped to the TUN inbound");
+        Check(JToken.DeepEquals(applied["endpoints"], endpoints), "guard preserves AWG endpoints and AllowedIPs");
+        Check(!Build(config.ToString(), new SplitTunnelSettings())["route"]["rules"].Any(rule => (int?)rule["ip_version"] == 6),
+            "AWG is unchanged when split tunneling is off");
+
+        ((JArray)endpoints[1]["address"]).Add("fd01::2/128");
+        Check(Route(Build(config.ToString(), Settings()), Browser, ipVersion: 6) == "proxy",
+            "a pool with a dual-family AWG member keeps IPv6");
+        endpoints.RemoveAt(1);
+        ((JArray)config["outbounds"]).Add(new JObject { ["tag"] = "smart-wg-1", ["type"] = "socks" });
+        Check(Route(Build(config.ToString(), Settings()), Browser, ipVersion: 6) == "proxy",
+            "mixed protocol pools retain their routing");
+
+        group.Remove();
+        endpoints[0]["tag"] = "proxy";
+        Check(Route(Build(config.ToString(), Settings()), Browser, ipVersion: 6) == "reject",
+            "a native IPv4-only WireGuard endpoint is recognized as a fallback target");
+        config["inbounds"][1].Remove();
+        Check(!Build(config.ToString(), Settings())["route"]["rules"].Any(rule => (int?)rule["ip_version"] == 6),
+            "the split builder leaves proxy-only IPv6 policy to the existing proxy transform");
+    }
+
     static void Main(string[] args)
     {
         string original = Base();
@@ -124,6 +166,7 @@ class Program
         Check(TunBrowserCompatibility.Apply(Base(false)) == Base(false), "browser fix does not change proxy-only mode");
         var normal = JObject.Parse(TunBrowserCompatibility.Apply(original));
         Check(!FastQuicReject(JObject.Parse(original), Browser), "reproduce old post-sniff QUIC rejection");
+        WireGuardTunRoutes();
         Check(FastQuicReject(normal, Browser), "normal TUN rejects QUIC before sniff without dropping");
         Check(Route(normal, @"C:\Runtime\throne.exe", network: "udp") == "direct", "core UDP/443 not rejected");
         Check(JToken.DeepEquals(normal, JObject.Parse(TunBrowserCompatibility.Apply(normal.ToString()))), "browser transform idempotent");
