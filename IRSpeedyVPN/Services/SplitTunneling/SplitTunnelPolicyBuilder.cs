@@ -2,6 +2,8 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Linq;
+using System.Net;
+using System.Net.Sockets;
 
 namespace IRSpeedyVPN.Services.SplitTunneling
 {
@@ -97,8 +99,39 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 dns["final"] = "dns-remote";
             }
             foreach (var rule in rules) prefix.Add(rule.DeepClone());
+            if (tunTags.Length > 0 && (string)route["final"] == "proxy" && IsIpv4OnlyWireGuardRoute(config))
+            {
+                // Keep IPv6 captured so selected apps cannot bypass the VPN. Only
+                // reject traffic that would fall through to an IPv4-only WG path.
+                prefix.Add(new JObject
+                {
+                    ["inbound"] = new JArray(tunTags), ["ip_version"] = 6,
+                    ["action"] = "reject", ["method"] = "default", ["no_drop"] = true
+                });
+            }
             route["rules"] = prefix;
             return config.ToString(Formatting.None);
+        }
+
+        private static bool IsIpv4OnlyWireGuardRoute(JObject config)
+        {
+            var endpoints = (config["endpoints"] as JArray)?.OfType<JObject>()
+                .Where(endpoint => (string)endpoint["type"] == "wireguard").ToArray();
+            if (endpoints == null || endpoints.Length == 0) return false;
+            var primary = ((JArray)config["outbounds"]).OfType<JObject>()
+                .FirstOrDefault(outbound => (string)outbound["tag"] == "proxy");
+            if (primary != null && (string)primary["type"] != "auto-selector-round-robin") return false;
+            var members = primary == null ? new[] { "proxy" } : (primary["outbounds"] as JArray)?.Values<string>().ToArray();
+            return members != null && members.Length > 0 && members.All(tag => endpoints.Any(endpoint =>
+                (string)endpoint["tag"] == tag && IsIpv4OnlyWireGuard(endpoint)));
+        }
+
+        private static bool IsIpv4OnlyWireGuard(JObject endpoint)
+        {
+            var addresses = (endpoint["address"] as JArray)?.Values<string>().Select(prefix =>
+                IPAddress.TryParse(prefix?.Split('/')[0], out var address) ? address.AddressFamily : AddressFamily.Unknown).ToArray();
+            // An IPv6 AllowedIPs entry does not supply an IPv6 source address.
+            return addresses != null && addresses.Length > 0 && addresses.All(family => family == AddressFamily.InterNetwork);
         }
 
         private static string[] Tags(JArray inbounds, params string[] types)
