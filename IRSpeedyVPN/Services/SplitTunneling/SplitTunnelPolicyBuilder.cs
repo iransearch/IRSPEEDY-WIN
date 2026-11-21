@@ -2,8 +2,6 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
 using System.Linq;
-using System.Net;
-using System.Net.Sockets;
 
 namespace IRSpeedyVPN.Services.SplitTunneling
 {
@@ -38,6 +36,7 @@ namespace IRSpeedyVPN.Services.SplitTunneling
             // Game mode has a direct catch-all. App split mode takes precedence,
             // while the existing AI, shield, LAN and geo rules stay intact.
             if ((string)route["final"] == "direct") route["final"] = "proxy";
+            bool ipv4Only = tunTags.Length > 0 && UsesWireGuardPrimary(config);
 
             // Capture IPv6 as well; leaving only IPv4 in the TUN would bypass
             // application rules on a dual-stack Windows network.
@@ -56,12 +55,27 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 && r["outbound"] != null && (string)r["outbound"] != "proxy")) prefix.Add(rule.DeepClone());
             if (tunTags.Length > 0)
                 prefix.Add(new JObject { ["inbound"] = new JArray(tunTags), ["port"] = 53, ["action"] = "hijack-dns" });
+            if (ipv4Only)
+            {
+                // Keep capturing IPv6; reject user destinations before sniffing or
+                // selecting an outbound. DNS packets to the TUN are handled above.
+                prefix.Add(new JObject
+                {
+                    ["inbound"] = new JArray(tunTags.Concat(proxyTags)), ["ip_version"] = 6,
+                    ["action"] = "reject", ["method"] = "default", ["no_drop"] = true
+                });
+                // Unlike a proxy listener, TUN gives the browser DNS records.
+                // Core applies the default strategy to those answers as well.
+                dns["strategy"] = "ipv4_only";
+            }
 
             var matcher = DirectMatcher(patterns);
             if (matcher != null)
             {
                 outbounds.Add(new JObject { ["tag"] = "split-direct", ["type"] = "direct",
-                    ["domain_resolver"] = "split-dns-direct" });
+                    ["domain_resolver"] = ipv4Only
+                        ? (JToken)new JObject { ["server"] = "split-dns-direct", ["strategy"] = "ipv4_only" }
+                        : new JValue("split-dns-direct") });
                 ((JArray)dns["servers"]).Add(new JObject { ["tag"] = "split-dns-direct", ["type"] = "udp",
                     ["server"] = "1.1.1.1", ["detour"] = "split-direct" });
                 var traffic = ScopedMatcher(matcher, scope);
@@ -94,26 +108,23 @@ namespace IRSpeedyVPN.Services.SplitTunneling
                 }
                 orderedDns.Add(dnsRule);
                 foreach (var rule in dnsRules.OfType<JObject>().Where(r => (string)r["action"] != "predefined"))
-                    orderedDns.Add(rule.DeepClone());
+                {
+                    var copy = (JObject)rule.DeepClone();
+                    // Generated bootstrap rules keep their direct resolver and
+                    // inherit the family policy without a legacy rule strategy.
+                    if (ipv4Only && (string)copy["server"] == "dns-direct" && (string)copy["strategy"] == "prefer_ipv4")
+                        copy.Remove("strategy");
+                    orderedDns.Add(copy);
+                }
                 dns["rules"] = orderedDns;
                 dns["final"] = "dns-remote";
             }
             foreach (var rule in rules) prefix.Add(rule.DeepClone());
-            if (tunTags.Length > 0 && (string)route["final"] == "proxy" && IsIpv4OnlyWireGuardRoute(config))
-            {
-                // Keep IPv6 captured so selected apps cannot bypass the VPN. Only
-                // reject traffic that would fall through to an IPv4-only WG path.
-                prefix.Add(new JObject
-                {
-                    ["inbound"] = new JArray(tunTags), ["ip_version"] = 6,
-                    ["action"] = "reject", ["method"] = "default", ["no_drop"] = true
-                });
-            }
             route["rules"] = prefix;
             return config.ToString(Formatting.None);
         }
 
-        private static bool IsIpv4OnlyWireGuardRoute(JObject config)
+        private static bool UsesWireGuardPrimary(JObject config)
         {
             var endpoints = (config["endpoints"] as JArray)?.OfType<JObject>()
                 .Where(endpoint => (string)endpoint["type"] == "wireguard").ToArray();
@@ -123,15 +134,7 @@ namespace IRSpeedyVPN.Services.SplitTunneling
             if (primary != null && (string)primary["type"] != "auto-selector-round-robin") return false;
             var members = primary == null ? new[] { "proxy" } : (primary["outbounds"] as JArray)?.Values<string>().ToArray();
             return members != null && members.Length > 0 && members.All(tag => endpoints.Any(endpoint =>
-                (string)endpoint["tag"] == tag && IsIpv4OnlyWireGuard(endpoint)));
-        }
-
-        private static bool IsIpv4OnlyWireGuard(JObject endpoint)
-        {
-            var addresses = (endpoint["address"] as JArray)?.Values<string>().Select(prefix =>
-                IPAddress.TryParse(prefix?.Split('/')[0], out var address) ? address.AddressFamily : AddressFamily.Unknown).ToArray();
-            // An IPv6 AllowedIPs entry does not supply an IPv6 source address.
-            return addresses != null && addresses.Length > 0 && addresses.All(family => family == AddressFamily.InterNetwork);
+                (string)endpoint["tag"] == tag));
         }
 
         private static string[] Tags(JArray inbounds, params string[] types)
