@@ -103,15 +103,16 @@ namespace IRSpeedyVPN.Services.SingBox
             if (!IsVpnOutbound((string)route["final"]) && !rules.OfType<JObject>().Any(r => IsVpnOutbound((string)r["outbound"])
                 && (string.IsNullOrEmpty((string)r["action"]) || (string)r["action"] == "route"))) return;
 
-            // A TUN profile also has a mixed listener. Presence of that listener
-            // alone must not change TUN mode's existing dual-family policy.
-            bool ipv4Only = !inbounds.Any(i => (string)i["type"] == "tun");
+            // AWG split TUN already installs its own early reject for both
+            // inbound types. Its explicit proxy resolver must use IPv4 too.
+            bool proxyOnly = !inbounds.Any(i => (string)i["type"] == "tun");
+            bool ipv4Only = proxyOnly || (string)config["dns"]?["strategy"] == "ipv4_only";
             var ipv6Reject = new JObject { ["inbound"] = new JArray(tags), ["ip_version"] = 6,
                 ["action"] = "reject", ["method"] = "default", ["no_drop"] = true };
             var ordered = new JArray();
             foreach (var rule in rules)
             {
-                if (ipv4Only && JToken.DeepEquals(rule, ipv6Reject)) continue;
+                if (proxyOnly && JToken.DeepEquals(rule, ipv6Reject)) continue;
                 var target = rule as JObject;
                 // Upgrade generated resolve rules from a previous application
                 // pass too, rather than leaving a dual-family lookup ahead of us.
@@ -131,7 +132,7 @@ namespace IRSpeedyVPN.Services.SingBox
                 AddResolve(ordered, ProxyResolve(tags, null, ipv4Only), tags);
             // Resolve acts only on hostnames; literal IPv6 destinations must be
             // rejected explicitly. Core-owned DNS/Pool sockets have no user inbound.
-            if (ipv4Only) ordered.Insert(0, ipv6Reject);
+            if (proxyOnly) ordered.Insert(0, ipv6Reject);
             route["rules"] = ordered;
         }
 

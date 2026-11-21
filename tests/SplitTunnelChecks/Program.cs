@@ -129,25 +129,48 @@ class Program
             ["peers"] = new JArray(new JObject { ["allowed_ips"] = new JArray("0.0.0.0/0", "::/0") })
         }));
         config["endpoints"] = endpoints;
+        ((JArray)config["dns"]["rules"]).Add(new JObject
+        {
+            ["action"] = "route", ["server"] = "dns-direct", ["domain"] = "awg.example",
+            ["strategy"] = "prefer_ipv4"
+        });
         var applied = Build(config.ToString(), Settings());
-        Check(Route(applied, Browser, ipVersion: 6) == "reject", "IPv4-only AWG pool rejects IPv6 on the TUN fallback");
-        var reject = applied["route"]["rules"].Last;
+        Check((string)applied["dns"]["strategy"] == "ipv4_only", "AWG split TUN applies IPv4-only to DNS replies");
+        var bootstrap = applied["dns"]["rules"].Single(r => (string)r["domain"] == "awg.example");
+        Check((string)bootstrap["server"] == "dns-direct" && bootstrap["strategy"] == null,
+            "the direct bootstrap rule uses the new default without an incompatible legacy strategy");
+        Check((string)applied["route"]["default_domain_resolver"]["strategy"] == "prefer_ipv4",
+            "the transport dialer retains its own bootstrap address preference");
+        var routeRules = (JArray)applied["route"]["rules"];
+        var reject = routeRules.Single(rule => (int?)rule["ip_version"] == 6);
         Check((bool)reject["no_drop"] && (string)reject["method"] == "default", "unsupported IPv6 is rejected rather than silently dropped");
+        Check(routeRules.IndexOf(reject) < routeRules.IndexOf(routeRules.First(rule => (string)rule["action"] == "sniff")),
+            "IPv6 is rejected before sniffing can wait for an established connection");
+        Check(Route(applied, Browser, ipVersion: 6) == "reject", "IPv4-only policy rejects literal IPv6 from selected apps");
         Check(Route(applied, Browser) == "proxy", "selected app IPv4 still uses the AWG pool");
-        Check(Route(applied, Other, ipVersion: 6) == "split-direct", "unselected app IPv6 remains direct");
+        Check(Route(applied, Other) == "split-direct" && Route(applied, Other, ipVersion: 6) == "reject",
+            "unselected apps retain the direct IPv4 path and do not leak IPv6");
+        var directDns = applied["outbounds"].Single(outbound => (string)outbound["tag"] == "split-direct")["domain_resolver"];
+        Check((string)directDns["server"] == "split-dns-direct" && (string)directDns["strategy"] == "ipv4_only",
+            "the direct outbound dials only IPv4 destinations for hostname requests");
+        Check(DnsRoute(applied, Browser) == "dns-remote" && DnsRoute(applied, Other) == "split-dns-direct",
+            "the two IPv4 DNS paths retain their resolver selection");
         Check(Route(applied, Browser, port: 53, ipVersion: 6) == "hijack-dns", "TUN IPv6 DNS capture precedes the guard");
-        Check(Route(applied, Browser, "mixed-in", ipVersion: 6) == "proxy", "the guard is scoped to the TUN inbound");
+        Check(Route(applied, Browser, "mixed-in", ipVersion: 6) == "reject" && Route(applied, Browser, "", ipVersion: 6) == "proxy",
+            "the guard covers the local proxy listener and leaves internal traffic alone");
+        Check(Route(applied, @"C:\Runtime\throne.exe", ipVersion: 6) == "direct", "Core transport loop prevention precedes the guard");
         Check(JToken.DeepEquals(applied["endpoints"], endpoints), "guard preserves AWG endpoints and AllowedIPs");
         Check(!Build(config.ToString(), new SplitTunnelSettings())["route"]["rules"].Any(rule => (int?)rule["ip_version"] == 6),
             "AWG is unchanged when split tunneling is off");
 
         ((JArray)endpoints[1]["address"]).Add("fd01::2/128");
-        Check(Route(Build(config.ToString(), Settings()), Browser, ipVersion: 6) == "proxy",
-            "a pool with a dual-family AWG member keeps IPv6");
+        Check(Route(Build(config.ToString(), Settings()), Browser, ipVersion: 6) == "reject",
+            "the explicitly IPv4-only AWG mode also covers dual-family members");
         endpoints.RemoveAt(1);
         ((JArray)config["outbounds"]).Add(new JObject { ["tag"] = "smart-wg-1", ["type"] = "socks" });
-        Check(Route(Build(config.ToString(), Settings()), Browser, ipVersion: 6) == "proxy",
-            "mixed protocol pools retain their routing");
+        var mixed = Build(config.ToString(), Settings());
+        Check(Route(mixed, Browser, ipVersion: 6) == "proxy" && mixed["dns"]["strategy"] == null,
+            "mixed protocol pools retain their IPv6 and DNS policy");
 
         group.Remove();
         endpoints[0]["tag"] = "proxy";

@@ -91,6 +91,24 @@ internal static class Program
                     File.WriteAllText(Path.Combine(output, (split ? "split-" : "") + (tun ? "tun" : "proxy") + ".json"), after.ToString());
                 }
             }
+        var awgTun = Build(true, false);
+        awgTun["outbounds"][0]["type"] = "auto-selector-round-robin";
+        awgTun["outbounds"][0]["outbounds"] = new JArray("smart-wg-0");
+        awgTun["endpoints"] = new JArray(new JObject
+        {
+            ["tag"] = "smart-wg-0", ["type"] = "wireguard", ["address"] = new JArray("10.0.0.2/32")
+        });
+        awgTun = JObject.Parse(SplitTunnelPolicyBuilder.Apply(awgTun.ToString(), new SplitTunnelSettings { Enabled = true }));
+        var awgWithRace = JObject.Parse(ParallelDnsRouting.Apply(awgTun.ToString()));
+        Check((string)awgWithRace["dns"]["strategy"] == "ipv4_only"
+            && (string)awgWithRace["dns"]["servers"][0]["type"] == "vpn-dns-race", "the native race retains IPv4-only DNS for AWG split TUN");
+        var awgRules = awgWithRace["route"]["rules"].OfType<JObject>().ToArray();
+        Check(awgRules.Any(r => (string)r["action"] == "resolve")
+            && awgRules.Where(r => (string)r["action"] == "resolve").All(r => (string)r["strategy"] == "ipv4_only"),
+            "the accompanying local proxy uses explicit IPv4-only resolution");
+        Check(JToken.DeepEquals(awgWithRace, JObject.Parse(ParallelDnsRouting.Apply(awgWithRace.ToString()))),
+            "AWG split TUN keeps the same IPv4 policy after reapplying the transform");
+
         var scoped = Build(false, false);
         ((JArray)scoped["dns"]["rules"]).Insert(2, new JObject { ["action"] = "route", ["server"] = "dns-remote",
             ["domain"] = "scoped.example.org", ["disable_cache"] = true, ["timeout"] = "2s" });
