@@ -37,7 +37,7 @@ class Program
         Check(CoreRuntimeIdentity.Token("abc\nforged=value") == "unknown", "untrusted metadata cannot inject report lines");
         var empty = new CoreRuntimeIdentity();
         var report = empty.Failure("config password=secret unknown outbound type: auto-selector-round-robin");
-        Check(report.Contains("Pool") && report.Contains("Core commit: unknown") && !report.Contains("secret"), "actionable report keeps missing identity explicit and excludes config secrets");
+        Check(report.Contains("شروع سرویس اتصال با خطا مواجه شد.") && report.Contains("Core commit: unknown") && !report.Contains("secret"), "actionable report keeps missing identity explicit and excludes config secrets");
         Check(empty.Failure("startup-timeout").Contains("مهلت"), "timeout retains its distinct reason");
         Check(CoreRuntimeIdentity.Capture(old, 0).RpcMetadata == "not-reported"
             && CoreRuntimeIdentity.Capture(info, 0).RpcMetadata == "reported"

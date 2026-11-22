@@ -1,0 +1,113 @@
+<Project>
+  <!-- Standalone: dotnet msbuild tools/Check-CoreArchive.proj -p:ArchivePath=/path/to/Files.zip -->
+  <UsingTask TaskName="CheckCoreArchive" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <Task>
+      <Code Type="Class" Language="cs"><![CDATA[
+using System;
+using System.Collections.Generic;
+using System.IO;
+using System.IO.Compression;
+using System.Linq;
+using System.Security.Cryptography;
+using System.Text;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Utilities;
+
+public sealed class CheckCoreArchive : Task
+{
+    private const string RequiredCore = "Use a Throne-G Core with the 5c47531b Pool change (base c0fa2071) and vpn-dns-race, such as c3802d34.";
+    private static readonly string[] Markers = { "auto-selector-round-robin", "vpn-dns-race" };
+    private static readonly HashSet<string> Executables = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+    {
+        "V-Guard/SGuard64.exe", "V-Guard/SGuard32.exe", "V-Guard/SGuard764.exe", "V-Guard/SGuard732.exe"
+    };
+
+    [Required]
+    public string ArchivePath { get; set; }
+
+    public override bool Execute()
+    {
+        var hashes = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            using (var source = File.OpenRead(ArchivePath))
+            using (var archive = new ZipArchive(source, ZipArchiveMode.Read))
+            {
+                foreach (var entry in archive.Entries)
+                {
+                    string path = string.Join("/", entry.FullName.Replace('\\', '/')
+                        .Split(new[] { '/' }, StringSplitOptions.RemoveEmptyEntries).Where(part => part != "."));
+                    if (!Executables.Contains(path)) continue;
+                    if (entry.FullName.EndsWith("/", StringComparison.Ordinal) || entry.FullName.EndsWith("\\", StringComparison.Ordinal))
+                    {
+                        Log.LogError("Core entry {0} is a directory; Core SHA256 unavailable. {1}", path, RequiredCore);
+                        continue;
+                    }
+
+                    string digest;
+                    bool[] found;
+                    using (var stream = entry.Open())
+                        digest = Inspect(stream, out found);
+
+                    if (!hashes.TryGetValue(path, out var matches))
+                        hashes.Add(path, matches = new List<string>());
+                    matches.Add(digest);
+                    Log.LogMessage(MessageImportance.High, "Core {0} SHA256={1} {2}={3} {4}={5}",
+                        path, digest, Markers[0], found[0], Markers[1], found[1]);
+
+                    for (int i = 0; i < Markers.Length; i++)
+                        if (!found[i])
+                            Log.LogError("Core {0} SHA256={1} is missing required feature {2}. {3}", path, digest, Markers[i], RequiredCore);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException || ex is NotSupportedException
+            || ex is InvalidDataException || ex is ArgumentException || ex is CryptographicException)
+        {
+            Log.LogError("Could not inspect Core in Files.zip; Core SHA256 unavailable. {0} {1}", ex.Message, RequiredCore);
+            return false;
+        }
+
+        if (hashes.Count == 0)
+            Log.LogError("Files.zip is missing a V-Guard/SGuard Core executable; Core SHA256 unavailable. {0}", RequiredCore);
+
+        // Each filename is a separate OS/architecture slot. Every included slot
+        // must pass, and two entries for the same slot are ambiguous.
+        foreach (var item in hashes.Where(item => item.Value.Count > 1))
+            Log.LogError("Files.zip has multiple Core entries for {0}; Core SHA256: {1}. {2}",
+                item.Key, string.Join(", ", item.Value), RequiredCore);
+
+        return !Log.HasLoggedErrors;
+    }
+
+    private static string Inspect(Stream source, out bool[] found)
+    {
+        found = new bool[Markers.Length];
+        var bytes = new byte[64 * 1024];
+        int overlap = Markers.Max(marker => marker.Length) - 1;
+        using (var hash = SHA256.Create())
+        using (var stream = new CryptoStream(source, hash, CryptoStreamMode.Read))
+        {
+            string tail = "";
+            int count;
+            while ((count = stream.Read(bytes, 0, bytes.Length)) > 0)
+            {
+                if (found[0] && found[1]) continue;
+                string chunk = tail + Encoding.ASCII.GetString(bytes, 0, count);
+                for (int i = 0; i < Markers.Length; i++)
+                    found[i] |= chunk.IndexOf(Markers[i], StringComparison.Ordinal) >= 0;
+                tail = chunk.Substring(Math.Max(0, chunk.Length - overlap));
+            }
+            return BitConverter.ToString(hash.Hash).Replace("-", "").ToLowerInvariant();
+        }
+    }
+}
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="CheckCoreArchive">
+    <CheckCoreArchive ArchivePath="$(ArchivePath)" />
+  </Target>
+</Project>

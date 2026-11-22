@@ -12,11 +12,12 @@ with tempfile.TemporaryDirectory(prefix='sentry-core-checks-') as tmp:
  source=(base/'Services/TunnelPlusService.cs').read_text();assert 'const int CoreStartDeadlineMs = 30000;' in source and 'const int CoreConnectRetryDelayMs = 200;' in source;a=source.index('        private T ExecuteCoreCall<T>(');b=source.index('        private bool TryKillProcess(',a)
  diag=(base/'Services/TunnelPlusService.Diagnostics.cs').read_text();c=diag.index('        private void AnnotateCoreStartup(');d=diag.index('        internal string DiagnosticIdentity',c)
  ensure=source.index('            var startupClock = Stopwatch.StartNew();'); stop=source.index('        private string[] GetShieldFiles()',ensure)
- tail='private bool StartupHarness(string configData,out string error,bool needXray=true,string xrayConfig="XRAY SECRET",string xrayOutboundDnsStrategy=""){error=null;'+source[ensure:stop]
+ tail='private bool TryStartCoreWithConfig(string configData,out string error,bool needXray=true,string xrayConfig="XRAY SECRET",string xrayOutboundDnsStrategy="",bool allowParallelDns=false){error=null;bool parallelDnsAdded=false;string originalConfigData=configData,originalXrayConfig=xrayConfig;'+source[ensure:stop]
+ failure=diag[diag.index('        private string DiagnosticStartFailure('):diag.index('        private void Diagnostic(string stage')]
  sa=source.index('        private bool SafeStopCore(');sb=source.index('        private T ExecuteCoreCall<T>(',sa)
  safe=source[sa:sb]
- (p/'ProductionMethods.cs').write_text('using System;using System.IO;using System.Diagnostics;using System.Threading;using IRSpeedyVPN.Common;using IRSpeedyVPN.Services.Libcore;internal sealed partial class RpcOperationProbe{'+source[a:b]+diag[c:d]+safe+tail+'}')
- sources=[base/'Common/ErrorReporting.cs',base/'Common/CoreRuntimeIdentity.cs',base/'Common/NetworkFailureDiagnostic.cs',Path(__file__).with_name('Program.cs'),Path(__file__).with_name('CoreRpcChecks.cs'),Path(__file__).with_name('OperationChecks.cs'),p/'ProductionMethods.cs']+libcore
+ (p/'ProductionMethods.cs').write_text('using System;using System.IO;using System.Diagnostics;using System.Threading;using IRSpeedyVPN.Common;using IRSpeedyVPN.Resource;using IRSpeedyVPN.Services.Libcore;internal sealed partial class RpcOperationProbe{'+source[a:b]+diag[c:d]+failure+safe+tail+'}')
+ sources=[base/'Common/ErrorReporting.cs',base/'Common/CoreRuntimeIdentity.cs',base/'Common/CoreStartFailureDiagnostic.cs',base/'Common/NetworkFailureDiagnostic.cs',Path(__file__).with_name('Program.cs'),Path(__file__).with_name('CoreRpcChecks.cs'),Path(__file__).with_name('OperationChecks.cs'),p/'ProductionMethods.cs']+libcore
  for refs,name in [(refs48,'Checks.dll'),(refs8,'Checks8.dll')]:
   args=[dotnet,csc,'-nologo','-langversion:7.3','-nowarn:0649,0169','-define:CORE_RPC_OPERATION_CHECKS','-target:exe','-out:'+str(p/name)]
   args+=['-r:'+str(f) for f in Path(refs).glob('*.dll') if f.name not in ['System.EnterpriseServices.Wrapper.dll','System.EnterpriseServices.Thunk.dll']]+['-r:'+sentry]+[str(f) for f in sources]

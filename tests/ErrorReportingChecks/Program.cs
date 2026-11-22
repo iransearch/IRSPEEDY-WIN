@@ -54,6 +54,7 @@ namespace IRSpeedyVPN.Common
     {
         internal static string Caller()=>"fixture";
         internal static void RequestSnapshot(){}
+        internal static string SafeCoreStartText(string value)=>"[redacted]";
         internal static string Fingerprint(string value) => new string('a',16);
         internal static string SelectedMode => "Proxy";
         internal static string ObservedMode => "not-connected";

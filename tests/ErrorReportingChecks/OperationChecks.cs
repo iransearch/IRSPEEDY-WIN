@@ -22,8 +22,7 @@ internal sealed partial class RpcOperationProbe
     private bool PauseSharingBeforeCoreRestart()=>true;
     private void RecoverCoreAfterFailedStart(){}
     private void TryStopCore(){}
-    private void DiagnosticStartFailure(string stage,string message,string phase){}
-    internal bool Startup(int port){CorePort=port;string error;return StartupHarness("CONFIG SECRET",out error);}
+    internal bool Startup(int port){CorePort=port;autoSelectorPlan=null;string error;return TryStartCoreWithConfig("CONFIG SECRET",out error);}
     internal int EnsureCalls;
     internal bool FailEnsure;
     private void Diagnostic(string name,string fields="") { }
@@ -126,4 +125,5 @@ internal static class OperationChecks
 }
 
 namespace IRSpeedyVPN.Common {internal static class CoreDiagnosticMetadata {internal static int ListenerPid(int port)=>-1;}}
+namespace IRSpeedyVPN.Resource {internal static class ResourceManager {internal static string PackagedCoreSha256=>null;}}
 namespace Traffic {internal sealed class TrafficUsageService {internal static readonly TrafficUsageService Instance=new TrafficUsageService();internal void StopSession(){}internal void StartSession(Func<int,QueryConnectionsResponse> reader){}}}

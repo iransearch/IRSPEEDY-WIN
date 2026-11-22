@@ -20,16 +20,30 @@ label = next(e for e in ET.fromstring(xaml).iter()
 assert label.attrib.get('IsHitTestVisible') == 'False' and 'ToolTip' not in label.attrib
 methods = source[source.index('        void ShowMessage('):source.index('        public void ShowUserMessage(')]
 assert 'CoreRuntimeIdentity.ConnectionFailureMessage' in methods and 'lblErrorMessage.ToolTip = null' in methods
-print('PASS generic connection error mapping and no technical popup/link/tooltip')
+assert 'Message = CoreRuntimeIdentity.UserConnectionError(Message)' in methods
+assert 'Message.Length < 60 || Message == CoreRuntimeIdentity.CoreCompatibilityMessage' in methods
+print('PASS connection error and Core upgrade banners with no technical popup/link/tooltip')
 if sys.argv[1:] == ['--check-only']:
     raise SystemExit(0)
 with tempfile.TemporaryDirectory(prefix='core-error-ui-') as temp:
     folder = Path(temp)
-    (folder/'Handlers.cs').write_text('''using System; using System.Windows;
+    (folder/'Handlers.cs').write_text('''using System; using System.Threading; using System.Windows; using IRSpeedyVPN.Services;
 class CoreRuntimeIdentity { internal const string ErrorPrefix="[CoreFailure]\\n";
- internal const string ConnectionFailureMessage="خطا در برقراری اتصال VPN"; }
+ internal const string ConnectionFailureMessage="خطا در برقراری اتصال VPN";
+ internal const string CoreCompatibilityMessage="upgrade";
+ internal static string UserConnectionError(string error) => ConnectionFailureMessage; }
 class LogHelper { internal static void WriteLog(string value) {} }
-class MainWindow : Window { System.Windows.Controls.TextBlock lblErrorMessage = new System.Windows.Controls.TextBlock();
+class ConnectionAttemptDiagnostic {
+ internal ConnectionAttemptDiagnostic(long version, string owner, Func<string> identity) {}
+ internal void Step(string name, string result, string message) {}
+}
+static class gInfo { internal static object CurrentService => null; }
+namespace IRSpeedyVPN.Services {
+ class TunnelPlusService { internal string DiagnosticIdentity => "fixture"; }
+}
+class MainWindow : Window {
+ long connectionRequestVersion;
+ System.Windows.Controls.TextBlock lblErrorMessage = new System.Windows.Controls.TextBlock();
 ''' + methods + '}')
     if len(sys.argv) == 4:
         names = ['mscorlib.dll', 'System.dll', 'System.Core.dll', 'WindowsBase.dll',

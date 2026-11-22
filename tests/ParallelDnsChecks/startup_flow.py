@@ -12,6 +12,9 @@ APP = ROOT / 'IRSpeedyVPN'
 source = (APP / 'Services/TunnelPlusService.cs').read_text(encoding='utf-8-sig')
 startup = source[source.index('        private bool TryStartCoreWithConfig('):
                  source.index('        private string[] GetShieldFiles()')]
+diagnostics = (APP / 'Services/TunnelPlusService.Diagnostics.cs').read_text(encoding='utf-8-sig')
+start_failure = diagnostics[diagnostics.index('        private string DiagnosticStartFailure('):
+                            diagnostics.index('        private void Diagnostic(string stage')]
 
 fixture = r'''
 using System;
@@ -54,18 +57,22 @@ namespace IRSpeedyVPN.Services.Traffic {
 namespace IRSpeedyVPN.Services.Libcore {
     class LibcoreServiceClient {
         public static Func<LoadConfigReq, ErrorResp> OnStart;
+        public static CoreBuildInfo BuildInfo;
         public LibcoreServiceClient(string host, int port, int timeout = 0) { }
-        public CoreBuildInfo QueryBuildInfo(int timeout, CancellationToken token) => null;
+        public CoreBuildInfo QueryBuildInfo(int timeout, CancellationToken token) => BuildInfo;
         public ErrorResp StartWithDeadline(LoadConfigReq req, int timeout, CancellationToken token) => OnStart(req);
         public object QueryConnections(int timeout) => null;
     }
 }
 namespace IRSpeedyVPN.Services {
-    static class CoreDiagnosticMetadata { public static int ListenerPid(int port) => -1; }
-    static class ConnectionDiagnostics { public static string Fingerprint(string config) => "fixture"; }
-    static class NetworkFailureDiagnostic {
-        public static string ExceptionFields(Exception ex) => "";
-        public static string CoreReason(string error) => "";
+    static class CoreDiagnosticMetadata {
+        public static int ProcessId;
+        public static int ListenerPid(int port) => ProcessId;
+    }
+    static class ConnectionDiagnostics {
+        public static string Fingerprint(string config) => "fixture";
+        public static string SafeCoreStartText(string error) => "[redacted]";
+        public static void RequestSnapshot() { }
     }
     static class ErrorReporting { public static void Annotate(Exception ex, params string[] fields) { } }
     static class LogHelper {
@@ -89,6 +96,9 @@ namespace IRSpeedyVPN.Services {
         private readonly List<string> calls = new List<string>();
         private readonly List<LoadConfigReq> starts = new List<LoadConfigReq>();
         private readonly List<string> dnsConfig = new List<string>();
+        private readonly List<string> failures = new List<string>();
+        private CoreBuildInfo buildInfo;
+        private int listenerPid = -1;
         private CancellationToken cancellation;
         private bool userCancelRequested, coreOwned, lastVpnMode;
         private Process coreProcess;
@@ -102,8 +112,10 @@ namespace IRSpeedyVPN.Services {
         private void TryStopCore() { calls.Add("cleanup"); onStop?.Invoke(); }
         private void RecoverCoreAfterFailedStart() => calls.Add("recover");
         private bool SafeStopCore(LibcoreServiceClient client, out Exception failure) { failure = null; calls.Add("pre-stop"); return true; }
-        private void Diagnostic(string stage, string detail = null) { if (stage == "parallel-dns-config") dnsConfig.Add(detail); }
-        private void DiagnosticStartFailure(string stage, string error, string location) { }
+        private void Diagnostic(string stage, string detail = null) {
+            if (stage == "parallel-dns-config") dnsConfig.Add(detail);
+            if (stage == "core-start-config-error" || stage == "core-start-incompatible-error") failures.Add(detail);
+        }
         private void AnnotateCoreStartup(Exception ex, CoreRuntimeIdentity identity, string config, string xray, bool needXray, string stage) { }
         private T ExecuteCoreCall<T>(Func<LibcoreServiceClient, T> call, string operation, Action<Exception> annotate, Action<Exception> recovered)
             => call(new LibcoreServiceClient("127.0.0.1", CorePort));
@@ -116,6 +128,8 @@ checks = r'''
         }
         private bool Start(IEnumerable<string> errors, out string error, string config = standardConfig) {
             var responses = new Queue<string>(errors);
+            LibcoreServiceClient.BuildInfo = buildInfo;
+            CoreDiagnosticMetadata.ProcessId = listenerPid;
             LibcoreServiceClient.OnStart = request => {
                 starts.Add(request);
                 calls.Add("start");
@@ -127,9 +141,9 @@ checks = r'''
         }
         public static void Main() {
             var service = new TunnelPlusService();
-            Check(service.Start(new[] { legacyError, null }, out var error) && error == null
+            Check(service.Start(new[] { dnsError, null }, out var error) && error == null
                 && service.calls.SequenceEqual(new[] { "pre-stop", "start", "cleanup", "pre-stop", "start" }),
-                "legacy DNS decode rejection calls TryStopCore once between the two Start calls");
+                "other DNS rejection calls TryStopCore once between the two Start calls");
             Check(LogHelper.Identity.Count == 2 && LogHelper.Identity.All(entry =>
                 entry.Contains("Packaged Core SHA256: " + ResourceManager.PackagedCoreSha256)
                 && entry.Contains("Core package match: unknown") && entry.Contains("Core RPC identity: unavailable")),
@@ -139,6 +153,29 @@ checks = r'''
                 && service.starts[1].CoreConfig == standardConfig
                 && service.starts.All(r => r.NeedXray && r.XrayConfig == "{}" && r.XrayOutboundDnsStrategy == "prefer_ipv4"),
                 "fallback disables parallel DNS and restores the original sing-box and Xray inputs");
+
+            service = new TunnelPlusService();
+            Check(!service.Start(new[] { legacyError }, out error) && service.starts.Count == 1
+                && service.calls.SequenceEqual(new[] { "pre-stop", "start", "cleanup" })
+                && CoreRuntimeIdentity.UserConnectionError(error) == CoreRuntimeIdentity.CoreCompatibilityMessage
+                && service.failures.Single().Contains("reason=unknown-dns-transport requiredFeature=vpn-dns-race cause=\"dns.servers[0]: unknown transport type: vpn-dns-race\""),
+                "a missing DNS transport logs the cause, shows the upgrade message and never retries");
+
+            service = new TunnelPlusService { listenerPid = Process.GetCurrentProcess().Id };
+            Check(!service.Start(Array.Empty<string>(), out error) && service.starts.Count == 0
+                && CoreRuntimeIdentity.UserConnectionError(error) == CoreRuntimeIdentity.CoreCompatibilityMessage
+                && service.failures.Single().Contains("reason=package-mismatch"),
+                "a package mismatch shows the upgrade message before Start");
+
+            service = new TunnelPlusService { autoSelectorPlan = new Xray.AutoSelectorPlan(), buildInfo = new CoreBuildInfo() };
+            Check(!service.Start(Array.Empty<string>(), out error) && service.starts.Count == 0
+                && CoreRuntimeIdentity.UserConnectionError(error) == CoreRuntimeIdentity.CoreCompatibilityMessage
+                && service.failures.Single().Contains("reason=pool-identity-not-reported"),
+                "a legacy RPC reply stops a Pool request before Start");
+
+            service = new TunnelPlusService { buildInfo = new CoreBuildInfo() };
+            Check(service.Start(new string[] { null }, out error) && service.starts.Count == 1,
+                "a legacy RPC reply still allows a non-Pool Start");
 
             service = new TunnelPlusService();
             Check(!service.Start(new[] { nonDnsError }, out error) && service.starts.Count == 1,
@@ -159,7 +196,8 @@ checks = r'''
             service = new TunnelPlusService();
             const string xrayError = "unknown outbound type: auto-selector-round-robin";
             Check(!service.Start(new[] { dnsError, xrayError }, out error) && service.starts.Count == 2
-                && error == new CoreRuntimeIdentity().Failure(xrayError),
+                && error == new CoreRuntimeIdentity().IncompatibleFailure()
+                && service.failures.Last().Contains("reason=unknown-outbound-type requiredFeature=auto-selector-round-robin"),
                 "failed fallback returns the second failure through the production formatter");
 
             service = new TunnelPlusService();
@@ -178,9 +216,9 @@ checks = r'''
 
 with tempfile.TemporaryDirectory(prefix='parallel-dns-startup-') as temporary:
     project = Path(temporary) / 'Checks.csproj'
-    project.with_name('Program.cs').write_text(fixture + startup + checks, encoding='utf-8')
+    project.with_name('Program.cs').write_text(fixture + startup + start_failure + checks, encoding='utf-8')
     sources = ['Common/CoreStartFailureDiagnostic.cs', 'Common/CoreRuntimeIdentity.cs',
-               'Services/Libcore/LibcoreMessages.cs', 'Services/SingBox/ParallelDnsRouting.cs']
+               'Common/NetworkFailureDiagnostic.cs', 'Services/Libcore/LibcoreMessages.cs', 'Services/SingBox/ParallelDnsRouting.cs']
     items = ''.join(f'<Compile Include={quoteattr(str(APP / name))} />' for name in sources)
     project.write_text('<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType>'
                        '<TargetFramework>net8.0</TargetFramework><LangVersion>7.3</LangVersion>'
