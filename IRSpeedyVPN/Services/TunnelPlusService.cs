@@ -593,8 +593,9 @@ namespace IRSpeedyVPN.Services
                 try { buildInfo = new LibcoreServiceClient("127.0.0.1", CorePort).QueryBuildInfo(750, cancellation); }
                 catch (OperationCanceledException) { throw; }
                 catch (Exception ex) { Diagnostic("core-identity-unavailable", "exception=" + ex.GetType().Name); }
-                runtimeIdentity = CoreRuntimeIdentity.Capture(buildInfo, CoreDiagnosticMetadata.ListenerPid(CorePort));
-                LogHelper.WriteLog("[CoreRuntimeIdentity]\n" + runtimeIdentity.Details);
+                runtimeIdentity = CoreRuntimeIdentity.Capture(buildInfo, CoreDiagnosticMetadata.ListenerPid(CorePort),
+                    ResourceManager.PackagedCoreSha256);
+                LogHelper.WriteLog("[CoreRuntimeIdentity]\n" + runtimeIdentity.LogDetails);
                 cancellation.ThrowIfCancellationRequested();
                 startResp = ExecuteCoreCall(client =>
                 {

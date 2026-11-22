@@ -37,6 +37,15 @@ internal static class StartupFailureChecks
         const string unknownRace = "dns.servers[0]: unknown transport type: vpn-dns-race";
         string configPrefix = "decode config at {\"dns\":{\"servers\":[{\"type\":\"vpn-dns-race\"}]},"
             + "\"outbounds\":[{\"tag\":\"proxy\"}],\"test\":\"PRIVATE }\\\": dns.rules[0].timeout " + new string('x', 9000) + "\"}: ";
+        const string unknownPool = "unknown outbound type: auto-selector-round-robin";
+        check(CoreStartFailureDiagnostic.UnsupportedFeature(configPrefix + unknownRace) == "vpn-dns-race"
+            && CoreStartFailureDiagnostic.UnsupportedFeature(configPrefix + unknownPool) == "auto-selector-round-robin",
+            "startup log identifies both unsupported features after a large config dump");
+        check(CoreStartFailureDiagnostic.UnsupportedFeature("decode config at {\"remark\":\"" + unknownPool + "\"}: invalid settings") == null
+            && CoreStartFailureDiagnostic.UnsupportedFeature("error password=\"" + unknownRace + "\"") == null
+            && CoreStartFailureDiagnostic.UnsupportedFeature(unknownPool + "-extra") == null
+            && CoreStartFailureDiagnostic.UnsupportedFeature(unknownRace + "-extra") == null,
+            "unsupported-feature fields ignore private config and credential text and require the exact type");
         var dnsErrors = new[] {
             unknownRace,
             configPrefix + unknownRace,

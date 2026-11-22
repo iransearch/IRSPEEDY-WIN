@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.IO.Compression;
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -38,11 +39,58 @@ class Program
         var report = empty.Failure("config password=secret unknown outbound type: auto-selector-round-robin");
         Check(report.Contains("Pool") && report.Contains("Core commit: unknown") && !report.Contains("secret"), "actionable report keeps missing identity explicit and excludes config secrets");
         Check(empty.Failure("startup-timeout").Contains("مهلت"), "timeout retains its distinct reason");
+        Check(CoreRuntimeIdentity.Capture(old, 0).RpcMetadata == "not-reported"
+            && CoreRuntimeIdentity.Capture(info, 0).RpcMetadata == "reported"
+            && mismatch.RpcMetadata == "pid-mismatch", "identity log distinguishes a legacy reply from a mismatched or extended reply");
+        PackagedIdentityChecks(info);
         StartupFailureChecks.Run(Check);
         await WireQuery(false, true);
         await WireQuery(false);
         await WireQuery(true);
     }
+    static void PackagedIdentityChecks(CoreBuildInfo info)
+    {
+        const string executable = "SGuard64.exe";
+        const string path = "V-Guard/SGuard64.exe";
+        const string expected = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        byte[] package = CreatePackage(("SGuard64.exe", "decoy"), ("V-Guard/SGuard32.exe", "other core"), (path, "abc"));
+        string packaged = CoreRuntimeIdentity.ReadPackagedCoreHash(package, executable);
+        Check(packaged == expected, "expected digest hashes the selected executable bytes inside the ZIP");
+        Check(CoreRuntimeIdentity.ReadPackagedCoreHash(package, "SGuard764.exe") == null,
+            "a missing platform-specific executable has no expected digest");
+        Check(CoreRuntimeIdentity.ReadPackagedCoreHash(CreatePackage((path, "abc"), ("v-guard\\.\\sguard64.exe", "other")), executable) == null,
+            "ambiguous archive paths have no expected digest");
+
+        var identity = CoreRuntimeIdentity.Capture(null, -1, packaged);
+        Check(identity.PackageMatch == "unknown", "unavailable runtime digest leaves the comparison unknown");
+        identity.Sha256 = expected.ToUpperInvariant();
+        Check(identity.PackageMatch == "match" && identity.LogDetails.Contains("Packaged Core SHA256: " + expected)
+            && identity.LogDetails.Contains("Core package match: match"), "matching digests and the expected hash are logged together");
+        identity.Sha256 = new string('a', 64);
+        Check(identity.PackageMatch == "mismatch" && identity.LogDetails.Contains("Core package match: mismatch"),
+            "different runtime and packaged executables are distinguished");
+        identity = CoreRuntimeIdentity.Capture(info, 456, packaged);
+        Check(identity.PackagedSha256 == expected && identity.PackageMatch == "unknown",
+            "PID mismatch keeps the package evidence without comparing against another process");
+    }
+
+    static byte[] CreatePackage(params (string Path, string Contents)[] files)
+    {
+        using (var buffer = new MemoryStream())
+        {
+            using (var archive = new ZipArchive(buffer, ZipArchiveMode.Create, leaveOpen: true))
+            {
+                foreach (var file in files)
+                {
+                    byte[] contents = Encoding.UTF8.GetBytes(file.Contents);
+                    using (var entry = archive.CreateEntry(file.Path).Open())
+                        entry.Write(contents, 0, contents.Length);
+                }
+            }
+            return buffer.ToArray();
+        }
+    }
+
     static async Task WireQuery(bool stall, bool health = false)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0); listener.Start();
