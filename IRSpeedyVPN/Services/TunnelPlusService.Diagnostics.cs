@@ -79,18 +79,19 @@ namespace IRSpeedyVPN.Services
         {
             try { return process?.Id ?? -1; } catch { return -1; }
         }
-        private void DiagnosticStartFailure(string stage, string error, string phase)
+        private string DiagnosticStartFailure(string stage, string error, string phase)
         {
             var feature = CoreStartFailureDiagnostic.UnsupportedFeature(error);
-            var reason = feature == null ? NetworkFailureDiagnostic.CoreReason(error)
-                : feature == "auto-selector-round-robin" ? "unknown-outbound-type" : "unknown-dns-transport";
+            var reason = CoreStartFailureDiagnostic.Reason(error);
             Diagnostic(stage, "startupPhase=" + phase
                 + " reason=" + reason
                 + (feature == null ? "" : " requiredFeature=" + feature)
+                + " cause=" + CoreStartFailureDiagnostic.SafeCause(error)
                 + " " + CoreStartFailureDiagnostic.Fields(error)
                 + " messageId=" + ConnectionDiagnostics.Fingerprint(error)
                 + " text=\"" + ConnectionDiagnostics.SafeCoreStartText(error) + "\"");
             ConnectionDiagnostics.RequestSnapshot();
+            return reason;
         }
         private void Diagnostic(string stage, string details = "")
         {

@@ -597,6 +597,14 @@ namespace IRSpeedyVPN.Services
                     ResourceManager.PackagedCoreSha256);
                 LogHelper.WriteLog("[CoreRuntimeIdentity]\n" + runtimeIdentity.LogDetails);
                 cancellation.ThrowIfCancellationRequested();
+                if (runtimeIdentity.PackageMatch == "mismatch"
+                    || (autoSelectorPlan != null && runtimeIdentity.RpcMetadata == "not-reported"))
+                {
+                    Diagnostic("core-start-incompatible-error", "startupPhase=identity reason="
+                        + (runtimeIdentity.PackageMatch == "mismatch" ? "package-mismatch" : "pool-identity-not-reported"));
+                    error = runtimeIdentity.IncompatibleFailure();
+                    return false;
+                }
                 startResp = ExecuteCoreCall(client =>
                 {
                     startupStage = "stop-before-start"; rpcClock.Reset();
@@ -666,20 +674,21 @@ namespace IRSpeedyVPN.Services
                 diagnosticXrayConfigId = needXray ? ConnectionDiagnostics.Fingerprint(xrayConfig) : "none";
             if (!string.IsNullOrEmpty(startResp.Error))
             {
-                DiagnosticStartFailure("core-start-config-error", startResp.Error, "start-response");
+                var reason = DiagnosticStartFailure("core-start-config-error", startResp.Error, "start-response");
+                bool incompatible = reason == "unknown-outbound-type" || reason == "unknown-dns-transport";
                 var report = recoveredRpcFailure ?? new InvalidOperationException("Core rejected the connection configuration.");
                 ErrorReporting.Annotate(report, "core.operation", "start", "core.rpc", "start", "core.rpc_stage", "server-error",
                     "core.close_reason", "server-error", "core.lifecycle_stage", "start",
                     "core.outcome", recoveredRpcFailure == null ? "failed" : "retry-failed",
                     "core.rpc_budget_ms", CoreStartDeadlineMs.ToString(), "core.rpc_elapsed_ms", rpcClock.ElapsedMilliseconds.ToString(),
-                    "core.failure_reason", NetworkFailureDiagnostic.CoreReason(startResp.Error));
+                    "core.failure_reason", reason);
                 if (recoveredRpcFailure == null) ErrorReporting.Annotate(report, "core.attempts", "1", "core.operation_id", Guid.NewGuid().ToString("N"),
                     "core.attempt1_ms", rpcClock.ElapsedMilliseconds.ToString(), "core.total_ms", rpcClock.ElapsedMilliseconds.ToString());
                 AnnotateCoreStartup(report, runtimeIdentity, configData, xrayConfig, needXray, "start");
                 LogHelper.WriteLog(report);
-                error = runtimeIdentity.Failure(startResp.Error);
+                error = incompatible ? runtimeIdentity.IncompatibleFailure() : runtimeIdentity.Failure(startResp.Error);
                 TryStopCore();
-                if (allowParallelDns && parallelDnsAdded && CoreStartFailureDiagnostic.IsDnsComponent(startResp.Error)
+                if (!incompatible && allowParallelDns && parallelDnsAdded && CoreStartFailureDiagnostic.IsDnsComponent(startResp.Error)
                     && !userCancelRequested && !GetStartCancellation().IsCancellationRequested)
                 {
                     Diagnostic("parallel-dns-fallback", "stage=begin trigger=dns-config-rejected");

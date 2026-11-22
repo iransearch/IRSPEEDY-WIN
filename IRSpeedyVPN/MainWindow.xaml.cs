@@ -874,7 +874,7 @@ namespace IRSpeedyVPN
             if (Message == "سروری یافت نشد" || Message == "سرور یافت نشد")
                 Message = string.Empty;
             if (Message != null && Message.StartsWith(CoreRuntimeIdentity.ErrorPrefix, StringComparison.Ordinal))
-                Message = CoreRuntimeIdentity.ConnectionFailureMessage;
+                Message = CoreRuntimeIdentity.UserConnectionError(Message);
 
             Dispatcher.Invoke((Action)(() =>
             {
@@ -889,7 +889,7 @@ namespace IRSpeedyVPN
                     if (Message.Contains("The remote name could not be resolved: 'apichcek-p.isdm.ir'"))
                         lblErrorMessage.Text = "وب سرویس اعتبارسنجی در دسترس نیست";
                     else
-                    if (Message.Length < 60)
+                    if (Message.Length < 60 || Message == CoreRuntimeIdentity.CoreCompatibilityMessage)
                         lblErrorMessage.Text = Message;
                     else
                     {

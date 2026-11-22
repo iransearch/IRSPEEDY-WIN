@@ -13,10 +13,12 @@ namespace IRSpeedyVPN.Common
     {
         internal const string ErrorPrefix = "[CoreFailure]\n";
         internal const string ConnectionFailureMessage = "خطا در برقراری اتصال VPN";
+        internal const string CoreCompatibilityMessage = "هستهٔ برنامه با نسخهٔ برنامه هماهنگ نیست. لطفاً آخرین نسخه را نصب کنید.";
 
         internal static string UserConnectionError(string error)
             => string.IsNullOrWhiteSpace(error) || error == "سروری یافت نشد" || error == "سرور یافت نشد" || error == "Connection canceled."
-                ? string.Empty : ConnectionFailureMessage;
+                ? string.Empty : error.StartsWith(ErrorPrefix + CoreCompatibilityMessage + "\n\n", StringComparison.Ordinal)
+                    ? CoreCompatibilityMessage : ConnectionFailureMessage;
         internal string Version = "unknown", Xray = "unknown", Commit = "unknown", Modified = "unknown",
             Architecture = "unknown", GoVersion = "unknown", Path = "unknown", Sha256 = "unknown", Privileged = "unknown";
         internal int Pid = -1;
@@ -136,13 +138,13 @@ namespace IRSpeedyVPN.Common
         {
             // Core errors can contain a complete config with credentials. Show a
             // fixed summary here; the existing detailed error log is independent.
-            string summary = (error ?? "").IndexOf("unknown outbound type: auto-selector-round-robin", StringComparison.OrdinalIgnoreCase) >= 0
-                ? "Core اجراشده با Pool سازگار نیست."
-                : error == "startup-timeout" ? "مهلت شروع Core پایان یافت."
+            string summary = error == "startup-timeout" ? "مهلت شروع Core پایان یافت."
                 : error == "rpc-transport-failure" ? "ارتباط با Core هنگام شروع قطع شد."
                 : "شروع سرویس اتصال با خطا مواجه شد.";
             return ErrorPrefix + summary + "\n\n" + Details;
         }
+
+        internal string IncompatibleFailure() => ErrorPrefix + CoreCompatibilityMessage + "\n\n" + Details;
     }
 }
 

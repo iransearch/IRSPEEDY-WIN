@@ -36,7 +36,8 @@ internal static class StartupFailureChecks
         // sing-box f154bec emits the other parser, DNS manager and inbound causes.
         const string unknownRace = "dns.servers[0]: unknown transport type: vpn-dns-race";
         string configPrefix = "decode config at {\"dns\":{\"servers\":[{\"type\":\"vpn-dns-race\"}]},"
-            + "\"outbounds\":[{\"tag\":\"proxy\"}],\"test\":\"PRIVATE }\\\": dns.rules[0].timeout " + new string('x', 9000) + "\"}: ";
+            + "\"outbounds\":[{\"server\":\"192.0.2.1\",\"uuid\":\"049797c0-fe08-4b8f-ad98-02f750be6475\"}],"
+            + "\"test\":\"PRIVATE }\\\": dns.rules[0].timeout " + new string('x', 9000) + "\"}: ";
         const string unknownPool = "unknown outbound type: auto-selector-round-robin";
         check(CoreStartFailureDiagnostic.UnsupportedFeature(configPrefix + unknownRace) == "vpn-dns-race"
             && CoreStartFailureDiagnostic.UnsupportedFeature(configPrefix + unknownPool) == "auto-selector-round-robin",
@@ -46,6 +47,23 @@ internal static class StartupFailureChecks
             && CoreStartFailureDiagnostic.UnsupportedFeature(unknownPool + "-extra") == null
             && CoreStartFailureDiagnostic.UnsupportedFeature(unknownRace + "-extra") == null,
             "unsupported-feature fields ignore private config and credential text and require the exact type");
+        CheckLoggedCause(check, configPrefix + unknownPool, "unknown-outbound-type", "\"" + unknownPool + "\"");
+        CheckLoggedCause(check, configPrefix + unknownRace, "unknown-dns-transport", "\"" + unknownRace + "\"");
+        CheckLoggedCause(check, configPrefix + "dns.rules[0].timeout: time: invalid duration \"invalid\"",
+            "invalid-dns-duration", "unavailable");
+        CheckLoggedCause(check, configPrefix + "start inbound/mixed[proxy]: listen tcp 127.0.0.1:37233: bind: address already in use",
+            "address-in-use", "unavailable");
+        CheckLoggedCause(check, configPrefix + denied, "socket-access-denied", "unavailable");
+        CheckLoggedCause(check, configPrefix + "open wintun.dll: Access is denied.", "socket-access-denied",
+            "\"open wintun.dll: Access is denied.\"");
+        CheckLoggedCause(check, configPrefix + "context deadline exceeded", "timeout", "\"context deadline exceeded\"");
+        CheckLoggedCause(check, configPrefix + "invalid settings", "unclassified", "unavailable");
+        CheckLoggedCause(check, configPrefix + "duplicate outbound/endpoint tag: timeout", "unclassified", "unavailable");
+        foreach (var suffix in new[] { " /private/path", " 192.0.2.1", " [::1]", " vless://private.example",
+            " 049797c0-fe08-4b8f-ad98-02f750be6475", " SGVsbG9Xb3JsZA", " password=example",
+            new string('x', 161), "\r\nforged", " ｋ" })
+            check(CoreStartFailureDiagnostic.SafeCause(configPrefix + unknownPool + suffix) == "unavailable",
+                "cause fails closed on unexpected trailing data");
         var dnsErrors = new[] {
             unknownRace,
             configPrefix + unknownRace,
@@ -88,8 +106,17 @@ internal static class StartupFailureChecks
         foreach (string error in new[] { denied, "short technical error", "startup-timeout", "rpc-transport-failure",
             new CoreRuntimeIdentity().Failure("permission denied"), "تنظیمات مسیریابی یا DNS معتبر نیست" })
             check(CoreRuntimeIdentity.UserConnectionError(error) == userMessage, "connection failure displays only the requested text");
+        check(CoreRuntimeIdentity.UserConnectionError(new CoreRuntimeIdentity().IncompatibleFailure()) == CoreRuntimeIdentity.CoreCompatibilityMessage,
+            "the existing Core failure banner has a localized upgrade message");
         check(CoreRuntimeIdentity.UserConnectionError(null) == "" && CoreRuntimeIdentity.UserConnectionError("") == ""
             && CoreRuntimeIdentity.UserConnectionError("سروری یافت نشد") == "" && CoreRuntimeIdentity.UserConnectionError("Connection canceled.") == "",
             "normal disconnect, cancellation and empty search status remain silent");
+    }
+
+    private static void CheckLoggedCause(Action<bool, string> check, string error, string expectedReason, string expectedCause)
+    {
+        check(CoreStartFailureDiagnostic.Reason(error) == expectedReason
+            && CoreStartFailureDiagnostic.SafeCause(error) == expectedCause,
+            "startup reason and sanitized cause agree for " + expectedReason + "/" + expectedCause);
     }
 }

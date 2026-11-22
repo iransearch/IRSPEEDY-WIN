@@ -27,9 +27,38 @@ namespace IRSpeedyVPN.Common
         private static readonly Regex UnknownDnsRaceType = new Regex(
             @"\bunknown transport type: vpn-dns-race(?![\w-])", RegexOptions.IgnoreCase);
 
-        internal static string UnsupportedFeature(string error)
+        private static readonly Regex StartupTimeout = new Regex(
+            @"\A(?:startup-)?timeout\.?\z|(?:\A|:\s*)(?:(?:i/o|connection) timeout|(?:operation|connection) timed out|(?:context |core start rpc )?deadline exceeded)\.?\z|\Atimeout connecting to ", RegexOptions.IgnoreCase);
+        // Only known fixed native wording and parser indexes can go in cause.
+        // Arbitrary tags, addresses and option values may look like ordinary words.
+        private static readonly Regex SafeCausePattern = new Regex(
+            @"\A(?:(?:outbounds\[[0-9]{1,4}\]: )?unknown outbound type: auto-selector-round-robin|(?:dns\.servers\[[0-9]{1,4}\]: )?unknown transport type: vpn-dns-race|(?:bind: )?address already in use|permission denied|(?:open wintun\.dll: )?access is denied\.|(?:context |core start rpc )?deadline exceeded\.?|i/o timeout|startup-timeout|timeout)\z",
+            RegexOptions.IgnoreCase | RegexOptions.CultureInvariant);
+
+        internal static string Reason(string error)
         {
             string cause = StartupContext(error);
+            string feature = UnsupportedFeatureFromCause(cause);
+            if (feature == "auto-selector-round-robin") return "unknown-outbound-type";
+            if (feature == "vpn-dns-race") return "unknown-dns-transport";
+            if (DnsRulePath.IsMatch(cause) && cause.Contains(": time: invalid duration")) return "invalid-dns-duration";
+            if (cause.IndexOf("address already in use", StringComparison.OrdinalIgnoreCase) >= 0) return "address-in-use";
+            if (StartupTimeout.IsMatch(cause.Trim())) return "timeout";
+            string reason = NetworkFailureDiagnostic.CoreReason(cause);
+            return reason == "timeout" ? "unclassified" : reason;
+        }
+
+        internal static string SafeCause(string error)
+        {
+            string cause = StartupCause(error).Trim(' ');
+            return cause.Length <= 160 && Regex.IsMatch(cause, @"\A[A-Za-z0-9 /\[\]:._-]+\z")
+                && SafeCausePattern.IsMatch(cause) ? "\"" + cause + "\"" : "unavailable";
+        }
+
+        internal static string UnsupportedFeature(string error) => UnsupportedFeatureFromCause(StartupContext(error));
+
+        private static string UnsupportedFeatureFromCause(string cause)
+        {
             if (UnknownPoolType.IsMatch(cause)) return "auto-selector-round-robin";
             if (UnknownDnsRaceType.IsMatch(cause)) return "vpn-dns-race";
             return null;
@@ -103,12 +132,15 @@ namespace IRSpeedyVPN.Common
                 && Component(lower, kind, inbound.Success) == "dns";
         }
 
-        private static string StartupContext(string error)
+        private static string StartupContext(string error) => Context(StartupCause(error));
+
+        private static string StartupCause(string error)
         {
             // Throne-G puts the original config before the parser error. Skip
             // that object, including quoted braces, without classifying its data.
             const string prefix = "decode config at ";
-            if (error == null || !error.StartsWith(prefix, StringComparison.Ordinal)) return Context(error);
+            if (error == null) return string.Empty;
+            if (!error.StartsWith(prefix, StringComparison.Ordinal)) return error;
             int first = prefix.Length;
             while (first < error.Length && char.IsWhiteSpace(error[first])) first++;
             if (first == error.Length || error[first] != '{') return string.Empty;
@@ -132,7 +164,7 @@ namespace IRSpeedyVPN.Common
                     if (separator >= error.Length || error[separator] != ':') return string.Empty;
                     int cause = separator + 1;
                     while (cause < error.Length && char.IsWhiteSpace(error[cause])) cause++;
-                    return Context(error.Substring(cause, Math.Min(error.Length - cause, 8192)));
+                    return error.Substring(cause);
                 }
             }
             return string.Empty;
