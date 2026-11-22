@@ -1,9 +1,12 @@
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)tools/Check-CoreArchive.proj"
+          Condition="Exists('$(MSBuildProjectDirectory)\Resource\ResourceManager.cs')" />
+
   <Target Name="GenerateFilesZipIntegritySource"
           BeforeTargets="CoreCompile"
           Condition="Exists('$(MSBuildProjectDirectory)\Resource\ResourceManager.cs')">
     <PropertyGroup>
-      <_FilesZipPath>$(MSBuildProjectDirectory)\Resources\Files.zip</_FilesZipPath>
+      <_FilesZipPath>$(MSBuildProjectDirectory)/Resources/Files.zip</_FilesZipPath>
       <_FilesZipIntegritySourceFile>$(IntermediateOutputPath)FilesZipIntegrity.$(MSBuildProjectName).g.cs</_FilesZipIntegritySourceFile>
     </PropertyGroup>
 
@@ -20,6 +23,8 @@
 
     <Error Condition="'$(_FilesZipHashValue)' == ''"
            Text="Could not calculate SHA256 for Resources\Files.zip." />
+
+    <CheckCoreArchive ArchivePath="$(_FilesZipPath)" />
 
     <WriteLinesToFile
       File="$(_FilesZipIntegritySourceFile)"
