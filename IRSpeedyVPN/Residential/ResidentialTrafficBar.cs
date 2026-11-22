@@ -112,12 +112,14 @@ namespace IRSpeedyVPN.Residential
         }
         internal void Update(ResidentialTraffic traffic, bool connected, bool activeTab)
         {
-            bool show = traffic != null && activeTab;
+            bool show = activeTab;
+            ToolTip = show && traffic == null ? "Traffic data unavailable" : null;
             if (traffic != null)
             {
                 remainingValue.Text = RemainingLabel(traffic); usedValue.Text = traffic.UsedText; totalValue.Text = traffic.TotalText;
                 string remainingColor = RemainingColor(traffic);
                 remainingValue.Foreground = Color(remainingColor);
+                usedValue.Foreground = totalValue.Foreground = Brushes.White;
                 arc.Stroke = Color(remainingColor == "#FFFFFF" ? "#F2C53D" : remainingColor);
                 percentage.Text = RemainingPercentage(traffic);
                 percentage.Foreground = traffic.Exhausted ? Color("#EF5D6A") : Brushes.White;
@@ -126,6 +128,14 @@ namespace IRSpeedyVPN.Residential
                 AutomationProperties.SetName(ring, description);
                 AutomationProperties.SetName(this, remainingValue.Text + " left, " + traffic.UsedText + " used of " + traffic.TotalText);
                 arc.Data = MakeArc(traffic.Ratio);
+            }
+            else
+            {
+                remainingValue.Text = usedValue.Text = totalValue.Text = percentage.Text = "—";
+                remainingValue.Foreground = usedValue.Foreground = totalValue.Foreground = percentage.Foreground = Color("#A3ADC7");
+                arc.Data = Geometry.Empty;
+                AutomationProperties.SetName(ring, "Remaining traffic unavailable");
+                AutomationProperties.SetName(this, "Residential traffic data unavailable");
             }
             bar.BorderBrush = Color(connected ? "#8C3FCF8E" : "#2D3850");
             connectionDot.Visibility = connected ? Visibility.Visible : Visibility.Collapsed;
