@@ -246,7 +246,11 @@ assert '" left, " + traffic.UsedText + " used of " + traffic.TotalText' in traff
 assert not any(dead in traffic for dead in ['badge','usageTrack','usageFill','usedFraction','arcGlow','YellowGradient','CardBackground','DropShadowEffect','LinearGradientBrush','new Button','In use','infoText'])
 assert not any('\u0600'<=c<='\u06ff' for c in traffic)
 assert '650' not in traffic and 'TimeSpan.FromMilliseconds(250)' in traffic
-assert 'Animation(-6, 0)' in traffic and 'SystemParameters.ClientAreaAnimation' in traffic and 'bool show = traffic != null && activeTab' in traffic
+assert 'Animation(-6, 0)' in traffic and 'SystemParameters.ClientAreaAnimation' in traffic and 'bool show = activeTab;' in traffic
+assert 'trafficBar.Update(residential.VisibleTraffic, residentialConnected, isResidentialTab && residential.IsAllowed);' in controller
+missing_traffic = traffic[traffic.index('arc.Data = MakeArc(traffic.Ratio)'):traffic.index('bar.BorderBrush = Color(connected')]
+assert 'remainingValue.Text = usedValue.Text = totalValue.Text = percentage.Text = "—";' in missing_traffic
+assert 'arc.Data = Geometry.Empty;' in missing_traffic and 'Residential traffic data unavailable' in missing_traffic
 assert '250ms' in (root/'docs/windows-residential.md').read_text().replace('250 ms','250ms')
 signal=next(e for e in xml.iter() if e.attrib.get('DataContext')=='{Binding SignalServer, Mode=OneWay}')
 assert signal.attrib['VerticalAlignment']=='Center' and not list(signal.iter('{http://schemas.microsoft.com/winfx/2006/xaml/presentation}TranslateTransform'))

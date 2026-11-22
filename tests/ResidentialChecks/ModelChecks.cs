@@ -59,7 +59,7 @@ internal static class ModelChecks
         Check(connecting.probesPaused&&connecting.Resumes==0&&!connecting.isResidentialTab,
             "revoked tab transition preserves a connection-owned probe pause");
         foreach (var header in new[] { "", "upload=1;total=2", "upload=-1;download=0;total=2", "upload=1;upload=2;download=0;total=3", "upload=x;download=0;total=3" })
-            Check(ResidentialTraffic.Parse(header) == null, "invalid traffic remains hidden");
+            Check(ResidentialTraffic.Parse(header) == null, "invalid traffic does not yield a quota");
         Check(ResidentialPresentation.IsEco("39", "VIP") && ResidentialPresentation.IsEco(null, "اکو – سرویس") && ResidentialPresentation.IsEco(null, "eco plus")
             && !ResidentialPresentation.IsEco("139", "economy"), "Android ECO gate uses group ID and whole tokens");
         Check(new ResidentialConfig { enabled = true, subscription_url = "https://example.invalid/token" }.IsUsable, "HTTPS config accepted");

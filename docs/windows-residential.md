@@ -1,4 +1,10 @@
-# Windows Residential (1.4.71)
+# Windows Residential (1.4.94)
+
+## 1.4.94: traffic card visibility
+
+The card stays visible while the eligible Residential tab is selected. Valid
+subscription quota fills LEFT, USED and TOTAL. While quota is loading,
+unavailable or invalid, these fields and the ring label show an em dash.
 
 ## 1.4.71: ECO tab access
 
@@ -271,9 +277,9 @@ Accept plain or standard/URL-safe Base64 URI lines. URI fragments carry
 `city, ISO-country / ISP` metadata; `UK` maps to `GB`. Country pools deduplicate
 connection URIs but preserve complete original links, including XHTTP headers.
 Traffic comes from `subscription-userinfo`: upload + download = used; total = 0
-means unlimited. Missing, malformed, negative or duplicate quota fields hide the
-bar. Saturating addition prevents overflow. Quota exhaustion blocks a new
-Residential connection; it does not silently disconnect a live session.
+means unlimited. Missing, malformed, negative or duplicate quota fields leave
+the card values unavailable. Saturating addition prevents overflow. Quota
+exhaustion blocks a new Residential connection and lets a live session continue.
 
 Windows reuses `TunnelPlusService`, the normal serialized connection request,
 protocol builders, routing, Shield, tests and country pool. No Core, Shield or
@@ -308,7 +314,7 @@ selection. Logout, password re-login, account changes and application exit cance
 downloads and clear account state; late responses cannot repopulate it.
 
 The traffic control owns its visibility history and animation cancellation.
-Initial valid display is immediate; later entrances/connection state changes use
+Initial display is immediate; later entrances/connection state changes use
 250 ms ease-out, opacity and a -6 DIP translation. Height also transitions, so the
 hidden bar reserves no space and the list does not jump on later entrances.
 System reduced-motion settings and unloading stop clocks. The ring shows the

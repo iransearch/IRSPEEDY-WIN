@@ -135,7 +135,7 @@ namespace IRSpeedyVPN.UserControls
             residentialTab.IsEnabled = residential.IsAllowed;
             vpnCountryPicker.Visibility = isResidentialTab ? Visibility.Collapsed : Visibility.Visible;
             residentialCountryPicker.Visibility = isResidentialTab ? Visibility.Visible : Visibility.Collapsed;
-            trafficBar.Update(residential.VisibleTraffic, residentialConnected, isResidentialTab);
+            trafficBar.Update(residential.VisibleTraffic, residentialConnected, isResidentialTab && residential.IsAllowed);
             btnConnect.Content = connectionConnecting ? "در حال اتصال…" : connectionConnected ? "قطع اتصال" : "اتصال";
             System.Windows.Automation.AutomationProperties.SetName(btnConnect, (string)btnConnect.Content);
             btnConnect.IsEnabled = connectionConnecting || connectionConnected || !isResidentialTab || (residential.CanConnect && ResidentialSelectionHasSuccess());
