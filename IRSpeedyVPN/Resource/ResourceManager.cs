@@ -33,6 +33,9 @@ namespace IRSpeedyVPN.Resource
         private const uint MoveFileReplaceExisting = 0x1;
         private const uint MoveFileWriteThrough = 0x8;
         private static readonly TimeSpan StagingStaleAge = TimeSpan.FromMinutes(30);
+        private static volatile string packagedCoreSha256;
+
+        internal static string PackagedCoreSha256 => packagedCoreSha256;
 
         private readonly TripleDesHelper tdes;
         private readonly object extractionLock = new object();
@@ -323,6 +326,15 @@ namespace IRSpeedyVPN.Resource
         {
             var state = ValidateAndRepairRuntimeStateLocked();
             var archiveBytes = ReadEmbeddedArchiveAndVerifyHash();
+            if (packagedCoreSha256 == null)
+            {
+                try
+                {
+                    string executable = Path.GetFileName(GetCorePath(runtimeRoot));
+                    packagedCoreSha256 = CoreRuntimeIdentity.ReadPackagedCoreHash(archiveBytes, executable) ?? "unknown";
+                }
+                catch { packagedCoreSha256 = "unknown"; }
+            }
             var versionId = ComputeSha256Hex(archiveBytes);
             var versionDirectory = GetVersionPath(versionId);
 

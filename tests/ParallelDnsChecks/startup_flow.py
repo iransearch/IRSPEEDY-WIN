@@ -21,10 +21,14 @@ using System.IO;
 using System.Linq;
 using System.Threading;
 using IRSpeedyVPN.Common;
+using IRSpeedyVPN.Resource;
 using IRSpeedyVPN.Services.Libcore;
 using Newtonsoft.Json.Linq;
 
 namespace System.Windows.Forms { static class Application { public static string ExecutablePath => "fixture.exe"; } }
+namespace IRSpeedyVPN.Resource {
+    static class ResourceManager { public static string PackagedCoreSha256 => new string('a', 64); }
+}
 namespace IRSpeedyVPN.Services.Xray {
     class AutoSelectorPlan { public int MainMembers, AiMembers; public bool AiEnabled; }
     static class SmartIpRouting {
@@ -65,7 +69,10 @@ namespace IRSpeedyVPN.Services {
     }
     static class ErrorReporting { public static void Annotate(Exception ex, params string[] fields) { } }
     static class LogHelper {
-        public static void WriteLog(object value) { }
+        public static readonly List<string> Identity = new List<string>();
+        public static void WriteLog(object value) {
+            if (value is string text && text.StartsWith("[CoreRuntimeIdentity]")) Identity.Add(text);
+        }
         public static void WriteExLog(string value) { }
     }
     static class GeoRoutingFallback {
@@ -123,6 +130,10 @@ checks = r'''
             Check(service.Start(new[] { legacyError, null }, out var error) && error == null
                 && service.calls.SequenceEqual(new[] { "pre-stop", "start", "cleanup", "pre-stop", "start" }),
                 "legacy DNS decode rejection calls TryStopCore once between the two Start calls");
+            Check(LogHelper.Identity.Count == 2 && LogHelper.Identity.All(entry =>
+                entry.Contains("Packaged Core SHA256: " + ResourceManager.PackagedCoreSha256)
+                && entry.Contains("Core package match: unknown") && entry.Contains("Core RPC identity: unavailable")),
+                "each attempt logs the packaged hash and the unavailable fake process identity");
             Check(service.dnsConfig.SequenceEqual(new[] { "enabled=True added=True", "enabled=False added=False" })
                 && (string)JObject.Parse(service.starts[0].CoreConfig)["dns"]["servers"][0]["type"] == "vpn-dns-race"
                 && service.starts[1].CoreConfig == standardConfig

@@ -81,8 +81,12 @@ namespace IRSpeedyVPN.Services
         }
         private void DiagnosticStartFailure(string stage, string error, string phase)
         {
+            var feature = CoreStartFailureDiagnostic.UnsupportedFeature(error);
+            var reason = feature == null ? NetworkFailureDiagnostic.CoreReason(error)
+                : feature == "auto-selector-round-robin" ? "unknown-outbound-type" : "unknown-dns-transport";
             Diagnostic(stage, "startupPhase=" + phase
-                + " reason=" + NetworkFailureDiagnostic.CoreReason(error)
+                + " reason=" + reason
+                + (feature == null ? "" : " requiredFeature=" + feature)
                 + " " + CoreStartFailureDiagnostic.Fields(error)
                 + " messageId=" + ConnectionDiagnostics.Fingerprint(error)
                 + " text=\"" + ConnectionDiagnostics.SafeCoreStartText(error) + "\"");

@@ -22,6 +22,18 @@ namespace IRSpeedyVPN.Common
         private static readonly Regex DnsRulePath = new Regex(@"^dns\.rules\[[0-9]+\][.:]");
         private static readonly Regex DnsRaceError = new Regex(
             @"\b(?:unknown transport type: vpn-dns-race(?![\w-])|start dns/vpn-dns-race\[|vpn-dns-race (?:requires|timeouts must be positive|servers must share one vpn detour|fallback must use the same vpn detour)\b|invalid vpn-dns-race doh options\b|unsupported vpn-dns-race transport:)");
+        private static readonly Regex UnknownPoolType = new Regex(
+            @"\bunknown outbound type: auto-selector-round-robin(?![\w-])", RegexOptions.IgnoreCase);
+        private static readonly Regex UnknownDnsRaceType = new Regex(
+            @"\bunknown transport type: vpn-dns-race(?![\w-])", RegexOptions.IgnoreCase);
+
+        internal static string UnsupportedFeature(string error)
+        {
+            string cause = StartupContext(error);
+            if (UnknownPoolType.IsMatch(cause)) return "auto-selector-round-robin";
+            if (UnknownDnsRaceType.IsMatch(cause)) return "vpn-dns-race";
+            return null;
+        }
 
         internal static string Context(string error)
         {
