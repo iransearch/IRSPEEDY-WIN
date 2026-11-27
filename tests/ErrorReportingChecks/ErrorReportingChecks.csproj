@@ -8,7 +8,7 @@
   <ItemGroup>
     <Compile Remove="OperationChecks.cs" />
     <PackageReference Include="Sentry" Version="6.11.0" />
-    <PackageReference Include="CrashRelay.Windows" Version="1.0.1" />
+    <PackageReference Include="CrashRelay.Windows" Version="1.0.2" />
     <Compile Include="../../IRSpeedyVPN/Common/CrashRelayReporting.cs" Link="CrashRelayReporting.cs" />
     <Compile Include="../../IRSpeedyVPN/Common/ErrorReporting.cs" Link="ErrorReporting.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs" />
