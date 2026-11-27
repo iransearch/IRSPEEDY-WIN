@@ -37,9 +37,12 @@ namespace IRSpeedyVPN
 
         protected override void OnStartup(StartupEventArgs e)
         {
-
             base.OnStartup(e);
-          
+            try
+            {
+                Common.CrashRelayReporting.BindUi(new System.Windows.Threading.DispatcherSynchronizationContext(Dispatcher));
+            }
+            catch { } // Diagnostic monitoring must not stop startup.
         }
     }
 }

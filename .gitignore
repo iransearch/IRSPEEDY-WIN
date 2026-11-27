@@ -2,6 +2,7 @@
 .git
 .git-old
 packages
+/.crashrelay-dsn
 IRSpeedyVPN/bin
 IRSpeedyVPN/packages
 IRSpeedyVPN/obj

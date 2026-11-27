@@ -35,6 +35,15 @@ namespace IRSpeedyVPN
 
             try
             {
+                // Guard SDK assembly loading as well as SDK initialization.
+                try
+                {
+                    CrashRelayReporting.Initialize();
+                    if (Environment.GetCommandLineArgs().Contains("--crashrelay-test"))
+                        CrashRelayReporting.Verify();
+                }
+                catch { LogHelper.WriteLog("[CrashRelay] SDK could not be loaded"); }
+
                 VpnTimeZone.Recover();
                 // Also guard assembly/JIT loading failures before Initialize can catch them.
                 try

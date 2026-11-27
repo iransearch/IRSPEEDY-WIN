@@ -4,6 +4,7 @@ Sentry is never initialized. No telemetry can be submitted by this runner.
 """
 from pathlib import Path
 import json,shutil,subprocess,sys,tempfile
+from zipfile import ZipFile
 root=Path(__file__).resolve().parents[2];base=root/'IRSpeedyVPN'
 dotnet,csc,refs8,refs48,sentry=sys.argv[1:]
 libcore=[base/'Services/Libcore'/f'{name}.cs' for name in ['ProtorpcClient','LibcoreServiceClient','LibcoreProto','LibcoreTraffic','LibcoreAutoSelectors','LibcoreMessages']]
@@ -17,10 +18,13 @@ with tempfile.TemporaryDirectory(prefix='sentry-core-checks-') as tmp:
  sa=source.index('        private bool SafeStopCore(');sb=source.index('        private T ExecuteCoreCall<T>(',sa)
  safe=source[sa:sb]
  (p/'ProductionMethods.cs').write_text('using System;using System.IO;using System.Diagnostics;using System.Threading;using IRSpeedyVPN.Common;using IRSpeedyVPN.Resource;using IRSpeedyVPN.Services.Libcore;internal sealed partial class RpcOperationProbe{'+source[a:b]+diag[c:d]+failure+safe+tail+'}')
- sources=[base/'Common/ErrorReporting.cs',base/'Common/CoreRuntimeIdentity.cs',base/'Common/CoreStartFailureDiagnostic.cs',base/'Common/NetworkFailureDiagnostic.cs',Path(__file__).with_name('Program.cs'),Path(__file__).with_name('CoreRpcChecks.cs'),Path(__file__).with_name('OperationChecks.cs'),p/'ProductionMethods.cs']+libcore
+ sources=[base/'Common/ErrorReporting.cs',base/'Common/CrashRelayReporting.cs',base/'Common/CoreRuntimeIdentity.cs',base/'Common/CoreStartFailureDiagnostic.cs',base/'Common/NetworkFailureDiagnostic.cs',Path(__file__).with_name('Program.cs'),Path(__file__).with_name('CoreRpcChecks.cs'),Path(__file__).with_name('OperationChecks.cs'),p/'ProductionMethods.cs']+libcore
+ with ZipFile(root/'vendor/crashrelay/CrashRelay.Windows.1.0.1.nupkg') as package:
+  relay=p/'CrashRelay.dll'
+  relay.write_bytes(package.read('lib/net462/CrashRelay.dll'))
  for refs,name in [(refs48,'Checks.dll'),(refs8,'Checks8.dll')]:
   args=[dotnet,csc,'-nologo','-langversion:7.3','-nowarn:0649,0169','-define:CORE_RPC_OPERATION_CHECKS','-target:exe','-out:'+str(p/name)]
-  args+=['-r:'+str(f) for f in Path(refs).glob('*.dll') if f.name not in ['System.EnterpriseServices.Wrapper.dll','System.EnterpriseServices.Thunk.dll']]+['-r:'+sentry]+[str(f) for f in sources]
+  args+=['-r:'+str(f) for f in Path(refs).glob('*.dll') if f.name not in ['System.EnterpriseServices.Wrapper.dll','System.EnterpriseServices.Thunk.dll']]+['-r:'+sentry,'-r:'+str(relay)]+[str(f) for f in sources]
   subprocess.run(args,check=True)
  shutil.copy2(sentry,p/'Sentry.dll')
  (p/'Checks.runtimeconfig.json').write_text(json.dumps({'runtimeOptions':{'tfm':'net8.0','framework':{'name':'Microsoft.NETCore.App','version':'8.0.0'}}}))

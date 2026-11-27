@@ -16,6 +16,11 @@ namespace IRSpeedyVPN.Common
         internal static int ListenerPid(int port) => ListeningPid;
     }
     internal static class VpnTimeZone { internal static void EndConnection(object service) { } }
+    internal static class ErrorReporting
+    {
+        internal static int Exits;
+        internal static void CaptureCoreExit() => Interlocked.Increment(ref Exits);
+    }
 }
 namespace IRSpeedyVPN.Services
 {
@@ -86,19 +91,21 @@ internal static class CoreExitChecks
             var process=Start();
             try
             {
+                int exits = ErrorReporting.Exits;
                 var context=new FixtureInfo();var creator=new TunnelPlusService(context);creator.Cancel();creator.DisconnectState();
                 var active=Active(residential,context);context.CurrentService=active;
                 CoreDiagnosticMetadata.ListeningPid=process.Id;
                 DateTime started=DateTime.UtcNow.AddSeconds(-5);active.Bind(process,started);creator.Subscribe(process);
                 Check(active.BoundTo(process)&&active.StartTime==started,tab+" binds the reused app-owned listener and its actual launch time");
                 process.Kill();Check(process.WaitForExit(1500),"real shared child process exits within its deadline");
-                await Until(()=>active.Reconnects==1);
+                await Until(()=>active.Reconnects==1 && ErrorReporting.Exits==exits+1);
                 Check(creator.Reconnects==0&&active.Disconnects==0,tab+" real Exited event recovers the active service despite a canceled/disconnected creator");
             }
             finally {Stop(process);}
             process=Start();
             try
             {
+                int exits = ErrorReporting.Exits;
                 var info=new FixtureInfo();var creator=new TunnelPlusService(info);var active=Active(residential,info);info.CurrentService=active;
                 CoreDiagnosticMetadata.ListeningPid=process.Id;active.Bind(process,DateTime.UtcNow.AddSeconds(-5));
                 // A stale generation, cancellation and tab/service switches must
@@ -114,9 +121,10 @@ internal static class CoreExitChecks
                 Check(active.Reconnects==0,tab+" deliberately stopped Core exit stays suppressed");
                 active=Active(residential,info);info.CurrentService=active;active.Bind(process,DateTime.UtcNow.AddSeconds(-5));active.DisconnectState();creator.Trigger(process);await Until(()=>active.Decisions.Count>0);
                 Check(active.Reconnects==0,tab+" idle connection cannot reconnect");
-                active=Active(residential,info);info.CurrentService=active;active.Bind(process,DateTime.UtcNow);creator.Trigger(process);await Until(()=>active.Disconnects==1);
+                Check(ErrorReporting.Exits==exits,tab+" stale, canceled and deliberate exits are not reported");
+                active=Active(residential,info);info.CurrentService=active;active.Bind(process,DateTime.UtcNow);creator.Trigger(process);await Until(()=>active.Disconnects==1 && ErrorReporting.Exits==exits+1);
                 Check(active.Reconnects==0,tab+" preserves the two-second immediate-exit stop policy");
-                active=Active(residential,info);info.CurrentService=active;active.Bind(process,DateTime.UtcNow.AddSeconds(-5));active.ExhaustRetries();creator.Trigger(process);await Until(()=>active.Disconnects==1);
+                active=Active(residential,info);info.CurrentService=active;active.Bind(process,DateTime.UtcNow.AddSeconds(-5));active.ExhaustRetries();creator.Trigger(process);await Until(()=>active.Disconnects==1 && ErrorReporting.Exits==exits+2);
                 Check(active.Reconnects==0,tab+" preserves the ten-exits-in-thirty-seconds stop policy");
                 active=Active(residential,info);info.CurrentService=active;CoreDiagnosticMetadata.ListeningPid=process.Id+1;active.Bind(process,DateTime.UtcNow.AddSeconds(-5));creator.Trigger(process);await Until(()=>active.Decisions.Count>0);
                 Check(!active.BoundTo(process)&&active.Reconnects==0,tab+" never adopts an external or mismatched listener");
@@ -128,6 +136,7 @@ internal static class CoreExitChecks
                 finally {active.ExitApp(false);}
                 info.CurrentService=null;int decisions=creator.Decisions.Count;creator.Trigger(process);await Until(()=>creator.Decisions.Count>decisions);
                 Check(creator.Reconnects==0,tab+" no active service means no recovery");
+                Check(ErrorReporting.Exits==exits+2,tab+" external or shutdown exits are not reported");
             }
             finally {Stop(process);}
         }

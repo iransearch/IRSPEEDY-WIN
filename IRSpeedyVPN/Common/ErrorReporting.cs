@@ -14,7 +14,7 @@ using IRSpeedyVPN.Services.Libcore;
 
 namespace IRSpeedyVPN.Common
 {
-    // Only explicitly constructed metadata reaches Sentry. Local diagnostic logs stay local.
+    // Only explicitly constructed metadata reaches telemetry. Local diagnostic logs stay local.
     internal static class ErrorReporting
     {
         private static IDisposable sdk;
@@ -336,15 +336,46 @@ namespace IRSpeedyVPN.Common
 
         internal static void Capture(Exception exception, bool fatal)
         {
-            if (!ready || exception == null) return;
+            if (exception == null || (!ready && !CrashRelayReporting.Ready)) return;
+            if (fatal && CrashRelayReporting.Ready)
+            {
+                // Keep fatal capture independent of the handled-error rate limit.
+                try { CrashRelayReporting.Capture(exception, true); } catch { }
+            }
             try
             {
                 if (!Admit(DeduplicationKey(exception, fatal), false)) return;
+                if (!fatal && CrashRelayReporting.Ready && !(exception is OperationCanceledException))
+                {
+                    try
+                    {
+                        CrashRelayReporting.Capture(exception, false, new Dictionary<string, string>
+                        {
+                            ["error.kind"] = Classify(exception.Message),
+                            ["core.operation"] = GroupingField(exception, "core.operation"),
+                            ["core.rpc_stage"] = GroupingField(exception, "core.rpc_stage"),
+                            ["core.lifecycle_stage"] = GroupingField(exception, "core.lifecycle_stage"),
+                            ["core.outcome"] = GroupingField(exception, "core.outcome")
+                        });
+                    }
+                    catch { }
+                }
+                if (!ready) return;
                 var report = PrepareException(exception, fatal);
                 SentrySdk.CaptureEvent(report);
                 if (fatal) SentrySdk.FlushAsync(TimeSpan.FromSeconds(2)).GetAwaiter().GetResult();
             }
             catch { } // Never recurse through LogHelper on a telemetry failure.
+        }
+
+        internal static void CaptureCoreExit()
+        {
+            if (!CrashRelayReporting.Ready) return;
+            try
+            {
+                if (Admit("crashrelay:core-exit", false)) CrashRelayReporting.CaptureCoreExit();
+            }
+            catch { }
         }
 
         internal static void ObserveDiagnostic(string message)

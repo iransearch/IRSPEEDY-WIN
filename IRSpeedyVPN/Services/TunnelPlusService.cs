@@ -2368,11 +2368,14 @@ namespace IRSpeedyVPN.Services
                         Diagnostic("core-exit-decision", "action=disconnect reason=retry-policy");
                         VpnTimeZone.EndConnection(this);
                         DisconnectLocked(true, false, false);
-                        return;
                     }
-                    Diagnostic("core-exit-decision", "action=reconnect");
-                    TryReconnect();
+                    else
+                    {
+                        Diagnostic("core-exit-decision", "action=reconnect");
+                        TryReconnect();
+                    }
                 }
+                ErrorReporting.CaptureCoreExit();
             });
         }
         private bool ShouldRetryCoreExit()

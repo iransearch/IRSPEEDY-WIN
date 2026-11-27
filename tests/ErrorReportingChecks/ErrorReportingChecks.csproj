@@ -3,10 +3,13 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net48</TargetFramework>
     <LangVersion>7.3</LangVersion>
+    <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../../vendor/crashrelay</RestoreAdditionalProjectSources>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="OperationChecks.cs" />
     <PackageReference Include="Sentry" Version="6.11.0" />
+    <PackageReference Include="CrashRelay.Windows" Version="1.0.1" />
+    <Compile Include="../../IRSpeedyVPN/Common/CrashRelayReporting.cs" Link="CrashRelayReporting.cs" />
     <Compile Include="../../IRSpeedyVPN/Common/ErrorReporting.cs" Link="ErrorReporting.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/ProtorpcClient.cs" Link="ProtorpcClient.cs" />
     <Compile Include="../../IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs" Link="LibcoreServiceClient.cs" />

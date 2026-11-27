@@ -4,6 +4,10 @@ Analyzed commit: `5febacbedc6fe0a551ceb33912bf6eb17c4c628d`. Validity: **needs-r
 
 Only this status/manifest describe the current snapshot. Other narrative pages are manually reviewed baseline notes.
 
+The Windows CrashRelay integration postdates this snapshot. Startup, exception reporting,
+Core exit reporting, and the Windows project's package and resource relationships are stale
+until the next source review.
+
 - files_changed: 9
 - files_examined: 6
 - content_files_read: 6
