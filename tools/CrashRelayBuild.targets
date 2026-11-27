@@ -1,0 +1,72 @@
+<Project>
+  <PropertyGroup>
+    <_CrashRelayCheckoutDsn>$(MSBuildThisFileDirectory)../.crashrelay-dsn</_CrashRelayCheckoutDsn>
+    <CrashRelayDsnFile Condition="'$(CrashRelayDsnFile)' == '' And Exists('$(_CrashRelayCheckoutDsn)')">$(_CrashRelayCheckoutDsn)</CrashRelayDsnFile>
+    <CrashRelayDsnFile Condition="'$(CrashRelayDsnFile)' == '' And '$(LOCALAPPDATA)' != ''">$(LOCALAPPDATA)/IRSpeedyVPN/Build/crashrelay.dsn</CrashRelayDsnFile>
+  </PropertyGroup>
+
+  <ItemGroup Condition="Exists('$(CrashRelayDsnFile)')">
+    <EmbeddedResource Include="$(CrashRelayDsnFile)" LogicalName="IRSpeedyVPN.CrashRelayDsn" />
+  </ItemGroup>
+
+  <!-- Accept the same DSN shape as the bundled SDK. Keep DSN contents out of
+       MSBuild properties, task parameters, warnings and diagnostic output. -->
+  <UsingTask TaskName="CheckCrashRelayDsn" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <Task>
+      <Code Type="Class" Language="cs"><![CDATA[
+using System;
+using System.IO;
+using System.Text.RegularExpressions;
+using Microsoft.Build.Framework;
+using Microsoft.Build.Utilities;
+
+public sealed class CheckCrashRelayDsn : Task
+{
+    [Required]
+    public string FilePath { get; set; }
+
+    [Output]
+    public bool Valid { get; private set; }
+
+    public override bool Execute()
+    {
+        try
+        {
+            var fields = File.ReadAllText(FilePath).Trim().Split('|');
+            Valid = fields.Length == 3
+                && Uri.TryCreate(fields[0], UriKind.Absolute, out var origin)
+                && origin.Scheme == Uri.UriSchemeHttps && origin.Host.Length != 0
+                && origin.AbsolutePath == "/" && origin.UserInfo.Length == 0
+                && origin.Query.Length == 0 && origin.Fragment.Length == 0
+                && Guid.TryParseExact(fields[1], "D", out _)
+                && Regex.IsMatch(fields[2], @"\A[a-f0-9]{64}\z");
+        }
+        catch (Exception ex) when (ex is IOException || ex is UnauthorizedAccessException
+            || ex is ArgumentException || ex is NotSupportedException)
+        {
+            Valid = false;
+        }
+        return true;
+    }
+}
+      ]]></Code>
+    </Task>
+  </UsingTask>
+
+  <Target Name="ValidateCrashRelayBuild" BeforeTargets="PrepareForBuild;CoreCompile"
+          Condition="'$(Configuration)' == 'Release' And '$(DesignTimeBuild)' != 'true'">
+    <PropertyGroup>
+      <_CrashRelayRequired Condition="'$(UseCosturaSingleFile)' == 'true' Or Exists('$(DotfuscatorExe)')">true</_CrashRelayRequired>
+    </PropertyGroup>
+    <Error Code="IRSC001" Condition="'$(_CrashRelayRequired)' == 'true' And !Exists('$(CrashRelayDsnFile)')"
+           Text="Release packaging requires the CrashRelay DSN. Place crashrelay.dsn in %LOCALAPPDATA%\IRSpeedyVPN\Build or set CrashRelayDsnFile to an existing file." />
+    <Warning Code="IRSC001" Condition="'$(_CrashRelayRequired)' != 'true' And !Exists('$(CrashRelayDsnFile)')"
+             Text="CrashRelay is disabled for this build. Provide .crashrelay-dsn or set CrashRelayDsnFile to an existing DSN file." />
+    <CheckCrashRelayDsn FilePath="$(CrashRelayDsnFile)" Condition="'$(_CrashRelayRequired)' == 'true'">
+      <Output TaskParameter="Valid" PropertyName="_CrashRelayDsnValid" />
+    </CheckCrashRelayDsn>
+    <Error Code="IRSC002" Condition="'$(_CrashRelayRequired)' == 'true' And '$(_CrashRelayDsnValid)' != 'true'"
+           Text="The CrashRelay DSN file could not be read or does not contain a valid HTTPS origin, project key and ingest key." />
+  </Target>
+</Project>

@@ -12,7 +12,6 @@
     <Deterministic>true</Deterministic>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
     <AppConfig>app.config</AppConfig>
-    <CrashRelayDsnFile Condition="'$(CrashRelayDsnFile)' == ''">$(MSBuildThisFileDirectory)../.crashrelay-dsn</CrashRelayDsnFile>
     <RestoreAdditionalProjectSources>$(RestoreAdditionalProjectSources);$(MSBuildThisFileDirectory)../vendor/crashrelay</RestoreAdditionalProjectSources>
   </PropertyGroup>
 
@@ -162,7 +161,6 @@
 
   <ItemGroup>
     <EmbeddedResource Include="Resources\TimeZones\iana-windows.tsv" LogicalName="IRSpeedyVPN.TimeZones.tsv" />
-    <EmbeddedResource Include="$(CrashRelayDsnFile)" LogicalName="IRSpeedyVPN.CrashRelayDsn" Condition="Exists('$(CrashRelayDsnFile)')" />
     <EmbeddedResource Include="..\docs\third-party\Unicode-CLDR-LICENSE.txt" Link="Licenses\Unicode-CLDR-LICENSE.txt" />
     <EmbeddedResource Include="..\docs\third-party\Moonlight-Tunneling-LICENSE.txt" Link="Licenses\Moonlight-Tunneling-LICENSE.txt" />
     <EmbeddedResource Include="Components\ToggleSwitch\Icons\ToggleSwitch.HorizontalToggleSwitch.Expression.Large.png" />
@@ -188,10 +186,7 @@
   <!-- Embed opaque helper payloads before compilation and the existing single-file packer. -->
   <Import Project="..\tools\HotspotPayload.targets" />
 
-  <Target Name="WarnIfCrashRelayIsUnconfigured" BeforeTargets="PrepareForBuild"
-          Condition="'$(Configuration)' == 'Release' And !Exists('$(CrashRelayDsnFile)')">
-    <Warning Code="IRSC001" Text="CrashRelay is disabled for this build. Provide .crashrelay-dsn or set CrashRelayDsnFile to an existing DSN file." />
-  </Target>
+  <Import Project="..\tools\CrashRelayBuild.targets" />
 
   <Target Name="RunDotfuscator" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' And Exists('$(DotfuscatorExe)')">
     <MakeDir Directories="$(TargetDir)Obfuscated" />
