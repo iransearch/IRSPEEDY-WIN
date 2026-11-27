@@ -17,11 +17,15 @@ namespace IRSpeedyVPN.WebServices
         private readonly Stopwatch clock = Stopwatch.StartNew();
         private readonly int budgetMs;
         private readonly HashSet<string> recovered = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        private readonly List<string> reportedAttempts = new List<string>();
+        private readonly bool refreshServerList;
+        private int apiAttempts, transportAttempts;
+        private string resolverOutcome = "unknown";
         internal readonly CancellationToken Cancellation;
         internal readonly string Id = Guid.NewGuid().ToString("N");
         internal LoginDeadline Endpoint { get; private set; }
-        internal LoginNetworkContext(CancellationToken cancellation, int budgetMs = 45000)
-        { Cancellation = cancellation; this.budgetMs = budgetMs; }
+        internal LoginNetworkContext(CancellationToken cancellation, int budgetMs = 45000, bool refreshServerList = false)
+        { Cancellation = cancellation; this.budgetMs = budgetMs; this.refreshServerList = refreshServerList; }
         internal int RemainingMs => (int)Math.Max(0, budgetMs - clock.ElapsedMilliseconds);
         internal void Check()
         {
@@ -33,7 +37,62 @@ namespace IRSpeedyVPN.WebServices
         internal bool RecoveryAvailable(string host)
         { lock (recovered) return !recovered.Contains(host); }
         internal void BeginEndpoint(int timeoutMs)
-        { Check(); Endpoint = new LoginDeadline(this, timeoutMs); }
+        {
+            Check();
+            Endpoint = new LoginDeadline(this, timeoutMs);
+            apiAttempts++;
+            resolverOutcome = "unknown";
+        }
+
+        internal void RecordResolverOutcome(string outcome) => resolverOutcome = outcome;
+
+        internal void RecordTransportAttempt(string route, bool https, LoginCurlResult result)
+        {
+            transportAttempts++;
+            if (reportedAttempts.Count >= 8) return;
+            bool hasHttp = result != null && result.HttpCode >= 100 && result.HttpCode <= 599;
+            bool notSent = result != null && (result.Unavailable || (https && result.DefinitelyNotSent));
+            string send = hasHttp || (result != null && result.MetricsKnown && result.UploadedBytes > 0)
+                ? "sent" : notSent ? "not-sent" : "unknown";
+            bool hasCurlExit = route != "managed" && result != null && !result.Unavailable
+                && result.ExitCode >= 0 && result.ExitCode <= 255;
+            string curl = hasCurlExit ? result.ExitCode.ToString(CultureInfo.InvariantCulture) : "unknown";
+            string http = hasHttp ? result.HttpCode.ToString(CultureInfo.InvariantCulture)
+                : result != null && result.HttpCode == 0 && (result.MetricsKnown || result.Unavailable) ? "none" : "unknown";
+            string phase = "unknown";
+            if (hasHttp) phase = "http-response";
+            else if (result != null && result.Unavailable) phase = "curl-unavailable";
+            else if (hasCurlExit)
+            {
+                switch (result.ExitCode)
+                {
+                    case 6: phase = "dns-failure"; break;
+                    case 7: phase = "connect-failure"; break;
+                    case 28: phase = notSent ? "pre-connect-timeout" : "transport-timeout"; break;
+                    default: phase = "transport-error"; break;
+                }
+            }
+            reportedAttempts.Add(FormattableString.Invariant(
+                $"api={apiAttempts};dns={resolverOutcome};route={route};phase={phase};curl={curl};http={http};send={send}"));
+        }
+
+        internal string[] DiagnosticFields()
+        {
+            var fields = new List<string>
+            {
+                "login.flow", refreshServerList ? "session-refresh" : "login",
+                "login.api_attempts", apiAttempts.ToString(CultureInfo.InvariantCulture),
+                "login.transport_attempts", transportAttempts.ToString(CultureInfo.InvariantCulture),
+                "login.elapsed_ms", clock.ElapsedMilliseconds.ToString(CultureInfo.InvariantCulture),
+                "login.last_dns", resolverOutcome
+            };
+            for (int i = 0; i < reportedAttempts.Count; i++)
+            {
+                fields.Add("login.attempt" + (i + 1).ToString(CultureInfo.InvariantCulture));
+                fields.Add(reportedAttempts[i]);
+            }
+            return fields.ToArray();
+        }
     }
 
     internal sealed class LoginDeadline
@@ -266,6 +325,7 @@ namespace IRSpeedyVPN.WebServices
             try
             {
                 var answer = resolver.Resolve(host, budget, context.Cancellation, refresh);
+                context.RecordResolverOutcome(answer != null && answer.Values.Length > 0 ? "answer" : "no-answer");
                 deadline.Check();
                 Log(context, host, "stage=resolver-first-answer addressCount=" + (answer == null ? 0 : answer.Values.Length)
                     + " cached=" + (answer != null && answer.FromCache));
@@ -275,6 +335,7 @@ namespace IRSpeedyVPN.WebServices
             catch (Exception ex)
             {
                 deadline.Check();
+                context.RecordResolverOutcome("lookup-error");
                 Log(context, host, "stage=resolver-first-lookup-failed type=" + ex.GetType().Name);
                 return null; // DNS GETs contain no POST; system fallback is safe.
             }
@@ -288,7 +349,7 @@ namespace IRSpeedyVPN.WebServices
             try
             {
                 var observed = transport as ILoginConnectTransport;
-                first = CredentialAttempt(deadline, context, remaining => observed == null
+                first = CredentialAttempt(deadline, context, "system", target.Scheme == Uri.UriSchemeHttps, remaining => observed == null
                     ? transport.Curl(url, method, headers, body, null, remaining, context.Cancellation)
                     : observed.CurlObserved(url, method, headers, body, remaining, context.Cancellation, progress));
             }
@@ -302,7 +363,7 @@ namespace IRSpeedyVPN.WebServices
                 Log(context, target.Host, "stage=managed reason=curl-unavailable");
                 try
                 {
-                    var managed = CredentialAttempt(deadline, context, remaining =>
+                    var managed = CredentialAttempt(deadline, context, "managed", target.Scheme == Uri.UriSchemeHttps, remaining =>
                         transport.Managed(url, method, headers, body, remaining, context.Cancellation));
                     Log(context, target.Host, "stage=managed-result http=" + managed.HttpCode);
                     return managed;
@@ -369,6 +430,7 @@ namespace IRSpeedyVPN.WebServices
                 for (int pass = 0; pass < 2; pass++)
                 {
                     deadline.Check();
+                    context.RecordResolverOutcome(answer != null && answer.Values.Length > 0 ? "answer" : "no-answer");
                     Log(context, target.Host, "stage=lookup-result pass=" + pass
                         + " addressCount=" + (answer == null ? 0 : answer.Values.Length)
                         + " cached=" + (answer != null && answer.FromCache));
@@ -423,18 +485,30 @@ namespace IRSpeedyVPN.WebServices
             string[] addresses, LoginDeadline deadline, LoginNetworkContext context)
         {
             deadline.Check();
-            return CredentialAttempt(deadline, context, remaining => transport.Curl(url, method, headers, body,
+            return CredentialAttempt(deadline, context, "resolved", target.Scheme == Uri.UriSchemeHttps, remaining => transport.Curl(url, method, headers, body,
                 target.Host + ":" + target.Port + ":" + string.Join(",", addresses.Select(ip => ip.Contains(":") ? "[" + ip + "]" : ip)),
                 remaining, context.Cancellation));
         }
         private static LoginCurlResult CredentialAttempt(LoginDeadline deadline, LoginNetworkContext context,
-            Func<int, LoginCurlResult> attempt)
+            string route, bool https, Func<int, LoginCurlResult> attempt)
         {
             deadline.Check();
             if (!CredentialGate.Wait(deadline.RemainingMs, context.Cancellation))
                 throw new TimeoutException("Login attempt queue deadline expired before sending.");
-            try { deadline.Check(); CurlHelper.EnsureCredentialCurlStopped(); return attempt(deadline.RemainingMs); }
-            finally { CredentialGate.Release(); }
+            LoginCurlResult result = null;
+            bool enteredTransport = false;
+            try
+            {
+                deadline.Check();
+                CurlHelper.EnsureCredentialCurlStopped();
+                enteredTransport = true;
+                return result = attempt(deadline.RemainingMs);
+            }
+            finally
+            {
+                CredentialGate.Release();
+                if (enteredTransport) context.RecordTransportAttempt(route, https, result);
+            }
         }
         private static LoginTransportException Failure(LoginCurlResult first, LoginCurlResult second, bool https = true)
             => new LoginTransportException("Initial: " + first.Summary + "; recovery: "

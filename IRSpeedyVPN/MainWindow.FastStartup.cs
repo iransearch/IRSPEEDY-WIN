@@ -534,7 +534,7 @@ namespace IRSpeedyVPN
                     if (!accountSessionMaintenance.RequestStarted(sessionVersion)) return false;
                     ScheduleSessionMaintenance();
                     LogHelper.WriteExLog("[SessionMaintenance] stage=request generation=" + sessionVersion);
-                    var response = serviceController.Login2(username, password, linked.Token);
+                    var response = serviceController.Login2(username, password, linked.Token, refreshServerList: true);
                     // Apply refresh results on the UI thread atomically with password re-login.
                     // An old in-flight refresh must never log out or restore the previous password.
                     Dispatcher.Invoke((Action)(() =>

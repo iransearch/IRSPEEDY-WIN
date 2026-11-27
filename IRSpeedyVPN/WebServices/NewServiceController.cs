@@ -65,8 +65,8 @@ namespace IRSpeedyVPN.WebServices
         /// Old ServiceController.Login2 -> New service server list.
         /// </summary>
         internal BaseHttpResponse<DefaultEncryptedResponse<AccountInfoEx>> Login2(string username, string password,
-            CancellationToken cancellation = default(CancellationToken))
-            => getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString(), cancellation);
+            CancellationToken cancellation = default(CancellationToken), bool refreshServerList = false)
+            => getServerList(username, password, SysThumbPrint.GetComputerName(), SysThumbPrint.ValueString(), cancellation, refreshServerList);
 
         internal BaseHttpResponse<ChangePasswordResult> ChangePassword(string username, string oldPassword, string newPassword)
             => PasswordChangeClient.Send(username, oldPassword, newPassword);
@@ -100,10 +100,10 @@ namespace IRSpeedyVPN.WebServices
             string password,
             string deviceName,
             string deviceToken,
-            CancellationToken cancellation = default(CancellationToken))
+            CancellationToken cancellation = default(CancellationToken), bool refreshServerList = false)
         {
             string requestId = Guid.NewGuid().ToString("N");
-            var loginContext = new LoginNetworkContext(cancellation, SlowNetworkLoginBudgetSeconds * 1000);
+            var loginContext = new LoginNetworkContext(cancellation, SlowNetworkLoginBudgetSeconds * 1000, refreshServerList);
             LogHelper.WriteExLog("[StartupAuth] stage=start flow=Login requestId=" + requestId);
 
             return ExecuteWithFailover(
@@ -402,6 +402,8 @@ namespace IRSpeedyVPN.WebServices
                     "api.elapsed_ms", flowStopwatch.ElapsedMilliseconds.ToString(), "api.budget_ms", flowBudgetMs.ToString());
                 for (int i = 0; i < history.Count && i < 4; i++)
                     ErrorReporting.Annotate(ex, "api.attempt" + (i + 1), history[i]);
+                if (loginContext != null && !(ex is OperationCanceledException))
+                    ErrorReporting.Annotate(ex, loginContext.DiagnosticFields());
                 throw;
             }
         }

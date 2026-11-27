@@ -36,6 +36,12 @@ static class RelayProbe {
     static void Main() {
         CrashRelayReporting.Initialize();
         CrashRelayReporting.Verify();
+        if (CrashRelayReporting.Ready)
+            CrashRelayReporting.Capture(new System.Exception("fixture-message-must-stay-local"), false,
+                new System.Collections.Generic.Dictionary<string, string> {
+                    ["login.flow"] = "session-refresh",
+                    ["login.attempt1"] = "api=1;dns=no-answer;route=system;phase=pre-connect-timeout;curl=28;http=none;send=not-sent"
+                });
     }
 }
 namespace IRSpeedyVPN.Common {
@@ -71,6 +77,10 @@ namespace IRSpeedyVPN.Common {
   if case=='configured':
    assert 'verification requested' in result.stdout
    assert any(e['app']['platform']=='windows' and e['message']=='IRSPEEDY Windows telemetry test' for e in events), events
+   diagnostic=next(e for e in events if e['kind']=='non_fatal')
+   assert diagnostic['context']['extras']['login.flow']=='session-refresh', diagnostic
+   assert diagnostic['context']['extras']['login.attempt1']=='api=1;dns=no-answer;route=system;phase=pre-connect-timeout;curl=28;http=none;send=not-sent', diagnostic
+   assert 'fixture-message-must-stay-local' not in json.dumps(diagnostic), diagnostic
   else:
    assert 'verification unavailable' in result.stdout and not events
   assert configured not in result.stdout and 'not-a-dsn' not in result.stdout
