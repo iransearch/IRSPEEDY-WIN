@@ -1,6 +1,6 @@
 {
   "schema_version": "1.0.0",
-  "analyzed_commit": "5febacbedc6fe0a551ceb33912bf6eb17c4c628d",
+  "analyzed_commit": "812a672c4e74685db53a0e24c540d1646e3ecf6b",
   "scope": "XAML declarations, name/event/resource-key references and matching partial class; not runtime behavior",
   "components": {
     "IRSpeedyVPN/App.xaml": {
@@ -150,7 +150,7 @@
       ],
       "codebehind": {
         "path": "IRSpeedyVPN/App.xaml.cs",
-        "blob_sha": "c7d63d4eb0e7bd9c27724479f98092b21b35c60f",
+        "blob_sha": "b1ca5c884b4f3c968300e0f9e96806996f0a1da7",
         "status": "verified-declaration",
         "evidence": {
           "line": 17,
@@ -400,7 +400,7 @@
     },
     "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml": {
       "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml",
-      "blob_sha": "2e83b6a5860fde58bad5da50e3c69d10d4751b1e",
+      "blob_sha": "9cbfeeb2cb76910ad0ebb959ebf3ba3857cac4ca",
       "status": "verified-declarations",
       "x_class": "IRSpeedyVPN.Components.ServerListControl.ServerCountryPicker",
       "evidence": {
@@ -510,7 +510,7 @@
           "name": "EmptyResults",
           "tag": "TextBlock",
           "evidence": {
-            "line": 325,
+            "line": 326,
             "text": "<TextBlock x:Name=\"EmptyResults\" Grid.Row=\"1\" Text=\"سروری پیدا نشد\" FontSize=\"13\" Foreground=\"{DynamicResource TextMutedBrush}\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Center\" Visibility=\"Collapsed\" IsHitTestVisible=\"False\"/>"
           }
         },
@@ -518,7 +518,7 @@
           "name": "MoreLocations",
           "tag": "TextBlock",
           "evidence": {
-            "line": 326,
+            "line": 327,
             "text": "<TextBlock x:Name=\"MoreLocations\" Grid.Row=\"1\" Text=\"More locations are coming soon.\" FontSize=\"13\" Foreground=\"#8793B3\" FlowDirection=\"LeftToRight\" HorizontalAlignment=\"Center\" VerticalAlignment=\"Top\" Visibility=\"Collapsed\" IsHitTestVisible=\"False\"/>"
           }
         },
@@ -526,7 +526,7 @@
           "name": "CometOverlay",
           "tag": "ServerListCometOverlay",
           "evidence": {
-            "line": 327,
+            "line": 328,
             "text": "<local:ServerListCometOverlay x:Name=\"CometOverlay\" Grid.RowSpan=\"2\" FlowDirection=\"LeftToRight\" IsHitTestVisible=\"False\" Focusable=\"False\"/>"
           }
         }
@@ -645,8 +645,8 @@
           "handler": "Row_Click",
           "status": "xaml-declaration-only",
           "evidence": {
-            "line": 320,
-            "text": "<Button Style=\"{StaticResource ServerCardButton}\" Height=\"{Binding DisplayedServer.RowHeight, Mode=OneWay}\" Margin=\"0,0,0,8\" IsEnabled=\"{Binding IsSelectable, Mode=OneWay}\" Cursor=\"{Binding RowCursor, Mode=OneWay}\" Click=\"Row_Click\" PreviewKeyDown=\"Row_KeyDown\" Tag=\"{Binding DisplayedServer.Identity, Mode=OneWay}\" AutomationProperties.Name=\"{Binding DisplayedServer.AutomationDescription, Mode=OneWay}\" AutomationProperties.HelpText=\"{Binding DisplayedServer.SignalText, Mode=OneWay}\" ToolTip=\"{Binding DisplayedServer.RowToolTip, Mode=OneWay}\" ToolTipService.ShowOnDisabled=\"True\"/>"
+            "line": 321,
+            "text": "<Button Style=\"{StaticResource ServerCardButton}\" Height=\"{Binding DisplayedServer.RowHeight, Mode=OneWay}\" Margin=\"0,0,0,8\" IsEnabled=\"{Binding IsSelectable, Mode=OneWay}\" Cursor=\"{Binding RowCursor, Mode=OneWay}\" ClickMode=\"Press\" Click=\"Row_Click\" PreviewKeyDown=\"Row_KeyDown\" Tag=\"{Binding DisplayedServer.Identity, Mode=OneWay}\" AutomationProperties.Name=\"{Binding DisplayedServer.AutomationDescription, Mode=OneWay}\" AutomationProperties.HelpText=\"{Binding DisplayedServer.SignalText, Mode=OneWay}\" ToolTip=\"{Binding DisplayedServer.RowToolTip, Mode=OneWay}\" ToolTipService.ShowOnDisabled=\"True\"/>"
           }
         },
         {
@@ -654,8 +654,8 @@
           "handler": "Row_KeyDown",
           "status": "xaml-declaration-only",
           "evidence": {
-            "line": 320,
-            "text": "<Button Style=\"{StaticResource ServerCardButton}\" Height=\"{Binding DisplayedServer.RowHeight, Mode=OneWay}\" Margin=\"0,0,0,8\" IsEnabled=\"{Binding IsSelectable, Mode=OneWay}\" Cursor=\"{Binding RowCursor, Mode=OneWay}\" Click=\"Row_Click\" PreviewKeyDown=\"Row_KeyDown\" Tag=\"{Binding DisplayedServer.Identity, Mode=OneWay}\" AutomationProperties.Name=\"{Binding DisplayedServer.AutomationDescription, Mode=OneWay}\" AutomationProperties.HelpText=\"{Binding DisplayedServer.SignalText, Mode=OneWay}\" ToolTip=\"{Binding DisplayedServer.RowToolTip, Mode=OneWay}\" ToolTipService.ShowOnDisabled=\"True\"/>"
+            "line": 321,
+            "text": "<Button Style=\"{StaticResource ServerCardButton}\" Height=\"{Binding DisplayedServer.RowHeight, Mode=OneWay}\" Margin=\"0,0,0,8\" IsEnabled=\"{Binding IsSelectable, Mode=OneWay}\" Cursor=\"{Binding RowCursor, Mode=OneWay}\" ClickMode=\"Press\" Click=\"Row_Click\" PreviewKeyDown=\"Row_KeyDown\" Tag=\"{Binding DisplayedServer.Identity, Mode=OneWay}\" AutomationProperties.Name=\"{Binding DisplayedServer.AutomationDescription, Mode=OneWay}\" AutomationProperties.HelpText=\"{Binding DisplayedServer.SignalText, Mode=OneWay}\" ToolTip=\"{Binding DisplayedServer.RowToolTip, Mode=OneWay}\" ToolTipService.ShowOnDisabled=\"True\"/>"
           }
         }
       ],
@@ -899,8 +899,8 @@
           "key": "ServerCardButton",
           "status": "key-reference-only",
           "evidence": {
-            "line": 320,
-            "text": "<Button Style=\"{StaticResource ServerCardButton}\" Height=\"{Binding DisplayedServer.RowHeight, Mode=OneWay}\" Margin=\"0,0,0,8\" IsEnabled=\"{Binding IsSelectable, Mode=OneWay}\" Cursor=\"{Binding RowCursor, Mode=OneWay}\" Click=\"Row_Click\" PreviewKeyDown=\"Row_KeyDown\" Tag=\"{Binding DisplayedServer.Identity, Mode=OneWay}\" AutomationProperties.Name=\"{Binding DisplayedServer.AutomationDescription, Mode=OneWay}\" AutomationProperties.HelpText=\"{Binding DisplayedServer.SignalText, Mode=OneWay}\" ToolTip=\"{Binding DisplayedServer.RowToolTip, Mode=OneWay}\" ToolTipService.ShowOnDisabled=\"True\"/>"
+            "line": 321,
+            "text": "<Button Style=\"{StaticResource ServerCardButton}\" Height=\"{Binding DisplayedServer.RowHeight, Mode=OneWay}\" Margin=\"0,0,0,8\" IsEnabled=\"{Binding IsSelectable, Mode=OneWay}\" Cursor=\"{Binding RowCursor, Mode=OneWay}\" ClickMode=\"Press\" Click=\"Row_Click\" PreviewKeyDown=\"Row_KeyDown\" Tag=\"{Binding DisplayedServer.Identity, Mode=OneWay}\" AutomationProperties.Name=\"{Binding DisplayedServer.AutomationDescription, Mode=OneWay}\" AutomationProperties.HelpText=\"{Binding DisplayedServer.SignalText, Mode=OneWay}\" ToolTip=\"{Binding DisplayedServer.RowToolTip, Mode=OneWay}\" ToolTipService.ShowOnDisabled=\"True\"/>"
           }
         }
       ],
@@ -958,7 +958,7 @@
       "merged_dictionaries": [],
       "codebehind": {
         "path": "IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs",
-        "blob_sha": "99351bde81910efd40ce1a484446165e580af3a2",
+        "blob_sha": "8e6d01dee15ffb5beefd4538712d7a2d9c71a545",
         "status": "verified-declaration",
         "evidence": {
           "line": 307,
@@ -2728,7 +2728,7 @@
       "merged_dictionaries": [],
       "codebehind": {
         "path": "IRSpeedyVPN/MainWindow.xaml.cs",
-        "blob_sha": "62b03e8486c6fe43e659f2ce8cffb92bdeb704f2",
+        "blob_sha": "a2c0646d39db0a6270296f70cf598aff615522b5",
         "status": "verified-declaration",
         "evidence": {
           "line": 39,
@@ -15138,7 +15138,7 @@
       "merged_dictionaries": [],
       "codebehind": {
         "path": "IRSpeedyVPN/UserControls/UCServerList.xaml.cs",
-        "blob_sha": "a8c28533081c22ad00689e8d0a428845d4df0ac4",
+        "blob_sha": "c7bd0a73e3592d94afb15b217aaaf8dd8bbd67f3",
         "status": "verified-declaration",
         "evidence": {
           "line": 20,
