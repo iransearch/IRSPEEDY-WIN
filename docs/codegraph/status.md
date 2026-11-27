@@ -1,19 +1,15 @@
 # Current Codegraph status
 
-Analyzed commit: `5febacbedc6fe0a551ceb33912bf6eb17c4c628d`. Validity: **needs-review**.
+Analyzed commit: `812a672c4e74685db53a0e24c540d1646e3ecf6b`. Validity: **needs-review**.
 
 Only this status/manifest describe the current snapshot. Other narrative pages are manually reviewed baseline notes.
 
-The Windows CrashRelay integration postdates this snapshot. Startup, exception reporting,
-Core exit reporting, and the Windows project's package and resource relationships are stale
-until the next source review.
-
-- files_changed: 9
-- files_examined: 6
-- content_files_read: 6
-- relationships_changed: 5
-- new_verified_relations: 0
-- stale_relations: 22
+- files_changed: 103
+- files_examined: 78
+- content_files_read: 78
+- relationships_changed: 130
+- new_verified_relations: 53
+- stale_relations: 77
 
 Pending source review:
 
@@ -36,3 +32,66 @@ Pending source review:
 - `IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.Transitions.cs`: runtime-or-ui-source-needs-review
 - `IRSpeedyVPN/Components/ServerListControl/ServerListViewModel.cs`: runtime-or-ui-source-needs-review
 - `tests/ServerListTransitionChecks/IncrementalOrderChecks.cs`: runtime-or-ui-source-needs-review
+- `Directory.Build.targets`: unresolved-build-declaration
+- `IRSpeedyVPN/App.xaml.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Common/CoreRuntimeIdentity.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Common/CoreStartFailureDiagnostic.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Common/CrashRelayReporting.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Common/ErrorReporting.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Components/ServerListControl/ServerCountryPicker.xaml.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Components/ServerListControl/ServerListRanking.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/IRSpeedyVPN.csproj`: unresolved-build-declaration
+- `IRSpeedyVPN/MainWindow.CountrySubscriptions.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/MainWindow.FastStartup.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/MainWindow.xaml.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Models/NewService/Group.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Models/NewService/ServerEx.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Models/NewService/Url.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Program.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Residential/ResidentialTrafficBar.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Residential/ResidentialViewModel.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Resource/ResourceManager.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/CiscoService.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/CountrySubscription.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/Libcore/LibcoreServiceClient.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/ServerProbeScheduler.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/ServerRefreshPlan.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/ServiceFactory.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/SingBox/ConfigGenerator.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/SingBox/Outbound.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/SingBox/ParallelDnsRouting.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/SingBox/SingBoxConfig.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/SingBox/WireGuardEndpoint.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/SplitTunneling/SplitTunnelPolicyBuilder.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/TunnelPlusService.Diagnostics.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/TunnelPlusService.RefreshTests.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/TunnelPlusService.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/UrlTestCoordinator.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/UrlTestRetryPolicy.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/V2Ray/Config.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/V2Ray/ShareHandler.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/Xray/AutoSelectorPoolPlan.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/Services/Xray/ConfigGenerator.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/UserControls/UCServerList.Refresh.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/UserControls/UCServerList.ServerResultsRefresh.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/WebServices/CurlHelper.Login.cs`: runtime-or-ui-source-needs-review
+- `IRSpeedyVPN/WebServices/NewServiceController.cs`: runtime-or-ui-source-needs-review
+- `tests/CoreIdentityChecks/Program.cs`: runtime-or-ui-source-needs-review
+- `tests/CoreIdentityChecks/StartupFailureChecks.cs`: runtime-or-ui-source-needs-review
+- `tests/DisplayServerProbeChecks/Fixtures.cs`: runtime-or-ui-source-needs-review
+- `tests/DisplayServerProbeChecks/Program.cs`: runtime-or-ui-source-needs-review
+- `tests/ErrorReportingChecks/OperationChecks.cs`: runtime-or-ui-source-needs-review
+- `tests/ErrorReportingChecks/Program.cs`: runtime-or-ui-source-needs-review
+- `tests/HysteriaXrayChecks/AutoSelectorPoolChecks.cs`: runtime-or-ui-source-needs-review
+- `tests/HysteriaXrayChecks/Fixtures.cs`: runtime-or-ui-source-needs-review
+- `tests/HysteriaXrayChecks/HysteriaXrayChecks.csproj`: unresolved-build-declaration
+- `tests/LoginRecoveryChecks/Api/Program.cs`: runtime-or-ui-source-needs-review
+- `tests/LoginRecoveryChecks/Fixtures.cs`: runtime-or-ui-source-needs-review
+- `tests/LoginRecoveryChecks/RegressionChecks.cs`: runtime-or-ui-source-needs-review
+- `tests/NetworkRecoveryChecks/CoreExitFixtures.cs`: runtime-or-ui-source-needs-review
+- `tests/ParallelDnsChecks/Program.cs`: runtime-or-ui-source-needs-review
+- `tests/ResidentialChecks/CompileBoundary.cs`: runtime-or-ui-source-needs-review
+- `tests/ResidentialChecks/StateBoundary.cs`: runtime-or-ui-source-needs-review
+- `tests/ResidentialChecks/UiCompileBoundary.cs`: runtime-or-ui-source-needs-review
+- `tests/SplitTunnelChecks/Program.cs`: runtime-or-ui-source-needs-review
