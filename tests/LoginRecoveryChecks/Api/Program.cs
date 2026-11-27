@@ -58,5 +58,69 @@ class ApiProgram
             if (calls != 0) throw new Exception("canceled login reached transport");
             Console.WriteLine("PASS complete production Login2 cancellation stops before transport/DoH");
         }
+        CheckTransportDiagnostics();
+    }
+
+    private static void CheckTransportDiagnostics()
+    {
+        var transport = new TimeoutTransport();
+        var resolver = new LoginDnsCache((_, __, ___) => Array.Empty<string>());
+        var recovery = new LoginRecovery(transport, resolver, null, LoginDnsOrder.ResolverFirst);
+        RestHelper.Handler = (url, payload, context) =>
+            recovery.Send(url, "POST", "", "fixture-secret", 8000, context);
+        try
+        {
+            new NewServiceController().Login2("fixture-user", "fixture-password", refreshServerList: true);
+            throw new Exception("timeout unexpectedly returned a response");
+        }
+        catch (LoginTransportException ex)
+        {
+            if (ex.MayHaveBeenSent || transport.Calls != 4
+                || !Equals(ex.Data["login.flow"], "session-refresh")
+                || !Equals(ex.Data["login.api_attempts"], "4")
+                || !Equals(ex.Data["login.transport_attempts"], "4"))
+                throw new Exception("refresh diagnostics or safe failover count is wrong");
+            for (int i = 1; i <= 4; i++)
+                if (!Equals(ex.Data["login.attempt" + i], "api=" + i
+                    + ";dns=no-answer;route=system;phase=pre-connect-timeout;curl=28;http=none;send=not-sent"))
+                    throw new Exception("refresh attempt outcome missing");
+        }
+
+        transport.Calls = 0;
+        transport.CompleteTrailer = false;
+        try
+        {
+            new NewServiceController().Login2("fixture-user", "fixture-password");
+            throw new Exception("ambiguous timeout unexpectedly returned a response");
+        }
+        catch (LoginTransportException ex)
+        {
+            if (!ex.MayHaveBeenSent || transport.Calls != 1 || !Equals(ex.Data["login.flow"], "login")
+                || !Equals(ex.Data["login.attempt1"],
+                    "api=1;dns=no-answer;route=system;phase=transport-timeout;curl=28;http=none;send=unknown"))
+                throw new Exception("ambiguous timeout evidence or replay policy changed");
+        }
+        Console.WriteLine("PASS production login diagnostics distinguish four pre-send refresh failures from a replay-blocked timeout");
+    }
+
+    private sealed class TimeoutTransport : ILoginTransport
+    {
+        internal int Calls;
+        internal bool CompleteTrailer = true;
+
+        public LoginCurlResult Curl(string url, string method, string headers, string body, string resolve,
+            int timeoutMs, CancellationToken cancellation)
+        {
+            Calls++;
+            return new LoginCurlResult
+            {
+                Body = "", ExitCode = 28, MetricsKnown = true, CompleteTimeoutTrailerWithEmptyPeer = CompleteTrailer,
+                FirstByteSeconds = 3, TotalSeconds = 3, DownloadedBytes = 0, HttpVersion = "0"
+            };
+        }
+
+        public LoginCurlResult Managed(string url, string method, string headers, string body,
+            int timeoutMs, CancellationToken cancellation)
+            => throw new Exception("unexpected managed transport");
     }
 }

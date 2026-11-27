@@ -35,7 +35,7 @@ class Controller {
  public Response<LoginData> Auth=new Response<LoginData>{StatusCode=HttpStatusCode.OK,ResponseData=new LoginData()};
  public string AuthPassword; public int Changes,Logins; public Exception Failure;
  public Response<Result> ChangePassword(string u,string o,string n){Changes++;return Next;}
- public Response<LoginData> Login2(string u,string p,CancellationToken cancellation=default(CancellationToken)){cancellation.ThrowIfCancellationRequested();if(Failure!=null)throw Failure;Logins++;AuthPassword=p;return Auth;}
+ public Response<LoginData> Login2(string u,string p,CancellationToken cancellation=default(CancellationToken),bool refreshServerList=false){cancellation.ThrowIfCancellationRequested();if(Failure!=null)throw Failure;Logins++;AuthPassword=p;return Auth;}
 }
 class TimerStub {public static long Now;public long DueAt;public int Period;readonly TimerCallback callback;public TimerStub(){}public TimerStub(TimerCallback cb,object state,int due,int period){callback=cb;Change(due,period);}public void Change(int due,int period){DueAt=due<0?-1:Now+due;Period=period;}public void Fire(){callback?.Invoke(null);} }
 class LoginForm { public string User,Password; public bool Remember; public void SetUserPassword(string u,string p,bool r){User=u;Password=p;Remember=r;} public void HideRenewMessage(){}public void ResetInput(){}public void ShowRenewMessage(string url){}public void SetUserName(string value){User=value;} }

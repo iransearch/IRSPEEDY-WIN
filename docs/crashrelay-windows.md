@@ -14,3 +14,5 @@
 4. If the test does not appear, inspect the local `[CrashRelay]` line for a missing build DSN, an initialization or SDK load failure, or an already running instance. A requested verification shows that the app called the SDK. The bot issue confirms delivery.
 
 CrashRelay receives managed app crashes, handled exceptions from the existing diagnostics path, UI hangs, and unexpected Core exits during active connections. Fatal events are saved locally and can be sent on the next launch. Reports include stack frames and selected error codes. The integration omits exception messages, console logs, HTTP observations, account IDs and dump files.
+
+Handled login and authenticated server-list refresh failures include `login.*` fields in `context.extras`. They record the request type, elapsed time, counts and up to eight transport attempts in order. Each attempt records the API attempt number, resolver outcome, transport route, phase, curl exit, HTTP status and send evidence. `not-sent` requires transport evidence and `unknown` covers ambiguous cases. Only fixed labels and numeric values are exported.

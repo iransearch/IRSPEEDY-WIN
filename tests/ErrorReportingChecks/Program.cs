@@ -30,11 +30,38 @@ internal static class Program
         Require(clean.Tags["build.mvid"].Length == 32, "Build identity missing");
         Require(ErrorReporting.EndpointAlias("https://api1.greadia.app/private?token=SECRET") == "api1", "API alias failed");
         Require(ErrorReporting.EndpointAlias("https://private.invalid") == "other", "Unknown host exported");
+        CheckCrashRelayLoginFields();
         CoreRpcChecks.Run().GetAwaiter().GetResult();
 #if CORE_RPC_OPERATION_CHECKS
         OperationChecks.Run();
 #endif
         Console.WriteLine("PASS: 13 existing reporting checks plus " + CoreRpcChecks.Checks + " Core RPC reporting checks. Sentry was never initialized and no events were sent.");
+    }
+
+    private static void CheckCrashRelayLoginFields()
+    {
+        const string attempt = "api=1;dns=no-answer;route=system;phase=pre-connect-timeout;curl=28;http=none;send=not-sent";
+        var inner = new Exception("SENSITIVE user and https://private.invalid");
+        inner.Data["login.attempt3"] = attempt;
+        ErrorReporting.Annotate(inner, "login.flow", "session-refresh", "login.api_attempts", "4",
+            "login.transport_attempts", "4", "login.elapsed_ms", "32000", "login.last_dns", "no-answer",
+            "login.attempt1", attempt, "login.attempt2", attempt + ";url=https://private.invalid",
+            "login.attempt9", attempt, "api.request_id", "internal-request-id");
+        var outer = new Exception("wrapper", inner);
+        var details = ErrorReporting.CrashRelayDetails(outer);
+        Require(details["login.flow"] == "session-refresh" && details["login.api_attempts"] == "4"
+            && details["login.transport_attempts"] == "4" && details["login.elapsed_ms"] == "32000"
+            && details["login.last_dns"] == "no-answer" && details["login.attempt1"] == attempt,
+            "Safe login evidence is missing through the wrapper");
+        Require(!details.ContainsKey("login.attempt2") && !details.ContainsKey("login.attempt3")
+            && !details.ContainsKey("login.attempt9") && !details.ContainsKey("api.request_id")
+            && details.Values.All(value => !value.Contains("SENSITIVE") && !value.Contains("private.invalid")),
+            "CrashRelay exported an invalid attempt, raw exception, or internal request ID");
+        Require(ErrorReporting.CrashRelayDetails(new Exception()).Keys.All(key => !key.StartsWith("login.")),
+            "An unrelated error inherited login evidence");
+        Require(!ErrorReporting.PrepareException(outer, false).Tags.ContainsKey("login.attempt1"),
+            "CrashRelay login details expanded Sentry reporting");
+        Console.WriteLine("PASS CrashRelay exports only bounded, allowlisted login evidence from the current exception");
     }
 
     private static void Require(bool condition, string message)

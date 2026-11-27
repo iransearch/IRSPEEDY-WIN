@@ -68,7 +68,7 @@ class Response {public HttpStatusCode StatusCode=HttpStatusCode.OK;public LoginD
 class Controller {
  public Response Next=new Response();public int Calls;public ManualResetEventSlim Hold;
  // Deliver the blocked response even after cancellation to exercise the late-result guard.
- public Response Login2(string u,string p,CancellationToken cancellation){Interlocked.Increment(ref Calls);Hold?.Wait();return Next;}
+ public Response Login2(string u,string p,CancellationToken cancellation,bool refreshServerList=false){Interlocked.Increment(ref Calls);Hold?.Wait();return Next;}
 }
 class ListView {public void RefreshCountrySubscriptionRows(){Binds++;}public int Binds;public bool Preserve;public void ConfigureResidential(Account account){}public void RefreshServicesFromFactory(bool preserveManualRefresh=false){Binds++;Preserve=preserveManualRefresh;} }
 class Cache {public string TempPath="temp";public int Saves;public void SaveConfig(Account a,string p){Saves++;} }

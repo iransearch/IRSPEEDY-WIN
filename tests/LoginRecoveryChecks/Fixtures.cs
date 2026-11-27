@@ -13,7 +13,11 @@ namespace IRSpeedyVPN.Common
     static class LogHelper { internal static void WriteExLog(string message) { } }
     static class ErrorReporting
     {
-        internal static void Annotate(Exception ex, params string[] values) { }
+        internal static void Annotate(Exception ex, params string[] values)
+        {
+            for (int i = 0; i + 1 < values.Length; i += 2)
+                if (values[i].StartsWith("login.", StringComparison.Ordinal)) ex.Data[values[i]] = values[i + 1];
+        }
         internal static string EndpointAlias(string value) => "api";
         internal static string FailureCode(Exception ex) => ex.GetType().Name;
     }

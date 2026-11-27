@@ -26,6 +26,17 @@ namespace IRSpeedyVPN.Common
         private static string installationId = SessionId;
         private static string identityScope = "session";
         private static readonly object DiagnosticKey = new object();
+        private static readonly string[] CrashRelayLoginFields =
+        {
+            "login.flow", "login.api_attempts", "login.transport_attempts", "login.elapsed_ms", "login.last_dns",
+            "login.attempt1", "login.attempt2", "login.attempt3", "login.attempt4",
+            "login.attempt5", "login.attempt6", "login.attempt7", "login.attempt8"
+        };
+        private const string ResolverOutcome = "answer|no-answer|lookup-error|unknown";
+        private static readonly Regex LoginAttemptPattern = new Regex(
+            @"\Aapi=[0-9]{1,3};dns=(?:" + ResolverOutcome + @");route=(?:system|resolved|managed)"
+            + @";phase=(?:unknown|http-response|curl-unavailable|dns-failure|connect-failure|pre-connect-timeout|transport-timeout|transport-error)"
+            + @";curl=(?:[0-9]{1,3}|unknown);http=(?:[1-5][0-9]{2}|none|unknown);send=(?:sent|not-sent|unknown)\z");
         private static readonly string[] DiagnosticTags =
         {
             "http.stage", "http.transport", "http.route", "http.endpoint", "http.budget_ms", "http.elapsed_ms",
@@ -53,7 +64,8 @@ namespace IRSpeedyVPN.Common
                 var values = exception.Data[DiagnosticKey] as Dictionary<string, string>;
                 if (values == null) exception.Data[DiagnosticKey] = values = new Dictionary<string, string>();
                 for (int i = 0; i + 1 < fields.Length; i += 2)
-                    if (DiagnosticTags.Contains(fields[i]) && SafeField(fields[i], fields[i + 1]))
+                    if ((DiagnosticTags.Contains(fields[i]) || CrashRelayLoginFields.Contains(fields[i]))
+                        && SafeField(fields[i], fields[i + 1]))
                         values[fields[i]] = fields[i + 1];
             }
             catch { }
@@ -67,6 +79,18 @@ namespace IRSpeedyVPN.Common
         {
             if (value == null || value.Length > 200) return false;
             if (key == "exception.handled") return OneOf(value, "true|false");
+            if (key.StartsWith("login.", StringComparison.Ordinal))
+            {
+                switch (key)
+                {
+                    case "login.flow": return OneOf(value, "login|session-refresh");
+                    case "login.last_dns": return OneOf(value, ResolverOutcome);
+                    case "login.api_attempts":
+                    case "login.transport_attempts":
+                    case "login.elapsed_ms": return Regex.IsMatch(value, @"\A[0-9]{1,9}\z");
+                    default: return LoginAttemptPattern.IsMatch(value);
+                }
+            }
             if (!key.StartsWith("core.", StringComparison.Ordinal)) return SafeDiagnosticValue(value);
             switch (key)
             {
@@ -334,6 +358,26 @@ namespace IRSpeedyVPN.Common
                 + ":" + GroupingField(exception, "core.rpc_stage") + ":" + GroupingField(exception, "core.lifecycle_stage")
                 + ":" + GroupingField(exception, "core.outcome") + (fatal ? ":fatal" : ":handled");
 
+        internal static Dictionary<string, string> CrashRelayDetails(Exception exception)
+        {
+            var details = new Dictionary<string, string>
+            {
+                ["error.kind"] = Classify(exception.Message),
+                ["core.operation"] = GroupingField(exception, "core.operation"),
+                ["core.rpc_stage"] = GroupingField(exception, "core.rpc_stage"),
+                ["core.lifecycle_stage"] = GroupingField(exception, "core.lifecycle_stage"),
+                ["core.outcome"] = GroupingField(exception, "core.outcome")
+            };
+            if (GroupingField(exception, "login.flow") == "unknown") return details;
+            foreach (var key in CrashRelayLoginFields)
+            {
+                var value = GroupingField(exception, key);
+                if (value != "unknown" || key == "login.last_dns")
+                    details[key] = value;
+            }
+            return details;
+        }
+
         internal static void Capture(Exception exception, bool fatal)
         {
             if (exception == null || (!ready && !CrashRelayReporting.Ready)) return;
@@ -347,17 +391,7 @@ namespace IRSpeedyVPN.Common
                 if (!Admit(DeduplicationKey(exception, fatal), false)) return;
                 if (!fatal && CrashRelayReporting.Ready && !(exception is OperationCanceledException))
                 {
-                    try
-                    {
-                        CrashRelayReporting.Capture(exception, false, new Dictionary<string, string>
-                        {
-                            ["error.kind"] = Classify(exception.Message),
-                            ["core.operation"] = GroupingField(exception, "core.operation"),
-                            ["core.rpc_stage"] = GroupingField(exception, "core.rpc_stage"),
-                            ["core.lifecycle_stage"] = GroupingField(exception, "core.lifecycle_stage"),
-                            ["core.outcome"] = GroupingField(exception, "core.outcome")
-                        });
-                    }
+                    try { CrashRelayReporting.Capture(exception, false, CrashRelayDetails(exception)); }
                     catch { }
                 }
                 if (!ready) return;
