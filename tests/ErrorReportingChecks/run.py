@@ -19,7 +19,7 @@ with tempfile.TemporaryDirectory(prefix='sentry-core-checks-') as tmp:
  safe=source[sa:sb]
  (p/'ProductionMethods.cs').write_text('using System;using System.IO;using System.Diagnostics;using System.Threading;using IRSpeedyVPN.Common;using IRSpeedyVPN.Resource;using IRSpeedyVPN.Services.Libcore;internal sealed partial class RpcOperationProbe{'+source[a:b]+diag[c:d]+failure+safe+tail+'}')
  sources=[base/'Common/ErrorReporting.cs',base/'Common/CrashRelayReporting.cs',base/'Common/CoreRuntimeIdentity.cs',base/'Common/CoreStartFailureDiagnostic.cs',base/'Common/NetworkFailureDiagnostic.cs',Path(__file__).with_name('Program.cs'),Path(__file__).with_name('CoreRpcChecks.cs'),Path(__file__).with_name('OperationChecks.cs'),p/'ProductionMethods.cs']+libcore
- with ZipFile(root/'vendor/crashrelay/CrashRelay.Windows.1.0.1.nupkg') as package:
+ with ZipFile(root/'vendor/crashrelay/CrashRelay.Windows.1.0.2.nupkg') as package:
   relay=p/'CrashRelay.dll'
   relay.write_bytes(package.read('lib/net462/CrashRelay.dll'))
  for refs,name in [(refs48,'Checks.dll'),(refs8,'Checks8.dll')]:
@@ -44,7 +44,7 @@ namespace IRSpeedyVPN.Common {
     }
 }
 """)
- with ZipFile(root/'vendor/crashrelay/CrashRelay.Windows.1.0.1.nupkg') as package:
+ with ZipFile(root/'vendor/crashrelay/CrashRelay.Windows.1.0.2.nupkg') as package:
   relay.write_bytes(package.read('lib/net8.0/CrashRelay.dll'))
  runtime_refs=['-r:'+str(ref) for ref in Path(refs8).glob('*.dll')]
  configured='https://127.0.0.1:1|00000000-0000-0000-0000-000000000001|'+'a'*64
