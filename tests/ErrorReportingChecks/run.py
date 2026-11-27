@@ -3,7 +3,7 @@ Usage: run.py DOTNET CSC NET8_REFS NET48_REFS SENTRY_NET462_DLL
 Sentry is never initialized. No telemetry can be submitted by this runner.
 """
 from pathlib import Path
-import json,shutil,subprocess,sys,tempfile
+import json,os,shutil,subprocess,sys,tempfile
 from zipfile import ZipFile
 root=Path(__file__).resolve().parents[2];base=root/'IRSpeedyVPN'
 dotnet,csc,refs8,refs48,sentry=sys.argv[1:]
@@ -29,4 +29,50 @@ with tempfile.TemporaryDirectory(prefix='sentry-core-checks-') as tmp:
  shutil.copy2(sentry,p/'Sentry.dll')
  (p/'Checks.runtimeconfig.json').write_text(json.dumps({'runtimeOptions':{'tfm':'net8.0','framework':{'name':'Microsoft.NETCore.App','version':'8.0.0'}}}))
  subprocess.run([dotnet,str(p/'Checks.dll')],check=True,timeout=30)
+ probe_source=p/'RelayProbe.cs'
+ probe_source.write_text("""
+using IRSpeedyVPN.Common;
+static class RelayProbe {
+    static void Main() {
+        CrashRelayReporting.Initialize();
+        CrashRelayReporting.Verify();
+    }
+}
+namespace IRSpeedyVPN.Common {
+    static class LogHelper {
+        internal static void WriteLog(string text) => System.Console.WriteLine(text);
+    }
+}
+""")
+ with ZipFile(root/'vendor/crashrelay/CrashRelay.Windows.1.0.1.nupkg') as package:
+  relay.write_bytes(package.read('lib/net8.0/CrashRelay.dll'))
+ runtime_refs=['-r:'+str(ref) for ref in Path(refs8).glob('*.dll')]
+ configured='https://127.0.0.1:1|00000000-0000-0000-0000-000000000001|'+'a'*64
+ for case,dsn,expected in [
+  ('missing',None,'status=disabled reason=missing-build-dsn'),
+  ('invalid','not-a-dsn','status=unavailable reason=initialization-failed'),
+  ('configured',configured,'status=ready')
+ ]:
+  output=p/'RelayProbe.dll'
+  resource=[]
+  if dsn is not None:
+   dsn_file=p/'fixture-dsn'
+   dsn_file.write_text(dsn)
+   resource=['-resource:'+str(dsn_file)+',IRSpeedyVPN.CrashRelayDsn']
+  subprocess.run([dotnet,csc,'-nologo','-langversion:7.3','-target:exe','-out:'+str(output),
+                  '-r:'+str(relay),*runtime_refs,*resource,str(probe_source),str(base/'Common/CrashRelayReporting.cs')],check=True)
+  shutil.copy2(p/'Checks.runtimeconfig.json',p/'RelayProbe.runtimeconfig.json')
+  app_data=p/case
+  app_data.mkdir()
+  result=subprocess.run([dotnet,str(output)],env={**os.environ,'XDG_DATA_HOME':str(app_data)},
+                        capture_output=True,text=True,check=True,timeout=15)
+  assert expected in result.stdout, result.stdout
+  events=[json.loads(f.read_text()) for f in (app_data/'CrashRelay'/'RelayProbe').glob('*.event')]
+  if case=='configured':
+   assert 'verification requested' in result.stdout
+   assert any(e['app']['platform']=='windows' and e['message']=='IRSPEEDY Windows telemetry test' for e in events), events
+  else:
+   assert 'verification unavailable' in result.stdout and not events
+  assert configured not in result.stdout and 'not-a-dsn' not in result.stdout
+  print('PASS production CrashRelay initialization and verification: '+case)
 print('PASS production RPC tracing, Sentry filtering and retry/startup annotators compile against actual .NET Framework 4.8 and Sentry 6.11.0 references')

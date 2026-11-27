@@ -15,7 +15,11 @@ namespace IRSpeedyVPN.Common
             using (var stream = typeof(CrashRelayReporting).Assembly
                 .GetManifestResourceStream("IRSpeedyVPN.CrashRelayDsn"))
             {
-                if (stream == null) return;
+                if (stream == null)
+                {
+                    LogHelper.WriteLog("[CrashRelay] status=disabled reason=missing-build-dsn");
+                    return;
+                }
                 using (var reader = new StreamReader(stream))
                     CrashReporter.Init(reader.ReadToEnd().Trim(), new Options
                     {
@@ -26,7 +30,9 @@ namespace IRSpeedyVPN.Common
                     });
             }
             Ready = CrashReporter.IsInitialized;
-            if (!Ready) LogHelper.WriteLog("[CrashRelay] unavailable; check the build configuration");
+            LogHelper.WriteLog(Ready
+                ? "[CrashRelay] status=ready"
+                : "[CrashRelay] status=unavailable reason=initialization-failed");
         }
 
         internal static void BindUi(SynchronizationContext context)
@@ -49,8 +55,8 @@ namespace IRSpeedyVPN.Common
         {
             if (Ready) CrashReporter.CaptureMessage("IRSPEEDY Windows telemetry test", "error");
             LogHelper.WriteLog(Ready
-                ? "[CrashRelay] verification queued; confirm receipt in CrashRelay"
-                : "[CrashRelay] verification unavailable; build with a valid CrashRelay DSN");
+                ? "[CrashRelay] verification requested; confirm receipt in CrashRelay"
+                : "[CrashRelay] verification unavailable; see the startup status above");
         }
     }
 }

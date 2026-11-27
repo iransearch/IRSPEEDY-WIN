@@ -27,8 +27,11 @@ namespace IRSpeedyVPN
             bool createdNew;
             mutex = new Mutex(true, MutexName, out createdNew);
 
+            bool verifyCrashRelay = Environment.GetCommandLineArgs().Contains("--crashrelay-test");
             if (!createdNew)
             {
+                if (verifyCrashRelay)
+                    LogHelper.WriteLog("[CrashRelay] verification skipped reason=already-running");
                 SignalFirstInstance();
                 return;
             }
@@ -39,10 +42,12 @@ namespace IRSpeedyVPN
                 try
                 {
                     CrashRelayReporting.Initialize();
-                    if (Environment.GetCommandLineArgs().Contains("--crashrelay-test"))
-                        CrashRelayReporting.Verify();
+                    if (verifyCrashRelay) CrashRelayReporting.Verify();
                 }
-                catch { LogHelper.WriteLog("[CrashRelay] SDK could not be loaded"); }
+                catch (Exception ex)
+                {
+                    LogHelper.WriteLog("[CrashRelay] status=unavailable reason=sdk-load-failed type=" + ex.GetType().Name);
+                }
 
                 VpnTimeZone.Recover();
                 // Also guard assembly/JIT loading failures before Initialize can catch them.
