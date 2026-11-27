@@ -188,6 +188,11 @@
   <!-- Embed opaque helper payloads before compilation and the existing single-file packer. -->
   <Import Project="..\tools\HotspotPayload.targets" />
 
+  <Target Name="WarnIfCrashRelayIsUnconfigured" BeforeTargets="PrepareForBuild"
+          Condition="'$(Configuration)' == 'Release' And !Exists('$(CrashRelayDsnFile)')">
+    <Warning Code="IRSC001" Text="CrashRelay is disabled for this build. Provide .crashrelay-dsn or set CrashRelayDsnFile to an existing DSN file." />
+  </Target>
+
   <Target Name="RunDotfuscator" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' And Exists('$(DotfuscatorExe)')">
     <MakeDir Directories="$(TargetDir)Obfuscated" />
     <Delete Files="$(TargetDir)Obfuscated\$(TargetFileName)" ContinueOnError="true" />
